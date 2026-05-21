@@ -150,7 +150,7 @@ class DashboardViewModel(
                     msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
                         "Invalid API Key. Please update your API key in Settings."
                     }
-                    else -> "Parsing failed: ${e.localizedMessage ?: "Unknown error"}"
+                    else -> "Unable to track meal: ${e.localizedMessage ?: "Unknown error"}"
                 }
                 _parsingState.value = ParsingState.Error(friendlyMsg)
             }

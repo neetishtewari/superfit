@@ -502,7 +502,7 @@ fun DashboardScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Food Logging & Parser",
+                            text = "Track Your Meals",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = Color.White
@@ -545,7 +545,7 @@ fun DashboardScreen(
                                         strokeWidth = 2.dp
                                     )
                                 } else {
-                                    Text("Parse", color = Color.Black, fontWeight = FontWeight.Bold)
+                                    Text("Track", color = Color.Black, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

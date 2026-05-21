@@ -8,7 +8,7 @@ import org.json.JSONObject
 class NutritionParser(private val apiKey: String) {
 
     private val model = GenerativeModel(
-        modelName = "gemini-2.0-flash",
+        modelName = "gemini-3.5-flash",
         apiKey = apiKey,
         generationConfig = generationConfig {
             responseMimeType = "application/json"
