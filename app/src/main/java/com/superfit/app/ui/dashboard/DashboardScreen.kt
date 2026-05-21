@@ -1,5 +1,6 @@
 package com.superfit.app.ui.dashboard
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -25,10 +26,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
+import android.text.format.DateUtils
 
 // Design tokens matching premium aesthetic
 private val DarkBg = Color(0xFF070709)
@@ -47,10 +51,21 @@ fun DashboardScreen(
     val dashboardState by viewModel.dashboardState.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
     val parsingState by viewModel.parsingState.collectAsState()
+    val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
+    val grantedPermissions by viewModel.grantedPermissions.collectAsState()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val scrollState = rememberScrollState()
 
     var showApiKeySettings by remember { mutableStateOf(false) }
     var foodInputText by remember { mutableStateOf("") }
+
+    // Health Connect Permission Launcher
+    val requestPermissionsLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        viewModel.checkPermissions()
+        viewModel.syncTelemetry()
+    }
 
     // Auto sync on entry
     LaunchedEffect(Unit) {
@@ -105,17 +120,45 @@ fun DashboardScreen(
                             )
                         }
 
-                        IconButton(
-                            onClick = { showApiKeySettings = !showApiKeySettings },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = CardBg,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "API Settings"
-                            )
+                        Box {
+                            IconButton(
+                                onClick = { showApiKeySettings = !showApiKeySettings },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = CardBg,
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "API Settings"
+                                )
+                            }
+
+                            // Subtle Health Connect Status Badge Dot
+                            val badgeColor = remember(grantedPermissions, hasHealthConnectPermissions) {
+                                when {
+                                    grantedPermissions.isEmpty() -> Color.Gray
+                                    hasHealthConnectPermissions -> NeonGreen
+                                    else -> ElectricCyan
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 1.dp, y = (-1).dp)
+                                    .size(10.dp)
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(DarkBg)
+                                    .padding(1.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(badgeColor)
+                                )
+                            }
                         }
                     }
 
@@ -150,10 +193,115 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
-                                text = "Providing your Gemini API Key allows natural language meal logging to run locally using on-device instructions.",
+                                text = "Providing your Gemini API Key allows natural language meal logging to run locally. If the default key has exceeded its quota, please enter your own API Key from Google AI Studio.",
                                 fontSize = 11.sp,
                                 color = Color.Gray
                             )
+
+                            HorizontalDivider(
+                                color = Color.DarkGray.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+
+                            Text(
+                                text = "Google Health Connect Status",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+
+                            val connectionStatus = remember(grantedPermissions, hasHealthConnectPermissions) {
+                                when {
+                                    grantedPermissions.isEmpty() -> "Disconnected"
+                                    hasHealthConnectPermissions -> "Fully Connected"
+                                    else -> "Partially Connected (${grantedPermissions.size}/${viewModel.healthConnectManager.permissions.size})"
+                                }
+                            }
+                            val statusColor = remember(grantedPermissions, hasHealthConnectPermissions) {
+                                when {
+                                    grantedPermissions.isEmpty() -> Color.Gray
+                                    hasHealthConnectPermissions -> NeonGreen
+                                    else -> ElectricCyan
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(statusColor)
+                                    )
+                                    Text(
+                                        text = connectionStatus,
+                                        color = statusColor,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                if (!hasHealthConnectPermissions) {
+                                    Button(
+                                        onClick = {
+                                            requestPermissionsLauncher.launch(viewModel.healthConnectManager.permissions)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = ElectricCyan.copy(alpha = 0.15f),
+                                            contentColor = ElectricCyan
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = if (grantedPermissions.isEmpty()) "Connect" else "Grant Rest",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Button(
+                                onClick = { viewModel.syncTelemetry() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = NeonGreen.copy(alpha = 0.15f),
+                                    contentColor = NeonGreen
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                            ) {
+                                Text(
+                                    text = "Sync Telemetry Now",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            if (lastSyncTime > 0L) {
+                                val relativeTime = DateUtils.getRelativeTimeSpanString(
+                                    lastSyncTime,
+                                    System.currentTimeMillis(),
+                                    DateUtils.MINUTE_IN_MILLIS
+                                ).toString()
+                                Text(
+                                    text = "Last synced: $relativeTime",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
+                                )
+                            }
                         }
                     }
 
@@ -405,22 +553,44 @@ fun DashboardScreen(
                         // Display parsing state messages
                         AnimatedVisibility(visible = parsingState is ParsingState.Error) {
                             val errMsg = (parsingState as? ParsingState.Error)?.message ?: "Error"
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(horizontal = 4.dp)
+                            Column(
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = EnergeticCoral
-                                )
-                                Text(
-                                    text = errMsg,
-                                    color = EnergeticCoral,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = EnergeticCoral
+                                    )
+                                    Text(
+                                        text = errMsg,
+                                        color = EnergeticCoral,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (errMsg.contains("Settings", ignoreCase = true)) {
+                                    Button(
+                                        onClick = { showApiKeySettings = true },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = EnergeticCoral.copy(alpha = 0.15f),
+                                            contentColor = EnergeticCoral
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = "Open API Settings",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
                         }
 

@@ -64,39 +64,43 @@ class HealthConnectManager(private val context: Context) {
     suspend fun readSleepTelemetry(localDate: LocalDate): SleepTelemetryEntity? {
         val client = healthConnectClient ?: return null
 
-        val zoneId = ZoneId.systemDefault()
-        // Query sleep sessions spanning last night
-        val startTime = localDate.minusDays(1).atStartOfDay(zoneId).toInstant()
-        val endTime = localDate.plusDays(1).atStartOfDay(zoneId).toInstant()
+        try {
+            val zoneId = ZoneId.systemDefault()
+            // Query sleep sessions spanning last night
+            val startTime = localDate.minusDays(1).atStartOfDay(zoneId).toInstant()
+            val endTime = localDate.plusDays(1).atStartOfDay(zoneId).toInstant()
 
-        val response = client.readRecords(
-            ReadRecordsRequest(
-                recordType = SleepSessionRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+            val response = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = SleepSessionRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+                )
             )
-        )
 
-        // Find the sleep session that ends on the given date (morning of localDate)
-        val relevantSession = response.records.firstOrNull { record ->
-            val recordEndDate = LocalDate.ofInstant(record.endTime, zoneId)
-            recordEndDate == localDate
-        } ?: response.records.lastOrNull()
+            // Find the sleep session that ends on the given date (morning of localDate)
+            val relevantSession = response.records.firstOrNull { record ->
+                val recordEndDate = LocalDate.ofInstant(record.endTime, zoneId)
+                recordEndDate == localDate
+            } ?: response.records.lastOrNull()
 
-        if (relevantSession != null) {
-            val durationSeconds = ChronoUnit.SECONDS.between(relevantSession.startTime, relevantSession.endTime)
-            // Standard ratio estimate for deep sleep (20%)
-            val deepSleepSeconds = (durationSeconds * 0.2).toLong()
+            if (relevantSession != null) {
+                val durationSeconds = ChronoUnit.SECONDS.between(relevantSession.startTime, relevantSession.endTime)
+                // Standard ratio estimate for deep sleep (20%)
+                val deepSleepSeconds = (durationSeconds * 0.2).toLong()
 
-            // 8 hours (28800s) = 100% sleep score
-            val sleepRatio = durationSeconds.toDouble() / 28800.0
-            val sleepReadiness = (sleepRatio * 100).toInt().coerceIn(0, 100)
+                // 8 hours (28800s) = 100% sleep score
+                val sleepRatio = durationSeconds.toDouble() / 28800.0
+                val sleepReadiness = (sleepRatio * 100).toInt().coerceIn(0, 100)
 
-            return SleepTelemetryEntity(
-                date = localDate.toString(),
-                sleepDurationSeconds = durationSeconds,
-                deepSleepDurationSeconds = deepSleepSeconds,
-                readinessScore = sleepReadiness
-            )
+                return SleepTelemetryEntity(
+                    date = localDate.toString(),
+                    sleepDurationSeconds = durationSeconds,
+                    deepSleepDurationSeconds = deepSleepSeconds,
+                    readinessScore = sleepReadiness
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         return null
     }

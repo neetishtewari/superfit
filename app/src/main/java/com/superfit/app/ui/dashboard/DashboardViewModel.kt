@@ -24,6 +24,8 @@ class DashboardViewModel(
     context: Context
 ) : ViewModel() {
 
+    val healthConnectManager = repository.healthConnectManager
+
     private val sharedPrefs = context.getSharedPreferences("superfit_prefs", Context.MODE_PRIVATE)
 
     private val _apiKey = MutableStateFlow(sharedPrefs.getString("gemini_api_key", "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM") ?: "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM")
@@ -31,6 +33,29 @@ class DashboardViewModel(
 
     private val _parsingState = MutableStateFlow<ParsingState>(ParsingState.Idle)
     val parsingState: StateFlow<ParsingState> = _parsingState
+
+    private val _hasHealthConnectPermissions = MutableStateFlow(false)
+    val hasHealthConnectPermissions: StateFlow<Boolean> = _hasHealthConnectPermissions
+
+    private val _grantedPermissions = MutableStateFlow<Set<String>>(emptySet())
+    val grantedPermissions: StateFlow<Set<String>> = _grantedPermissions
+
+    private val _lastSyncTime = MutableStateFlow(sharedPrefs.getLong("last_telemetry_sync", 0L))
+    val lastSyncTime: StateFlow<Long> = _lastSyncTime
+
+    init {
+        checkPermissions()
+    }
+
+    fun checkPermissions() {
+        viewModelScope.launch {
+            val client = repository.healthConnectManager.healthConnectClient
+            val granted = client?.permissionController?.getGrantedPermissions() ?: emptySet()
+            val hasAll = repository.healthConnectManager.hasAllPermissions()
+            _hasHealthConnectPermissions.value = hasAll
+            _grantedPermissions.value = granted
+        }
+    }
 
     fun updateApiKey(key: String) {
         _apiKey.value = key
@@ -86,13 +111,17 @@ class DashboardViewModel(
     fun syncTelemetry() {
         viewModelScope.launch {
             repository.syncHealthConnectTelemetry(LocalDate.now())
+            val now = System.currentTimeMillis()
+            sharedPrefs.edit().putLong("last_telemetry_sync", now).apply()
+            _lastSyncTime.value = now
+            checkPermissions()
         }
     }
 
     fun parseAndAddMeal(input: String) {
         val key = _apiKey.value
         if (key.isBlank()) {
-            _parsingState.value = ParsingState.Error("Please enter your Gemini API Key first.")
+            _parsingState.value = ParsingState.Error("Please enter your Gemini API Key in Settings first.")
             return
         }
 
@@ -113,7 +142,17 @@ class DashboardViewModel(
                 repository.addNutritionEntry(entry)
                 _parsingState.value = ParsingState.Success
             } catch (e: Exception) {
-                _parsingState.value = ParsingState.Error("Parsing failed: ${e.localizedMessage ?: "Unknown error"}")
+                val msg = e.localizedMessage ?: ""
+                val friendlyMsg = when {
+                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
+                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
+                    }
+                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
+                        "Invalid API Key. Please update your API key in Settings."
+                    }
+                    else -> "Parsing failed: ${e.localizedMessage ?: "Unknown error"}"
+                }
+                _parsingState.value = ParsingState.Error(friendlyMsg)
             }
         }
     }

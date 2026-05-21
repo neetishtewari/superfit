@@ -44,14 +44,27 @@ class DataRepository(
     }
 
     suspend fun syncHealthConnectTelemetry(date: LocalDate) {
-        if (healthConnectManager.isAvailable() && healthConnectManager.hasAllPermissions()) {
+        if (healthConnectManager.isAvailable()) {
+            val client = healthConnectManager.healthConnectClient ?: return
             try {
-                val activity = healthConnectManager.readDailyTelemetry(date)
-                database.telemetryDao().insertActivity(activity)
+                val granted = client.permissionController.getGrantedPermissions()
+                if (granted.isEmpty()) return
 
-                val sleep = healthConnectManager.readSleepTelemetry(date)
-                if (sleep != null) {
-                    database.telemetryDao().insertSleep(sleep)
+                // Separate sync steps to support partial permissions gracefully
+                try {
+                    val activity = healthConnectManager.readDailyTelemetry(date)
+                    database.telemetryDao().insertActivity(activity)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                try {
+                    val sleep = healthConnectManager.readSleepTelemetry(date)
+                    if (sleep != null) {
+                        database.telemetryDao().insertSleep(sleep)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
