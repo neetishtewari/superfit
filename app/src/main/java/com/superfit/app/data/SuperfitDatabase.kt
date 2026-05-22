@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         SleepTelemetryEntity::class,
         NutritionEntryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SuperfitDatabase : RoomDatabase() {
