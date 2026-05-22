@@ -26,10 +26,10 @@ object PhysiologyEngine {
 
     /**
      * Calculates Total Daily Energy Expenditure (TDEE) in real-time:
-     * BMR + Active Calories Burned (from Health Connect)
+     * BMR * Activity Multiplier + Active Calories Burned (from Health Connect)
      */
-    fun calculateTdee(bmr: Double, activeCalories: Double): Double {
-        return bmr + activeCalories
+    fun calculateTdee(bmr: Double, activityMultiplier: Double, activeCalories: Double): Double {
+        return bmr * activityMultiplier + activeCalories
     }
 
     /**
@@ -57,22 +57,24 @@ object PhysiologyEngine {
     }
 
     /**
-     * Computes macronutrient targets based on TDEE, bodyweight, and sleep readiness.
+     * Computes macronutrient targets based on TDEE, bodyweight, sleep readiness, and active calories.
      * Higher sleep readiness shifts recommendations towards support for higher training volume (more carbs & protein).
      * Lower sleep readiness shifts macronutrients to conserve energy and promote recovery.
+     * Includes a recovery protein bonus of 0.05g per active calorie.
      */
     fun calculateMacroTargets(
         profile: UserProfileEntity,
         tdee: Double,
-        readinessScore: Int
+        readinessScore: Int,
+        activeCalories: Double
     ): MacroTargets {
         // Apply the calorie offset to the computed TDEE
         val adjustedTargetCalories = (tdee + profile.calorieOffset).coerceAtLeast(1200.0)
 
         // Protein: 1.6g/kg to 2.2g/kg depending on readiness
         val readinessFactor = readinessScore / 100.0
-        val proteinPerKg = 1.6 + (0.6 * readinessFactor)
-        val proteinG = (profile.weightKg * proteinPerKg).coerceAtLeast(40.0)
+        val baseProtein = profile.weightKg * (1.6 + 0.6 * readinessFactor)
+        val proteinG = (baseProtein + (activeCalories * 0.05)).coerceAtLeast(40.0)
 
         // Fat: hormonal baseline, 25% of adjusted target calories
         val fatCalories = adjustedTargetCalories * 0.25

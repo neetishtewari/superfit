@@ -92,11 +92,11 @@ class DashboardViewModel(
             // Live physiological calculations
             val bmr = PhysiologyEngine.calculateBmr(profile)
             val activeCal = activity?.activeCalories ?: 0.0
-            val tdee = PhysiologyEngine.calculateTdee(bmr, activeCal)
+            val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, activeCal)
             val readiness = sleep?.readinessScore ?: 50 // Default 50% if no sleep session found
 
             // Compute dynamic macro targets based on live TDEE and sleep readiness
-            val macroTargets = PhysiologyEngine.calculateMacroTargets(profile, tdee, readiness)
+            val macroTargets = PhysiologyEngine.calculateMacroTargets(profile, tdee, readiness, activeCal)
 
             // Aggregate nutrition eaten today
             val caloriesEaten = nutrition.sumOf { it.calories }

@@ -6,7 +6,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeightRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -28,7 +28,7 @@ class HealthConnectManager(private val context: Context) {
 
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
-        HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(HeightRecord::class)
@@ -123,11 +123,11 @@ class HealthConnectManager(private val context: Context) {
         return try {
             val response = client.aggregate(
                 AggregateRequest(
-                    metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
+                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
                 )
             )
-            val energy = response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
+            val energy = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
             // Access inKilocalories (the standard calorie scale used for foods and workouts)
             energy?.inKilocalories ?: 0.0
         } catch (e: Exception) {

@@ -529,6 +529,73 @@ fun DashboardScreen(
                         }
                     }
 
+                    // Activity & Performance Card
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(CardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Activity & Performance",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = Color.White
+                            )
+
+                            // Glassmorphic estimated distance pill
+                            val distanceKm = state.activity.steps * 0.00075
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ElectricCyan.copy(alpha = 0.1f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = String.format("%.2f km (Est)", distanceKm),
+                                    color = ElectricCyan,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
+                        // Steps Progress
+                        ActivityProgressBar(
+                            label = "Steps",
+                            current = state.activity.steps.toDouble(),
+                            target = 10000.0,
+                            color = ElectricCyan,
+                            unit = "steps"
+                        )
+
+                        // Active Energy Burn Progress
+                        ActivityProgressBar(
+                            label = "Active Energy Burned",
+                            current = state.activity.activeCalories,
+                            target = 500.0,
+                            color = EnergeticCoral,
+                            unit = "kcal"
+                        )
+                    }
+
                     // AI Daily Coach Insights Card
                     Column(
                         modifier = Modifier
@@ -1309,6 +1376,65 @@ fun MealItemRow(
                 contentDescription = "Delete entry",
                 tint = EnergeticCoral.copy(alpha = 0.7f)
             )
+        }
+    }
+}
+
+@Composable
+fun ActivityProgressBar(
+    label: String,
+    current: Double,
+    target: Double,
+    color: Color,
+    unit: String
+) {
+    val progress = if (target > 0.0) (current / target).toFloat().coerceIn(0f, 1f) else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "ActivityProgress"
+    )
+    
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                color = Color.LightGray,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "${current.toInt()} / ${target.toInt()} $unit",
+                fontSize = 12.sp,
+                color = color,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.White.copy(alpha = 0.05f))
+        ) {
+            if (animatedProgress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(animatedProgress)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(color, color.copy(alpha = 0.7f))
+                            )
+                        )
+                )
+            }
         }
     }
 }

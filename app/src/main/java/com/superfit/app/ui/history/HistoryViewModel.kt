@@ -106,7 +106,7 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
 
                 val activity = activityByDate[tempDate]
                 val activeCal = activity?.activeCalories ?: 0.0
-                val tdee = PhysiologyEngine.calculateTdee(bmr, activeCal)
+                val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, activeCal)
 
                 val status = when {
                     mealsCount < 2 -> DayStatus.Insufficient
@@ -141,7 +141,7 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
                     val caloriesEaten = meals.sumOf { it.calories }
                     val activity = activityByDate[checkDate]
                     val activeCal = activity?.activeCalories ?: 0.0
-                    val tdee = PhysiologyEngine.calculateTdee(bmr, activeCal)
+                    val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, activeCal)
                     if (caloriesEaten < tdee) {
                         rollingDeficitCount++
                     }
@@ -161,7 +161,7 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
             val yesterdayMeals = nutritionByDate[yesterday] ?: emptyList()
             val yesterdayActivity = activityByDate[yesterday]
             val yesterdayActiveCal = yesterdayActivity?.activeCalories ?: 0.0
-            val yesterdayTdee = PhysiologyEngine.calculateTdee(bmr, yesterdayActiveCal)
+            val yesterdayTdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, yesterdayActiveCal)
             val yesterdayEaten = yesterdayMeals.sumOf { it.calories }
 
             yesterdaySummary = YesterdaySummaryState(
