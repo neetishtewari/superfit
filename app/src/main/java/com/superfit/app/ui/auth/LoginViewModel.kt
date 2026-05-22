@@ -72,7 +72,12 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                     } else {
                         isLoading = false
-                        errorMessage = task.exception?.localizedMessage ?: "Login failed. Please check credentials."
+                        val rawError = task.exception?.localizedMessage ?: "Login failed. Please check credentials."
+                        errorMessage = if (rawError.contains("API key not valid", ignoreCase = true) || rawError.contains("API_KEY_INVALID", ignoreCase = true)) {
+                            "Invalid API Key. Please replace the mock google-services.json in the app/ directory with your real Firebase config."
+                        } else {
+                            rawError
+                        }
                     }
                 }
         } else {
@@ -91,9 +96,45 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                     } else {
                         isLoading = false
-                        errorMessage = task.exception?.localizedMessage ?: "Registration failed."
+                        val rawError = task.exception?.localizedMessage ?: "Registration failed."
+                        errorMessage = if (rawError.contains("API key not valid", ignoreCase = true) || rawError.contains("API_KEY_INVALID", ignoreCase = true)) {
+                            "Invalid API Key. Please replace the mock google-services.json in the app/ directory with your real Firebase config."
+                        } else {
+                            rawError
+                        }
                     }
                 }
         }
+    }
+
+    fun setCustomErrorMessage(message: String?) {
+        errorMessage = message
+    }
+
+    fun signInWithCredential(credential: com.google.firebase.auth.AuthCredential, onSuccess: () -> Unit) {
+        errorMessage = null
+        isLoading = true
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    viewModelScope.launch {
+                        try {
+                            repository.firebaseSyncManager.syncAllDown()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        isLoading = false
+                        onSuccess()
+                    }
+                } else {
+                    isLoading = false
+                    val rawError = task.exception?.localizedMessage ?: "Google sign in failed."
+                    errorMessage = if (rawError.contains("API key not valid", ignoreCase = true) || rawError.contains("API_KEY_INVALID", ignoreCase = true)) {
+                        "Invalid API Key. Please replace the mock google-services.json in the app/ directory with your real Firebase config."
+                    } else {
+                        rawError
+                    }
+                }
+            }
     }
 }

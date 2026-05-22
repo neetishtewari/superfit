@@ -19,6 +19,7 @@ healthConnect = "1.1.0-alpha11"
 generativeai = "0.9.0"
 firebaseBom = "33.1.0"
 googleServices = "4.4.2"
+playServicesAuth = "21.2.0"
 
 
 [libraries]
@@ -64,6 +65,8 @@ google-generativeai = { module = "com.google.ai.client.generativeai:generativeai
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

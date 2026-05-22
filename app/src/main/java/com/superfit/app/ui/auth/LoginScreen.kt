@@ -34,6 +34,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.theme.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.GoogleAuthProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +57,40 @@ fun LoginScreen(
 
     val primaryColor = NeonMint
     val secondaryColor = ElectricCyan
+
+    val context = LocalContext.current
+    val webClientIdResId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+    val webClientId = if (webClientIdResId != 0) context.getString(webClientIdResId) else null
+
+    val googleSignInClient = remember(webClientId) {
+        if (webClientId != null) {
+            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(webClientId)
+                .requestEmail()
+                .build()
+            GoogleSignIn.getClient(context, gso)
+        } else {
+            null
+        }
+    }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account.idToken
+            if (idToken != null) {
+                val credential = GoogleAuthProvider.getCredential(idToken, null)
+                viewModel.signInWithCredential(credential, onLoginSuccess)
+            } else {
+                viewModel.setCustomErrorMessage("Google Sign-In failed: ID token is null.")
+            }
+        } catch (e: ApiException) {
+            viewModel.setCustomErrorMessage("Google Sign-In failed: ${e.localizedMessage ?: "Unknown error"}")
+        }
+    }
 
     Box(
         modifier = modifier
@@ -294,6 +337,79 @@ fun LoginScreen(
                                 color = Color.White
                             )
                         }
+                    }
+                }
+
+                // Divider and Google Sign-In Button
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(
+                        modifier = Modifier.weight(1f),
+                        color = Color.White.copy(alpha = 0.1f)
+                    )
+                    Text(
+                        text = "OR",
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.weight(1f),
+                        color = Color.White.copy(alpha = 0.1f)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        focusManager.clearFocus()
+                        if (webClientId != null && googleSignInClient != null) {
+                            val signInIntent = googleSignInClient.signInIntent
+                            googleSignInLauncher.launch(signInIntent)
+                        } else {
+                            viewModel.setCustomErrorMessage(
+                                "Google Services not configured. Please replace mock google-services.json in the app/ directory with your real Firebase config."
+                            )
+                        }
+                    },
+                    enabled = !viewModel.isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.03f),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.12f),
+                                Color.White.copy(alpha = 0.04f)
+                            )
+                        )
+                    )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = com.superfit.app.R.drawable.ic_google_logo),
+                            contentDescription = "Google Logo",
+                            modifier = Modifier.size(20.dp),
+                            tint = Color.Unspecified
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = if (viewModel.isLoginMode) "Sign In with Google" else "Sign Up with Google",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
                     }
                 }
 
