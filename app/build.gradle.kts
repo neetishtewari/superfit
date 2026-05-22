@@ -4,7 +4,9 @@ plugins {
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
   id("kotlin-kapt")
+  alias(libs.plugins.google.services)
 }
+
 
 android {
     namespace = "com.superfit.app"
@@ -99,4 +101,10 @@ dependencies {
 
   // Google AI (Gemini) SDK
   implementation(libs.google.generativeai)
+
+  // Firebase
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.firestore)
 }
+

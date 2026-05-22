@@ -26,13 +26,16 @@ import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
 
-// Premium Color System
-private val DarkBg = Color(0xFF0A0A0C)
-private val CardBg = Color(0xFF131317)
-private val NeonGreen = Color(0xFF10B981)
-private val ElectricCyan = Color(0xFF06B6D4)
-private val GradientStart = Color(0xFF10B981)
-private val GradientEnd = Color(0xFF3B82F6)
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import com.superfit.app.theme.*
+
+// Premium Color System mapped to the unified brand palette
+private val NeonGreen = NeonMint
+private val GradientStart = NeonMint
+private val GradientEnd = HyperViolet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,13 +61,39 @@ fun OnboardingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBg)
-            .padding(16.dp)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(DarkBgStart, DarkBgEnd)
+                )
+            )
     ) {
+        // Ambient Aurora background glow
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(HyperViolet.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(0f, 0f),
+                    radius = size.minDimension * 0.8f
+                ),
+                radius = size.minDimension * 0.8f,
+                center = Offset(0f, 0f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(com.superfit.app.theme.ElectricCyan.copy(alpha = 0.08f), Color.Transparent),
+                    center = Offset(size.width, size.height * 0.5f),
+                    radius = size.minDimension * 0.7f
+                ),
+                radius = size.minDimension * 0.7f,
+                center = Offset(size.width, size.height * 0.5f)
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState)
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -92,12 +121,17 @@ fun OnboardingScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(CardBg)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(CardBgTranslucent)
                     .border(
                         width = 1.dp,
-                        brush = Brush.horizontalGradient(listOf(ElectricCyan.copy(alpha = 0.3f), Color.Transparent)),
-                        shape = RoundedCornerShape(16.dp)
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.02f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp)
                     )
                     .padding(16.dp)
             ) {
@@ -218,8 +252,18 @@ fun OnboardingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(CardBg)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(CardBgTranslucent)
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.02f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -238,7 +282,7 @@ fun OnboardingScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = Color.DarkGray,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
                         focusedLabelColor = NeonGreen,
                         unfocusedLabelColor = Color.Gray,
                         focusedTextColor = Color.White,
@@ -255,7 +299,7 @@ fun OnboardingScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = Color.DarkGray,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
                         focusedLabelColor = NeonGreen,
                         unfocusedLabelColor = Color.Gray,
                         focusedTextColor = Color.White,
@@ -272,7 +316,7 @@ fun OnboardingScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = Color.DarkGray,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
                         focusedLabelColor = NeonGreen,
                         unfocusedLabelColor = Color.Gray,
                         focusedTextColor = Color.White,
@@ -289,27 +333,46 @@ fun OnboardingScreen(
                         color = Color.Gray,
                         fontWeight = FontWeight.SemiBold
                     )
+
+                    val maleBgColor by animateColorAsState(
+                        targetValue = if (uiState.isMale) NeonGreen else Color.Transparent,
+                        label = "MaleBgColor"
+                    )
+                    val maleTextColor by animateColorAsState(
+                        targetValue = if (uiState.isMale) Color.Black else Color.White,
+                        label = "MaleTextColor"
+                    )
+                    val femaleBgColor by animateColorAsState(
+                        targetValue = if (!uiState.isMale) NeonGreen else Color.Transparent,
+                        label = "FemaleBgColor"
+                    )
+                    val femaleTextColor by animateColorAsState(
+                        targetValue = if (!uiState.isMale) Color.Black else Color.White,
+                        label = "FemaleTextColor"
+                    )
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black),
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.03f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (uiState.isMale) NeonGreen else Color.Transparent)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(maleBgColor)
                                 .align(Alignment.CenterVertically)
                                 .BoxClickable { viewModel.onSexChanged(true) },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "Male",
-                                color = if (uiState.isMale) Color.Black else Color.White,
+                                color = maleTextColor,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -318,15 +381,15 @@ fun OnboardingScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (!uiState.isMale) NeonGreen else Color.Transparent)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(femaleBgColor)
                                 .align(Alignment.CenterVertically)
                                 .BoxClickable { viewModel.onSexChanged(false) },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "Female",
-                                color = if (!uiState.isMale) Color.Black else Color.White,
+                                color = femaleTextColor,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -432,7 +495,7 @@ fun OnboardingScreen(
 @Composable
 private fun Modifier.BoxClickable(onClick: () -> Unit): Modifier {
     return this.background(Color.Transparent).then(
-        Modifier.clip(RoundedCornerShape(8.dp))
+        Modifier.clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     )
 }

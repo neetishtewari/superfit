@@ -30,6 +30,12 @@ interface TelemetryDao {
     @Query("SELECT * FROM activity_telemetry WHERE date = :date")
     fun getActivityFlow(date: String): Flow<ActivityTelemetryEntity?>
 
+    @Query("SELECT * FROM activity_telemetry")
+    suspend fun getAllActivity(): List<ActivityTelemetryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertActivities(activities: List<ActivityTelemetryEntity>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSleep(sleep: SleepTelemetryEntity)
 
@@ -41,6 +47,12 @@ interface TelemetryDao {
 
     @Query("SELECT * FROM sleep_telemetry ORDER BY date DESC LIMIT 7")
     fun getRecentSleepFlow(): Flow<List<SleepTelemetryEntity>>
+
+    @Query("SELECT * FROM sleep_telemetry")
+    suspend fun getAllSleep(): List<SleepTelemetryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSleeps(sleeps: List<SleepTelemetryEntity>)
 }
 
 @Dao
@@ -54,6 +66,9 @@ interface NutritionDao {
     @Query("SELECT * FROM nutrition_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
     fun getEntriesForDayFlow(startOfDay: Long, endOfDay: Long): Flow<List<NutritionEntryEntity>>
 
+    @Query("SELECT * FROM nutrition_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
+    suspend fun getEntriesForDay(startOfDay: Long, endOfDay: Long): List<NutritionEntryEntity>
+
     @Query("SELECT SUM(calories) FROM nutrition_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay")
     fun getCaloriesSumForDayFlow(startOfDay: Long, endOfDay: Long): Flow<Double?>
 
@@ -65,4 +80,14 @@ interface NutritionDao {
 
     @Query("SELECT SUM(fatG) FROM nutrition_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay")
     fun getFatSumForDayFlow(startOfDay: Long, endOfDay: Long): Flow<Double?>
+
+    @Query("SELECT * FROM nutrition_entries")
+    suspend fun getAllEntries(): List<NutritionEntryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEntries(entries: List<NutritionEntryEntity>)
+
+    @Query("DELETE FROM nutrition_entries")
+    suspend fun deleteAllEntries()
 }
+

@@ -8,12 +8,15 @@ class DataRepository(
     private val database: SuperfitDatabase,
     val healthConnectManager: HealthConnectManager
 ) {
+    val firebaseSyncManager = FirebaseSyncManager(database)
+
     val profileFlow: Flow<UserProfileEntity?> = database.profileDao().getProfileFlow()
 
     suspend fun getProfile(): UserProfileEntity? = database.profileDao().getProfile()
 
     suspend fun saveProfile(profile: UserProfileEntity) {
         database.profileDao().insertProfile(profile)
+        firebaseSyncManager.uploadProfile(profile)
     }
 
     fun getActivityFlow(date: String): Flow<ActivityTelemetryEntity?> {
@@ -37,10 +40,12 @@ class DataRepository(
 
     suspend fun addNutritionEntry(entry: NutritionEntryEntity) {
         database.nutritionDao().insertEntry(entry)
+        firebaseSyncManager.uploadNutrition(entry)
     }
 
     suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) {
         database.nutritionDao().deleteEntry(entry)
+        firebaseSyncManager.deleteNutrition(entry)
     }
 
     suspend fun syncHealthConnectTelemetry(date: LocalDate) {
@@ -54,6 +59,7 @@ class DataRepository(
                 try {
                     val activity = healthConnectManager.readDailyTelemetry(date)
                     database.telemetryDao().insertActivity(activity)
+                    firebaseSyncManager.uploadActivity(activity)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -62,6 +68,7 @@ class DataRepository(
                     val sleep = healthConnectManager.readSleepTelemetry(date)
                     if (sleep != null) {
                         database.telemetryDao().insertSleep(sleep)
+                        firebaseSyncManager.uploadSleep(sleep)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -71,4 +78,17 @@ class DataRepository(
             }
         }
     }
+
+    suspend fun clearAllLocalData() {
+        database.clearAllTables()
+    }
+
+    suspend fun getAllNutritionEntries(): List<NutritionEntryEntity> {
+        return database.nutritionDao().getAllEntries()
+    }
+
+    suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> {
+        return database.telemetryDao().getAllActivity()
+    }
 }
+

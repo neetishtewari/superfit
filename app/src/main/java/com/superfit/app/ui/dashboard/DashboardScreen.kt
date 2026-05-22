@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,22 +31,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
+import androidx.compose.animation.core.*
+import com.superfit.app.theme.*
 import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import android.text.format.DateUtils
 
 // Design tokens matching premium aesthetic
-private val DarkBg = Color(0xFF070709)
-private val CardBg = Color(0xFF101014)
-private val NeonGreen = Color(0xFF10B981)
-private val ElectricCyan = Color(0xFF06B6D4)
-private val EnergeticCoral = Color(0xFFFF5E7E)
-private val CarbYellow = Color(0xFFFBBF24)
+private val DarkBg = DarkBgStart
+private val NeonGreen = NeonMint
+private val ElectricCyan = com.superfit.app.theme.ElectricCyan
+private val EnergeticCoral = CoralRed
+private val CarbYellow = SolarAmber
+private val HyperVioletAccent = HyperViolet
 
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToOnboarding: () -> Unit,
+    onNavigateToHistory: () -> Unit,
+    onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
@@ -75,8 +80,35 @@ fun DashboardScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBg)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(DarkBgStart, DarkBgEnd)
+                )
+            )
     ) {
+        if (dashboardState is DashboardUiState.Success) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(HyperVioletAccent.copy(alpha = 0.12f), Color.Transparent),
+                        center = Offset(0f, 0f),
+                        radius = size.minDimension * 0.8f
+                    ),
+                    radius = size.minDimension * 0.8f,
+                    center = Offset(0f, 0f)
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(ElectricCyan.copy(alpha = 0.08f), Color.Transparent),
+                        center = Offset(size.width, size.height * 0.5f),
+                        radius = size.minDimension * 0.7f
+                    ),
+                    radius = size.minDimension * 0.7f,
+                    center = Offset(size.width, size.height * 0.5f)
+                )
+            }
+        }
+
         when (val state = dashboardState) {
             DashboardUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -120,44 +152,62 @@ fun DashboardScreen(
                             )
                         }
 
-                        Box {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             IconButton(
-                                onClick = { showApiKeySettings = !showApiKeySettings },
+                                onClick = onNavigateToHistory,
                                 colors = IconButtonDefaults.iconButtonColors(
                                     containerColor = CardBg,
                                     contentColor = Color.White
                                 )
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "API Settings"
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "History Ledger"
                                 )
                             }
 
-                            // Subtle Health Connect Status Badge Dot
-                            val badgeColor = remember(grantedPermissions, hasHealthConnectPermissions) {
-                                when {
-                                    grantedPermissions.isEmpty() -> Color.Gray
-                                    hasHealthConnectPermissions -> NeonGreen
-                                    else -> ElectricCyan
+                            Box {
+                                IconButton(
+                                    onClick = { showApiKeySettings = !showApiKeySettings },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        containerColor = CardBg,
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "API Settings"
+                                    )
                                 }
-                            }
 
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 1.dp, y = (-1).dp)
-                                    .size(10.dp)
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(DarkBg)
-                                    .padding(1.dp)
-                            ) {
+                                // Subtle Health Connect Status Badge Dot
+                                val badgeColor = remember(grantedPermissions, hasHealthConnectPermissions) {
+                                    when {
+                                        grantedPermissions.isEmpty() -> Color.Gray
+                                        hasHealthConnectPermissions -> NeonGreen
+                                        else -> ElectricCyan
+                                    }
+                                }
+
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(badgeColor)
-                                )
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 1.dp, y = (-1).dp)
+                                        .size(10.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(DarkBg)
+                                        .padding(1.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(badgeColor)
+                                    )
+                                }
                             }
                         }
                     }
@@ -302,13 +352,44 @@ fun DashboardScreen(
                                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
                                 )
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Button(
+                                onClick = onLogout,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = EnergeticCoral.copy(alpha = 0.15f),
+                                    contentColor = EnergeticCoral
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                            ) {
+                                Text(
+                                    text = "Sign Out & Clear History",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
 
                     // Circular Activity & Target Rings
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CardBg),
-                        shape = RoundedCornerShape(24.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(CardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(24.dp)
+                            )
                     ) {
                         Row(
                             modifier = Modifier
@@ -364,7 +445,17 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBg)
+                            .background(CardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -408,7 +499,17 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBg)
+                            .background(CardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
@@ -497,7 +598,17 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBg)
+                            .background(CardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -636,6 +747,22 @@ fun ConcentricActivityRings(
     caloriesRemaining: Int,
     modifier: Modifier = Modifier
 ) {
+    val caloriesAnimated by animateFloatAsState(
+        targetValue = caloriesEatenProgress,
+        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        label = "CaloriesProgress"
+    )
+    val stepsAnimated by animateFloatAsState(
+        targetValue = stepsProgress,
+        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        label = "StepsProgress"
+    )
+    val activeBurnAnimated by animateFloatAsState(
+        targetValue = activeBurnProgress,
+        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        label = "ActiveBurnProgress"
+    )
+
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -669,31 +796,63 @@ fun ConcentricActivityRings(
                 style = Stroke(width = strokeWidth)
             )
 
-            // Progress Arcs
+            // Progress Arcs with shadow glows
+            val glowWidth = strokeWidth + 4.dp.toPx()
+
+            // 1. Calories Eaten Arc
+            drawArc(
+                color = NeonGreen.copy(alpha = 0.15f),
+                startAngle = -90f,
+                sweepAngle = (caloriesAnimated * 360f).coerceAtLeast(1f),
+                useCenter = false,
+                topLeft = Offset(center.x - radius1, center.y - radius1),
+                size = Size(radius1 * 2, radius1 * 2),
+                style = Stroke(width = glowWidth, cap = StrokeCap.Round)
+            )
             drawArc(
                 color = NeonGreen,
                 startAngle = -90f,
-                sweepAngle = (caloriesEatenProgress * 360f).coerceAtLeast(1f),
+                sweepAngle = (caloriesAnimated * 360f).coerceAtLeast(1f),
                 useCenter = false,
                 topLeft = Offset(center.x - radius1, center.y - radius1),
                 size = Size(radius1 * 2, radius1 * 2),
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
+            // 2. Steps Arc
+            drawArc(
+                color = ElectricCyan.copy(alpha = 0.15f),
+                startAngle = -90f,
+                sweepAngle = (stepsAnimated * 360f).coerceAtLeast(1f),
+                useCenter = false,
+                topLeft = Offset(center.x - radius2, center.y - radius2),
+                size = Size(radius2 * 2, radius2 * 2),
+                style = Stroke(width = glowWidth, cap = StrokeCap.Round)
+            )
             drawArc(
                 color = ElectricCyan,
                 startAngle = -90f,
-                sweepAngle = (stepsProgress * 360f).coerceAtLeast(1f),
+                sweepAngle = (stepsAnimated * 360f).coerceAtLeast(1f),
                 useCenter = false,
                 topLeft = Offset(center.x - radius2, center.y - radius2),
                 size = Size(radius2 * 2, radius2 * 2),
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
+            // 3. Active Burn Arc
+            drawArc(
+                color = EnergeticCoral.copy(alpha = 0.15f),
+                startAngle = -90f,
+                sweepAngle = (activeBurnAnimated * 360f).coerceAtLeast(1f),
+                useCenter = false,
+                topLeft = Offset(center.x - radius3, center.y - radius3),
+                size = Size(radius3 * 2, radius3 * 2),
+                style = Stroke(width = glowWidth, cap = StrokeCap.Round)
+            )
             drawArc(
                 color = EnergeticCoral,
                 startAngle = -90f,
-                sweepAngle = (activeBurnProgress * 360f).coerceAtLeast(1f),
+                sweepAngle = (activeBurnAnimated * 360f).coerceAtLeast(1f),
                 useCenter = false,
                 topLeft = Offset(center.x - radius3, center.y - radius3),
                 size = Size(radius3 * 2, radius3 * 2),
@@ -762,6 +921,11 @@ fun MacroProgressBar(
     unit: String
 ) {
     val progress = if (target > 0.0) (eaten / target).toFloat().coerceIn(0f, 1f) else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "MacroProgress"
+    )
     
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -787,15 +951,21 @@ fun MacroProgressBar(
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color.Black)
+                .background(Color.White.copy(alpha = 0.05f))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(progress)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(color)
-            )
+            if (animatedProgress > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(animatedProgress)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(color, color.copy(alpha = 0.7f))
+                            )
+                        )
+                )
+            }
         }
     }
 }
@@ -809,7 +979,8 @@ fun SleepMetricPill(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black)
+            .background(Color.White.copy(alpha = 0.03f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
             .padding(12.dp)
     ) {
         Column {
@@ -839,7 +1010,8 @@ fun MealItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black)
+            .background(Color.White.copy(alpha = 0.03f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
