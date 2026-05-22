@@ -106,6 +106,14 @@ fun MainNavigation(
                     onLogout = {
                         coroutineScope.launch {
                             repository.clearAllLocalData()
+                            FirebaseAuth.getInstance().signOut()
+                            backStack.removeLastOrNull()
+                            backStack.add(Login)
+                        }
+                    },
+                    onSignOut = {
+                        coroutineScope.launch {
+                            FirebaseAuth.getInstance().signOut()
                             backStack.removeLastOrNull()
                             backStack.add(Login)
                         }

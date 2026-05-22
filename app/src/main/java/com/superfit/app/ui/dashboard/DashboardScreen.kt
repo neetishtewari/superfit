@@ -51,6 +51,7 @@ fun DashboardScreen(
     onNavigateToOnboarding: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onLogout: () -> Unit,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
@@ -355,21 +356,43 @@ fun DashboardScreen(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            Button(
-                                onClick = onLogout,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = EnergeticCoral.copy(alpha = 0.15f),
-                                    contentColor = EnergeticCoral
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = "Sign Out & Clear History",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
+                                Button(
+                                    onClick = onSignOut,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.White.copy(alpha = 0.08f),
+                                        contentColor = Color.White
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(40.dp)
+                                ) {
+                                    Text(
+                                        text = "Sign Out",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+
+                                Button(
+                                    onClick = onLogout,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = EnergeticCoral.copy(alpha = 0.15f),
+                                        contentColor = EnergeticCoral
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(40.dp)
+                                ) {
+                                    Text(
+                                        text = "Clear & Sign Out",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }

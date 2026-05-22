@@ -62,10 +62,12 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         viewModelScope.launch {
-                            try {
-                                repository.firebaseSyncManager.syncAllDown()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+                            viewModelScope.launch {
+                                try {
+                                    repository.firebaseSyncManager.syncAllDown()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                             isLoading = false
                             onSuccess()
@@ -85,11 +87,13 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         viewModelScope.launch {
-                            try {
-                                // Upload default/empty profile or existing local db
-                                repository.firebaseSyncManager.syncAllUp()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+                            viewModelScope.launch {
+                                try {
+                                    // Upload default/empty profile or existing local db
+                                    repository.firebaseSyncManager.syncAllUp()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                             isLoading = false
                             onSuccess()
@@ -118,10 +122,12 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     viewModelScope.launch {
-                        try {
-                            repository.firebaseSyncManager.syncAllDown()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                        viewModelScope.launch {
+                            try {
+                                repository.firebaseSyncManager.syncAllDown()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                         isLoading = false
                         onSuccess()
