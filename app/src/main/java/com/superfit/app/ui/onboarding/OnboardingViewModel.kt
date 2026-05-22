@@ -49,6 +49,10 @@ class OnboardingViewModel(private val repository: DataRepository) : ViewModel() 
         _uiState.value = _uiState.value.copy(activityMultiplier = multiplier)
     }
 
+    fun onGoalChanged(goal: String, offset: Int) {
+        _uiState.value = _uiState.value.copy(goal = goal, calorieOffset = offset)
+    }
+
     fun autofillFromHealthConnect() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isAutofilling = true, error = null)
@@ -97,7 +101,9 @@ class OnboardingViewModel(private val repository: DataRepository) : ViewModel() 
                     heightCm = heightDouble,
                     weightKg = weightDouble,
                     isMale = state.isMale,
-                    activityMultiplier = state.activityMultiplier
+                    activityMultiplier = state.activityMultiplier,
+                    goal = state.goal,
+                    calorieOffset = state.calorieOffset
                 )
                 repository.saveProfile(profile)
                 onSuccess()
@@ -114,6 +120,8 @@ data class OnboardingUiState(
     val weight: String = "",
     val isMale: Boolean = true,
     val activityMultiplier: Double = 1.2,
+    val goal: String = "LOSE_WEIGHT",
+    val calorieOffset: Int = -500,
     val hasHealthConnectPermissions: Boolean = false,
     val grantedPermissions: Set<String> = emptySet(),
     val isAutofilling: Boolean = false,

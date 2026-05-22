@@ -66,23 +66,26 @@ object PhysiologyEngine {
         tdee: Double,
         readinessScore: Int
     ): MacroTargets {
+        // Apply the calorie offset to the computed TDEE
+        val adjustedTargetCalories = (tdee + profile.calorieOffset).coerceAtLeast(1200.0)
+
         // Protein: 1.6g/kg to 2.2g/kg depending on readiness
         val readinessFactor = readinessScore / 100.0
         val proteinPerKg = 1.6 + (0.6 * readinessFactor)
         val proteinG = (profile.weightKg * proteinPerKg).coerceAtLeast(40.0)
 
-        // Fat: hormonal baseline, 25% of total TDEE
-        val fatCalories = tdee * 0.25
+        // Fat: hormonal baseline, 25% of adjusted target calories
+        val fatCalories = adjustedTargetCalories * 0.25
         val fatG = (fatCalories / 9.0).coerceAtLeast(30.0)
 
         // Carbs: remainder of calories
         val proteinCalories = proteinG * 4.0
         val fatCalActual = fatG * 9.0
-        val remainingCalories = (tdee - proteinCalories - fatCalActual).coerceAtLeast(0.0)
+        val remainingCalories = (adjustedTargetCalories - proteinCalories - fatCalActual).coerceAtLeast(0.0)
         val carbsG = (remainingCalories / 4.0).coerceAtLeast(50.0)
 
         return MacroTargets(
-            calories = tdee,
+            calories = adjustedTargetCalories,
             proteinG = proteinG,
             carbsG = carbsG,
             fatG = fatG

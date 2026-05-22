@@ -11,9 +11,11 @@ import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.MacroTargets
+import com.superfit.app.domain.CoachingEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,8 +45,23 @@ class DashboardViewModel(
     private val _lastSyncTime = MutableStateFlow(sharedPrefs.getLong("last_telemetry_sync", 0L))
     val lastSyncTime: StateFlow<Long> = _lastSyncTime
 
+    private val _coachingState = MutableStateFlow<CoachingInsightState>(CoachingInsightState.Idle)
+    val coachingState: StateFlow<CoachingInsightState> = _coachingState.asStateFlow()
+
     init {
         checkPermissions()
+        loadCachedCoachingInsight()
+    }
+
+    private fun loadCachedCoachingInsight() {
+        val todayStr = LocalDate.now().toString()
+        val cachedDate = sharedPrefs.getString("coaching_insight_date", "")
+        if (cachedDate == todayStr) {
+            val text = sharedPrefs.getString("coaching_insight_text", "")
+            if (!text.isNullOrBlank()) {
+                _coachingState.value = CoachingInsightState.Success(text)
+            }
+        }
     }
 
     fun checkPermissions() {
@@ -166,6 +183,66 @@ class DashboardViewModel(
     fun resetParsingState() {
         _parsingState.value = ParsingState.Idle
     }
+
+    fun updateGoal(goal: String, offset: Int) {
+        viewModelScope.launch {
+            val currentProfile = repository.getProfile() ?: return@launch
+            val updated = currentProfile.copy(goal = goal, calorieOffset = offset)
+            repository.saveProfile(updated)
+        }
+    }
+
+    fun refreshCoachingInsight() {
+        val key = _apiKey.value
+        if (key.isBlank()) {
+            _coachingState.value = CoachingInsightState.Error("Please enter your Gemini API Key in Settings first.")
+            return
+        }
+
+        val currentState = dashboardState.value
+        if (currentState !is DashboardUiState.Success) {
+            _coachingState.value = CoachingInsightState.Error("Daily metrics are not loaded yet.")
+            return
+        }
+
+        viewModelScope.launch {
+            _coachingState.value = CoachingInsightState.Loading
+            try {
+                val engine = CoachingEngine(key)
+                val insight = engine.generateDailyInsight(
+                    profile = currentState.profile,
+                    activity = currentState.activity,
+                    sleep = currentState.sleep,
+                    nutrition = currentState.nutritionList,
+                    macroTargets = currentState.macroTargets,
+                    caloriesEaten = currentState.caloriesEaten,
+                    proteinEaten = currentState.proteinEaten,
+                    carbsEaten = currentState.carbsEaten,
+                    fatEaten = currentState.fatEaten
+                )
+
+                val todayStr = LocalDate.now().toString()
+                sharedPrefs.edit()
+                    .putString("coaching_insight_date", todayStr)
+                    .putString("coaching_insight_text", insight)
+                    .apply()
+
+                _coachingState.value = CoachingInsightState.Success(insight)
+            } catch (e: Exception) {
+                val msg = e.localizedMessage ?: ""
+                val friendlyMsg = when {
+                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
+                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
+                    }
+                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
+                        "Invalid API Key. Please update your API key in Settings."
+                    }
+                    else -> "Failed to load insight: ${e.localizedMessage ?: "Unknown error"}"
+                }
+                _coachingState.value = CoachingInsightState.Error(friendlyMsg)
+            }
+        }
+    }
 }
 
 sealed interface ParsingState {
@@ -192,4 +269,11 @@ sealed interface DashboardUiState {
         val carbsEaten: Double,
         val fatEaten: Double
     ) : DashboardUiState
+}
+
+sealed interface CoachingInsightState {
+    object Idle : CoachingInsightState
+    object Loading : CoachingInsightState
+    data class Success(val insight: String) : CoachingInsightState
+    data class Error(val message: String) : CoachingInsightState
 }

@@ -10,7 +10,9 @@ data class UserProfileEntity(
     val heightCm: Double,
     val weightKg: Double,
     val isMale: Boolean,
-    val activityMultiplier: Double = 1.2
+    val activityMultiplier: Double = 1.2,
+    val goal: String = "LOSE_WEIGHT",
+    val calorieOffset: Int = -500
 )
 
 @Entity(tableName = "activity_telemetry")

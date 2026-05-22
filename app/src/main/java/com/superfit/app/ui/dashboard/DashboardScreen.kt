@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,6 +62,7 @@ fun DashboardScreen(
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
     val grantedPermissions by viewModel.grantedPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
+    val coachingState by viewModel.coachingState.collectAsState()
     val scrollState = rememberScrollState()
 
     var showApiKeySettings by remember { mutableStateOf(false) }
@@ -248,6 +251,69 @@ fun DashboardScreen(
                                 fontSize = 11.sp,
                                 color = Color.Gray
                             )
+
+                            HorizontalDivider(
+                                color = Color.DarkGray.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+
+                            Text(
+                                text = "Fitness Goal Target",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+
+                            val goals = listOf(
+                                Triple("LOSE_WEIGHT", "Weight Loss (-500 kcal)", -500),
+                                Triple("MAINTAIN", "Maintenance (0 kcal)", 0),
+                                Triple("GAIN_MUSCLE", "Muscle Gain (+300 kcal)", 300)
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White.copy(alpha = 0.03f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                goals.forEach { (goalKey, goalLabel, offset) ->
+                                    val isSelected = state.profile.goal == goalKey
+                                    val bgActiveColor by animateColorAsState(
+                                        targetValue = if (isSelected) NeonGreen else Color.Transparent,
+                                        label = "SettingsGoalBg"
+                                    )
+                                    val textActiveColor by animateColorAsState(
+                                        targetValue = if (isSelected) Color.Black else Color.White,
+                                        label = "SettingsGoalText"
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(bgActiveColor)
+                                            .clickable {
+                                                viewModel.updateGoal(goalKey, offset)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = when (goalKey) {
+                                                "LOSE_WEIGHT" -> "Deficit"
+                                                "MAINTAIN" -> "Maintain"
+                                                else -> "Surplus"
+                                            },
+                                            color = textActiveColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
 
                             HorizontalDivider(
                                 color = Color.DarkGray.copy(alpha = 0.5f),
@@ -459,6 +525,166 @@ fun DashboardScreen(
                                     value = "${state.activity.activeCalories.toInt()} / 500 kcal",
                                     color = EnergeticCoral
                                 )
+                            }
+                        }
+                    }
+
+                    // AI Daily Coach Insights Card
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(CardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.08f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "✨ AI Daily Coach",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = Color.White
+                                )
+                            }
+
+                            val isCoachingLoading = coachingState is CoachingInsightState.Loading
+                            val infiniteTransition = rememberInfiniteTransition(label = "RefreshRotation")
+                            val rotationAngle by if (isCoachingLoading) {
+                                infiniteTransition.animateFloat(
+                                    initialValue = 0f,
+                                    targetValue = 360f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1200, easing = LinearEasing),
+                                        repeatMode = RepeatMode.Restart
+                                    ),
+                                    label = "Rotation"
+                                )
+                            } else {
+                                remember { mutableStateOf(0f) }
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.refreshCoachingInsight() },
+                                modifier = Modifier.rotate(rotationAngle),
+                                enabled = !isCoachingLoading,
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    contentColor = ElectricCyan
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh Insights"
+                                )
+                            }
+                        }
+
+                        when (val cState = coachingState) {
+                            CoachingInsightState.Idle -> {
+                                Text(
+                                    text = "Generate your personalized AI coaching advice based on today's physical and nutritional telemetry.",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp
+                                )
+                                Button(
+                                    onClick = { viewModel.refreshCoachingInsight() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ElectricCyan.copy(alpha = 0.15f),
+                                        contentColor = ElectricCyan
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Analyze & Generate Insights", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            CoachingInsightState.Loading -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(32.dp),
+                                            color = ElectricCyan,
+                                            strokeWidth = 3.dp
+                                        )
+                                        Text(
+                                            text = "Analyzing physiological telemetry with Gemini...",
+                                            color = Color.Gray,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                            is CoachingInsightState.Success -> {
+                                Text(
+                                    text = cState.insight,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp
+                                )
+                            }
+                            is CoachingInsightState.Error -> {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = EnergeticCoral
+                                        )
+                                        Text(
+                                            text = cState.message,
+                                            color = EnergeticCoral,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    if (cState.message.contains("Settings", ignoreCase = true) || cState.message.contains("API Key", ignoreCase = true)) {
+                                        Button(
+                                            onClick = { showApiKeySettings = true },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = EnergeticCoral.copy(alpha = 0.15f),
+                                                contentColor = EnergeticCoral
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text(
+                                                text = "Configure API Key",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

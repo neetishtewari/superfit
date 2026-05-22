@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "superfit-mock",
-    "storage_bucket": "superfit-mock.appspot.com"
+    "project_number": "797661593902",
+    "project_id": "superfit-cb643",
+    "storage_bucket": "superfit-cb643.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+        "mobilesdk_app_id": "1:797661593902:android:59ec7d7e8f60901b027abf",
         "android_client_info": {
           "package_name": "com.superfit.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "797661593902-8a5jk3h2kcrjj0eigmcahp6cim4urfrv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.superfit.app",
+            "certificate_hash": "59d158ab675f2cf6cde2213d777b9da186855953"
+          }
+        },
+        {
+          "client_id": "797661593902-o1rge1l0mnohd637qa2pau7bgl1n8u5p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "mock_api_key_for_compilation"
+          "current_key": "AIzaSyDgUlcnH4y1E-LZL61I8PCg6rQbTUbp57M"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "797661593902-o1rge1l0mnohd637qa2pau7bgl1n8u5p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

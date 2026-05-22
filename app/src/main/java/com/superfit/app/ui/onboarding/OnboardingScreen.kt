@@ -447,6 +447,81 @@ fun OnboardingScreen(
                         )
                     )
                 }
+
+                // Goal Selection Card Group
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Fitness Goal",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    val goals = listOf(
+                        Triple("LOSE_WEIGHT", "Weight Loss", -500),
+                        Triple("MAINTAIN", "Maintenance", 0),
+                        Triple("GAIN_MUSCLE", "Muscle Gain", 300)
+                    )
+
+                    goals.forEach { (goalKey, goalLabel, offset) ->
+                        val isSelected = uiState.goal == goalKey
+                        val borderAlpha by animateFloatAsState(targetValue = if (isSelected) 0.8f else 0.08f, label = "GoalBorderAlpha")
+                        val bgAlpha by animateFloatAsState(targetValue = if (isSelected) 0.15f else 0.03f, label = "GoalBgAlpha")
+                        val textColor by animateColorAsState(targetValue = if (isSelected) NeonGreen else Color.White, label = "GoalTextColor")
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = bgAlpha))
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) NeonGreen.copy(alpha = borderAlpha) else Color.White.copy(alpha = borderAlpha),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    viewModel.onGoalChanged(goalKey, offset)
+                                }
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = goalLabel,
+                                        color = textColor,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    val desc = when (goalKey) {
+                                        "LOSE_WEIGHT" -> "Calorie Deficit: -500 kcal"
+                                        "MAINTAIN" -> "Energy Balance: 0 kcal"
+                                        else -> "Calorie Surplus: +300 kcal"
+                                    }
+                                    Text(
+                                        text = desc,
+                                        color = Color.Gray,
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { viewModel.onGoalChanged(goalKey, offset) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = NeonGreen,
+                                        unselectedColor = Color.Gray
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             // Error display

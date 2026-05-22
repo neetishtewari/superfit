@@ -168,7 +168,9 @@ class FirebaseSyncManager(private val database: SuperfitDatabase) {
         "heightCm" to heightCm,
         "weightKg" to weightKg,
         "isMale" to isMale,
-        "activityMultiplier" to activityMultiplier
+        "activityMultiplier" to activityMultiplier,
+        "goal" to goal,
+        "calorieOffset" to calorieOffset
     )
 
     private fun Map<String, Any>.toUserProfileEntity(): UserProfileEntity = UserProfileEntity(
@@ -177,7 +179,9 @@ class FirebaseSyncManager(private val database: SuperfitDatabase) {
         heightCm = (this["heightCm"] as? Number)?.toDouble() ?: 0.0,
         weightKg = (this["weightKg"] as? Number)?.toDouble() ?: 0.0,
         isMale = this["isMale"] as? Boolean ?: true,
-        activityMultiplier = (this["activityMultiplier"] as? Number)?.toDouble() ?: 1.2
+        activityMultiplier = (this["activityMultiplier"] as? Number)?.toDouble() ?: 1.2,
+        goal = this["goal"] as? String ?: "LOSE_WEIGHT",
+        calorieOffset = (this["calorieOffset"] as? Number)?.toInt() ?: -500
     )
 
     private fun ActivityTelemetryEntity.toMap(): Map<String, Any> = mapOf(
