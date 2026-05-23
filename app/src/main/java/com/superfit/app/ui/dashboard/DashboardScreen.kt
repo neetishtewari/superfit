@@ -161,6 +161,19 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(
+                                onClick = { viewModel.syncTelemetry() },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = CardBg,
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Sync Telemetry"
+                                )
+                            }
+
+                            IconButton(
                                 onClick = onNavigateToHistory,
                                 colors = IconButtonDefaults.iconButtonColors(
                                     containerColor = CardBg,
@@ -374,112 +387,7 @@ fun DashboardScreen(
                                 )
                             }
 
-                            HorizontalDivider(
-                                color = Color.DarkGray.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-
-                            Text(
-                                text = "Google Health Connect Status",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
-
-                            val connectionStatus = remember(grantedPermissions, hasHealthConnectPermissions) {
-                                when {
-                                    grantedPermissions.isEmpty() -> "Disconnected"
-                                    hasHealthConnectPermissions -> "Fully Connected"
-                                    else -> "Partially Connected (${grantedPermissions.size}/${viewModel.healthConnectManager.permissions.size})"
-                                }
-                            }
-                            val statusColor = remember(grantedPermissions, hasHealthConnectPermissions) {
-                                when {
-                                    grantedPermissions.isEmpty() -> Color.Gray
-                                    hasHealthConnectPermissions -> NeonGreen
-                                    else -> ElectricCyan
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(statusColor)
-                                    )
-                                    Text(
-                                        text = connectionStatus,
-                                        color = statusColor,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                if (!hasHealthConnectPermissions) {
-                                    Button(
-                                        onClick = {
-                                            requestPermissionsLauncher.launch(viewModel.healthConnectManager.permissions)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = ElectricCyan.copy(alpha = 0.15f),
-                                            contentColor = ElectricCyan
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text(
-                                            text = if (grantedPermissions.isEmpty()) "Connect" else "Grant Rest",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Button(
-                                onClick = { viewModel.syncTelemetry() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = NeonGreen.copy(alpha = 0.15f),
-                                    contentColor = NeonGreen
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
-                            ) {
-                                Text(
-                                    text = "Sync Telemetry Now",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            }
-
-                            if (lastSyncTime > 0L) {
-                                val relativeTime = DateUtils.getRelativeTimeSpanString(
-                                    lastSyncTime,
-                                    System.currentTimeMillis(),
-                                    DateUtils.MINUTE_IN_MILLIS
-                                ).toString()
-                                Text(
-                                    text = "Last synced: $relativeTime",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -518,6 +426,56 @@ fun DashboardScreen(
                                         fontSize = 12.sp
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    // Health Connect Permission Alert Card (if missing permissions)
+                    if (!hasHealthConnectPermissions) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.03f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "Warning",
+                                tint = EnergeticCoral,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Telemetry Sync Paused",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Grant Health Connect permissions to sync steps and sleep data.",
+                                    color = Color.LightGray,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    requestPermissionsLauncher.launch(viewModel.healthConnectManager.permissions)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = EnergeticCoral),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text(
+                                    text = "Grant",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
                             }
                         }
                     }
