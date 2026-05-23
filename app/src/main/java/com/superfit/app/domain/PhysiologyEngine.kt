@@ -26,10 +26,14 @@ object PhysiologyEngine {
 
     /**
      * Calculates Total Daily Energy Expenditure (TDEE) in real-time:
-     * BMR * Activity Multiplier + Active Calories Burned (from Health Connect)
+     * BMR * Base Multiplier + Active Calories Burned (from Health Connect).
+     * If active calories are tracked (> 10.0 kcal), we use the standard sedentary baseline (1.2)
+     * as the base multiplier to represent basic resting NEAT and prevent double-counting of physical activity.
+     * If active calories are zero (or un-synced), we fall back to the user's chosen profile multiplier.
      */
     fun calculateTdee(bmr: Double, activityMultiplier: Double, activeCalories: Double): Double {
-        return bmr * activityMultiplier + activeCalories
+        val baseMultiplier = if (activeCalories > 10.0) 1.2 else activityMultiplier
+        return bmr * baseMultiplier + activeCalories
     }
 
     /**

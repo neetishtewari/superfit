@@ -38,6 +38,20 @@ class PhysiologyEngineTest {
     }
 
     @Test
+    fun testTdeeCalculationPreventsDoubleCounting() {
+        // High activity level multiplier (1.725) but active calories synced (500.0)
+        val tdee = PhysiologyEngine.calculateTdee(1780.0, 1.725, 500.0)
+        // Should adjust base multiplier to 1.2 (sedentary baseline) to avoid double-counting:
+        // 1780.0 * 1.2 + 500.0 = 2136.0 + 500.0 = 2636.0
+        assertEquals(2636.0, tdee, 0.01)
+
+        // Active calories zero: should fall back to user's chosen multiplier (1.725):
+        // 1780.0 * 1.725 + 0.0 = 3070.5
+        val tdeeNoActivity = PhysiologyEngine.calculateTdee(1780.0, 1.725, 0.0)
+        assertEquals(3070.5, tdeeNoActivity, 0.01)
+    }
+
+    @Test
     fun testReadinessScoreOptimum() {
         // 8 hours sleep, 1.6 hours deep sleep (exactly 20%)
         val score = PhysiologyEngine.calculateReadinessScore(28800, 5760)

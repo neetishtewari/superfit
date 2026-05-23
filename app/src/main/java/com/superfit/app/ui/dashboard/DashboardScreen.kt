@@ -788,7 +788,9 @@ fun DashboardScreen(
                             eaten = state.proteinEaten,
                             target = state.macroTargets.proteinG,
                             color = NeonGreen,
-                            unit = "g"
+                            unit = "g",
+                            entries = state.nutritionList,
+                            macroSelector = { it.proteinG }
                         )
 
                         // Carbs
@@ -797,7 +799,9 @@ fun DashboardScreen(
                             eaten = state.carbsEaten,
                             target = state.macroTargets.carbsG,
                             color = CarbYellow,
-                            unit = "g"
+                            unit = "g",
+                            entries = state.nutritionList,
+                            macroSelector = { it.carbsG }
                         )
 
                         // Fat
@@ -806,7 +810,9 @@ fun DashboardScreen(
                             eaten = state.fatEaten,
                             target = state.macroTargets.fatG,
                             color = ElectricCyan,
-                            unit = "g"
+                            unit = "g",
+                            entries = state.nutritionList,
+                            macroSelector = { it.fatG }
                         )
                     }
 
@@ -1234,7 +1240,9 @@ fun MacroProgressBar(
     eaten: Double,
     target: Double,
     color: Color,
-    unit: String
+    unit: String,
+    entries: List<NutritionEntryEntity> = emptyList(),
+    macroSelector: (NutritionEntryEntity) -> Double = { 0.0 }
 ) {
     val progress = if (target > 0.0) (eaten / target).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
@@ -1242,18 +1250,38 @@ fun MacroProgressBar(
         animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "MacroProgress"
     )
-    
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = Color.LightGray,
-                fontWeight = FontWeight.SemiBold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    color = Color.LightGray,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (expanded) "▲" else "▼",
+                    fontSize = 8.sp,
+                    color = Color.Gray.copy(alpha = 0.6f)
+                )
+            }
             Text(
                 text = "${eaten.toInt()}${unit} / ${target.toInt()}${unit}",
                 fontSize = 12.sp,
@@ -1281,6 +1309,58 @@ fun MacroProgressBar(
                             )
                         )
                 )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.03f))
+                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val contributingEntries = entries
+                    .map { it to macroSelector(it) }
+                    .filter { it.second > 0.0 }
+                    .sortedByDescending { it.second }
+
+                if (contributingEntries.isEmpty()) {
+                    Text(
+                        text = "No entries logged today containing $label.",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    contributingEntries.forEach { (entry, amount) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = entry.foodText,
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "+${amount.toInt()}$unit",
+                                color = color,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
             }
         }
     }
