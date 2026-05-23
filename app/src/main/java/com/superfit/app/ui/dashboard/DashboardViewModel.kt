@@ -192,6 +192,14 @@ class DashboardViewModel(
         }
     }
 
+    fun updateActivityMultiplier(multiplier: Double) {
+        viewModelScope.launch {
+            val currentProfile = repository.getProfile() ?: return@launch
+            val updated = currentProfile.copy(activityMultiplier = multiplier)
+            repository.saveProfile(updated)
+        }
+    }
+
     fun refreshCoachingInsight() {
         val key = _apiKey.value
         if (key.isBlank()) {

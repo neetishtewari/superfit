@@ -320,6 +320,65 @@ fun DashboardScreen(
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
 
+                            // Baseline Activity Level Slider in settings
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val currentMultiplier = state.profile.activityMultiplier
+                                val multiplierDesc = when (currentMultiplier) {
+                                    1.2 -> "Sedentary (No formal exercise)"
+                                    1.375 -> "Lightly Active (1-3 days/week)"
+                                    1.55 -> "Moderately Active (3-5 days/week)"
+                                    1.725 -> "Very Active (6-7 days/week)"
+                                    else -> "Custom / High Athlete"
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Baseline Activity Level",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "Multiplier: $currentMultiplier",
+                                        fontSize = 12.sp,
+                                        color = NeonGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Text(
+                                    text = multiplierDesc,
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                val multiplierValues = listOf(1.2, 1.375, 1.55, 1.725)
+                                Slider(
+                                    value = multiplierValues.indexOf(currentMultiplier).toFloat().coerceAtLeast(0f),
+                                    onValueChange = { index ->
+                                        val cleanIndex = index.toInt().coerceIn(0, multiplierValues.size - 1)
+                                        viewModel.updateActivityMultiplier(multiplierValues[cleanIndex])
+                                    },
+                                    valueRange = 0f..3f,
+                                    steps = 2,
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = NeonGreen,
+                                        thumbColor = NeonGreen,
+                                        inactiveTrackColor = Color.DarkGray
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            HorizontalDivider(
+                                color = Color.DarkGray.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+
                             Text(
                                 text = "Google Health Connect Status",
                                 fontWeight = FontWeight.Bold,
