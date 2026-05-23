@@ -33,22 +33,12 @@ class PhysiologyEngineTest {
     @Test
     fun testTdeeCalculation() {
         val tdee = PhysiologyEngine.calculateTdee(1780.0, 1.2, 450.0)
-        // 1780.0 * 1.2 + 450.0 = 2136.0 + 450.0 = 2586.0
-        assertEquals(2586.0, tdee, 0.01)
-    }
+        // 1780.0 * 1.2 = 2136.0 (active calories ignored)
+        assertEquals(2136.0, tdee, 0.01)
 
-    @Test
-    fun testTdeeCalculationPreventsDoubleCounting() {
-        // High activity level multiplier (1.725) but active calories synced (500.0)
-        val tdee = PhysiologyEngine.calculateTdee(1780.0, 1.725, 500.0)
-        // Should adjust base multiplier to 1.2 (sedentary baseline) to avoid double-counting:
-        // 1780.0 * 1.2 + 500.0 = 2136.0 + 500.0 = 2636.0
-        assertEquals(2636.0, tdee, 0.01)
-
-        // Active calories zero: should fall back to user's chosen multiplier (1.725):
-        // 1780.0 * 1.725 + 0.0 = 3070.5
-        val tdeeNoActivity = PhysiologyEngine.calculateTdee(1780.0, 1.725, 0.0)
-        assertEquals(3070.5, tdeeNoActivity, 0.01)
+        val tdeeHighMultiplier = PhysiologyEngine.calculateTdee(1780.0, 1.725, 500.0)
+        // 1780.0 * 1.725 = 3070.5 (active calories ignored)
+        assertEquals(3070.5, tdeeHighMultiplier, 0.01)
     }
 
     @Test
@@ -99,7 +89,7 @@ class PhysiologyEngineTest {
     }
 
     @Test
-    fun testMacroTargetsWithActiveCaloriesBurned() {
+    fun testMacroTargetsWithActiveCaloriesBurnedIgnored() {
         val profile = UserProfileEntity(
             id = 0,
             age = 30,
@@ -110,14 +100,13 @@ class PhysiologyEngineTest {
             calorieOffset = 0 // set to 0 for simpler math
         )
         // BMR is 1780.0
-        // TDEE = BMR * Multiplier + Active Calories = 1780.0 * 1.2 + 500 = 2136.0 + 500 = 2636.0
-        // Target Calories = TDEE + Calorie Offset = 2636.0
+        // TDEE = BMR * Multiplier = 1780.0 * 1.2 = 2136.0 (active calories ignored in target)
+        // Target Calories = TDEE + Calorie Offset = 2136.0
         // Readiness = 100 (readinessFactor = 1.0) -> Base Protein = 80 * 2.2 = 176g
-        // Recovery Protein Bonus = 500 * 0.05 = 25g
-        // Total Protein = 176 + 25 = 201g
+        // Active calories are ignored for macro target scaling
         
         val tdee = PhysiologyEngine.calculateTdee(1780.0, 1.2, 500.0)
-        assertEquals(2636.0, tdee, 0.01)
+        assertEquals(2136.0, tdee, 0.01)
 
         val targets = PhysiologyEngine.calculateMacroTargets(
             profile = profile,
@@ -126,13 +115,13 @@ class PhysiologyEngineTest {
             activeCalories = 500.0
         )
 
-        assertEquals(2636.0, targets.calories, 0.01)
-        assertEquals(201.0, targets.proteinG, 0.01)
+        assertEquals(2136.0, targets.calories, 0.01)
+        assertEquals(176.0, targets.proteinG, 0.01)
         
-        // Fat target: 2636.0 * 0.25 / 9 = 73.22g
-        assertEquals(73.22, targets.fatG, 0.01)
+        // Fat target: 2136.0 * 0.25 / 9 = 59.33g
+        assertEquals(59.33, targets.fatG, 0.01)
         
-        // Carbs target: (2636 - (201 * 4) - (73.22 * 9)) / 4 = 293.25g
-        assertEquals(293.25, targets.carbsG, 0.01)
+        // Carbs target: (2136.0 - (176.0 * 4) - (59.33 * 9)) / 4 = (2136.0 - 704 - 533.97) / 4 = 224.5g
+        assertEquals(224.50, targets.carbsG, 0.01)
     }
 }

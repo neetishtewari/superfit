@@ -25,15 +25,12 @@ object PhysiologyEngine {
     }
 
     /**
-     * Calculates Total Daily Energy Expenditure (TDEE) in real-time:
-     * BMR * Base Multiplier + Active Calories Burned (from Health Connect).
-     * If active calories are tracked (> 10.0 kcal), we use the standard sedentary baseline (1.2)
-     * as the base multiplier to represent basic resting NEAT and prevent double-counting of physical activity.
-     * If active calories are zero (or un-synced), we fall back to the user's chosen profile multiplier.
+     * Calculates Total Daily Energy Expenditure (TDEE) in real-time using BMR and the Activity Multiplier:
+     * BMR * Activity Multiplier.
+     * Note: Active calories burned from Health Connect are tracked on the dashboard but omitted from target budget calculations to avoid inflation.
      */
-    fun calculateTdee(bmr: Double, activityMultiplier: Double, activeCalories: Double): Double {
-        val baseMultiplier = if (activeCalories > 10.0) 1.2 else activityMultiplier
-        return bmr * baseMultiplier + activeCalories
+    fun calculateTdee(bmr: Double, activityMultiplier: Double, activeCalories: Double = 0.0): Double {
+        return bmr * activityMultiplier
     }
 
     /**
@@ -70,15 +67,14 @@ object PhysiologyEngine {
         profile: UserProfileEntity,
         tdee: Double,
         readinessScore: Int,
-        activeCalories: Double
+        activeCalories: Double = 0.0
     ): MacroTargets {
         // Apply the calorie offset to the computed TDEE
         val adjustedTargetCalories = (tdee + profile.calorieOffset).coerceAtLeast(1200.0)
 
         // Protein: 1.6g/kg to 2.2g/kg depending on readiness
         val readinessFactor = readinessScore / 100.0
-        val baseProtein = profile.weightKg * (1.6 + 0.6 * readinessFactor)
-        val proteinG = (baseProtein + (activeCalories * 0.05)).coerceAtLeast(40.0)
+        val proteinG = (profile.weightKg * (1.6 + 0.6 * readinessFactor)).coerceAtLeast(40.0)
 
         // Fat: hormonal baseline, 25% of adjusted target calories
         val fatCalories = adjustedTargetCalories * 0.25
