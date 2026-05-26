@@ -53,6 +53,8 @@ import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import android.provider.Settings
+import android.net.Uri
 
 // Design tokens matching premium aesthetic
 private val DarkBg = DarkBgStart
@@ -116,7 +118,15 @@ fun DashboardScreen(
         if (isGranted) {
             speechHelper.startListening()
         } else {
-            Toast.makeText(context, "Microphone permission is required for voice logging.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Opening Settings to enable microphone permission...", Toast.LENGTH_LONG).show()
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Please open Settings and grant microphone permissions manually.", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
