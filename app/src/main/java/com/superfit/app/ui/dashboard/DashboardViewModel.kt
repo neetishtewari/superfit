@@ -148,6 +148,11 @@ class DashboardViewModel(
                 val parser = NutritionParser(key)
                 val result = parser.parseFoodInput(input)
                 
+                if (result.foodText == "invalid") {
+                    _parsingState.value = ParsingState.Error("Could not recognize any food items. Please try saying 'one apple and some greek yogurt'.")
+                    return@launch
+                }
+
                 val entry = NutritionEntryEntity(
                     foodText = result.foodText,
                     calories = result.calories,
@@ -157,7 +162,7 @@ class DashboardViewModel(
                     timestamp = System.currentTimeMillis()
                 )
                 repository.addNutritionEntry(entry)
-                _parsingState.value = ParsingState.Success
+                _parsingState.value = ParsingState.Success(result.foodText)
             } catch (e: Exception) {
                 val msg = e.localizedMessage ?: ""
                 val friendlyMsg = when {
@@ -256,7 +261,7 @@ class DashboardViewModel(
 sealed interface ParsingState {
     object Idle : ParsingState
     object Loading : ParsingState
-    object Success : ParsingState
+    data class Success(val foodText: String) : ParsingState
     data class Error(val message: String) : ParsingState
 }
 

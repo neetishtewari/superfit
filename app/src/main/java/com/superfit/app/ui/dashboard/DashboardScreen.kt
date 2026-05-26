@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,12 +34,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.health.connect.client.PermissionController
 import androidx.compose.animation.core.*
 import com.superfit.app.theme.*
 import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import android.text.format.DateUtils
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 // Design tokens matching premium aesthetic
 private val DarkBg = DarkBgStart
@@ -68,6 +83,78 @@ fun DashboardScreen(
     var showApiKeySettings by remember { mutableStateOf(false) }
     var foodInputText by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
+
+    // Voice Quick-Log State variables
+    var isListening by remember { mutableStateOf(false) }
+    var voiceMessage by remember { mutableStateOf<String?>(null) }
+    var voiceBannerColor by remember { mutableStateOf(Color.Transparent) }
+    var showVoiceBanner by remember { mutableStateOf(false) }
+
+    // Speech recognizer helper instantiation
+    val speechHelper = remember {
+        SpeechRecognizerHelper(
+            context = context,
+            onResult = { text ->
+                viewModel.parseAndAddMeal(text)
+            },
+            onError = { error ->
+                voiceMessage = error
+                voiceBannerColor = EnergeticCoral
+                showVoiceBanner = true
+            },
+            onListeningStateChange = { listening ->
+                isListening = listening
+            }
+        )
+    }
+
+    // Permission launcher for microphone
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            speechHelper.startListening()
+        } else {
+            Toast.makeText(context, "Microphone permission is required for voice logging.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Auto-dismiss voice feedback banner
+    LaunchedEffect(showVoiceBanner) {
+        if (showVoiceBanner) {
+            kotlinx.coroutines.delay(4000)
+            showVoiceBanner = false
+        }
+    }
+
+    // Listen to parsing updates for success/error popups
+    LaunchedEffect(parsingState) {
+        val state = parsingState
+        when (state) {
+            is ParsingState.Success -> {
+                voiceMessage = "Logged: ${state.foodText}"
+                voiceBannerColor = NeonGreen
+                showVoiceBanner = true
+                viewModel.resetParsingState()
+            }
+            is ParsingState.Error -> {
+                voiceMessage = state.message
+                voiceBannerColor = EnergeticCoral
+                showVoiceBanner = true
+                viewModel.resetParsingState()
+            }
+            else -> {}
+        }
+    }
+
+    // Clean up voice listener on dispose
+    DisposableEffect(Unit) {
+        onDispose {
+            speechHelper.stopListening()
+        }
+    }
+
     // Health Connect Permission Launcher
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract()
@@ -90,6 +177,44 @@ fun DashboardScreen(
                 )
             )
     ) {
+        // Floating Success/Error Notification Banner
+        AnimatedVisibility(
+            visible = showVoiceBanner,
+            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                .zIndex(99f)
+        ) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, voiceBannerColor, RoundedCornerShape(16.dp))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(voiceBannerColor)
+                    )
+                    Text(
+                        text = voiceMessage ?: "",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
         if (dashboardState is DashboardUiState.Success) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
@@ -228,6 +353,27 @@ fun DashboardScreen(
                             }
                         }
                     }
+
+                    // Voice Quick Log Card
+                    VoiceQuickLogCard(
+                        isListening = isListening,
+                        isProcessing = parsingState is ParsingState.Loading,
+                        onMicClick = {
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (hasPermission) {
+                                speechHelper.startListening()
+                            } else {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        onStopClick = {
+                            speechHelper.stopListening()
+                        }
+                    )
 
                     // API Settings panel (collapsible)
                     AnimatedVisibility(visible = showApiKeySettings) {
@@ -1480,6 +1626,206 @@ fun ActivityProgressBar(
                                 colors = listOf(color, color.copy(alpha = 0.7f))
                             )
                         )
+                )
+            }
+        }
+    }
+}
+
+// Voice Speech Recognition Helper class
+class SpeechRecognizerHelper(
+    private val context: Context,
+    private val onResult: (String) -> Unit,
+    private val onError: (String) -> Unit,
+    private val onListeningStateChange: (Boolean) -> Unit
+) {
+    private var speechRecognizer: SpeechRecognizer? = null
+
+    fun startListening() {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            onError("Speech recognition is not available on this device.")
+            return
+        }
+        
+        stopListening()
+        
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    onListeningStateChange(true)
+                }
+
+                override fun onBeginningOfSpeech() {}
+
+                override fun onRmsChanged(rmsdB: Float) {}
+
+                override fun onBufferReceived(buffer: ByteArray?) {}
+
+                override fun onEndOfSpeech() {
+                    onListeningStateChange(false)
+                }
+
+                override fun onError(error: Int) {
+                    onListeningStateChange(false)
+                    val message = when (error) {
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
+                        SpeechRecognizer.ERROR_CLIENT -> "Client side error."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission denied."
+                        SpeechRecognizer.ERROR_NETWORK -> "Network error."
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
+                        SpeechRecognizer.ERROR_NO_MATCH -> "Could not understand audio. Try again."
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy."
+                        SpeechRecognizer.ERROR_SERVER -> "Server connection error."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected."
+                        else -> "Speech error: $error"
+                    }
+                    onError(message)
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull()
+                    if (!text.isNullOrBlank()) {
+                        onResult(text)
+                    } else {
+                        onError("Could not understand speech.")
+                    }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {}
+
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        speechRecognizer?.startListening(intent)
+    }
+
+    fun stopListening() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        onListeningStateChange(false)
+    }
+}
+
+// Voice Quick Log UI Composable Card
+@Composable
+fun VoiceQuickLogCard(
+    isListening: Boolean,
+    isProcessing: Boolean,
+    onMicClick: () -> Unit,
+    onStopClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.08f),
+                        Color.White.copy(alpha = 0.02f)
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Pulse animated scale for listening indicator
+            val infiniteTransition = rememberInfiniteTransition(label = "MicPulse")
+            val scale by if (isListening) {
+                infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.25f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(800, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "Scale"
+                )
+            } else {
+                remember { mutableStateOf(1f) }
+            }
+
+            val glowBg = if (isListening) {
+                HyperViolet.copy(alpha = 0.3f)
+            } else {
+                Color.White.copy(alpha = 0.05f)
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(glowBg)
+                    .clickable(enabled = !isProcessing) {
+                        if (isListening) onStopClick() else onMicClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isProcessing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = ElectricCyan,
+                        strokeWidth = 2.5.dp
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size((36.dp.value * scale).dp)
+                            .clip(CircleShape)
+                            .background(if (isListening) NeonMint else Color.Transparent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Quick Voice Log Microphone",
+                            tint = if (isListening) Color.Black else Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = when {
+                        isListening -> "Listening..."
+                        isProcessing -> "Analyzing Speech..."
+                        else -> "Quick-Log Meal"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = when {
+                        isListening -> NeonMint
+                        isProcessing -> ElectricCyan
+                        else -> Color.White
+                    }
+                )
+                Text(
+                    text = when {
+                        isListening -> "Speak what you ate now..."
+                        isProcessing -> "Estimating calories & macros with Gemini..."
+                        else -> "Tap the mic and speak what you ate."
+                    },
+                    fontSize = 11.sp,
+                    color = Color.Gray
                 )
             }
         }
