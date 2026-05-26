@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Request package visibility for Health Connect -->
+    <!-- Request package visibility for Health Connect and Speech Recognition Service -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 
     <!-- Health Connect Read Permissions -->
