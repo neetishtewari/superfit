@@ -7,6 +7,8 @@ import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.UserProfileEntity
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 class CoachingEngine(private val apiKey: String) {
 
@@ -21,7 +23,8 @@ class CoachingEngine(private val apiKey: String) {
                 "You are Superfit AI Coach, a premium, friendly, highly analytical personal trainer and health scientist.\n" +
                 "Your role is to analyze the user's daily metrics (steps, sleep quality, active/passive calories, macronutrients eaten vs targets, and fitness goal) and provide a concise, highly actionable, personalized daily summary.\n" +
                 "Keep the tone encouraging but scientifically precise, modern, and direct.\n" +
-                "You MUST limit your response to exactly 2 to 3 sentences (approx 50-80 words). Do not write a greeting or a signature (e.g. no 'Hey there,' or 'Best, Coach'). Use clean Markdown styling where appropriate (like bolding key insights or targets)."
+                "You MUST limit your response to exactly 2 to 3 sentences (approx 50-80 words). Do not write a greeting or a signature (e.g. no 'Hey there,' or 'Best, Coach'). Use clean Markdown styling where appropriate (like bolding key insights or targets).\n" +
+                "CRITICAL: Be aware of the 'Current Time of Day' provided in the prompt. If the current time is in the morning, afternoon, or early evening (e.g., before 7:00 PM), do NOT flag low calorie or protein intake as a deficit or critical problem; instead, frame recommendations around what they should focus on eating for the rest of the day. Only diagnose definitive daily calorie/macronutrient deficits or surpluses when it is late in the evening (after 7:00 PM)."
             )
         }
     )
@@ -37,6 +40,10 @@ class CoachingEngine(private val apiKey: String) {
         carbsEaten: Double,
         fatEaten: Double
     ): String {
+        val currentTime = LocalTime.now()
+        val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
+        val formattedTime = currentTime.format(timeFormatter)
+
         val sleepText = if (sleep != null) {
             "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h (Deep Sleep: ${sleep.deepSleepDurationSeconds / 60}m), Sleep Readiness Score: ${sleep.readinessScore}%"
         } else {
@@ -44,15 +51,16 @@ class CoachingEngine(private val apiKey: String) {
         }
 
         val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} kcal (Target: ${macroTargets.calories.toInt()} kcal). " +
-                "Protein: ${proteinEaten.toInt()}g (Target: ${macroTargets.proteinG.toInt()}g). " +
-                "Carbs: ${carbsEaten.toInt()}g (Target: ${macroTargets.carbsG.toInt()}g). " +
-                "Fat: ${fatEaten.toInt()}g (Target: ${macroTargets.fatG.toInt()}g)."
+            "Protein: ${proteinEaten.toInt()}g (Target: ${macroTargets.proteinG.toInt()}g). " +
+            "Carbs: ${carbsEaten.toInt()}g (Target: ${macroTargets.carbsG.toInt()}g). " +
+            "Fat: ${fatEaten.toInt()}g (Target: ${macroTargets.fatG.toInt()}g)."
 
         val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
 
         val goalText = "Current Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)."
 
         val prompt = """
+            Current Time of Day: $formattedTime
             User Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm, Activity Level Multiplier ${profile.activityMultiplier}.
             Goal: $goalText
             Daily Physical Metrics:

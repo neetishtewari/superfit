@@ -77,24 +77,40 @@ class HealthConnectManager(private val context: Context) {
                 )
             )
 
-            // Find the sleep session that ends on the given date (morning of localDate)
-            val relevantSession = response.records.firstOrNull { record ->
+            // Find the sleep sessions that end on the given date (morning of localDate)
+            val relevantSessions = response.records.filter { record ->
                 val recordEndDate = LocalDate.ofInstant(record.endTime, zoneId)
                 recordEndDate == localDate
-            } ?: response.records.lastOrNull()
+            }
 
-            if (relevantSession != null) {
-                val durationSeconds = ChronoUnit.SECONDS.between(relevantSession.startTime, relevantSession.endTime)
+            val targetSessions = if (relevantSessions.isNotEmpty()) {
+                relevantSessions
+            } else {
+                val lastRecord = response.records.lastOrNull()
+                if (lastRecord != null) {
+                    val lastRecordEndDate = LocalDate.ofInstant(lastRecord.endTime, zoneId)
+                    response.records.filter { record ->
+                        LocalDate.ofInstant(record.endTime, zoneId) == lastRecordEndDate
+                    }
+                } else {
+                    emptyList()
+                }
+            }
+
+            if (targetSessions.isNotEmpty()) {
+                val totalDurationSeconds = targetSessions.sumOf { record ->
+                    ChronoUnit.SECONDS.between(record.startTime, record.endTime)
+                }
                 // Standard ratio estimate for deep sleep (20%)
-                val deepSleepSeconds = (durationSeconds * 0.2).toLong()
+                val deepSleepSeconds = (totalDurationSeconds * 0.2).toLong()
 
                 // 8 hours (28800s) = 100% sleep score
-                val sleepRatio = durationSeconds.toDouble() / 28800.0
+                val sleepRatio = totalDurationSeconds.toDouble() / 28800.0
                 val sleepReadiness = (sleepRatio * 100).toInt().coerceIn(0, 100)
 
                 return SleepTelemetryEntity(
                     date = localDate.toString(),
-                    sleepDurationSeconds = durationSeconds,
+                    sleepDurationSeconds = totalDurationSeconds,
                     deepSleepDurationSeconds = deepSleepSeconds,
                     readinessScore = sleepReadiness
                 )
@@ -107,13 +123,24 @@ class HealthConnectManager(private val context: Context) {
 
     private suspend fun readStepsAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long {
         return try {
-            val response = client.aggregate(
-                AggregateRequest(
-                    metrics = setOf(StepsRecord.COUNT_TOTAL),
+            val response = client.readRecords(
+                ReadRecordsRequest(
+                    recordType = StepsRecord::class,
                     timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
                 )
             )
-            response[StepsRecord.COUNT_TOTAL] ?: 0L
+            // Group records by package name and sum the count for each package name
+            val stepsByPackage = response.records.groupBy { it.metadata.dataOrigin.packageName }
+                .mapValues { entry -> entry.value.sumOf { it.count } }
+
+            // Prioritize Samsung Health
+            val shealthSteps = stepsByPackage["com.sec.android.app.shealth"]
+            if (shealthSteps != null) {
+                shealthSteps
+            } else {
+                // Fallback to the maximum single source count
+                stepsByPackage.values.maxOrNull() ?: 0L
+            }
         } catch (e: Exception) {
             0L
         }

@@ -507,17 +507,14 @@ fun DashboardScreen(
                             // Concentric rings canvas
                             val stepsTarget = 10000.0
                             val caloriesTarget = state.macroTargets.calories
-                            val activeCaloriesTarget = 500.0
 
                             val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
                             val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
-                            val activeBurnProgress = (state.activity.activeCalories / activeCaloriesTarget).toFloat().coerceIn(0f, 1f)
                             val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
 
                             ConcentricActivityRings(
                                 caloriesEatenProgress = caloriesProgress,
                                 stepsProgress = stepsProgress,
-                                activeBurnProgress = activeBurnProgress,
                                 caloriesRemaining = caloriesRemaining,
                                 modifier = Modifier.size(160.dp)
                             )
@@ -536,11 +533,6 @@ fun DashboardScreen(
                                     label = "Steps",
                                     value = "${state.activity.steps} / 10K",
                                     color = ElectricCyan
-                                )
-                                RingLegendItem(
-                                    label = "Active Burn",
-                                    value = "${state.activity.activeCalories.toInt()} / 500 kcal",
-                                    color = EnergeticCoral
                                 )
                             }
                         }
@@ -601,15 +593,6 @@ fun DashboardScreen(
                             target = 10000.0,
                             color = ElectricCyan,
                             unit = "steps"
-                        )
-
-                        // Active Energy Burn Progress
-                        ActivityProgressBar(
-                            label = "Active Energy Burned",
-                            current = state.activity.activeCalories,
-                            target = 500.0,
-                            color = EnergeticCoral,
-                            unit = "kcal"
                         )
                     }
 
@@ -1082,7 +1065,6 @@ fun DashboardScreen(
 fun ConcentricActivityRings(
     caloriesEatenProgress: Float,
     stepsProgress: Float,
-    activeBurnProgress: Float,
     caloriesRemaining: Int,
     modifier: Modifier = Modifier
 ) {
@@ -1096,11 +1078,6 @@ fun ConcentricActivityRings(
         animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
         label = "StepsProgress"
     )
-    val activeBurnAnimated by animateFloatAsState(
-        targetValue = activeBurnProgress,
-        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-        label = "ActiveBurnProgress"
-    )
 
     Box(
         modifier = modifier,
@@ -1113,7 +1090,6 @@ fun ConcentricActivityRings(
 
             val radius1 = (size.minDimension / 2) - strokeWidth
             val radius2 = radius1 - strokeWidth - spacing
-            val radius3 = radius2 - strokeWidth - spacing
 
             // Background tracks
             drawCircle(
@@ -1125,12 +1101,6 @@ fun ConcentricActivityRings(
             drawCircle(
                 color = Color.DarkGray.copy(alpha = 0.15f),
                 radius = radius2,
-                center = center,
-                style = Stroke(width = strokeWidth)
-            )
-            drawCircle(
-                color = Color.DarkGray.copy(alpha = 0.15f),
-                radius = radius3,
                 center = center,
                 style = Stroke(width = strokeWidth)
             )
@@ -1175,26 +1145,6 @@ fun ConcentricActivityRings(
                 useCenter = false,
                 topLeft = Offset(center.x - radius2, center.y - radius2),
                 size = Size(radius2 * 2, radius2 * 2),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // 3. Active Burn Arc
-            drawArc(
-                color = EnergeticCoral.copy(alpha = 0.15f),
-                startAngle = -90f,
-                sweepAngle = (activeBurnAnimated * 360f).coerceAtLeast(1f),
-                useCenter = false,
-                topLeft = Offset(center.x - radius3, center.y - radius3),
-                size = Size(radius3 * 2, radius3 * 2),
-                style = Stroke(width = glowWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = EnergeticCoral,
-                startAngle = -90f,
-                sweepAngle = (activeBurnAnimated * 360f).coerceAtLeast(1f),
-                useCenter = false,
-                topLeft = Offset(center.x - radius3, center.y - radius3),
-                size = Size(radius3 * 2, radius3 * 2),
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
         }
