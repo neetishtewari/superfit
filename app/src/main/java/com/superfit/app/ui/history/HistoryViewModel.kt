@@ -29,7 +29,7 @@ data class HistoryDayState(
     val status: DayStatus
 )
 
-data class YesterdaySummaryState(
+data class DaySummaryState(
     val date: LocalDate,
     val caloriesEaten: Double,
     val tdee: Double,
@@ -56,8 +56,16 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
     var loggedDaysCount by mutableStateOf(0)
         private set
 
-    var yesterdaySummary by mutableStateOf<YesterdaySummaryState?>(null)
+    var selectedDate by mutableStateOf<LocalDate>(LocalDate.now().minusDays(1))
         private set
+
+    var selectedSummary by mutableStateOf<DaySummaryState?>(null)
+        private set
+
+    private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
+    private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
+    private var bmr: Double = 0.0
+    private var activityMultiplier: Double = 1.2
 
     init {
         loadData()
@@ -73,19 +81,43 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
         loadData()
     }
 
+    fun selectDate(date: LocalDate) {
+        selectedDate = date
+        updateSelectedSummary()
+    }
+
+    private fun updateSelectedSummary() {
+        val meals = nutritionByDate[selectedDate] ?: emptyList()
+        val activity = activityByDate[selectedDate]
+        val activeCal = activity?.activeCalories ?: 0.0
+        val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+        val eaten = meals.sumOf { it.calories }
+
+        selectedSummary = DaySummaryState(
+            date = selectedDate,
+            caloriesEaten = eaten,
+            tdee = tdee,
+            activeBurn = activeCal,
+            steps = activity?.steps ?: 0,
+            netBalance = eaten - tdee,
+            meals = meals
+        )
+    }
+
     fun loadData() {
         viewModelScope.launch {
             val profile = repository.getProfile() ?: return@launch
-            val bmr = PhysiologyEngine.calculateBmr(profile)
+            bmr = PhysiologyEngine.calculateBmr(profile)
+            activityMultiplier = profile.activityMultiplier
 
             // Get all local entries to compute month grid and consistency
             val allNutrition = repository.getAllNutritionEntries()
             val allActivity = repository.getAllActivityTelemetry()
 
-            val nutritionByDate = allNutrition.groupBy {
+            nutritionByDate = allNutrition.groupBy {
                 Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
             }
-            val activityByDate = allActivity.associateBy {
+            activityByDate = allActivity.associateBy {
                 try {
                     LocalDate.parse(it.date)
                 } catch (e: Exception) {
@@ -106,7 +138,7 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
 
                 val activity = activityByDate[tempDate]
                 val activeCal = activity?.activeCalories ?: 0.0
-                val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, activeCal)
+                val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
 
                 val status = when {
                     mealsCount < 2 -> DayStatus.Insufficient
@@ -141,7 +173,7 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
                     val caloriesEaten = meals.sumOf { it.calories }
                     val activity = activityByDate[checkDate]
                     val activeCal = activity?.activeCalories ?: 0.0
-                    val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, activeCal)
+                    val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
                     if (caloriesEaten < tdee) {
                         rollingDeficitCount++
                     }
@@ -156,23 +188,7 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
                 0
             }
 
-            // Yesterday's summary
-            val yesterday = today.minusDays(1)
-            val yesterdayMeals = nutritionByDate[yesterday] ?: emptyList()
-            val yesterdayActivity = activityByDate[yesterday]
-            val yesterdayActiveCal = yesterdayActivity?.activeCalories ?: 0.0
-            val yesterdayTdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, yesterdayActiveCal)
-            val yesterdayEaten = yesterdayMeals.sumOf { it.calories }
-
-            yesterdaySummary = YesterdaySummaryState(
-                date = yesterday,
-                caloriesEaten = yesterdayEaten,
-                tdee = yesterdayTdee,
-                activeBurn = yesterdayActiveCal,
-                steps = yesterdayActivity?.steps ?: 0,
-                netBalance = yesterdayEaten - yesterdayTdee,
-                meals = yesterdayMeals
-            )
+            updateSelectedSummary()
         }
     }
 }

@@ -130,13 +130,18 @@ fun HistoryScreen(
                 CalendarCard(
                     currentMonthName = viewModel.currentMonth.month.getDisplayName(TextStyle.FULL, Locale.US) + " " + viewModel.currentMonth.year,
                     daysInMonth = viewModel.daysInMonth,
+                    selectedDate = viewModel.selectedDate,
+                    onDateSelected = { viewModel.selectDate(it) },
                     onPrevMonth = { viewModel.prevMonth() },
                     onNextMonth = { viewModel.nextMonth() }
                 )
 
-                // 3. Yesterday's Balance Card
-                viewModel.yesterdaySummary?.let { summary ->
-                    YesterdayBalanceCard(summary = summary)
+                // 3. Selected Day's Balance Card
+                viewModel.selectedSummary?.let { summary ->
+                    DayBalanceCard(
+                        summary = summary,
+                        selectedDate = viewModel.selectedDate
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -262,6 +267,8 @@ fun ConsistencyScoreGauge(
 fun CalendarCard(
     currentMonthName: String,
     daysInMonth: List<HistoryDayState>,
+    selectedDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
     modifier: Modifier = Modifier
@@ -350,6 +357,8 @@ fun CalendarCard(
                                     val dayState = daysInMonth[index - offset]
                                     CalendarDayCell(
                                         dayState = dayState,
+                                        isSelected = dayState.date == selectedDate,
+                                        onClick = { onDateSelected(dayState.date) },
                                         modifier = Modifier
                                             .weight(1f)
                                             .aspectRatio(1f)
@@ -380,6 +389,8 @@ fun CalendarCard(
 @Composable
 fun CalendarDayCell(
     dayState: HistoryDayState,
+    isSelected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bgColor = when (dayState.status) {
@@ -388,21 +399,30 @@ fun CalendarDayCell(
         DayStatus.Insufficient -> Color(0xFF2E2E3A).copy(alpha = 0.3f)
     }
 
-    val borderColor = when (dayState.status) {
-        DayStatus.Deficit -> NeonMint
-        DayStatus.Surplus -> CoralRed
-        DayStatus.Insufficient -> Color.Transparent
+    val borderColor = when {
+        isSelected -> HyperViolet
+        dayState.date == LocalDate.now() -> HyperViolet.copy(alpha = 0.6f)
+        else -> when (dayState.status) {
+            DayStatus.Deficit -> NeonMint
+            DayStatus.Surplus -> CoralRed
+            DayStatus.Insufficient -> Color.Transparent
+        }
     }
 
-    val isToday = dayState.date == LocalDate.now()
+    val borderWidth = when {
+        isSelected -> 2.dp
+        dayState.date == LocalDate.now() -> 2.dp
+        else -> 1.dp
+    }
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
+            .clickable { onClick() }
             .border(
-                width = if (isToday) 2.dp else 1.dp,
-                color = if (isToday) HyperViolet else borderColor,
+                width = borderWidth,
+                color = borderColor,
                 shape = RoundedCornerShape(8.dp)
             ),
         contentAlignment = Alignment.Center
@@ -411,7 +431,7 @@ fun CalendarDayCell(
             Text(
                 text = dayState.date.dayOfMonth.toString(),
                 fontSize = 13.sp,
-                fontWeight = if (isToday) FontWeight.Black else FontWeight.Bold,
+                fontWeight = if (dayState.date == LocalDate.now() || isSelected) FontWeight.Black else FontWeight.Bold,
                 color = if (dayState.status == DayStatus.Insufficient) Color.Gray else Color.White
             )
             if (dayState.status != DayStatus.Insufficient) {
@@ -448,12 +468,21 @@ fun LegendItem(
 }
 
 @Composable
-fun YesterdayBalanceCard(
-    summary: YesterdaySummaryState,
+fun DayBalanceCard(
+    summary: DaySummaryState,
+    selectedDate: LocalDate,
     modifier: Modifier = Modifier
 ) {
     val netColor = if (summary.netBalance < 0) NeonMint else CoralRed
     val balanceLabel = if (summary.netBalance < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
+
+    val today = LocalDate.now()
+    val yesterday = today.minusDays(1)
+    val dateLabel = when (selectedDate) {
+        today -> "TODAY"
+        yesterday -> "YESTERDAY"
+        else -> selectedDate.toString()
+    }
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -477,7 +506,7 @@ fun YesterdayBalanceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "YESTERDAY'S BALANCE",
+                    text = "BALANCE FOR $dateLabel",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray,
@@ -485,7 +514,7 @@ fun YesterdayBalanceCard(
                 )
 
                 Text(
-                    text = summary.date.toString(),
+                    text = selectedDate.toString(),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = ElectricCyan
@@ -552,7 +581,7 @@ fun YesterdayBalanceCard(
 
             if (summary.meals.isEmpty()) {
                 Text(
-                    text = "No meals logged yesterday.",
+                    text = "No meals logged on this day.",
                     fontSize = 13.sp,
                     color = Color.DarkGray,
                     textAlign = TextAlign.Center,
