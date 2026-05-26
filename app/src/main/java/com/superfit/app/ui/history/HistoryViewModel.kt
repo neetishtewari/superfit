@@ -39,6 +39,15 @@ data class DaySummaryState(
     val meals: List<NutritionEntryEntity>
 )
 
+data class WeeklyTrendsState(
+    val avgNetCalories: Double,
+    val avgSteps: Double,
+    val avgSleepDurationSeconds: Long,
+    val avgSleepReadiness: Int,
+    val avgProteinG: Double,
+    val trackedDaysCount: Int
+)
+
 class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
 
     var currentMonth by mutableStateOf(YearMonth.now())
@@ -60,6 +69,9 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
         private set
 
     var selectedSummary by mutableStateOf<DaySummaryState?>(null)
+        private set
+
+    var weeklyTrends by mutableStateOf<WeeklyTrendsState?>(null)
         private set
 
     private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
@@ -113,11 +125,19 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
             // Get all local entries to compute month grid and consistency
             val allNutrition = repository.getAllNutritionEntries()
             val allActivity = repository.getAllActivityTelemetry()
+            val allSleep = repository.getAllSleepTelemetry()
 
             nutritionByDate = allNutrition.groupBy {
                 Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
             }
             activityByDate = allActivity.associateBy {
+                try {
+                    LocalDate.parse(it.date)
+                } catch (e: Exception) {
+                    LocalDate.now()
+                }
+            }
+            val sleepByDate = allSleep.associateBy {
                 try {
                     LocalDate.parse(it.date)
                 } catch (e: Exception) {
@@ -187,6 +207,54 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
             } else {
                 0
             }
+
+            // Calculate rolling 7-day weekly trends (from today backwards)
+            var totalNetCalories = 0.0
+            var totalSteps = 0.0
+            var totalSleepDurationSeconds = 0L
+            var totalSleepReadiness = 0
+            var sleepDaysCount = 0
+            var totalProteinG = 0.0
+            var trackedDaysCount = 0
+            var activeDaysCount = 0
+
+            for (i in 0 until 7) {
+                val checkDate = today.minusDays(i.toLong())
+                val meals = nutritionByDate[checkDate] ?: emptyList()
+                val mealsCount = meals.size
+
+                if (mealsCount >= 2) {
+                    val eatenCalories = meals.sumOf { it.calories }
+                    val activity = activityByDate[checkDate]
+                    val activeCal = activity?.activeCalories ?: 0.0
+                    val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+                    totalNetCalories += (eatenCalories - tdee)
+                    totalProteinG += meals.sumOf { it.proteinG }
+                    trackedDaysCount++
+                }
+
+                val activity = activityByDate[checkDate]
+                if (activity != null) {
+                    totalSteps += activity.steps
+                    activeDaysCount++
+                }
+
+                val sleep = sleepByDate[checkDate]
+                if (sleep != null) {
+                    totalSleepDurationSeconds += sleep.sleepDurationSeconds
+                    totalSleepReadiness += sleep.readinessScore
+                    sleepDaysCount++
+                }
+            }
+
+            weeklyTrends = WeeklyTrendsState(
+                avgNetCalories = if (trackedDaysCount > 0) totalNetCalories / trackedDaysCount else 0.0,
+                avgSteps = totalSteps / 7.0,
+                avgSleepDurationSeconds = if (sleepDaysCount > 0) totalSleepDurationSeconds / sleepDaysCount else 0L,
+                avgSleepReadiness = if (sleepDaysCount > 0) totalSleepReadiness / sleepDaysCount else 0,
+                avgProteinG = if (trackedDaysCount > 0) totalProteinG / trackedDaysCount else 0.0,
+                trackedDaysCount = trackedDaysCount
+            )
 
             updateSelectedSummary()
         }

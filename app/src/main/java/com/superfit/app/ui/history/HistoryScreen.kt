@@ -126,6 +126,11 @@ fun HistoryScreen(
                     loggedDays = viewModel.loggedDaysCount
                 )
 
+                // 1.5 Weekly Trends Card
+                viewModel.weeklyTrends?.let { trends ->
+                    WeeklyTrendsCard(trends = trends)
+                }
+
                 // 2. Calendar Card
                 CalendarCard(
                     currentMonthName = viewModel.currentMonth.month.getDisplayName(TextStyle.FULL, Locale.US) + " " + viewModel.currentMonth.year,
@@ -626,6 +631,129 @@ fun DayBalanceCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun WeeklyTrendsCard(
+    trends: WeeklyTrendsState,
+    modifier: Modifier = Modifier
+) {
+    val netColor = if (trends.avgNetCalories < 0) NeonMint else CoralRed
+    val balanceText = if (trends.avgNetCalories < 0) {
+        "${trends.avgNetCalories.toInt()} kcal"
+    } else {
+        "+${trends.avgNetCalories.toInt()} kcal"
+    }
+    val balanceLabel = if (trends.avgNetCalories < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
+
+    val sleepHours = trends.avgSleepDurationSeconds / 3600.0
+    val sleepText = String.format("%.1fh (${trends.avgSleepReadiness}%%)", sleepHours)
+
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))),
+                RoundedCornerShape(24.dp)
+            )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "WEEKLY PROGRESS (7-DAY ROLLING AVG)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                letterSpacing = 1.sp
+            )
+
+            // 2x2 grid for averages
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TrendItem(
+                        label = balanceLabel,
+                        value = balanceText,
+                        valueColor = netColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TrendItem(
+                        label = "DAILY STEPS",
+                        value = String.format("%,.0f", trends.avgSteps),
+                        valueColor = ElectricCyan,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TrendItem(
+                        label = "SLEEP & READINESS",
+                        value = sleepText,
+                        valueColor = HyperViolet,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TrendItem(
+                        label = "DAILY PROTEIN",
+                        value = "${trends.avgProteinG.toInt()}g",
+                        valueColor = SolarAmber,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Text(
+                text = if (trends.trackedDaysCount > 0) {
+                    "Calculated from ${trends.trackedDaysCount} tracked days of the past 7. Keep logging to improve accuracy!"
+                } else {
+                    "No meals logged in the last 7 days. Start logging meals to view your average daily calorie trends!"
+                },
+                fontSize = 11.sp,
+                color = Color.Gray,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+fun TrendItem(
+    label: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.02f))
+            .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(16.dp))
+            .padding(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = label,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                letterSpacing = 0.5.sp
+            )
+            Text(
+                text = value,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                color = valueColor
+            )
         }
     }
 }

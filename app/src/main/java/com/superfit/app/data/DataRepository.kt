@@ -90,5 +90,9 @@ class DataRepository(
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> {
         return database.telemetryDao().getAllActivity()
     }
+
+    suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> {
+        return database.telemetryDao().getAllSleep()
+    }
 }
 
