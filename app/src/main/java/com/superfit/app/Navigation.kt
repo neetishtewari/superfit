@@ -79,7 +79,7 @@ fun MainNavigation(
             }
             entry<Onboarding> {
                 val onboardingViewModel: OnboardingViewModel = viewModel {
-                    OnboardingViewModel(repository)
+                    OnboardingViewModel(repository, context.applicationContext)
                 }
                 OnboardingScreen(
                     healthConnectManager = healthConnectManager,

@@ -25,6 +25,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.result.contract.ActivityResultContracts
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -48,6 +57,8 @@ fun OnboardingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
+    val context = LocalContext.current
+
     // Health Connect Permission Launcher
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract()
@@ -56,6 +67,33 @@ fun OnboardingScreen(
         if (granted.isNotEmpty()) {
             viewModel.autofillFromHealthConnect()
         }
+    }
+
+    // Permission launcher for microphone
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        viewModel.onMicPermissionStateChanged(isGranted)
+        if (!isGranted) {
+            Toast.makeText(context, "Opening Settings to enable microphone permission...", Toast.LENGTH_LONG).show()
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Please open Settings and grant microphone permissions manually.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Auto check microphone permission on entry
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        viewModel.onMicPermissionStateChanged(hasPermission)
     }
 
     Box(
@@ -244,6 +282,200 @@ fun OnboardingScreen(
                                 }
                                 .padding(vertical = 4.dp)
                         )
+                    }
+                }
+            }
+
+            // Voice Logging & AI Configuration Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(CardBgTranslucent)
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.02f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Header row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = ElectricCyan
+                            )
+                            Text(
+                                text = "Voice & AI Setup",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                fontSize = 16.sp
+                            )
+                        }
+
+                        // Status Badge
+                        val isKeyConfigured = uiState.apiKey.trim().startsWith("AIzaSy")
+                        val micGranted = uiState.isMicPermissionGranted
+                        val overallStatus = when {
+                            isKeyConfigured && micGranted -> "Ready"
+                            isKeyConfigured -> "Mic Missing"
+                            micGranted -> "Key Missing"
+                            else -> "Not Setup"
+                        }
+                        val statusColor = when {
+                            isKeyConfigured && micGranted -> NeonGreen
+                            isKeyConfigured || micGranted -> ElectricCyan
+                            else -> Color.Gray
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(statusColor.copy(alpha = 0.15f))
+                                .border(1.dp, statusColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = overallStatus,
+                                color = statusColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Quick Voice Logging uses Gemini AI to parse spoken meals. Set up access below to get started.",
+                        fontSize = 13.sp,
+                        color = Color.LightGray
+                    )
+
+                    // Step 1: Microphone permission request button
+                    Button(
+                        onClick = {
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPermission) {
+                                viewModel.onMicPermissionStateChanged(true)
+                            } else {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.isMicPermissionGranted) NeonGreen.copy(alpha = 0.15f) else ElectricCyan.copy(alpha = 0.15f),
+                            contentColor = if (uiState.isMicPermissionGranted) NeonGreen else ElectricCyan
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (uiState.isMicPermissionGranted) "Microphone Access: Granted" else "Grant Microphone Access",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    HorizontalDivider(
+                        color = Color.White.copy(alpha = 0.05f),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    // Step 2: Gemini API Key Setup
+                    Text(
+                        text = "Configure Gemini API Key",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.apiKey,
+                        onValueChange = { viewModel.onApiKeyChanged(it) },
+                        label = { Text("Gemini API Key") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ElectricCyan,
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                            focusedLabelColor = ElectricCyan,
+                            unfocusedLabelColor = Color.Gray,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Clipboard Paste Helper
+                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                    Button(
+                        onClick = {
+                            val clipText = clipboardManager.getText()?.text
+                            if (!clipText.isNullOrBlank()) {
+                                viewModel.onApiKeyChanged(clipText.trim())
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.05f),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = "Paste from Clipboard", fontSize = 12.sp)
+                    }
+
+                    // Only show "Get Free Key" button if a valid key is NOT configured
+                    val isKeyWorking = uiState.apiKey.trim().startsWith("AIzaSy")
+                    if (!isKeyWorking) {
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Could not open browser. Please visit: https://aistudio.google.com/app/apikey", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ElectricCyan.copy(alpha = 0.1f),
+                                contentColor = ElectricCyan
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Get Free Gemini Key (30 Seconds)", fontSize = 12.sp)
+                        }
+                    } else {
+                        // Success Feedback
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = NeonGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Working key detected! Helper instructions hidden.",
+                                color = NeonGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }

@@ -9,8 +9,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class OnboardingViewModel(private val repository: DataRepository) : ViewModel() {
-    private val _uiState = MutableStateFlow(OnboardingUiState())
+class OnboardingViewModel(
+    private val repository: DataRepository,
+    context: android.content.Context
+) : ViewModel() {
+
+    private val sharedPrefs = context.getSharedPreferences("superfit_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _uiState = MutableStateFlow(
+        OnboardingUiState(
+            apiKey = sharedPrefs.getString("gemini_api_key", "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM") ?: "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM"
+        )
+    )
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     init {
@@ -74,6 +84,14 @@ class OnboardingViewModel(private val repository: DataRepository) : ViewModel() 
         }
     }
 
+    fun onApiKeyChanged(key: String) {
+        _uiState.value = _uiState.value.copy(apiKey = key)
+    }
+
+    fun onMicPermissionStateChanged(granted: Boolean) {
+        _uiState.value = _uiState.value.copy(isMicPermissionGranted = granted)
+    }
+
     fun saveProfile(onSuccess: () -> Unit) {
         val state = _uiState.value
         val ageInt = state.age.toIntOrNull()
@@ -95,6 +113,9 @@ class OnboardingViewModel(private val repository: DataRepository) : ViewModel() 
 
         viewModelScope.launch {
             try {
+                // Persist the API Key configured by the user
+                sharedPrefs.edit().putString("gemini_api_key", state.apiKey).apply()
+
                 val profile = UserProfileEntity(
                     id = 0,
                     age = ageInt,
@@ -125,5 +146,7 @@ data class OnboardingUiState(
     val hasHealthConnectPermissions: Boolean = false,
     val grantedPermissions: Set<String> = emptySet(),
     val isAutofilling: Boolean = false,
+    val apiKey: String = "",
+    val isMicPermissionGranted: Boolean = false,
     val error: String? = null
 )
