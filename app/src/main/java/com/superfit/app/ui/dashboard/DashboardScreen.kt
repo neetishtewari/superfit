@@ -161,7 +161,7 @@ fun DashboardScreen(
     // Clean up voice listener on dispose
     DisposableEffect(Unit) {
         onDispose {
-            speechHelper.stopListening()
+            speechHelper.destroy()
         }
     }
 
@@ -1651,72 +1651,95 @@ class SpeechRecognizerHelper(
 ) {
     private var speechRecognizer: SpeechRecognizer? = null
 
+    private fun getOrCreateRecognizer(): SpeechRecognizer {
+        if (speechRecognizer == null) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context.applicationContext).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        onListeningStateChange(true)
+                    }
+
+                    override fun onBeginningOfSpeech() {}
+
+                    override fun onRmsChanged(rmsdB: Float) {}
+
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+
+                    override fun onEndOfSpeech() {
+                        onListeningStateChange(false)
+                    }
+
+                    override fun onError(error: Int) {
+                        onListeningStateChange(false)
+                        val message = when (error) {
+                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
+                            SpeechRecognizer.ERROR_CLIENT -> "Client side error."
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission denied."
+                            SpeechRecognizer.ERROR_NETWORK -> "Network error."
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
+                            SpeechRecognizer.ERROR_NO_MATCH -> "Could not understand audio. Try again."
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy."
+                            SpeechRecognizer.ERROR_SERVER -> "Server connection error."
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected."
+                            11 -> "Binding error. Try again."
+                            else -> "Speech error: $error"
+                        }
+                        onError(message)
+                    }
+
+                    override fun onResults(results: Bundle?) {
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull()
+                        if (!text.isNullOrBlank()) {
+                            onResult(text)
+                        } else {
+                            onError("Could not understand speech.")
+                        }
+                    }
+
+                    override fun onPartialResults(partialResults: Bundle?) {}
+
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+        }
+        return speechRecognizer!!
+    }
+
     fun startListening() {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             onError("Speech recognition is not available on this device.")
             return
         }
         
-        stopListening()
-        
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    onListeningStateChange(true)
-                }
-
-                override fun onBeginningOfSpeech() {}
-
-                override fun onRmsChanged(rmsdB: Float) {}
-
-                override fun onBufferReceived(buffer: ByteArray?) {}
-
-                override fun onEndOfSpeech() {
-                    onListeningStateChange(false)
-                }
-
-                override fun onError(error: Int) {
-                    onListeningStateChange(false)
-                    val message = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                        SpeechRecognizer.ERROR_CLIENT -> "Client side error."
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission denied."
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error."
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
-                        SpeechRecognizer.ERROR_NO_MATCH -> "Could not understand audio. Try again."
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy."
-                        SpeechRecognizer.ERROR_SERVER -> "Server connection error."
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected."
-                        else -> "Speech error: $error"
-                    }
-                    onError(message)
-                }
-
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.firstOrNull()
-                    if (!text.isNullOrBlank()) {
-                        onResult(text)
-                    } else {
-                        onError("Could not understand speech.")
-                    }
-                }
-
-                override fun onPartialResults(partialResults: Bundle?) {}
-
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
+        try {
+            speechRecognizer?.cancel()
+            val recognizer = getOrCreateRecognizer()
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            }
+            recognizer.startListening(intent)
+        } catch (e: Exception) {
+            onError("Failed to start listening: ${e.localizedMessage}")
         }
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
-        speechRecognizer?.startListening(intent)
     }
 
     fun stopListening() {
-        speechRecognizer?.destroy()
+        try {
+            speechRecognizer?.stopListening()
+        } catch (e: Exception) {
+            // Ignore
+        }
+        onListeningStateChange(false)
+    }
+
+    fun destroy() {
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            // Ignore
+        }
         speechRecognizer = null
         onListeningStateChange(false)
     }
