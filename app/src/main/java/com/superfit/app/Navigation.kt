@@ -122,7 +122,7 @@ fun MainNavigation(
             }
             entry<History> {
                 val historyViewModel: HistoryViewModel = viewModel {
-                    HistoryViewModel(repository)
+                    HistoryViewModel(repository, context.applicationContext)
                 }
                 HistoryScreen(
                     viewModel = historyViewModel,

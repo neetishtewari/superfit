@@ -14,9 +14,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -145,7 +152,8 @@ fun HistoryScreen(
                 viewModel.selectedSummary?.let { summary ->
                     DayBalanceCard(
                         summary = summary,
-                        selectedDate = viewModel.selectedDate
+                        selectedDate = viewModel.selectedDate,
+                        viewModel = viewModel
                     )
                 }
 
@@ -476,6 +484,7 @@ fun LegendItem(
 fun DayBalanceCard(
     summary: DaySummaryState,
     selectedDate: LocalDate,
+    viewModel: HistoryViewModel,
     modifier: Modifier = Modifier
 ) {
     val netColor = if (summary.netBalance < 0) NeonMint else CoralRed
@@ -519,34 +528,36 @@ fun DayBalanceCard(
                 )
 
                 Text(
-                    text = selectedDate.toString(),
-                    fontSize = 12.sp,
+                    text = if (summary.netBalance < 0) "ON TARGET" else "SURPLUS",
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ElectricCyan
+                    color = if (summary.netBalance < 0) NeonMint else CoralRed,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background((if (summary.netBalance < 0) NeonMint else CoralRed).copy(alpha = 0.15f))
+                        .border(1.dp, (if (summary.netBalance < 0) NeonMint else CoralRed).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
 
-            // Core numbers grid
+            // Stats breakdown grid (Calories, TDEE, Steps, Active Burn)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "EATEN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.caloriesEaten.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "TDEE", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.tdee.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "STEPS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text(text = summary.steps.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ElectricCyan)
+                    Text(text = String.format("%,d", summary.steps), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "BURN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.activeBurn.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CoralRed)
                 }
@@ -621,14 +632,142 @@ fun DayBalanceCard(
                                     color = Color.Gray
                                 )
                             }
-                            Text(
-                                text = "${entry.calories.toInt()} kcal",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NeonMint
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "${entry.calories.toInt()} kcal",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeonMint
+                                )
+                                IconButton(
+                                    onClick = { viewModel.deleteMeal(entry) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete Meal",
+                                        tint = CoralRed,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
                         }
                     }
+                }
+            }
+
+            HorizontalDivider(
+                color = Color.White.copy(alpha = 0.05f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            // Add missed meal text input row
+            var foodText by remember { mutableStateOf("") }
+            val parsingState by viewModel.parsingState.collectAsState()
+
+            var statusMessage by remember { mutableStateOf<String?>(null) }
+            var isErrorState by remember { mutableStateOf(false) }
+
+            LaunchedEffect(parsingState) {
+                val state = parsingState
+                when (state) {
+                    is HistoryParsingState.Success -> {
+                        statusMessage = "Logged: ${state.foodText}"
+                        isErrorState = false
+                        foodText = ""
+                        viewModel.resetParsingState()
+                    }
+                    is HistoryParsingState.Error -> {
+                        statusMessage = state.message
+                        isErrorState = true
+                        viewModel.resetParsingState()
+                    }
+                    else -> {}
+                }
+            }
+
+            LaunchedEffect(statusMessage) {
+                if (statusMessage != null) {
+                    kotlinx.coroutines.delay(4000)
+                    statusMessage = null
+                }
+            }
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "LOG A MISSED MEAL",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    letterSpacing = 0.5.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = foodText,
+                        onValueChange = { foodText = it },
+                        placeholder = { Text("e.g. 1 plate of pasta and chicken breast", fontSize = 12.sp, color = Color.Gray) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ElectricCyan,
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        modifier = Modifier.weight(1f),
+                        enabled = parsingState != HistoryParsingState.Loading
+                    )
+
+                    Button(
+                        onClick = {
+                            if (foodText.isNotBlank()) {
+                                viewModel.parseAndAddMeal(foodText)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ElectricCyan.copy(alpha = 0.15f),
+                            contentColor = ElectricCyan
+                        ),
+                        enabled = foodText.isNotBlank() && parsingState != HistoryParsingState.Loading
+                    ) {
+                        if (parsingState == HistoryParsingState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = ElectricCyan,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add Meal",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Log", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                statusMessage?.let { msg ->
+                    Text(
+                        text = msg,
+                        color = if (isErrorState) CoralRed else NeonMint,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
                 }
             }
         }

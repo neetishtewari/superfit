@@ -10,6 +10,10 @@ import com.superfit.app.data.DataRepository
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.domain.PhysiologyEngine
 import kotlinx.coroutines.launch
+import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -48,7 +52,22 @@ data class WeeklyTrendsState(
     val trackedDaysCount: Int
 )
 
-class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
+sealed interface HistoryParsingState {
+    object Idle : HistoryParsingState
+    object Loading : HistoryParsingState
+    data class Success(val foodText: String) : HistoryParsingState
+    data class Error(val message: String) : HistoryParsingState
+}
+
+class HistoryViewModel(
+    private val repository: DataRepository,
+    context: Context
+) : ViewModel() {
+
+    private val sharedPrefs = context.getSharedPreferences("superfit_prefs", Context.MODE_PRIVATE)
+
+    private val _parsingState = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
+    val parsingState: StateFlow<HistoryParsingState> = _parsingState.asStateFlow()
 
     var currentMonth by mutableStateOf(YearMonth.now())
         private set
@@ -257,6 +276,68 @@ class HistoryViewModel(private val repository: DataRepository) : ViewModel() {
             )
 
             updateSelectedSummary()
+        }
+    }
+
+    fun resetParsingState() {
+        _parsingState.value = HistoryParsingState.Idle
+    }
+
+    fun deleteMeal(entry: NutritionEntryEntity) {
+        viewModelScope.launch {
+            repository.deleteNutritionEntry(entry)
+            loadData()
+        }
+    }
+
+    fun parseAndAddMeal(input: String) {
+        val key = sharedPrefs.getString("gemini_api_key", "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM") ?: "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM"
+        if (key.isBlank()) {
+            _parsingState.value = HistoryParsingState.Error("Please enter your Gemini API Key in Settings first.")
+            return
+        }
+
+        viewModelScope.launch {
+            _parsingState.value = HistoryParsingState.Loading
+            try {
+                val parser = com.superfit.app.domain.NutritionParser(key)
+                val result = parser.parseFoodInput(input)
+
+                if (result.foodText == "invalid") {
+                    _parsingState.value = HistoryParsingState.Error("Could not recognize any food items. Please try typing something like 'one apple and greek yogurt'.")
+                    return@launch
+                }
+
+                // Construct a timestamp at exactly 12:00 PM of the selected date to avoid timezone boundaries
+                val targetTimestamp = selectedDate.atTime(12, 0)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+
+                val entry = NutritionEntryEntity(
+                    foodText = result.foodText,
+                    calories = result.calories,
+                    proteinG = result.proteinG,
+                    carbsG = result.carbsG,
+                    fatG = result.fatG,
+                    timestamp = targetTimestamp
+                )
+                repository.addNutritionEntry(entry)
+                loadData()
+                _parsingState.value = HistoryParsingState.Success(result.foodText)
+            } catch (e: Exception) {
+                val msg = e.localizedMessage ?: ""
+                val friendlyMsg = when {
+                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
+                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
+                    }
+                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
+                        "Invalid API Key. Please update your API key in Settings."
+                    }
+                    else -> "Unable to track meal: ${e.localizedMessage ?: "Unknown error"}"
+                }
+                _parsingState.value = HistoryParsingState.Error(friendlyMsg)
+            }
         }
     }
 }
