@@ -89,7 +89,9 @@ class DataRepository(
     }
 
     suspend fun clearAllLocalData() {
-        database.clearAllTables()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            database.clearAllTables()
+        }
     }
 
     suspend fun getAllNutritionEntries(): List<NutritionEntryEntity> {
