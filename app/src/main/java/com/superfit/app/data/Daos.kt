@@ -89,5 +89,32 @@ interface NutritionDao {
 
     @Query("DELETE FROM nutrition_entries")
     suspend fun deleteAllEntries()
+
+    @Query("SELECT foodText FROM nutrition_entries GROUP BY foodText ORDER BY COUNT(foodText) DESC LIMIT :limit")
+    suspend fun getFrequentFoodTexts(limit: Int): List<String>
+}
+
+@Dao
+interface WorkoutDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEntry(entry: WorkoutEntryEntity)
+
+    @Delete
+    suspend fun deleteEntry(entry: WorkoutEntryEntity)
+
+    @Query("SELECT * FROM workout_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
+    fun getEntriesForDayFlow(startOfDay: Long, endOfDay: Long): Flow<List<WorkoutEntryEntity>>
+
+    @Query("SELECT * FROM workout_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
+    suspend fun getEntriesForDay(startOfDay: Long, endOfDay: Long): List<WorkoutEntryEntity>
+
+    @Query("SELECT * FROM workout_entries")
+    suspend fun getAllEntries(): List<WorkoutEntryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEntries(entries: List<WorkoutEntryEntity>)
+
+    @Query("DELETE FROM workout_entries")
+    suspend fun deleteAllEntries()
 }
 

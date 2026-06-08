@@ -10,9 +10,10 @@ import androidx.room.RoomDatabase
         UserProfileEntity::class,
         ActivityTelemetryEntity::class,
         SleepTelemetryEntity::class,
-        NutritionEntryEntity::class
+        NutritionEntryEntity::class,
+        WorkoutEntryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class SuperfitDatabase : RoomDatabase() {
@@ -20,21 +21,30 @@ abstract class SuperfitDatabase : RoomDatabase() {
     abstract fun profileDao(): ProfileDao
     abstract fun telemetryDao(): TelemetryDao
     abstract fun nutritionDao(): NutritionDao
+    abstract fun workoutDao(): WorkoutDao
 
     companion object {
         @Volatile
         private var INSTANCE: SuperfitDatabase? = null
+        private var activeUserId: String? = null
 
         fun getDatabase(context: Context): SuperfitDatabase {
-            return INSTANCE ?: synchronized(this) {
+            val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
+            return INSTANCE?.takeIf { activeUserId == currentUserId } ?: synchronized(this) {
+                INSTANCE?.let {
+                    if (it.isOpen) {
+                        it.close()
+                    }
+                }
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SuperfitDatabase::class.java,
-                    "superfit_database"
+                    "superfit_database_$currentUserId"
                 )
-                .fallbackToDestructiveMigration() // Simple strategy for development updates
+                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
+                activeUserId = currentUserId
                 instance
             }
         }

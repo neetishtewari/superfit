@@ -1,16 +1,25 @@
 package com.superfit.app.data
 
+import android.content.Context
+import android.content.SharedPreferences
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.ZoneId
 
+fun getUserSharedPrefs(context: Context): SharedPreferences {
+    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
+    return context.getSharedPreferences("superfit_prefs_$userId", Context.MODE_PRIVATE)
+}
+
 class DataRepository(
-    private val database: SuperfitDatabase,
+    private val context: Context,
     val healthConnectManager: HealthConnectManager
 ) {
-    val firebaseSyncManager = FirebaseSyncManager(database)
+    private val database: SuperfitDatabase get() = SuperfitDatabase.getDatabase(context)
+    val firebaseSyncManager get() = FirebaseSyncManager(context)
 
-    val profileFlow: Flow<UserProfileEntity?> = database.profileDao().getProfileFlow()
+    val profileFlow: Flow<UserProfileEntity?> get() = database.profileDao().getProfileFlow()
 
     suspend fun getProfile(): UserProfileEntity? = database.profileDao().getProfile()
 
@@ -93,6 +102,31 @@ class DataRepository(
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> {
         return database.telemetryDao().getAllSleep()
+    }
+
+    suspend fun getFrequentFoodTexts(limit: Int): List<String> {
+        return database.nutritionDao().getFrequentFoodTexts(limit)
+    }
+
+    fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> {
+        val zoneId = ZoneId.systemDefault()
+        val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val endOfDay = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
+        return database.workoutDao().getEntriesForDayFlow(startOfDay, endOfDay)
+    }
+
+    suspend fun addWorkoutEntry(entry: WorkoutEntryEntity) {
+        database.workoutDao().insertEntry(entry)
+        firebaseSyncManager.uploadWorkout(entry)
+    }
+
+    suspend fun deleteWorkoutEntry(entry: WorkoutEntryEntity) {
+        database.workoutDao().deleteEntry(entry)
+        firebaseSyncManager.deleteWorkout(entry)
+    }
+
+    suspend fun getAllWorkoutEntries(): List<WorkoutEntryEntity> {
+        return database.workoutDao().getAllEntries()
     }
 }
 

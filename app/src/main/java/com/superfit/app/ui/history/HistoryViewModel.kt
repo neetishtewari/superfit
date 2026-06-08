@@ -5,9 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.superfit.app.data.ActivityTelemetryEntity
-import com.superfit.app.data.DataRepository
-import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.*
 import com.superfit.app.domain.PhysiologyEngine
 import kotlinx.coroutines.launch
 import android.content.Context
@@ -40,7 +38,8 @@ data class DaySummaryState(
     val activeBurn: Double,
     val steps: Int,
     val netBalance: Double,
-    val meals: List<NutritionEntryEntity>
+    val meals: List<NutritionEntryEntity>,
+    val workouts: List<WorkoutEntryEntity>
 )
 
 data class WeeklyTrendsState(
@@ -49,7 +48,9 @@ data class WeeklyTrendsState(
     val avgSleepDurationSeconds: Long,
     val avgSleepReadiness: Int,
     val avgProteinG: Double,
-    val trackedDaysCount: Int
+    val trackedDaysCount: Int,
+    val totalWorkouts: Int,
+    val totalStrengthSets: Int
 )
 
 sealed interface HistoryParsingState {
@@ -64,7 +65,7 @@ class HistoryViewModel(
     context: Context
 ) : ViewModel() {
 
-    private val sharedPrefs = context.getSharedPreferences("superfit_prefs", Context.MODE_PRIVATE)
+    private val sharedPrefs = getUserSharedPrefs(context)
 
     private val _parsingState = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
     val parsingState: StateFlow<HistoryParsingState> = _parsingState.asStateFlow()
@@ -76,6 +77,9 @@ class HistoryViewModel(
         private set
 
     var consistencyScore by mutableStateOf(0)
+        private set
+
+    var workoutConsistencyScore by mutableStateOf(0)
         private set
 
     var deficitDaysCount by mutableStateOf(0)
@@ -93,7 +97,11 @@ class HistoryViewModel(
     var weeklyTrends by mutableStateOf<WeeklyTrendsState?>(null)
         private set
 
+    var frequentMeals by mutableStateOf<List<String>>(emptyList())
+        private set
+
     private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
+    private var workoutsByDate: Map<LocalDate, List<WorkoutEntryEntity>> = emptyMap()
     private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
     private var bmr: Double = 0.0
     private var activityMultiplier: Double = 1.2
@@ -119,8 +127,10 @@ class HistoryViewModel(
 
     private fun updateSelectedSummary() {
         val meals = nutritionByDate[selectedDate] ?: emptyList()
+        val workouts = workoutsByDate[selectedDate] ?: emptyList()
         val activity = activityByDate[selectedDate]
-        val activeCal = activity?.activeCalories ?: 0.0
+        val manualCal = workouts.sumOf { it.caloriesBurned }
+        val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
         val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
         val eaten = meals.sumOf { it.calories }
 
@@ -131,7 +141,8 @@ class HistoryViewModel(
             activeBurn = activeCal,
             steps = activity?.steps ?: 0,
             netBalance = eaten - tdee,
-            meals = meals
+            meals = meals,
+            workouts = workouts
         )
     }
 
@@ -143,10 +154,14 @@ class HistoryViewModel(
 
             // Get all local entries to compute month grid and consistency
             val allNutrition = repository.getAllNutritionEntries()
+            val allWorkouts = repository.getAllWorkoutEntries()
             val allActivity = repository.getAllActivityTelemetry()
             val allSleep = repository.getAllSleepTelemetry()
 
             nutritionByDate = allNutrition.groupBy {
+                Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+            }
+            workoutsByDate = allWorkouts.groupBy {
                 Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
             }
             activityByDate = allActivity.associateBy {
@@ -175,8 +190,10 @@ class HistoryViewModel(
                 val mealsCount = meals.size
                 val caloriesEaten = meals.sumOf { it.calories }
 
+                val workouts = workoutsByDate[tempDate] ?: emptyList()
+                val manualCal = workouts.sumOf { it.caloriesBurned }
                 val activity = activityByDate[tempDate]
-                val activeCal = activity?.activeCalories ?: 0.0
+                val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
                 val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
 
                 val status = when {
@@ -210,8 +227,10 @@ class HistoryViewModel(
                 if (mealsCount >= 2) {
                     rollingLoggedCount++
                     val caloriesEaten = meals.sumOf { it.calories }
+                    val workouts = workoutsByDate[checkDate] ?: emptyList()
+                    val manualCal = workouts.sumOf { it.caloriesBurned }
                     val activity = activityByDate[checkDate]
-                    val activeCal = activity?.activeCalories ?: 0.0
+                    val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
                     val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
                     if (caloriesEaten < tdee) {
                         rollingDeficitCount++
@@ -227,6 +246,17 @@ class HistoryViewModel(
                 0
             }
 
+            // Calculate rolling 30-day training consistency score (from today backwards)
+            var rollingWorkoutDaysCount = 0
+            for (i in 0 until 30) {
+                val checkDate = today.minusDays(i.toLong())
+                val workouts = workoutsByDate[checkDate] ?: emptyList()
+                if (workouts.isNotEmpty()) {
+                    rollingWorkoutDaysCount++
+                }
+            }
+            workoutConsistencyScore = ((rollingWorkoutDaysCount.toDouble() / 30) * 100).toInt()
+
             // Calculate rolling 7-day weekly trends (from today backwards)
             var totalNetCalories = 0.0
             var totalSteps = 0.0
@@ -236,16 +266,23 @@ class HistoryViewModel(
             var totalProteinG = 0.0
             var trackedDaysCount = 0
             var activeDaysCount = 0
+            var totalWorkouts = 0
+            var totalStrengthSets = 0
 
             for (i in 0 until 7) {
                 val checkDate = today.minusDays(i.toLong())
                 val meals = nutritionByDate[checkDate] ?: emptyList()
                 val mealsCount = meals.size
 
+                val workouts = workoutsByDate[checkDate] ?: emptyList()
+                val manualCal = workouts.sumOf { it.caloriesBurned }
+                totalWorkouts += workouts.size
+                totalStrengthSets += workouts.filter { it.workoutType == "Strength" }.sumOf { it.setsCount }
+
                 if (mealsCount >= 2) {
                     val eatenCalories = meals.sumOf { it.calories }
                     val activity = activityByDate[checkDate]
-                    val activeCal = activity?.activeCalories ?: 0.0
+                    val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
                     val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
                     totalNetCalories += (eatenCalories - tdee)
                     totalProteinG += meals.sumOf { it.proteinG }
@@ -272,9 +309,12 @@ class HistoryViewModel(
                 avgSleepDurationSeconds = if (sleepDaysCount > 0) totalSleepDurationSeconds / sleepDaysCount else 0L,
                 avgSleepReadiness = if (sleepDaysCount > 0) totalSleepReadiness / sleepDaysCount else 0,
                 avgProteinG = if (trackedDaysCount > 0) totalProteinG / trackedDaysCount else 0.0,
-                trackedDaysCount = trackedDaysCount
+                trackedDaysCount = trackedDaysCount,
+                totalWorkouts = totalWorkouts,
+                totalStrengthSets = totalStrengthSets
             )
 
+            frequentMeals = repository.getFrequentFoodTexts(3)
             updateSelectedSummary()
         }
     }
@@ -290,8 +330,15 @@ class HistoryViewModel(
         }
     }
 
+    fun deleteWorkout(entry: WorkoutEntryEntity) {
+        viewModelScope.launch {
+            repository.deleteWorkoutEntry(entry)
+            loadData()
+        }
+    }
+
     fun parseAndAddMeal(input: String) {
-        val key = sharedPrefs.getString("gemini_api_key", "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM") ?: "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM"
+        val key = sharedPrefs.getString("gemini_api_key", "") ?: ""
         if (key.isBlank()) {
             _parsingState.value = HistoryParsingState.Error("Please enter your Gemini API Key in Settings first.")
             return

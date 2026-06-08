@@ -12,17 +12,28 @@ android {
     namespace = "com.superfit.app"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.superfit.app"
+        applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../superfit-release.jks")
+            storePassword = "superfitkey2026"
+            keyAlias = "superfit-key"
+            keyPassword = "superfitkey2026"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

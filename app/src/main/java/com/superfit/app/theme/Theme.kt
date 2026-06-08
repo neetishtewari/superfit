@@ -8,6 +8,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -27,17 +30,33 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40,
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = Color(0xFF7C3AED), // vibrant violet-600
+    secondary = Color(0xFF0891B2), // vibrant cyan-600
+    tertiary = Color(0xFF059669),  // vibrant emerald-600
+    background = LightBgStart,
+    surface = LightCardBg,
+    error = Color(0xFFDC2626),
     onPrimary = Color.White,
     onSecondary = Color.White,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF0F172A),
+    onError = Color.White
 )
+
+val LocalThemeIsDark = staticCompositionLocalOf { true }
+
+object SuperfitTheme {
+    val isDark: Boolean
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalThemeIsDark.current
+
+    val colors: SuperfitColors
+        @Composable
+        @ReadOnlyComposable
+        get() = if (isDark) DarkColors else LightColors
+}
 
 @Composable
 fun SuperfitTheme(
@@ -52,12 +71,15 @@ fun SuperfitTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> DarkColorScheme
-        else -> DarkColorScheme // Force dark theme for a premium cinematic layout
+        else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalThemeIsDark provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
+

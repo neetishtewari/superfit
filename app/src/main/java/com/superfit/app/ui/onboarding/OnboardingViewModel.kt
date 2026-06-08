@@ -2,8 +2,7 @@ package com.superfit.app.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.superfit.app.data.DataRepository
-import com.superfit.app.data.UserProfileEntity
+import com.superfit.app.data.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,11 +13,11 @@ class OnboardingViewModel(
     context: android.content.Context
 ) : ViewModel() {
 
-    private val sharedPrefs = context.getSharedPreferences("superfit_prefs", android.content.Context.MODE_PRIVATE)
+    private val sharedPrefs = getUserSharedPrefs(context)
 
     private val _uiState = MutableStateFlow(
         OnboardingUiState(
-            apiKey = sharedPrefs.getString("gemini_api_key", "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM") ?: "AIzaSyBO5mX4dLLtuZHoYHlZyT2W9CLoaMLYYLM"
+            apiKey = sharedPrefs.getString("gemini_api_key", "") ?: ""
         )
     )
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -108,6 +107,11 @@ class OnboardingViewModel(
         }
         if (weightDouble == null || weightDouble <= 0) {
             _uiState.value = _uiState.value.copy(error = "Please enter a valid weight in kg.")
+            return
+        }
+        val trimmedKey = state.apiKey.trim()
+        if (trimmedKey.isBlank() || (!trimmedKey.startsWith("AIzaSy") && !trimmedKey.startsWith("AQ."))) {
+            _uiState.value = _uiState.value.copy(error = "Please enter a valid Gemini API Key starting with 'AIzaSy' or 'AQ.'.")
             return
         }
 

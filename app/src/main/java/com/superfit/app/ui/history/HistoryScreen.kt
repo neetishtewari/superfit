@@ -33,6 +33,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,7 +63,7 @@ fun HistoryScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(DarkBgStart, DarkBgEnd)
+                    colors = listOf(ThemeBgStart, ThemeBgEnd)
                 )
             )
     ) {
@@ -96,15 +98,15 @@ fun HistoryScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 2.sp,
-                            color = Color.White
+                            color = ThemeTextPrimary
                         )
                     },
                     navigationIcon = {
                         IconButton(
                             onClick = onBack,
                             colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = CardBg,
-                                contentColor = Color.White
+                                containerColor = ThemeCardBg,
+                                contentColor = ThemeTextPrimary
                             )
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -128,10 +130,27 @@ fun HistoryScreen(
             ) {
                 // 1. Consistency Score Gauge
                 ConsistencyScoreGauge(
-                    score = viewModel.consistencyScore,
+                    deficitScore = viewModel.consistencyScore,
                     deficitDays = viewModel.deficitDaysCount,
-                    loggedDays = viewModel.loggedDaysCount
+                    loggedDays = viewModel.loggedDaysCount,
+                    trainingScore = viewModel.workoutConsistencyScore
                 )
+
+                // Calorie Trend Chart
+                val daysInMonth = viewModel.daysInMonth
+                if (daysInMonth.isNotEmpty()) {
+                    val selectedDate = viewModel.selectedDate
+                    val chartDays = remember(daysInMonth, selectedDate) {
+                        val selectedIndex = daysInMonth.indexOfFirst { it.date == selectedDate }
+                        if (selectedIndex != -1) {
+                            val start = (selectedIndex - 6).coerceAtLeast(0)
+                            daysInMonth.subList(start, selectedIndex + 1)
+                        } else {
+                            daysInMonth.takeLast(7)
+                        }
+                    }
+                    CalorieTrendChart(days = chartDays)
+                }
 
                 // 1.5 Weekly Trends Card
                 viewModel.weeklyTrends?.let { trends ->
@@ -165,19 +184,21 @@ fun HistoryScreen(
 
 @Composable
 fun ConsistencyScoreGauge(
-    score: Int,
+    deficitScore: Int,
     deficitDays: Int,
     loggedDays: Int,
+    trainingScore: Int,
     modifier: Modifier = Modifier
 ) {
+    val gaugeTrackColor = ThemeTextPrimary.copy(alpha = 0.05f)
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
         modifier = modifier
             .fillMaxWidth()
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))),
+                Brush.linearGradient(listOf(ThemeGlassBorder, ThemeGlassBorderGlow)),
                 RoundedCornerShape(24.dp)
             )
     ) {
@@ -187,7 +208,7 @@ fun ConsistencyScoreGauge(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "DEFICIT CONSISTENCY (ROLLING 30 DAYS)",
+                text = "CONSISTENCY METRICS (ROLLING 30 DAYS)",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Gray,
@@ -196,79 +217,123 @@ fun ConsistencyScoreGauge(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Circle Gauge
-                Box(
-                    modifier = Modifier.size(120.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val strokeWidth = 12.dp.toPx()
-                        // Track
-                        drawArc(
-                            color = Color.White.copy(alpha = 0.05f),
-                            startAngle = -220f,
-                            sweepAngle = 260f,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                            size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                            topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
-                        )
-                        // Progress
-                        val progressSweep = (score / 100f) * 260f
-                        drawArc(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(NeonMint, ElectricCyan)
-                            ),
-                            startAngle = -220f,
-                            sweepAngle = progressSweep,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                            size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                            topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
-                        )
-                    }
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "$score%",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "SCORE",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Gray,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
-
-                // Stats text details
+                // Deficit Gauge
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "Consistent Deficit Days: $deficitDays",
-                        fontSize = 13.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium
+                        text = "CALORIE DEFICIT",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 0.5.sp
                     )
+                    Box(
+                        modifier = Modifier.size(90.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val strokeWidth = 8.dp.toPx()
+                            drawArc(
+                                color = gaugeTrackColor,
+                                startAngle = -220f,
+                                sweepAngle = 260f,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                            )
+                            val progressSweep = (deficitScore / 100f) * 260f
+                            drawArc(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(NeonMint, ElectricCyan)
+                                ),
+                                startAngle = -220f,
+                                sweepAngle = progressSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "$deficitScore%",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = ThemeTextPrimary
+                            )
+                        }
+                    }
                     Text(
-                        text = "Total Logged Days: $loggedDays",
-                        fontSize = 13.sp,
+                        text = "$deficitDays / $loggedDays days",
+                        fontSize = 11.sp,
                         color = Color.Gray,
                         fontWeight = FontWeight.Medium
                     )
+                }
+
+                // Training Gauge
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        text = "*Requires at least 2 meals/day",
+                        text = "TRAINING DAYS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        letterSpacing = 0.5.sp
+                    )
+                    Box(
+                        modifier = Modifier.size(90.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val strokeWidth = 8.dp.toPx()
+                            drawArc(
+                                color = gaugeTrackColor,
+                                startAngle = -220f,
+                                sweepAngle = 260f,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                            )
+                            val progressSweep = (trainingScore / 100f) * 260f
+                            drawArc(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(HyperViolet, NeonMint)
+                                ),
+                                startAngle = -220f,
+                                sweepAngle = progressSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                                size = Size(size.width - strokeWidth, size.height - strokeWidth),
+                                topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "$trainingScore%",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = ThemeTextPrimary
+                            )
+                        }
+                    }
+                    val workoutDays = ((trainingScore / 100f) * 30).toInt()
+                    Text(
+                        text = "$workoutDays / 30 days",
                         fontSize = 11.sp,
-                        color = ElectricCyan,
-                        fontWeight = FontWeight.Normal
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -288,12 +353,12 @@ fun CalendarCard(
 ) {
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
         modifier = modifier
             .fillMaxWidth()
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))),
+                Brush.linearGradient(listOf(ThemeGlassBorder, ThemeGlassBorderGlow)),
                 RoundedCornerShape(24.dp)
             )
     ) {
@@ -309,24 +374,24 @@ fun CalendarCard(
             ) {
                 IconButton(
                     onClick = onPrevMonth,
-                    colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.05f))
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = ThemeTextPrimary.copy(alpha = 0.05f))
                 ) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = "Prev Month", tint = Color.White)
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Prev Month", tint = ThemeTextPrimary)
                 }
 
                 Text(
                     text = currentMonthName.uppercase(Locale.US),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White,
+                    color = ThemeTextPrimary,
                     letterSpacing = 1.sp
                 )
 
                 IconButton(
                     onClick = onNextMonth,
-                    colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.05f))
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = ThemeTextPrimary.copy(alpha = 0.05f))
                 ) {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = Color.White)
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = ThemeTextPrimary)
                 }
             }
 
@@ -392,8 +457,9 @@ fun CalendarCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 LegendItem(color = NeonMint, label = "Deficit")
+                val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
                 LegendItem(color = CoralRed, label = "Surplus")
-                LegendItem(color = Color(0xFF2E2E3A), label = "Untracked (<2 meals)")
+                LegendItem(color = untrackedColor, label = "Untracked (<2 meals)")
             }
         }
     }
@@ -406,10 +472,11 @@ fun CalendarDayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
     val bgColor = when (dayState.status) {
         DayStatus.Deficit -> NeonMint.copy(alpha = 0.20f)
         DayStatus.Surplus -> CoralRed.copy(alpha = 0.20f)
-        DayStatus.Insufficient -> Color(0xFF2E2E3A).copy(alpha = 0.3f)
+        DayStatus.Insufficient -> untrackedColor.copy(alpha = 0.3f)
     }
 
     val borderColor = when {
@@ -445,7 +512,7 @@ fun CalendarDayCell(
                 text = dayState.date.dayOfMonth.toString(),
                 fontSize = 13.sp,
                 fontWeight = if (dayState.date == LocalDate.now() || isSelected) FontWeight.Black else FontWeight.Bold,
-                color = if (dayState.status == DayStatus.Insufficient) Color.Gray else Color.White
+                color = if (dayState.status == DayStatus.Insufficient) ThemeTextTertiary else ThemeTextPrimary
             )
             if (dayState.status != DayStatus.Insufficient) {
                 val net = (dayState.caloriesEaten - dayState.tdee).toInt()
@@ -500,12 +567,12 @@ fun DayBalanceCard(
 
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
         modifier = modifier
             .fillMaxWidth()
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))),
+                Brush.linearGradient(listOf(ThemeGlassBorder, ThemeGlassBorderGlow)),
                 RoundedCornerShape(24.dp)
             )
     ) {
@@ -547,15 +614,15 @@ fun DayBalanceCard(
             ) {
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "EATEN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text(text = "${summary.caloriesEaten.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(text = "${summary.caloriesEaten.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "TDEE", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text(text = "${summary.tdee.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(text = "${summary.tdee.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "STEPS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text(text = String.format("%,d", summary.steps), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(text = String.format("%,d", summary.steps), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(text = "BURN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
@@ -568,7 +635,7 @@ fun DayBalanceCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.03f))
+                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
                     .padding(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -614,7 +681,7 @@ fun DayBalanceCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White.copy(alpha = 0.01f))
+                                .background(ThemeTextPrimary.copy(alpha = 0.03f))
                                 .padding(8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -624,7 +691,7 @@ fun DayBalanceCard(
                                     text = entry.foodText.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = ThemeTextPrimary
                                 )
                                 Text(
                                     text = "P: ${entry.proteinG.toInt()}g | C: ${entry.carbsG.toInt()}g | F: ${entry.fatG.toInt()}g",
@@ -659,8 +726,88 @@ fun DayBalanceCard(
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // List of workouts ledger
+            Text(
+                text = "LOGGED WORKOUTS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                letterSpacing = 0.5.sp
+            )
+
+            if (summary.workouts.isEmpty()) {
+                Text(
+                    text = "No workouts logged on this day.",
+                    fontSize = 13.sp,
+                    color = Color.DarkGray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                )
+            } else {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    summary.workouts.forEach { entry ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ThemeTextPrimary
+                                )
+                                val subText = if (entry.workoutType == "Strength") {
+                                    "Strength | ${entry.setsCount} sets x ${entry.repsCount} reps"
+                                } else {
+                                    "Cardio"
+                                }
+                                Text(
+                                    text = subText,
+                                    fontSize = 10.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "~${entry.caloriesBurned.toInt()} kcal",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CoralRed
+                                )
+                                IconButton(
+                                    onClick = { viewModel.deleteWorkout(entry) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete Workout",
+                                        tint = CoralRed,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             HorizontalDivider(
-                color = Color.White.copy(alpha = 0.05f),
+                color = ThemeTextPrimary.copy(alpha = 0.05f),
                 modifier = Modifier.padding(vertical = 4.dp)
             )
 
@@ -720,9 +867,9 @@ fun DayBalanceCard(
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ElectricCyan,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            unfocusedBorderColor = ThemeGlassBorder,
+                            focusedTextColor = ThemeTextPrimary,
+                            unfocusedTextColor = ThemeTextPrimary,
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent
                         ),
@@ -760,6 +907,47 @@ fun DayBalanceCard(
                     }
                 }
 
+                // Suggestions chips
+                val frequentMeals = viewModel.frequentMeals
+                if (frequentMeals.isNotEmpty()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = "Frequently Tracked (Tap to fill):",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            frequentMeals.forEach { meal ->
+                                SuggestionChip(
+                                    onClick = { foodText = meal },
+                                    label = {
+                                        Text(
+                                            text = meal,
+                                            color = ThemeTextPrimary,
+                                            fontSize = 11.sp,
+                                            maxLines = 1
+                                        )
+                                    },
+                                    colors = SuggestionChipDefaults.suggestionChipColors(
+                                        containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
+                                    ),
+                                    border = SuggestionChipDefaults.suggestionChipBorder(
+                                        enabled = true,
+                                        borderColor = ThemeGlassBorder
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
                 statusMessage?.let { msg ->
                     Text(
                         text = msg,
@@ -792,12 +980,12 @@ fun WeeklyTrendsCard(
 
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
         modifier = modifier
             .fillMaxWidth()
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))),
+                Brush.linearGradient(listOf(ThemeGlassBorder, ThemeGlassBorderGlow)),
                 RoundedCornerShape(24.dp)
             )
     ) {
@@ -849,6 +1037,23 @@ fun WeeklyTrendsCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TrendItem(
+                        label = "TOTAL WORKOUTS (7D)",
+                        value = "${trends.totalWorkouts} sessions",
+                        valueColor = ElectricCyan,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TrendItem(
+                        label = "STRENGTH VOLUME (7D)",
+                        value = "${trends.totalStrengthSets} sets",
+                        valueColor = SolarAmber,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
             Text(
@@ -875,8 +1080,8 @@ fun TrendItem(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.02f))
-            .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(16.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.02f))
+            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
             .padding(12.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -893,6 +1098,184 @@ fun TrendItem(
                 fontWeight = FontWeight.Black,
                 color = valueColor
             )
+        }
+    }
+}
+
+@Composable
+fun CalorieTrendChart(
+    days: List<HistoryDayState>,
+    modifier: Modifier = Modifier
+) {
+    if (days.size < 2) return
+
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(ThemeGlassBorder, ThemeGlassBorderGlow)),
+                RoundedCornerShape(24.dp)
+            )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "CALORIE TREND vs TDEE",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(NeonMint))
+                        Text("Eaten", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ElectricCyan))
+                        Text("TDEE", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            val chartBgColor = ThemeBgStart
+            val gridColor = ThemeGlassBorder
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .padding(vertical = 8.dp)
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val width = size.width
+                    val height = size.height
+
+                    val maxVal = (days.maxOf { maxOf(it.caloriesEaten, it.tdee) }).toFloat().coerceAtLeast(2000f) * 1.15f
+                    val minVal = 0f
+
+                    val stepX = width / (days.size - 1)
+
+                    val eatenPoints = days.mapIndexed { index, day ->
+                        val x = index * stepX
+                        val y = height - ((day.caloriesEaten.toFloat() - minVal) / (maxVal - minVal)) * height
+                        Offset(x, y)
+                    }
+
+                    val tdeePoints = days.mapIndexed { index, day ->
+                        val x = index * stepX
+                        val y = height - ((day.tdee.toFloat() - minVal) / (maxVal - minVal)) * height
+                        Offset(x, y)
+                    }
+
+                    // Draw grid lines
+                    val gridLines = 4
+                    for (i in 0..gridLines) {
+                        val y = height * i / gridLines
+                        drawLine(
+                            color = gridColor,
+                            start = Offset(0f, y),
+                            end = Offset(width, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+
+                    // TDEE Path (dashed curve or straight segments)
+                    val tdeePath = Path().apply {
+                        if (tdeePoints.isNotEmpty()) {
+                            moveTo(tdeePoints[0].x, tdeePoints[0].y)
+                            for (i in 1 until tdeePoints.size) {
+                                lineTo(tdeePoints[i].x, tdeePoints[i].y)
+                            }
+                        }
+                    }
+                    drawPath(
+                        path = tdeePath,
+                        color = ElectricCyan,
+                        style = Stroke(
+                            width = 2.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+                    )
+
+                    // Eaten Bezier Path
+                    if (eatenPoints.size >= 2) {
+                        val eatenPath = Path().apply {
+                            moveTo(eatenPoints[0].x, eatenPoints[0].y)
+                            for (i in 0 until eatenPoints.size - 1) {
+                                val from = eatenPoints[i]
+                                val to = eatenPoints[i + 1]
+                                val conX1 = from.x + (to.x - from.x) / 2
+                                val conY1 = from.y
+                                val conX2 = from.x + (to.x - from.x) / 2
+                                val conY2 = to.y
+                                cubicTo(conX1, conY1, conX2, conY2, to.x, to.y)
+                            }
+                        }
+
+                        // Draw background fill under Bezier Path
+                        val fillPath = Path().apply {
+                            addPath(eatenPath)
+                            lineTo(eatenPoints.last().x, height)
+                            lineTo(eatenPoints.first().x, height)
+                            close()
+                        }
+                        drawPath(
+                            path = fillPath,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(NeonMint.copy(alpha = 0.2f), Color.Transparent)
+                            )
+                        )
+
+                        // Draw primary stroke
+                        drawPath(
+                            path = eatenPath,
+                            color = NeonMint,
+                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                        )
+
+                        // Draw points/nodes
+                        eatenPoints.forEach { pt ->
+                            drawCircle(
+                                color = chartBgColor,
+                                radius = 6.dp.toPx(),
+                                center = pt
+                            )
+                            drawCircle(
+                                color = NeonMint,
+                                radius = 4.dp.toPx(),
+                                center = pt
+                            )
+                        }
+                    }
+                }
+            }
+
+            // X-Axis Labels (Date strings)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                days.forEach { day ->
+                    Text(
+                        text = "${day.date.dayOfMonth}/${day.date.monthValue}",
+                        fontSize = 10.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(36.dp)
+                    )
+                }
+            }
         }
     }
 }

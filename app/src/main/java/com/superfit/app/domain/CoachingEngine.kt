@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
 class CoachingEngine(private val apiKey: String) {
 
     private val model = GenerativeModel(
-        modelName = "gemini-3.5-flash",
+        modelName = "gemini-3.1-flash-lite",
         apiKey = apiKey,
         generationConfig = generationConfig {
             responseMimeType = "text/plain"

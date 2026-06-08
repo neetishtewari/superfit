@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,16 +27,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.theme.ThemeConfig
 
 class RationaleActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SuperfitTheme {
+            val isDark by ThemeConfig.isDarkTheme.collectAsState()
+            SuperfitTheme(darkTheme = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF0A0A0C) // DarkBg
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     RationaleScreen(
                         onBack = { finish() }
@@ -53,8 +57,14 @@ fun RationaleScreen(
 ) {
     val scrollState = rememberScrollState()
     
-    val darkBg = Color(0xFF0A0A0C)
-    val cardBg = Color(0xFF131317)
+    val colors = SuperfitTheme.colors
+    val darkBg = colors.bgStart
+    val cardBg = colors.cardBgTranslucent
+    val textPrimary = colors.textPrimary
+    val textSecondary = colors.textSecondary
+    val textTertiary = colors.textTertiary
+    val glassBorder = colors.glassBorder
+    
     val neonGreen = Color(0xFF10B981)
     val electricCyan = Color(0xFF06B6D4)
 
@@ -66,7 +76,7 @@ fun RationaleScreen(
                         text = "Data Privacy & Integration",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = textPrimary
                     )
                 },
                 navigationIcon = {
@@ -74,13 +84,13 @@ fun RationaleScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Go back",
-                            tint = Color.White
+                            tint = textPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = darkBg,
-                    titleContentColor = Color.White
+                    titleContentColor = textPrimary
                 )
             )
         },
@@ -119,12 +129,12 @@ fun RationaleScreen(
                         text = "Why Superfit uses Health Connect",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                        color = textPrimary
                     )
                     Text(
                         text = "To build a complete physiological ledger, Superfit reads specific health statistics. This allows our offline AI engine to adjust your daily target macronutrients based on real-time activity and sleep telemetry.",
                         fontSize = 14.sp,
-                        color = Color.LightGray,
+                        color = textSecondary,
                         lineHeight = 20.sp
                     )
                 }
@@ -134,7 +144,7 @@ fun RationaleScreen(
                 text = "Requested Permissions & Rationale",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = textPrimary,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
@@ -183,12 +193,12 @@ fun RationaleScreen(
                                 text = item.title,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = textPrimary
                             )
                             Text(
                                 text = item.description,
                                 fontSize = 13.sp,
-                                color = Color.Gray,
+                                color = textTertiary,
                                 lineHeight = 18.sp
                             )
                         }
@@ -205,7 +215,7 @@ fun RationaleScreen(
                     .height(50.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = neonGreen,
-                    contentColor = Color.White
+                    contentColor = Color.Black
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -219,7 +229,7 @@ fun RationaleScreen(
             Text(
                 text = "Superfit strictly complies with Google Play Health Connect developer policies. Your data is stored locally and is never uploaded to any remote servers.",
                 fontSize = 11.sp,
-                color = Color.DarkGray,
+                color = textTertiary,
                 textAlign = TextAlign.Center,
                 lineHeight = 16.sp,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)

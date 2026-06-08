@@ -1,5 +1,6 @@
 package com.superfit.app.data
 
+import android.content.Context
 import android.util.Log
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
@@ -8,7 +9,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class FirebaseSyncManager(private val database: SuperfitDatabase) {
+class FirebaseSyncManager(private val context: Context) {
+    private val database: SuperfitDatabase get() = SuperfitDatabase.getDatabase(context)
 
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
     private val firestore: FirebaseFirestore get() = FirebaseFirestore.getInstance()
@@ -56,6 +58,12 @@ class FirebaseSyncManager(private val database: SuperfitDatabase) {
         for (entry in entries) {
             uploadNutrition(entry)
         }
+
+        // 5. Sync Workout Entries
+        val workouts = database.workoutDao().getAllEntries()
+        for (workout in workouts) {
+            uploadWorkout(workout)
+        }
     }
 
     /**
@@ -96,6 +104,15 @@ class FirebaseSyncManager(private val database: SuperfitDatabase) {
             database.nutritionDao().deleteAllEntries()
             if (entries.isNotEmpty()) {
                 database.nutritionDao().insertEntries(entries)
+            }
+
+            // 5. Workout Entries
+            val workoutSnap = firestore.collection("users").document(userId).collection("workouts").get().await()
+            val workouts = workoutSnap.documents.mapNotNull { it.data?.toWorkoutEntry() }
+            // Clear local workout entries first to ensure an exact sync match
+            database.workoutDao().deleteAllEntries()
+            if (workouts.isNotEmpty()) {
+                database.workoutDao().insertEntries(workouts)
             }
 
             Log.d(tag, "Full bi-directional sync down complete.")
@@ -157,6 +174,28 @@ class FirebaseSyncManager(private val database: SuperfitDatabase) {
             Log.d(tag, "Nutrition entry deleted from Firestore with ID: ${entry.id}.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting nutrition: ${e.message}")
+        }
+    }
+
+    suspend fun uploadWorkout(entry: WorkoutEntryEntity) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("workouts").document(entry.id.toString()).set(entry.toMap()).await()
+            Log.d(tag, "Workout entry uploaded with ID: ${entry.id}.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading workout: ${e.message}")
+        }
+    }
+
+    suspend fun deleteWorkout(entry: WorkoutEntryEntity) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("workouts").document(entry.id.toString()).delete().await()
+            Log.d(tag, "Workout entry deleted from Firestore with ID: ${entry.id}.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting workout: ${e.message}")
         }
     }
 
@@ -227,6 +266,26 @@ class FirebaseSyncManager(private val database: SuperfitDatabase) {
         proteinG = (this["proteinG"] as? Number)?.toDouble() ?: 0.0,
         carbsG = (this["carbsG"] as? Number)?.toDouble() ?: 0.0,
         fatG = (this["fatG"] as? Number)?.toDouble() ?: 0.0,
+        timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L
+    )
+
+    private fun WorkoutEntryEntity.toMap(): Map<String, Any> = mapOf(
+        "id" to id,
+        "description" to description,
+        "caloriesBurned" to caloriesBurned,
+        "workoutType" to workoutType,
+        "setsCount" to setsCount,
+        "repsCount" to repsCount,
+        "timestamp" to timestamp
+    )
+
+    private fun Map<String, Any>.toWorkoutEntry(): WorkoutEntryEntity = WorkoutEntryEntity(
+        id = (this["id"] as? Number)?.toLong() ?: 0L,
+        description = this["description"] as? String ?: "",
+        caloriesBurned = (this["caloriesBurned"] as? Number)?.toDouble() ?: 0.0,
+        workoutType = this["workoutType"] as? String ?: "Cardio",
+        setsCount = (this["setsCount"] as? Number)?.toInt() ?: 0,
+        repsCount = (this["repsCount"] as? Number)?.toInt() ?: 0,
         timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L
     )
 }

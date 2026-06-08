@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Superfit</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #d1d5db;
+            background-color: #0B0F19;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 {
+            color: #ffffff;
+            font-weight: 800;
+        }
+        h1 {
+            font-size: 2.5rem;
+            border-bottom: 1px solid #1f2937;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, #10B981, #06B6D4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        h2 {
+            font-size: 1.5rem;
+            margin-top: 30px;
+            border-bottom: 1px solid #1f2937;
+            padding-bottom: 5px;
+        }
+        p, li {
+            font-size: 1.05rem;
+            color: #9ca3af;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight {
+            color: #10B981;
+            font-weight: 600;
+        }
+        .container {
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Privacy Policy</h1>
+        <p><strong>Last Updated: June 5, 2026</strong></p>
+        <p>Superfit is built to empower users with personalized physiological feedback. We are committed to protecting your privacy. This policy describes how Superfit handles data, specifically relating to local execution, Google Health Connect integration, and Gemini AI queries.</p>
+
+        <h2>1. Data Collection & Usage</h2>
+        <p>Superfit reads physical characteristics and fitness metrics to build a local physiological ledger. This data is used solely to compute your daily target macronutrients and track calorie trends.</p>
+        <ul>
+            <li><strong>Height & Weight:</strong> Used to compute your Basal Metabolic Rate (BMR) using scientific formulas.</li>
+            <li><strong>Steps & Activity:</strong> Used to estimate daily active metabolic rate increments, shifting recovery macronutrient targets reactively.</li>
+            <li><strong>Sleep Telemetry:</strong> Duration and quality of sleep are used to shape your daily Recovery Score, dynamically adapting protein and carbohydrate ratios.</li>
+            <li><strong>Active Calories:</strong> Used to record completed exercises and calculate daily energy balances.</li>
+        </ul>
+
+        <h2>2. Local Storage & Processing</h2>
+        <p class="highlight">All data processed by Superfit is stored locally on your device.</p>
+        <p>Superfit runs all calculation logic locally using an on-device SQLite database (Room). Your raw biometric data, steps record, sleep tracking, and calorie ledger are stored on your device and are not uploaded to any remote server or third-party service, with the exception of your own personal Firebase sync if configured.</p>
+
+        <h2>3. Google Health Connect Policy Compliance</h2>
+        <p>Superfit strictly complies with the <span class="highlight">Google Play Health Connect Developer Policies</span>, including the Additional Requirements:</p>
+        <ul>
+            <li>We request permission only for statistics necessary to calculate metabolic targets: steps, sleep sessions, weight, height, and active calories.</li>
+            <li>Under no circumstances is Health Connect data sold, rented, or transferred to advertising networks, data brokers, or information resellers.</li>
+            <li>Users can revoke permission access at any time directly through the Android system settings.</li>
+        </ul>
+
+        <h2>4. Generative AI & API Queries</h2>
+        <p>To enable natural language meal and workout logging, Superfit requires a Google Gemini API Key. When you speak or write food/workout logs, the query is sent directly to Google's Gemini API endpoints to perform structured parsing. The API key is stored securely in encrypted local SharedPreferences and is only transmitted directly to Google's APIs. No intermediary servers collect or inspect your queries.</p>
+
+        <h2>5. Your Rights & Data Portability</h2>
+        <p>Because all data resides in the local database of your device, you have complete ownership of it. If you choose to clear the app storage or uninstall the application, all stored logs are permanently deleted from your device.</p>
+
+        <h2>6. Changes to this Policy</h2>
+        <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
+
+        <div class="footer">
+            <p>Superfit Applications - Built for Premium Privacy and Local Processing.</p>
+        </div>
+    </div>
+</body>
+</html>

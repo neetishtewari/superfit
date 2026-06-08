@@ -97,7 +97,7 @@ fun LoginScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(DarkBgStart, DarkBgEnd)
+                    colors = listOf(ThemeBgStart, ThemeBgEnd)
                 )
             )
     ) {
@@ -138,7 +138,7 @@ fun LoginScreen(
                 text = "SUPERFIT",
                 fontSize = 36.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.White,
+                color = ThemeTextPrimary,
                 letterSpacing = 3.sp
             )
             Text(
@@ -157,13 +157,13 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(CardBgTranslucent)
+                    .background(ThemeCardBgTranslucent)
                     .border(
                         width = 1.dp,
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.08f),
-                                Color.White.copy(alpha = 0.02f)
+                                ThemeGlassBorder,
+                                ThemeGlassBorderGlow
                             )
                         ),
                         shape = RoundedCornerShape(24.dp)
@@ -176,7 +176,7 @@ fun LoginScreen(
                     text = if (viewModel.isLoginMode) "Welcome Back" else "Create Account",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = ThemeTextPrimary,
                     textAlign = TextAlign.Center
                 )
 
@@ -200,11 +200,11 @@ fun LoginScreen(
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = primaryColor,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                        unfocusedBorderColor = ThemeGlassBorder,
                         focusedLabelColor = primaryColor,
                         unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = ThemeTextPrimary,
+                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -240,11 +240,11 @@ fun LoginScreen(
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = primaryColor,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                        unfocusedBorderColor = ThemeGlassBorder,
                         focusedLabelColor = primaryColor,
                         unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = ThemeTextPrimary,
+                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -274,11 +274,11 @@ fun LoginScreen(
                         ),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                            unfocusedBorderColor = ThemeGlassBorder,
                             focusedLabelColor = primaryColor,
                             unfocusedLabelColor = Color.Gray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedTextColor = ThemeTextPrimary,
+                            unfocusedTextColor = ThemeTextPrimary
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -347,7 +347,7 @@ fun LoginScreen(
                 ) {
                     HorizontalDivider(
                         modifier = Modifier.weight(1f),
-                        color = Color.White.copy(alpha = 0.1f)
+                        color = ThemeGlassBorder
                     )
                     Text(
                         text = "OR",
@@ -358,7 +358,7 @@ fun LoginScreen(
                     )
                     HorizontalDivider(
                         modifier = Modifier.weight(1f),
-                        color = Color.White.copy(alpha = 0.1f)
+                        color = ThemeGlassBorder
                     )
                 }
 
@@ -380,15 +380,15 @@ fun LoginScreen(
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.03f),
-                        contentColor = Color.White
+                        containerColor = ThemeTextPrimary.copy(alpha = 0.03f),
+                        contentColor = ThemeTextPrimary
                     ),
                     border = BorderStroke(
                         width = 1.dp,
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.12f),
-                                Color.White.copy(alpha = 0.04f)
+                                ThemeGlassBorder,
+                                ThemeGlassBorderGlow
                             )
                         )
                     )
@@ -408,7 +408,7 @@ fun LoginScreen(
                             text = if (viewModel.isLoginMode) "Sign In with Google" else "Sign Up with Google",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = ThemeTextPrimary
                         )
                     }
                 }

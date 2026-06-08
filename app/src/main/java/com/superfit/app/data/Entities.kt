@@ -40,3 +40,14 @@ data class NutritionEntryEntity(
     val fatG: Double,
     val timestamp: Long // epoch millis
 )
+
+@Entity(tableName = "workout_entries")
+data class WorkoutEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val description: String,
+    val caloriesBurned: Double,
+    val workoutType: String, // "Cardio" or "Strength"
+    val setsCount: Int,
+    val repsCount: Int,
+    val timestamp: Long // epoch millis
+)

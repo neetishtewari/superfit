@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +22,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
@@ -52,12 +57,14 @@ fun OnboardingScreen(
     healthConnectManager: HealthConnectManager,
     viewModel: OnboardingViewModel,
     onOnboardingComplete: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
     val context = LocalContext.current
+    var showKeyInstructionsDialog by remember { mutableStateOf(false) }
 
     // Health Connect Permission Launcher
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
@@ -101,7 +108,7 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(DarkBgStart, DarkBgEnd)
+                    colors = listOf(ThemeBgStart, ThemeBgEnd)
                 )
             )
     ) {
@@ -127,6 +134,28 @@ fun OnboardingScreen(
             )
         }
 
+        if (onBack != null) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 16.dp, start = 16.dp)
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ThemeCardBgTranslucent)
+                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp)),
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = ThemeTextPrimary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Exit Onboarding Preview",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -142,7 +171,7 @@ fun OnboardingScreen(
                 text = "SUPERFIT",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.White,
+                color = ThemeTextPrimary,
                 letterSpacing = 2.sp
             )
 
@@ -160,13 +189,13 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(CardBgTranslucent)
+                    .background(ThemeCardBgTranslucent)
                     .border(
                         width = 1.dp,
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.08f),
-                                Color.White.copy(alpha = 0.02f)
+                                ThemeGlassBorder,
+                                ThemeGlassBorderGlow
                             )
                         ),
                         shape = RoundedCornerShape(20.dp)
@@ -209,7 +238,7 @@ fun OnboardingScreen(
                             Text(
                                 text = "Health Connect",
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = ThemeTextPrimary,
                                 fontSize = 16.sp
                             )
                         }
@@ -291,13 +320,13 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(CardBgTranslucent)
+                    .background(ThemeCardBgTranslucent)
                     .border(
                         width = 1.dp,
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.08f),
-                                Color.White.copy(alpha = 0.02f)
+                                ThemeGlassBorder,
+                                ThemeGlassBorderGlow
                             )
                         ),
                         shape = RoundedCornerShape(20.dp)
@@ -323,13 +352,13 @@ fun OnboardingScreen(
                             Text(
                                 text = "Voice & AI Setup",
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = ThemeTextPrimary,
                                 fontSize = 16.sp
                             )
                         }
 
                         // Status Badge
-                        val isKeyConfigured = uiState.apiKey.trim().startsWith("AIzaSy")
+                        val isKeyConfigured = uiState.apiKey.trim().startsWith("AIzaSy") || uiState.apiKey.trim().startsWith("AQ.")
                         val micGranted = uiState.isMicPermissionGranted
                         val overallStatus = when {
                             isKeyConfigured && micGranted -> "Ready"
@@ -362,7 +391,7 @@ fun OnboardingScreen(
                     Text(
                         text = "Quick Voice Logging uses Gemini AI to parse spoken meals. Set up access below to get started.",
                         fontSize = 13.sp,
-                        color = Color.LightGray
+                        color = ThemeTextSecondary
                     )
 
                     // Step 1: Microphone permission request button
@@ -391,7 +420,7 @@ fun OnboardingScreen(
                     }
 
                     HorizontalDivider(
-                        color = Color.White.copy(alpha = 0.05f),
+                    color = ThemeTextPrimary.copy(alpha = 0.05f),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
 
@@ -399,21 +428,34 @@ fun OnboardingScreen(
                     Text(
                         text = "Configure Gemini API Key",
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = ThemeTextPrimary,
                         fontSize = 14.sp
                     )
+
+                    var keyVisible by remember { mutableStateOf(false) }
 
                     OutlinedTextField(
                         value = uiState.apiKey,
                         onValueChange = { viewModel.onApiKeyChanged(it) },
                         label = { Text("Gemini API Key") },
+                        visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            val image = if (keyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                            IconButton(onClick = { keyVisible = !keyVisible }) {
+                                Icon(
+                                    imageVector = image,
+                                    contentDescription = if (keyVisible) "Hide API Key" else "Show API Key",
+                                    tint = Color.Gray
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ElectricCyan,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                            unfocusedBorderColor = ThemeGlassBorder,
                             focusedLabelColor = ElectricCyan,
                             unfocusedLabelColor = Color.Gray,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedTextColor = ThemeTextPrimary,
+                            unfocusedTextColor = ThemeTextPrimary
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -428,8 +470,8 @@ fun OnboardingScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.05f),
-                            contentColor = Color.White
+                            containerColor = ThemeTextPrimary.copy(alpha = 0.05f),
+                            contentColor = ThemeTextPrimary
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -437,16 +479,11 @@ fun OnboardingScreen(
                     }
 
                     // Only show "Get Free Key" button if a valid key is NOT configured
-                    val isKeyWorking = uiState.apiKey.trim().startsWith("AIzaSy")
+                    val isKeyWorking = uiState.apiKey.trim().startsWith("AIzaSy") || uiState.apiKey.trim().startsWith("AQ.")
                     if (!isKeyWorking) {
                         Button(
                             onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Could not open browser. Please visit: https://aistudio.google.com/app/apikey", Toast.LENGTH_LONG).show()
-                                }
+                                showKeyInstructionsDialog = true
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = ElectricCyan.copy(alpha = 0.1f),
@@ -485,13 +522,13 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(CardBgTranslucent)
+                    .background(ThemeCardBgTranslucent)
                     .border(
                         width = 1.dp,
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.08f),
-                                Color.White.copy(alpha = 0.02f)
+                                ThemeGlassBorder,
+                                ThemeGlassBorderGlow
                             )
                         ),
                         shape = RoundedCornerShape(20.dp)
@@ -503,7 +540,7 @@ fun OnboardingScreen(
                     text = "Physiology Metrics",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = Color.White
+                    color = ThemeTextPrimary
                 )
 
                 // Age input
@@ -514,11 +551,11 @@ fun OnboardingScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                        unfocusedBorderColor = ThemeGlassBorder,
                         focusedLabelColor = NeonGreen,
                         unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = ThemeTextPrimary,
+                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -531,11 +568,11 @@ fun OnboardingScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                        unfocusedBorderColor = ThemeGlassBorder,
                         focusedLabelColor = NeonGreen,
                         unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = ThemeTextPrimary,
+                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -548,11 +585,11 @@ fun OnboardingScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
+                        unfocusedBorderColor = ThemeGlassBorder,
                         focusedLabelColor = NeonGreen,
                         unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedTextColor = ThemeTextPrimary,
+                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -571,7 +608,7 @@ fun OnboardingScreen(
                         label = "MaleBgColor"
                     )
                     val maleTextColor by animateColorAsState(
-                        targetValue = if (uiState.isMale) Color.Black else Color.White,
+                        targetValue = if (uiState.isMale) Color.Black else ThemeTextPrimary,
                         label = "MaleTextColor"
                     )
                     val femaleBgColor by animateColorAsState(
@@ -579,7 +616,7 @@ fun OnboardingScreen(
                         label = "FemaleBgColor"
                     )
                     val femaleTextColor by animateColorAsState(
-                        targetValue = if (!uiState.isMale) Color.Black else Color.White,
+                        targetValue = if (!uiState.isMale) Color.Black else ThemeTextPrimary,
                         label = "FemaleTextColor"
                     )
 
@@ -588,8 +625,8 @@ fun OnboardingScreen(
                             .fillMaxWidth()
                             .height(48.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.03f))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -659,7 +696,7 @@ fun OnboardingScreen(
                     Text(
                         text = multiplierDesc,
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = ThemeTextPrimary,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -699,17 +736,17 @@ fun OnboardingScreen(
                         val isSelected = uiState.goal == goalKey
                         val borderAlpha by animateFloatAsState(targetValue = if (isSelected) 0.8f else 0.08f, label = "GoalBorderAlpha")
                         val bgAlpha by animateFloatAsState(targetValue = if (isSelected) 0.15f else 0.03f, label = "GoalBgAlpha")
-                        val textColor by animateColorAsState(targetValue = if (isSelected) NeonGreen else Color.White, label = "GoalTextColor")
+                        val textColor by animateColorAsState(targetValue = if (isSelected) NeonGreen else ThemeTextPrimary, label = "GoalTextColor")
 
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = bgAlpha))
+                                .background(ThemeTextPrimary.copy(alpha = bgAlpha))
                                 .border(
                                     width = 1.dp,
-                                    color = if (isSelected) NeonGreen.copy(alpha = borderAlpha) else Color.White.copy(alpha = borderAlpha),
+                                    color = if (isSelected) NeonGreen.copy(alpha = borderAlpha) else ThemeGlassBorder,
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
@@ -795,6 +832,82 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
         }
+
+        if (showKeyInstructionsDialog) {
+            AlertDialog(
+                onDismissRequest = { showKeyInstructionsDialog = false },
+                title = {
+                    Text(
+                        text = "🔑 Get Your Gemini API Key",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = ThemeTextPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text(
+                            text = "When you land on Google AI Studio in the browser, follow these simple steps to generate your free key:",
+                            fontSize = 13.sp,
+                            color = ThemeTextSecondary
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            InstructionStep(
+                                number = "1",
+                                text = "Click 'Create API Key' at the top-left or top-right of the screen."
+                            )
+                            InstructionStep(
+                                number = "2",
+                                text = "Select 'Create API key in new project' or select 'superfit'."
+                            )
+                            InstructionStep(
+                                number = "3",
+                                text = "Copy the generated key (usually starts with 'AIzaSy' or 'AQ.')."
+                            )
+                            InstructionStep(
+                                number = "4",
+                                text = "Return to Superfit and tap 'Paste from Clipboard'."
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showKeyInstructionsDialog = false
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open browser. Please visit: https://aistudio.google.com/app/apikey", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NeonGreen,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Open AI Studio", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showKeyInstructionsDialog = false }
+                    ) {
+                        Text("Cancel", color = ThemeTextPrimary)
+                    }
+                },
+                containerColor = ThemeCardBgTranslucent,
+                modifier = Modifier
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(listOf(ThemeGlassBorder, ThemeGlassBorderGlow)),
+                        shape = RoundedCornerShape(28.dp)
+                    )
+            )
+        }
     }
 }
 
@@ -808,3 +921,32 @@ private fun Modifier.BoxClickable(onClick: () -> Unit): Modifier {
 }
 
 // Re-expose standard clickable for ease of implementation
+
+@Composable
+private fun InstructionStep(number: String, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(com.superfit.app.theme.ElectricCyan.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = number,
+                color = com.superfit.app.theme.ElectricCyan,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            color = ThemeTextSecondary,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}

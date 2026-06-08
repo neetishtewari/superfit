@@ -11,6 +11,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
@@ -39,6 +42,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.compose.animation.core.*
 import com.superfit.app.theme.*
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
 import android.text.format.DateUtils
 import android.speech.RecognitionListener
@@ -57,7 +61,6 @@ import android.provider.Settings
 import android.net.Uri
 
 // Design tokens matching premium aesthetic
-private val DarkBg = DarkBgStart
 private val NeonGreen = NeonMint
 private val ElectricCyan = com.superfit.app.theme.ElectricCyan
 private val EnergeticCoral = CoralRed
@@ -65,25 +68,40 @@ private val CarbYellow = SolarAmber
 private val HyperVioletAccent = HyperViolet
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onLogout: () -> Unit,
-    onSignOut: () -> Unit,
-    modifier: Modifier = Modifier
+    onNavigateToSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    triggerVoiceLog: Boolean = false,
+    triggerFavoritesLog: Boolean = false,
+    onVoiceLogTriggeredHandled: () -> Unit = {},
+    onFavoritesLogTriggeredHandled: () -> Unit = {}
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
     val parsingState by viewModel.parsingState.collectAsState()
+    val workoutParsingState by viewModel.workoutParsingState.collectAsState()
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
     val grantedPermissions by viewModel.grantedPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val coachingState by viewModel.coachingState.collectAsState()
     val scrollState = rememberScrollState()
 
-    var showApiKeySettings by remember { mutableStateOf(false) }
+    var logType by remember { mutableStateOf("MEAL") }
+
+    var showChatBottomSheet by remember { mutableStateOf(false) }
     var foodInputText by remember { mutableStateOf("") }
+
+    var showFavoritesDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(triggerFavoritesLog) {
+        if (triggerFavoritesLog) {
+            showFavoritesDialog = true
+        }
+    }
 
     val context = LocalContext.current
 
@@ -94,11 +112,15 @@ fun DashboardScreen(
     var showVoiceBanner by remember { mutableStateOf(false) }
 
     // Speech recognizer helper instantiation
-    val speechHelper = remember {
+    val speechHelper = remember(logType) {
         SpeechRecognizerHelper(
             context = context,
             onResult = { text ->
-                viewModel.parseAndAddMeal(text)
+                if (logType == "MEAL") {
+                    viewModel.parseAndAddMeal(text)
+                } else {
+                    viewModel.parseAndAddWorkout(text)
+                }
             },
             onError = { error ->
                 voiceMessage = error
@@ -158,6 +180,25 @@ fun DashboardScreen(
         }
     }
 
+    LaunchedEffect(workoutParsingState) {
+        val state = workoutParsingState
+        when (state) {
+            is ParsingState.Success -> {
+                voiceMessage = "Logged: ${state.foodText}"
+                voiceBannerColor = NeonGreen
+                showVoiceBanner = true
+                viewModel.resetWorkoutParsingState()
+            }
+            is ParsingState.Error -> {
+                voiceMessage = state.message
+                voiceBannerColor = EnergeticCoral
+                showVoiceBanner = true
+                viewModel.resetWorkoutParsingState()
+            }
+            else -> {}
+        }
+    }
+
     // Clean up voice listener on dispose
     DisposableEffect(Unit) {
         onDispose {
@@ -178,15 +219,120 @@ fun DashboardScreen(
         viewModel.syncTelemetry()
     }
 
+    // Trigger voice log from notifications
+    LaunchedEffect(triggerVoiceLog) {
+        if (triggerVoiceLog) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasPermission) {
+                speechHelper.startListening()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            onVoiceLogTriggeredHandled()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(DarkBgStart, DarkBgEnd)
+                    colors = listOf(ThemeBgStart, ThemeBgEnd)
                 )
             )
     ) {
+        if (showFavoritesDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showFavoritesDialog = false
+                    onFavoritesLogTriggeredHandled()
+                },
+                title = {
+                    Text(
+                        text = "LOG A FAVORITE MEAL",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.5.sp,
+                        color = ThemeTextPrimary
+                    )
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Choose one of your frequently logged meals to track it instantly:",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        
+                        val meals = viewModel.frequentMeals.collectAsState().value
+                        if (meals.isEmpty()) {
+                            Text(
+                                text = "No frequent meals logged yet. Keep logging to see suggestions here!",
+                                fontSize = 13.sp,
+                                color = ThemeTextSecondary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+                            )
+                        } else {
+                            meals.forEach { meal ->
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.parseAndAddMeal(meal)
+                                            showFavoritesDialog = false
+                                            onFavoritesLogTriggeredHandled()
+                                        }
+                                        .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = meal,
+                                            color = ThemeTextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Log",
+                                            tint = NeonGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showFavoritesDialog = false
+                            onFavoritesLogTriggeredHandled()
+                        }
+                    ) {
+                        Text("Close", color = NeonGreen, fontWeight = FontWeight.Bold)
+                    }
+                },
+                containerColor = ThemeBgStart,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.border(1.dp, ThemeGlassBorder, RoundedCornerShape(20.dp))
+            )
+        }
         // Floating Success/Error Notification Banner
         AnimatedVisibility(
             visible = showVoiceBanner,
@@ -199,7 +345,7 @@ fun DashboardScreen(
         ) {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
+                colors = CardDefaults.cardColors(containerColor = ThemeCardBg),
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(1.dp, voiceBannerColor, RoundedCornerShape(16.dp))
@@ -217,7 +363,7 @@ fun DashboardScreen(
                     )
                     Text(
                         text = voiceMessage ?: "",
-                        color = Color.White,
+                        color = ThemeTextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
@@ -280,7 +426,7 @@ fun DashboardScreen(
                                 text = "SUPERFIT",
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Black,
-                                color = Color.White,
+                                color = ThemeTextPrimary,
                                 letterSpacing = 1.sp
                             )
                             Text(
@@ -298,8 +444,8 @@ fun DashboardScreen(
                             IconButton(
                                 onClick = { viewModel.syncTelemetry() },
                                 colors = IconButtonDefaults.iconButtonColors(
-                                    containerColor = CardBg,
-                                    contentColor = Color.White
+                                    containerColor = ThemeCardBg,
+                                    contentColor = ThemeTextPrimary
                                 )
                             ) {
                                 Icon(
@@ -311,8 +457,8 @@ fun DashboardScreen(
                             IconButton(
                                 onClick = onNavigateToHistory,
                                 colors = IconButtonDefaults.iconButtonColors(
-                                    containerColor = CardBg,
-                                    contentColor = Color.White
+                                    containerColor = ThemeCardBg,
+                                    contentColor = ThemeTextPrimary
                                 )
                             ) {
                                 Icon(
@@ -323,10 +469,10 @@ fun DashboardScreen(
 
                             Box {
                                 IconButton(
-                                    onClick = { showApiKeySettings = !showApiKeySettings },
+                                    onClick = onNavigateToSettings,
                                     colors = IconButtonDefaults.iconButtonColors(
-                                        containerColor = CardBg,
-                                        contentColor = Color.White
+                                        containerColor = ThemeCardBg,
+                                        contentColor = ThemeTextPrimary
                                     )
                                 ) {
                                     Icon(
@@ -350,7 +496,7 @@ fun DashboardScreen(
                                         .offset(x = 1.dp, y = (-1).dp)
                                         .size(10.dp)
                                         .clip(RoundedCornerShape(5.dp))
-                                        .background(DarkBg)
+                                        .background(ThemeCardBg)
                                         .padding(1.dp)
                                 ) {
                                     Box(
@@ -365,9 +511,12 @@ fun DashboardScreen(
                     }
 
                     // Voice Quick Log Card
+                    val isProcessing = parsingState is ParsingState.Loading || workoutParsingState is ParsingState.Loading
                     VoiceQuickLogCard(
+                        logType = logType,
+                        onLogTypeChange = { logType = it },
                         isListening = isListening,
-                        isProcessing = parsingState is ParsingState.Loading,
+                        isProcessing = isProcessing,
                         onMicClick = {
                             val hasPermission = ContextCompat.checkSelfPermission(
                                 context,
@@ -385,215 +534,14 @@ fun DashboardScreen(
                         }
                     )
 
-                    // API Settings panel (collapsible)
-                    AnimatedVisibility(visible = showApiKeySettings) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(CardBg)
-                                .border(1.dp, Color.DarkGray, RoundedCornerShape(12.dp))
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "Gemini API Configuration",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
-                            OutlinedTextField(
-                                value = apiKey,
-                                onValueChange = { viewModel.updateApiKey(it) },
-                                label = { Text("Gemini API Key") },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = ElectricCyan,
-                                    unfocusedBorderColor = Color.DarkGray,
-                                    focusedLabelColor = ElectricCyan,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Text(
-                                text = "Providing your Gemini API Key allows natural language meal logging to run locally. If the default key has exceeded its quota, please enter your own API Key from Google AI Studio.",
-                                fontSize = 11.sp,
-                                color = Color.Gray
-                            )
-
-                            HorizontalDivider(
-                                color = Color.DarkGray.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-
-                            Text(
-                                text = "Fitness Goal Target",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
-
-                            val goals = listOf(
-                                Triple("LOSE_WEIGHT", "Weight Loss (-500 kcal)", -500),
-                                Triple("MAINTAIN", "Maintenance (0 kcal)", 0),
-                                Triple("GAIN_MUSCLE", "Muscle Gain (+300 kcal)", 300)
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.03f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                goals.forEach { (goalKey, goalLabel, offset) ->
-                                    val isSelected = state.profile.goal == goalKey
-                                    val bgActiveColor by animateColorAsState(
-                                        targetValue = if (isSelected) NeonGreen else Color.Transparent,
-                                        label = "SettingsGoalBg"
-                                    )
-                                    val textActiveColor by animateColorAsState(
-                                        targetValue = if (isSelected) Color.Black else Color.White,
-                                        label = "SettingsGoalText"
-                                    )
-
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(bgActiveColor)
-                                            .clickable {
-                                                viewModel.updateGoal(goalKey, offset)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = when (goalKey) {
-                                                "LOSE_WEIGHT" -> "Deficit"
-                                                "MAINTAIN" -> "Maintain"
-                                                else -> "Surplus"
-                                            },
-                                            color = textActiveColor,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(
-                                color = Color.DarkGray.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-
-                            // Baseline Activity Level Slider in settings
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                val currentMultiplier = state.profile.activityMultiplier
-                                val multiplierDesc = when (currentMultiplier) {
-                                    1.2 -> "Sedentary (No formal exercise)"
-                                    1.375 -> "Lightly Active (1-3 days/week)"
-                                    1.55 -> "Moderately Active (3-5 days/week)"
-                                    1.725 -> "Very Active (6-7 days/week)"
-                                    else -> "Custom / High Athlete"
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Baseline Activity Level",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = "Multiplier: $currentMultiplier",
-                                        fontSize = 12.sp,
-                                        color = NeonGreen,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                Text(
-                                    text = multiplierDesc,
-                                    fontSize = 12.sp,
-                                    color = Color.Gray,
-                                    fontWeight = FontWeight.Medium
-                                )
-
-                                val multiplierValues = listOf(1.2, 1.375, 1.55, 1.725)
-                                Slider(
-                                    value = multiplierValues.indexOf(currentMultiplier).toFloat().coerceAtLeast(0f),
-                                    onValueChange = { index ->
-                                        val cleanIndex = index.toInt().coerceIn(0, multiplierValues.size - 1)
-                                        viewModel.updateActivityMultiplier(multiplierValues[cleanIndex])
-                                    },
-                                    valueRange = 0f..3f,
-                                    steps = 2,
-                                    colors = SliderDefaults.colors(
-                                        activeTrackColor = NeonGreen,
-                                        thumbColor = NeonGreen,
-                                        inactiveTrackColor = Color.DarkGray
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = onSignOut,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.White.copy(alpha = 0.08f),
-                                        contentColor = Color.White
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(40.dp)
-                                ) {
-                                    Text(
-                                        text = "Sign Out",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-
-                                Button(
-                                    onClick = onLogout,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = EnergeticCoral.copy(alpha = 0.15f),
-                                        contentColor = EnergeticCoral
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(40.dp)
-                                ) {
-                                    Text(
-                                        text = "Clear & Sign Out",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
                     // Health Connect Permission Alert Card (if missing permissions)
                     if (!hasHealthConnectPermissions) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color.White.copy(alpha = 0.03f))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                                .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -607,13 +555,13 @@ fun DashboardScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Telemetry Sync Paused",
-                                    color = Color.White,
+                                    color = ThemeTextPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Text(
                                     text = "Grant Health Connect permissions to sync steps and sleep data.",
-                                    color = Color.LightGray,
+                                    color = ThemeTextSecondary,
                                     fontSize = 12.sp,
                                     lineHeight = 16.sp
                                 )
@@ -641,13 +589,13 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(CardBgTranslucent)
+                            .background(ThemeCardBgTranslucent)
                             .border(
                                 width = 1.dp,
                                 brush = Brush.linearGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.White.copy(alpha = 0.02f)
+                                        ThemeGlassBorder,
+                                        ThemeGlassBorderGlow
                                     )
                                 ),
                                 shape = RoundedCornerShape(24.dp)
@@ -694,18 +642,78 @@ fun DashboardScreen(
                         }
                     }
 
+                    // Nutrition & Dynamic Macros Budget Card
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(ThemeCardBgTranslucent)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        ThemeGlassBorder,
+                                        ThemeGlassBorderGlow
+                                    )
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Daily Nutrient Ledger",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = ThemeTextPrimary
+                        )
+
+                        // Protein
+                        MacroProgressBar(
+                            label = "Protein",
+                            eaten = state.proteinEaten,
+                            target = state.macroTargets.proteinG,
+                            color = NeonGreen,
+                            unit = "g",
+                            entries = state.nutritionList,
+                            macroSelector = { it.proteinG }
+                        )
+
+                        // Carbs
+                        MacroProgressBar(
+                            label = "Carbohydrates",
+                            eaten = state.carbsEaten,
+                            target = state.macroTargets.carbsG,
+                            color = CarbYellow,
+                            unit = "g",
+                            entries = state.nutritionList,
+                            macroSelector = { it.carbsG }
+                        )
+
+                        // Fat
+                        MacroProgressBar(
+                            label = "Fats",
+                            eaten = state.fatEaten,
+                            target = state.macroTargets.fatG,
+                            color = ElectricCyan,
+                            unit = "g",
+                            entries = state.nutritionList,
+                            macroSelector = { it.fatG }
+                        )
+                    }
+
                     // Activity & Performance Card
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBgTranslucent)
+                            .background(ThemeCardBgTranslucent)
                             .border(
                                 width = 1.dp,
                                 brush = Brush.linearGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.White.copy(alpha = 0.02f)
+                                        ThemeGlassBorder,
+                                        ThemeGlassBorderGlow
                                     )
                                 ),
                                 shape = RoundedCornerShape(20.dp)
@@ -713,33 +721,21 @@ fun DashboardScreen(
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Column {
                             Text(
                                 text = "Activity & Performance",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
-                                color = Color.White
+                                color = ThemeTextPrimary
                             )
-
-                            // Glassmorphic estimated distance pill
+                            Spacer(modifier = Modifier.height(4.dp))
                             val distanceKm = state.activity.steps * 0.00075
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ElectricCyan.copy(alpha = 0.1f))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = String.format("%.2f km (Est)", distanceKm),
-                                    color = ElectricCyan,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            }
+                            Text(
+                                text = String.format("Estimated Distance: %.2f km", distanceKm),
+                                color = ElectricCyan,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
 
                         // Steps Progress
@@ -750,6 +746,76 @@ fun DashboardScreen(
                             color = ElectricCyan,
                             unit = "steps"
                         )
+
+                        if (state.workoutList.isNotEmpty()) {
+                            HorizontalDivider(
+                                color = ThemeTextPrimary.copy(alpha = 0.05f),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+
+                            Text(
+                                text = "TODAY'S WORKOUTS",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray,
+                                letterSpacing = 0.5.sp
+                            )
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                state.workoutList.forEach { entry ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                                            .padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() },
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ThemeTextPrimary
+                                            )
+                                            val subText = if (entry.workoutType == "Strength") {
+                                                "Strength | ${entry.setsCount} sets x ${entry.repsCount} reps"
+                                            } else {
+                                                "Cardio"
+                                            }
+                                            Text(
+                                                text = subText,
+                                                fontSize = 10.sp,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "~${entry.caloriesBurned.toInt()} kcal",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = EnergeticCoral
+                                            )
+                                            IconButton(
+                                                onClick = { viewModel.deleteWorkout(entry) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete Workout",
+                                                    tint = EnergeticCoral,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // AI Daily Coach Insights Card
@@ -757,13 +823,13 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBgTranslucent)
+                            .background(ThemeCardBgTranslucent)
                             .border(
                                 width = 1.dp,
                                 brush = Brush.linearGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.White.copy(alpha = 0.02f)
+                                        ThemeGlassBorder,
+                                        ThemeGlassBorderGlow
                                     )
                                 ),
                                 shape = RoundedCornerShape(20.dp)
@@ -784,7 +850,7 @@ fun DashboardScreen(
                                     text = "✨ AI Daily Coach",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 18.sp,
-                                    color = Color.White
+                                    color = ThemeTextPrimary
                                 )
                             }
 
@@ -862,12 +928,25 @@ fun DashboardScreen(
                                 }
                             }
                             is CoachingInsightState.Success -> {
-                                Text(
-                                    text = cState.insight,
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(
+                                        text = cState.insight,
+                                        color = ThemeTextPrimary,
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp
+                                    )
+                                    Button(
+                                        onClick = { showChatBottomSheet = true },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = NeonMint,
+                                            contentColor = Color.Black
+                                        ),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Chat with Coach 💬", fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                             is CoachingInsightState.Error -> {
                                 Column(
@@ -892,7 +971,10 @@ fun DashboardScreen(
                                     }
                                     if (cState.message.contains("Settings", ignoreCase = true) || cState.message.contains("API Key", ignoreCase = true)) {
                                         Button(
-                                            onClick = { showApiKeySettings = true },
+                                            onClick = {
+                                                showChatBottomSheet = false
+                                                onNavigateToSettings()
+                                            },
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = EnergeticCoral.copy(alpha = 0.15f),
                                                 contentColor = EnergeticCoral
@@ -901,7 +983,7 @@ fun DashboardScreen(
                                             modifier = Modifier.height(32.dp)
                                         ) {
                                             Text(
-                                                text = "Configure API Key",
+                                                text = "Open API Settings",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -912,78 +994,19 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Nutrition & Dynamic Macros Budget Card
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(CardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.White.copy(alpha = 0.02f)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Daily Nutrient Ledger",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = Color.White
-                        )
-
-                        // Protein
-                        MacroProgressBar(
-                            label = "Protein",
-                            eaten = state.proteinEaten,
-                            target = state.macroTargets.proteinG,
-                            color = NeonGreen,
-                            unit = "g",
-                            entries = state.nutritionList,
-                            macroSelector = { it.proteinG }
-                        )
-
-                        // Carbs
-                        MacroProgressBar(
-                            label = "Carbohydrates",
-                            eaten = state.carbsEaten,
-                            target = state.macroTargets.carbsG,
-                            color = CarbYellow,
-                            unit = "g",
-                            entries = state.nutritionList,
-                            macroSelector = { it.carbsG }
-                        )
-
-                        // Fat
-                        MacroProgressBar(
-                            label = "Fats",
-                            eaten = state.fatEaten,
-                            target = state.macroTargets.fatG,
-                            color = ElectricCyan,
-                            unit = "g",
-                            entries = state.nutritionList,
-                            macroSelector = { it.fatG }
-                        )
-                    }
 
                     // Sleep & Readiness Recovery Dashboard
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBgTranslucent)
+                            .background(ThemeCardBgTranslucent)
                             .border(
                                 width = 1.dp,
                                 brush = Brush.linearGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.White.copy(alpha = 0.02f)
+                                        ThemeGlassBorder,
+                                        ThemeGlassBorderGlow
                                     )
                                 ),
                                 shape = RoundedCornerShape(20.dp)
@@ -1000,7 +1023,7 @@ fun DashboardScreen(
                                 text = "Sleep & Recovery",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
-                                color = Color.White
+                                color = ThemeTextPrimary
                             )
 
                             // Status Pill
@@ -1039,7 +1062,7 @@ fun DashboardScreen(
                         Text(
                             text = readinessDesc,
                             fontSize = 13.sp,
-                            color = Color.LightGray
+                            color = ThemeTextSecondary
                         )
 
                         if (state.sleep != null) {
@@ -1076,13 +1099,13 @@ fun DashboardScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(20.dp))
-                            .background(CardBgTranslucent)
+                            .background(ThemeCardBgTranslucent)
                             .border(
                                 width = 1.dp,
                                 brush = Brush.linearGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = 0.08f),
-                                        Color.White.copy(alpha = 0.02f)
+                                        ThemeGlassBorder,
+                                        ThemeGlassBorderGlow
                                     )
                                 ),
                                 shape = RoundedCornerShape(20.dp)
@@ -1094,7 +1117,7 @@ fun DashboardScreen(
                             text = "Track Your Meals",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
-                            color = Color.White
+                            color = ThemeTextPrimary
                         )
 
                         Row(
@@ -1108,9 +1131,11 @@ fun DashboardScreen(
                                 label = { Text("Log food in natural language...") },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = NeonGreen,
-                                    unfocusedBorderColor = Color.DarkGray,
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
+                                    unfocusedBorderColor = ThemeGlassBorder,
+                                    focusedTextColor = ThemeTextPrimary,
+                                    unfocusedTextColor = ThemeTextPrimary,
+                                    focusedLabelColor = NeonGreen,
+                                    unfocusedLabelColor = ThemeTextSecondary
                                 ),
                                 placeholder = { Text("e.g. 2 eggs and a banana") },
                                 modifier = Modifier.weight(1f)
@@ -1135,6 +1160,44 @@ fun DashboardScreen(
                                     )
                                 } else {
                                     Text("Track", color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        // Suggestions chips
+                        val frequentMeals by viewModel.frequentMeals.collectAsState()
+                        if (frequentMeals.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "Frequently Tracked (Tap to fill):",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    frequentMeals.forEach { meal ->
+                                        SuggestionChip(
+                                            onClick = { foodInputText = meal },
+                                            label = {
+                                                Text(
+                                                    text = meal,
+                                                    color = ThemeTextPrimary,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1
+                                                )
+                                            },
+                                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                                containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
+                                            ),
+                                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                                enabled = true,
+                                                borderColor = ThemeGlassBorder
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1165,7 +1228,10 @@ fun DashboardScreen(
                                 }
                                 if (errMsg.contains("Settings", ignoreCase = true)) {
                                     Button(
-                                        onClick = { showApiKeySettings = true },
+                                        onClick = {
+                                            showChatBottomSheet = false
+                                            onNavigateToSettings()
+                                        },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = EnergeticCoral.copy(alpha = 0.15f),
                                             contentColor = EnergeticCoral
@@ -1188,14 +1254,14 @@ fun DashboardScreen(
                             text = "Today's Ledger Entries",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = Color.White
+                            color = ThemeTextPrimary
                         )
 
                         if (state.nutritionList.isEmpty()) {
                             Text(
                                 text = "No meals logged today yet.",
                                 fontSize = 13.sp,
-                                color = Color.Gray
+                                color = ThemeTextSecondary
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1210,6 +1276,183 @@ fun DashboardScreen(
                     }
 
                     Spacer(modifier = Modifier.height(48.dp))
+                }
+            }
+        }
+
+        if (showChatBottomSheet && dashboardState is DashboardUiState.Success) {
+            val chatMessages by viewModel.chatMessages.collectAsState()
+            val chatLoading by viewModel.chatLoading.collectAsState()
+            var chatInputText by remember { mutableStateOf("") }
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            
+            ModalBottomSheet(
+                onDismissRequest = { showChatBottomSheet = false },
+                sheetState = sheetState,
+                containerColor = ThemeCardBg,
+                scrimColor = Color.Black.copy(alpha = 0.6f),
+                dragHandle = { BottomSheetDefaults.DragHandle(color = ThemeTextSecondary) }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight(0.75f)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "💬 Chat with Coach",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = ThemeTextPrimary
+                        )
+                        IconButton(
+                            onClick = { viewModel.clearChat() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Clear Chat",
+                                tint = ThemeTextSecondary
+                            )
+                        }
+                    }
+                    
+                    // Messages list
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        val lazyListState = rememberLazyListState()
+                        LaunchedEffect(chatMessages.size) {
+                            if (chatMessages.isNotEmpty()) {
+                                lazyListState.animateScrollToItem(chatMessages.size - 1)
+                            }
+                        }
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(chatMessages) { message ->
+                                val isUser = message.sender == MessageSender.User
+                                val alignment = if (isUser) Alignment.End else Alignment.Start
+                                val bubbleColor = if (isUser) HyperVioletAccent.copy(alpha = 0.25f) else ThemeTextPrimary.copy(alpha = 0.05f)
+                                val borderColor = if (isUser) HyperVioletAccent else ThemeGlassBorder
+                                
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = alignment
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(
+                                                RoundedCornerShape(
+                                                    topStart = 12.dp,
+                                                    topEnd = 12.dp,
+                                                    bottomStart = if (isUser) 12.dp else 2.dp,
+                                                    bottomEnd = if (isUser) 2.dp else 12.dp
+                                                )
+                                            )
+                                            .background(bubbleColor)
+                                            .border(
+                                                width = 1.dp,
+                                                color = borderColor,
+                                                shape = RoundedCornerShape(
+                                                    topStart = 12.dp,
+                                                    topEnd = 12.dp,
+                                                    bottomStart = if (isUser) 12.dp else 2.dp,
+                                                    bottomEnd = if (isUser) 2.dp else 12.dp
+                                                )
+                                            )
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = message.text,
+                                            color = ThemeTextPrimary,
+                                            fontSize = 13.sp,
+                                            lineHeight = 18.sp
+                                        )
+                                    }
+                                    Text(
+                                        text = if (isUser) "You" else "Coach",
+                                        color = ThemeTextSecondary,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp)
+                                    )
+                                }
+                            }
+                            
+                            if (chatLoading) {
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = NeonGreen,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Text(
+                                            text = "Coach is thinking...",
+                                            color = ThemeTextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Input panel
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = chatInputText,
+                            onValueChange = { chatInputText = it },
+                            label = { Text("Ask Coach about diet or recovery...") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonGreen,
+                                unfocusedBorderColor = ThemeGlassBorder,
+                                focusedTextColor = ThemeTextPrimary,
+                                unfocusedTextColor = ThemeTextPrimary,
+                                focusedLabelColor = NeonGreen,
+                                unfocusedLabelColor = ThemeTextSecondary
+                            ),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        
+                        Button(
+                            onClick = {
+                                if (chatInputText.isNotBlank()) {
+                                    viewModel.sendChatMessage(chatInputText)
+                                    chatInputText = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                            enabled = !chatLoading && chatInputText.isNotBlank(),
+                            modifier = Modifier.height(56.dp)
+                        ) {
+                            Text("Send", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.navigationBarsPadding())
                 }
             }
         }
@@ -1235,6 +1478,7 @@ fun ConcentricActivityRings(
         label = "StepsProgress"
     )
 
+    val trackBgColor = ThemeTextPrimary.copy(alpha = 0.15f)
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
@@ -1249,13 +1493,13 @@ fun ConcentricActivityRings(
 
             // Background tracks
             drawCircle(
-                color = Color.DarkGray.copy(alpha = 0.15f),
+                color = trackBgColor,
                 radius = radius1,
                 center = center,
                 style = Stroke(width = strokeWidth)
             )
             drawCircle(
-                color = Color.DarkGray.copy(alpha = 0.15f),
+                color = trackBgColor,
                 radius = radius2,
                 center = center,
                 style = Stroke(width = strokeWidth)
@@ -1308,13 +1552,13 @@ fun ConcentricActivityRings(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "$caloriesRemaining",
-                color = Color.White,
+                color = ThemeTextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Black
             )
             Text(
                 text = "kcal left",
-                color = Color.Gray,
+                color = ThemeTextSecondary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -1343,13 +1587,13 @@ fun RingLegendItem(
             Text(
                 text = label,
                 fontSize = 11.sp,
-                color = Color.Gray,
+                color = ThemeTextSecondary,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = value,
                 fontSize = 13.sp,
-                color = Color.White,
+                color = ThemeTextPrimary,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -1396,7 +1640,7 @@ fun MacroProgressBar(
                 Text(
                     text = label,
                     fontSize = 12.sp,
-                    color = Color.LightGray,
+                    color = ThemeTextSecondary,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
@@ -1418,7 +1662,7 @@ fun MacroProgressBar(
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color.White.copy(alpha = 0.05f))
+                .background(ThemeTextPrimary.copy(alpha = 0.05f))
         ) {
             if (animatedProgress > 0f) {
                 Box(
@@ -1445,8 +1689,8 @@ fun MacroProgressBar(
                     .fillMaxWidth()
                     .padding(top = 4.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.03f))
-                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(8.dp))
                     .padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -1471,7 +1715,7 @@ fun MacroProgressBar(
                         ) {
                             Text(
                                 text = entry.foodText,
-                                color = Color.White.copy(alpha = 0.85f),
+                                color = ThemeTextPrimary.copy(alpha = 0.85f),
                                 fontSize = 12.sp,
                                 modifier = Modifier.weight(1f)
                             )
@@ -1498,8 +1742,8 @@ fun SleepMetricPill(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.03f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
             .padding(12.dp)
     ) {
         Column {
@@ -1512,7 +1756,7 @@ fun SleepMetricPill(
             Text(
                 text = value,
                 fontSize = 14.sp,
-                color = Color.White,
+                color = ThemeTextPrimary,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 2.dp)
             )
@@ -1529,8 +1773,8 @@ fun MealItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.03f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -1538,7 +1782,7 @@ fun MealItemRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = entry.foodText,
-                color = Color.White,
+                color = ThemeTextPrimary,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp
             )
@@ -1607,7 +1851,7 @@ fun ActivityProgressBar(
             Text(
                 text = label,
                 fontSize = 12.sp,
-                color = Color.LightGray,
+                color = ThemeTextSecondary,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
@@ -1623,7 +1867,7 @@ fun ActivityProgressBar(
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color.White.copy(alpha = 0.05f))
+                .background(ThemeTextPrimary.copy(alpha = 0.05f))
         ) {
             if (animatedProgress > 0f) {
                 Box(
@@ -1748,6 +1992,8 @@ class SpeechRecognizerHelper(
 // Voice Quick Log UI Composable Card
 @Composable
 fun VoiceQuickLogCard(
+    logType: String,
+    onLogTypeChange: (String) -> Unit,
     isListening: Boolean,
     isProcessing: Boolean,
     onMicClick: () -> Unit,
@@ -1756,110 +2002,158 @@ fun VoiceQuickLogCard(
 ) {
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBgTranslucent),
+        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
         modifier = modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.08f),
-                        Color.White.copy(alpha = 0.02f)
+                        ThemeGlassBorder,
+                        ThemeGlassBorderGlow
                     )
                 ),
                 shape = RoundedCornerShape(20.dp)
             )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Pulse animated scale for listening indicator
-            val infiniteTransition = rememberInfiniteTransition(label = "MicPulse")
-            val scale by if (isListening) {
-                infiniteTransition.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 1.25f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(800, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "Scale"
-                )
-            } else {
-                remember { mutableStateOf(1f) }
-            }
-
-            val glowBg = if (isListening) {
-                HyperViolet.copy(alpha = 0.3f)
-            } else {
-                Color.White.copy(alpha = 0.05f)
-            }
-
-            Box(
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Segment Selector Switch (MEAL / WORKOUT)
+            Row(
                 modifier = Modifier
-                    .size(54.dp)
-                    .clip(CircleShape)
-                    .background(glowBg)
-                    .clickable(enabled = !isProcessing) {
-                        if (isListening) onStopClick() else onMicClick()
-                    },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp))
+                    .padding(2.dp)
             ) {
-                if (isProcessing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = ElectricCyan,
-                        strokeWidth = 2.5.dp
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (logType == "MEAL") ThemeTextPrimary.copy(alpha = 0.08f) else Color.Transparent)
+                        .clickable { onLogTypeChange("MEAL") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "MEAL",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (logType == "MEAL") ThemeSecondaryAccent else ThemeTextTertiary,
+                        letterSpacing = 1.sp
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size((36.dp.value * scale).dp)
-                            .clip(CircleShape)
-                            .background(if (isListening) NeonMint else Color.Transparent),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Quick Voice Log Microphone",
-                            tint = if (isListening) Color.Black else Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (logType == "WORKOUT") ThemeTextPrimary.copy(alpha = 0.08f) else Color.Transparent)
+                        .clickable { onLogTypeChange("WORKOUT") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "WORKOUT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (logType == "WORKOUT") ThemeSecondaryAccent else ThemeTextTertiary,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = when {
-                        isListening -> "Listening..."
-                        isProcessing -> "Analyzing Speech..."
-                        else -> "Quick-Log Meal"
-                    },
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = when {
-                        isListening -> NeonMint
-                        isProcessing -> ElectricCyan
-                        else -> Color.White
+                // Pulse animated scale for listening indicator
+                val infiniteTransition = rememberInfiniteTransition(label = "MicPulse")
+                val scale by if (isListening) {
+                    infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.25f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(800, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "Scale"
+                    )
+                } else {
+                    remember { mutableStateOf(1f) }
+                }
+
+                val glowBg = if (isListening) {
+                    HyperViolet.copy(alpha = 0.3f)
+                } else {
+                    ThemeTextPrimary.copy(alpha = 0.05f)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .background(glowBg)
+                        .clickable(enabled = !isProcessing) {
+                            if (isListening) onStopClick() else onMicClick()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isProcessing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = ThemeSecondaryAccent,
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size((36.dp.value * scale).dp)
+                                .clip(CircleShape)
+                                .background(if (isListening) NeonMint else Color.Transparent),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Quick Voice Log Microphone",
+                                tint = if (isListening) Color.Black else ThemeTextPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
-                )
-                Text(
-                    text = when {
-                        isListening -> "Speak what you ate now..."
-                        isProcessing -> "Estimating calories & macros with Gemini..."
-                        else -> "Tap the mic and speak what you ate."
-                    },
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = when {
+                            isListening -> "Listening..."
+                            isProcessing -> "Analyzing Speech..."
+                            logType == "MEAL" -> "Quick-Log Meal"
+                            else -> "Quick-Log Workout"
+                        },
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = when {
+                            isListening -> NeonMint
+                            isProcessing -> ThemeSecondaryAccent
+                            else -> ThemeTextPrimary
+                        }
+                    )
+                    Text(
+                        text = when {
+                            isListening -> if (logType == "MEAL") "Speak what you ate now..." else "Speak what workout you did..."
+                            isProcessing -> if (logType == "MEAL") "Estimating calories & macros with Gemini..." else "Estimating calories & sets/reps with Gemini..."
+                            logType == "MEAL" -> "Tap the mic and speak what you ate."
+                            else -> "Tap the mic and speak what exercise you did."
+                        },
+                        fontSize = 11.sp,
+                        color = ThemeTextSecondary
+                    )
+                }
             }
         }
     }

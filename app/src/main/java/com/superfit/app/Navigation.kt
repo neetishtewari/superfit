@@ -19,8 +19,11 @@ import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.auth.LoginViewModel
 import com.superfit.app.ui.dashboard.DashboardScreen
 import com.superfit.app.ui.dashboard.DashboardViewModel
+import com.superfit.app.ui.dashboard.SettingsScreen
 import com.superfit.app.ui.history.HistoryScreen
 import com.superfit.app.ui.history.HistoryViewModel
+import android.content.Context
+import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.ui.onboarding.OnboardingScreen
 import com.superfit.app.ui.onboarding.OnboardingViewModel
 import kotlinx.coroutines.launch
@@ -28,7 +31,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainNavigation(
     healthConnectManager: HealthConnectManager,
-    repository: DataRepository
+    repository: DataRepository,
+    triggerVoiceLog: Boolean = false,
+    triggerFavoritesLog: Boolean = false,
+    onVoiceLogTriggeredHandled: () -> Unit = {},
+    onFavoritesLogTriggeredHandled: () -> Unit = {}
 ) {
     var startDestination by remember { mutableStateOf<NavKey?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -38,8 +45,19 @@ fun MainNavigation(
         if (currentUser == null) {
             startDestination = Login
         } else {
-            val hasProfile = repository.getProfile() != null
-            startDestination = if (hasProfile) Dashboard else Onboarding
+            val localProfile = repository.getProfile()
+            if (localProfile != null) {
+                startDestination = Dashboard
+            } else {
+                // If local database was wiped but user is logged in, attempt to restore from Firestore
+                try {
+                    repository.firebaseSyncManager.syncAllDown()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                val hasProfile = repository.getProfile() != null
+                startDestination = if (hasProfile) Dashboard else Onboarding
+            }
         }
     }
 
@@ -66,6 +84,11 @@ fun MainNavigation(
                     viewModel = loginViewModel,
                     onLoginSuccess = {
                         coroutineScope.launch {
+                            try {
+                                repository.firebaseSyncManager.syncAllDown()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                             val hasProfile = repository.getProfile() != null
                             backStack.removeLastOrNull()
                             if (hasProfile) {
@@ -87,7 +110,8 @@ fun MainNavigation(
                     onOnboardingComplete = {
                         backStack.removeLastOrNull()
                         backStack.add(Dashboard)
-                    }
+                    },
+                    onBack = if (backStack.size > 1) { { backStack.removeLastOrNull() } } else null
                 )
             }
             entry<Dashboard> {
@@ -96,6 +120,10 @@ fun MainNavigation(
                 }
                 DashboardScreen(
                     viewModel = dashboardViewModel,
+                    triggerVoiceLog = triggerVoiceLog,
+                    triggerFavoritesLog = triggerFavoritesLog,
+                    onVoiceLogTriggeredHandled = onVoiceLogTriggeredHandled,
+                    onFavoritesLogTriggeredHandled = onFavoritesLogTriggeredHandled,
                     onNavigateToOnboarding = {
                         backStack.removeLastOrNull()
                         backStack.add(Onboarding)
@@ -103,20 +131,41 @@ fun MainNavigation(
                     onNavigateToHistory = {
                         backStack.add(History)
                     },
+                    onNavigateToSettings = {
+                        backStack.add(Settings)
+                    }
+                )
+            }
+            entry<Settings> {
+                val dashboardViewModel: DashboardViewModel = viewModel {
+                    DashboardViewModel(repository, context.applicationContext)
+                }
+                SettingsScreen(
+                    viewModel = dashboardViewModel,
+                    onBack = {
+                        backStack.removeLastOrNull()
+                    },
                     onLogout = {
                         coroutineScope.launch {
                             repository.clearAllLocalData()
+                            val prefs = getUserSharedPrefs(context)
+                            prefs.edit().clear().commit()
                             FirebaseAuth.getInstance().signOut()
-                            backStack.removeLastOrNull()
+                            backStack.removeLastOrNull() // pop Settings
+                            backStack.removeLastOrNull() // pop Dashboard
                             backStack.add(Login)
                         }
                     },
                     onSignOut = {
                         coroutineScope.launch {
                             FirebaseAuth.getInstance().signOut()
-                            backStack.removeLastOrNull()
+                            backStack.removeLastOrNull() // pop Settings
+                            backStack.removeLastOrNull() // pop Dashboard
                             backStack.add(Login)
                         }
+                    },
+                    onNavigateToOnboarding = {
+                        backStack.add(Onboarding)
                     }
                 )
             }
