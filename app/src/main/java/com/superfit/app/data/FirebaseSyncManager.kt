@@ -229,6 +229,23 @@ class FirebaseSyncManager(private val context: Context) {
                 doc.reference.delete().await()
             }
 
+            // Wait for all deletes to sync to the server (up to 5 seconds)
+            try {
+                kotlinx.coroutines.withTimeoutOrNull(5000) {
+                    firestore.waitForPendingWrites().await()
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Timeout or error waiting for pending writes: ${e.message}")
+            }
+
+            // Terminate and clear persistence to avoid caching stale data
+            try {
+                firestore.terminate().await()
+                firestore.clearPersistence().await()
+            } catch (e: Exception) {
+                Log.e(tag, "Error terminating/clearing persistence: ${e.message}")
+            }
+
             Log.d(tag, "Full Firestore cloud data wipe complete.")
         } catch (e: Exception) {
             Log.e(tag, "Error clearing cloud data: ${e.message}", e)
