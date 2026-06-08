@@ -199,6 +199,42 @@ class FirebaseSyncManager(private val context: Context) {
         }
     }
 
+    suspend fun clearAllCloudData() {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            // 1. Delete profile doc
+            firestore.collection("users").document(userId).delete().await()
+
+            // 2. Delete activity documents
+            val activitySnap = firestore.collection("users").document(userId).collection("activity").get().await()
+            for (doc in activitySnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 3. Delete sleep documents
+            val sleepSnap = firestore.collection("users").document(userId).collection("sleep").get().await()
+            for (doc in sleepSnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 4. Delete nutrition documents
+            val nutritionSnap = firestore.collection("users").document(userId).collection("nutrition").get().await()
+            for (doc in nutritionSnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 5. Delete workout documents
+            val workoutSnap = firestore.collection("users").document(userId).collection("workouts").get().await()
+            for (doc in workoutSnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            Log.d(tag, "Full Firestore cloud data wipe complete.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error clearing cloud data: ${e.message}", e)
+        }
+    }
+
     // --- Entity Mappers ---
 
     private fun UserProfileEntity.toMap(): Map<String, Any> = mapOf(

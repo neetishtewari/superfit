@@ -94,6 +94,10 @@ class DataRepository(
         }
     }
 
+    suspend fun clearAllCloudData() {
+        firebaseSyncManager.clearAllCloudData()
+    }
+
     suspend fun getAllNutritionEntries(): List<NutritionEntryEntity> {
         return database.nutritionDao().getAllEntries()
     }

@@ -147,6 +147,7 @@ fun MainNavigation(
                     },
                     onLogout = {
                         coroutineScope.launch {
+                            repository.clearAllCloudData()
                             repository.clearAllLocalData()
                             val prefs = getUserSharedPrefs(context)
                             prefs.edit().clear().commit()
