@@ -115,6 +115,22 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
         errorMessage = message
     }
 
+    fun resetPassword(emailAddress: String, onComplete: (Boolean, String?) -> Unit) {
+        if (emailAddress.isBlank()) {
+            onComplete(false, "Please enter your email address.")
+            return
+        }
+        auth.sendPasswordResetEmail(emailAddress)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onComplete(true, "Password reset email sent to $emailAddress.")
+                } else {
+                    val rawError = task.exception?.localizedMessage ?: "Failed to send reset email."
+                    onComplete(false, rawError)
+                }
+            }
+    }
+
     fun signInWithCredential(credential: com.google.firebase.auth.AuthCredential, onSuccess: () -> Unit) {
         errorMessage = null
         isLoading = true

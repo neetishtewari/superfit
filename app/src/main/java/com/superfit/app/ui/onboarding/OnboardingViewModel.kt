@@ -24,6 +24,24 @@ class OnboardingViewModel(
 
     init {
         checkPermissions()
+        loadExistingProfile()
+    }
+
+    private fun loadExistingProfile() {
+        viewModelScope.launch {
+            val existing = repository.getProfile()
+            if (existing != null) {
+                _uiState.value = _uiState.value.copy(
+                    age = existing.age.toString(),
+                    height = existing.heightCm.toString(),
+                    weight = existing.weightKg.toString(),
+                    isMale = existing.isMale,
+                    activityMultiplier = existing.activityMultiplier,
+                    goal = existing.goal,
+                    calorieOffset = existing.calorieOffset
+                )
+            }
+        }
     }
 
     fun checkPermissions() {
@@ -117,8 +135,8 @@ class OnboardingViewModel(
 
         viewModelScope.launch {
             try {
-                // Persist the API Key configured by the user
-                sharedPrefs.edit().putString("gemini_api_key", state.apiKey).apply()
+                // Persist the API Key configured by the user (trimmed to prevent spaces/newlines causing exceptions)
+                sharedPrefs.edit().putString("gemini_api_key", trimmedKey).apply()
 
                 val profile = UserProfileEntity(
                     id = 0,

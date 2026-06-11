@@ -37,6 +37,7 @@ fun MainNavigation(
     onVoiceLogTriggeredHandled: () -> Unit = {},
     onFavoritesLogTriggeredHandled: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     var startDestination by remember { mutableStateOf<NavKey?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -46,7 +47,8 @@ fun MainNavigation(
             startDestination = Login
         } else {
             val localProfile = repository.getProfile()
-            if (localProfile != null) {
+            val hasApiKey = !getUserSharedPrefs(context).getString("gemini_api_key", "").isNullOrBlank()
+            if (localProfile != null && hasApiKey) {
                 startDestination = Dashboard
             } else {
                 // If local database was wiped but user is logged in, attempt to restore from Firestore
@@ -56,7 +58,8 @@ fun MainNavigation(
                     e.printStackTrace()
                 }
                 val hasProfile = repository.getProfile() != null
-                startDestination = if (hasProfile) Dashboard else Onboarding
+                val hasApiKeyAfterSync = !getUserSharedPrefs(context).getString("gemini_api_key", "").isNullOrBlank()
+                startDestination = if (hasProfile && hasApiKeyAfterSync) Dashboard else Onboarding
             }
         }
     }
@@ -70,7 +73,6 @@ fun MainNavigation(
     }
 
     val backStack = rememberNavBackStack(startDest)
-    val context = LocalContext.current
 
     NavDisplay(
         backStack = backStack,
@@ -90,8 +92,9 @@ fun MainNavigation(
                                 e.printStackTrace()
                             }
                             val hasProfile = repository.getProfile() != null
+                            val hasApiKey = !getUserSharedPrefs(context).getString("gemini_api_key", "").isNullOrBlank()
                             backStack.removeLastOrNull()
-                            if (hasProfile) {
+                            if (hasProfile && hasApiKey) {
                                 backStack.add(Dashboard)
                             } else {
                                 backStack.add(Onboarding)

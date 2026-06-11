@@ -222,8 +222,9 @@ class DashboardViewModel(
     }
 
     fun updateApiKey(key: String) {
-        _apiKey.value = key
-        sharedPrefs.edit().putString("gemini_api_key", key).apply()
+        val trimmed = key.trim()
+        _apiKey.value = trimmed
+        sharedPrefs.edit().putString("gemini_api_key", trimmed).apply()
     }
 
     // Dynamic state combinations

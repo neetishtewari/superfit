@@ -40,6 +40,9 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.activity.result.contract.ActivityResultContracts
 
+import androidx.compose.ui.platform.LocalView
+import android.view.View
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -62,6 +65,15 @@ fun OnboardingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val original = view.importantForAutofill
+        view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+        onDispose {
+            view.importantForAutofill = original
+        }
+    }
 
     val context = LocalContext.current
     var showKeyInstructionsDialog by remember { mutableStateOf(false) }

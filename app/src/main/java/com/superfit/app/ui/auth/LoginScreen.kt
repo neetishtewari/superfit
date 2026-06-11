@@ -55,12 +55,20 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
+    var resetErrorMessage by remember { mutableStateOf<String?>(null) }
+
     val primaryColor = NeonMint
     val secondaryColor = ElectricCyan
 
     val context = LocalContext.current
-    val webClientIdResId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-    val webClientId = if (webClientIdResId != 0) context.getString(webClientIdResId) else null
+    val webClientId = try {
+        context.getString(com.superfit.app.R.string.default_web_client_id)
+    } catch (e: Exception) {
+        null
+    }
 
     val googleSignInClient = remember(webClientId) {
         if (webClientId != null) {
@@ -250,6 +258,29 @@ fun LoginScreen(
                     singleLine = true
                 )
 
+                // Forgot Password link (only in Login Mode)
+                if (viewModel.isLoginMode) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            text = "Forgot Password?",
+                            color = primaryColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable {
+                                resetEmail = viewModel.email
+                                resetSuccessMessage = null
+                                resetErrorMessage = null
+                                showForgotPasswordDialog = true
+                            }
+                        )
+                    }
+                }
+
                 // Confirm Password field (only for Signup)
                 AnimatedVisibility(
                     visible = !viewModel.isLoginMode,
@@ -436,6 +467,104 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(48.dp))
+        }
+
+        if (showForgotPasswordDialog) {
+            AlertDialog(
+                onDismissRequest = { showForgotPasswordDialog = false },
+                title = {
+                    Text(
+                        text = "Reset Password",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = ThemeTextPrimary
+                    )
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Enter your email address and we'll send you a link to reset your password.",
+                            fontSize = 13.sp,
+                            color = ThemeTextSecondary
+                        )
+
+                        OutlinedTextField(
+                            value = resetEmail,
+                            onValueChange = { resetEmail = it },
+                            label = { Text("Email Address") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = primaryColor,
+                                unfocusedBorderColor = ThemeGlassBorder,
+                                focusedLabelColor = primaryColor,
+                                unfocusedLabelColor = Color.Gray,
+                                focusedTextColor = ThemeTextPrimary,
+                                unfocusedTextColor = ThemeTextPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        if (resetErrorMessage != null) {
+                            Text(
+                                text = resetErrorMessage!!,
+                                color = CoralRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        if (resetSuccessMessage != null) {
+                            Text(
+                                text = resetSuccessMessage!!,
+                                color = NeonMint,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (resetSuccessMessage != null) {
+                                showForgotPasswordDialog = false
+                            } else {
+                                viewModel.resetPassword(resetEmail) { success, msg ->
+                                    if (success) {
+                                        resetSuccessMessage = msg
+                                        resetErrorMessage = null
+                                    } else {
+                                        resetErrorMessage = msg
+                                        resetSuccessMessage = null
+                                    }
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = primaryColor,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (resetSuccessMessage != null) "Close" else "Send Reset Link",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                dismissButton = {
+                    if (resetSuccessMessage == null) {
+                        TextButton(
+                            onClick = { showForgotPasswordDialog = false }
+                        ) {
+                            Text("Cancel", color = Color.Gray)
+                        }
+                    }
+                }
+            )
         }
     }
 }
