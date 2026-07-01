@@ -165,7 +165,11 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = "Providing your Gemini API Key allows natural language meal logging to run locally. If the default key has exceeded its quota, please enter your own API Key from Google AI Studio.",
+                        text = "🔒 Security & Cost Details:\n" +
+                               "• Stored securely on-device (never sent to our servers).\n" +
+                               "• Transmitted directly to Google's official Gemini API endpoints.\n" +
+                               "• Google AI Studio keys are 100% free with no credit card or billing details required.\n" +
+                               "If the default key has exceeded its quota, providing your own key restores full natural language features.",
                         fontSize = 11.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )

@@ -490,6 +490,13 @@ fun OnboardingScreen(
                         Text(text = "Paste from Clipboard", fontSize = 12.sp)
                     }
 
+                    Text(
+                        text = "🔒 Stored securely on-device & sent directly to Google. Gemini keys from Google AI Studio are 100% free with no credit card required.",
+                        fontSize = 11.sp,
+                        color = ThemeTextSecondary,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
                     // Only show "Get Free Key" button if a valid key is NOT configured
                     val isKeyWorking = uiState.apiKey.trim().startsWith("AIzaSy") || uiState.apiKey.trim().startsWith("AQ.")
                     if (!isKeyWorking) {
@@ -882,6 +889,20 @@ fun OnboardingScreen(
                                 text = "Return to Superfit and tap 'Paste from Clipboard'."
                             )
                         }
+
+                        HorizontalDivider(
+                            color = ThemeTextPrimary.copy(alpha = 0.05f),
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+
+                        Text(
+                            text = "🔒 Privacy & Cost Assurance:\n" +
+                                   "• Stored securely on-device (never sent to our servers).\n" +
+                                   "• Transmitted directly to Google's official Gemini API endpoints.\n" +
+                                   "• Google AI Studio keys are 100% free with no credit card or billing details required.",
+                            fontSize = 11.sp,
+                            color = ThemeTextSecondary
+                        )
                     }
                 },
                 confirmButton = {
