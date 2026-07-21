@@ -457,6 +457,11 @@ class DashboardViewModel(
         viewModelScope.launch {
             _coachingState.value = CoachingInsightState.Loading
             try {
+                val historyNutrition = repository.getAllNutritionEntries()
+                val historyWorkouts = repository.getAllWorkoutEntries()
+                val historyActivity = repository.getAllActivityTelemetry()
+                val historySleep = repository.getAllSleepTelemetry()
+
                 val engine = CoachingEngine(key)
                 val insight = engine.generateDailyInsight(
                     profile = currentState.profile,
@@ -467,7 +472,11 @@ class DashboardViewModel(
                     caloriesEaten = currentState.caloriesEaten,
                     proteinEaten = currentState.proteinEaten,
                     carbsEaten = currentState.carbsEaten,
-                    fatEaten = currentState.fatEaten
+                    fatEaten = currentState.fatEaten,
+                    historyNutrition = historyNutrition,
+                    historyWorkouts = historyWorkouts,
+                    historyActivity = historyActivity,
+                    historySleep = historySleep
                 )
 
                 val todayStr = LocalDate.now().toString()

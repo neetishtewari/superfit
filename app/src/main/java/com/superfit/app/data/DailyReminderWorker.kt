@@ -92,6 +92,11 @@ class DailyReminderWorker(
                     val carbsEaten = entries.sumOf { it.carbsG }
                     val fatEaten = entries.sumOf { it.fatG }
 
+                    val historyNutrition = database.nutritionDao().getAllEntries()
+                    val historyWorkouts = database.workoutDao().getAllEntries()
+                    val historyActivity = database.telemetryDao().getAllActivity()
+                    val historySleep = database.telemetryDao().getAllSleep()
+
                     val coachingEngine = CoachingEngine(apiKey)
                     val insight = coachingEngine.generateDailyInsight(
                         profile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2),
@@ -102,7 +107,11 @@ class DailyReminderWorker(
                         caloriesEaten = totalCalories,
                         proteinEaten = proteinEaten,
                         carbsEaten = carbsEaten,
-                        fatEaten = fatEaten
+                        fatEaten = fatEaten,
+                        historyNutrition = historyNutrition,
+                        historyWorkouts = historyWorkouts,
+                        historyActivity = historyActivity,
+                        historySleep = historySleep
                     )
 
                     // Cache generated insight in shared prefs for dashboard
