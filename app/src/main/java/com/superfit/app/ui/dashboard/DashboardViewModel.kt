@@ -61,8 +61,8 @@ class DashboardViewModel(
     private val _chatLoading = MutableStateFlow(false)
     val chatLoading: StateFlow<Boolean> = _chatLoading.asStateFlow()
 
-    private val _frequentMeals = MutableStateFlow<List<String>>(emptyList())
-    val frequentMeals: StateFlow<List<String>> = _frequentMeals.asStateFlow()
+    private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
+    val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
 
     private val _customMacroTrigger = MutableStateFlow(System.currentTimeMillis())
 
@@ -81,9 +81,10 @@ class DashboardViewModel(
 
     fun loadFrequentMeals() {
         viewModelScope.launch {
-            _frequentMeals.value = repository.getFrequentFoodTexts(3)
+            _predictedFoods.value = repository.getPredictedFoods()
         }
     }
+
 
     fun clearChat() {
         _chatMessages.value = listOf(

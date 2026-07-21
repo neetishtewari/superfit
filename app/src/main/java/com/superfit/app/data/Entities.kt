@@ -51,3 +51,13 @@ data class WorkoutEntryEntity(
     val repsCount: Int,
     val timestamp: Long // epoch millis
 )
+
+data class PredictedFood(
+    val foodText: String,
+    val calories: Double,
+    val proteinG: Double,
+    val carbsG: Double,
+    val fatG: Double,
+    val score: Double
+)
+

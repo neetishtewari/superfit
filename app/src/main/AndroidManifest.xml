@@ -23,6 +23,9 @@
     <!-- Microphone Permission for Voice Logging -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Notification Permission for Daily Reminders and AI Coaching Alerts -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".SuperfitApplication"
         android:allowBackup="true"

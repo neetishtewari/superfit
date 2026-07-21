@@ -97,14 +97,26 @@ class HistoryViewModel(
     var weeklyTrends by mutableStateOf<WeeklyTrendsState?>(null)
         private set
 
-    var frequentMeals by mutableStateOf<List<String>>(emptyList())
+    var predictedFoods by mutableStateOf<List<PredictedFood>>(emptyList())
         private set
+
 
     private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
     private var workoutsByDate: Map<LocalDate, List<WorkoutEntryEntity>> = emptyMap()
     private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
     private var bmr: Double = 0.0
     private var activityMultiplier: Double = 1.2
+    private var calorieOffset: Double = 0.0
+
+    private fun calculateTargetCalories(activeCal: Double): Double {
+        val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
+        return if (customMacroEnabled) {
+            sharedPrefs.getInt("custom_calories", 2000).toDouble()
+        } else {
+            val rawTdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+            (rawTdee + calorieOffset).coerceAtLeast(1200.0)
+        }
+    }
 
     init {
         loadData()
@@ -131,7 +143,7 @@ class HistoryViewModel(
         val activity = activityByDate[selectedDate]
         val manualCal = workouts.sumOf { it.caloriesBurned }
         val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-        val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+        val tdee = calculateTargetCalories(activeCal)
         val eaten = meals.sumOf { it.calories }
 
         selectedSummary = DaySummaryState(
@@ -151,6 +163,7 @@ class HistoryViewModel(
             val profile = repository.getProfile() ?: return@launch
             bmr = PhysiologyEngine.calculateBmr(profile)
             activityMultiplier = profile.activityMultiplier
+            calorieOffset = profile.calorieOffset.toDouble()
 
             // Get all local entries to compute month grid and consistency
             val allNutrition = repository.getAllNutritionEntries()
@@ -194,7 +207,7 @@ class HistoryViewModel(
                 val manualCal = workouts.sumOf { it.caloriesBurned }
                 val activity = activityByDate[tempDate]
                 val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-                val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+                val tdee = calculateTargetCalories(activeCal)
 
                 val status = when {
                     mealsCount < 2 -> DayStatus.Insufficient
@@ -231,7 +244,7 @@ class HistoryViewModel(
                     val manualCal = workouts.sumOf { it.caloriesBurned }
                     val activity = activityByDate[checkDate]
                     val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-                    val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+                    val tdee = calculateTargetCalories(activeCal)
                     if (caloriesEaten < tdee) {
                         rollingDeficitCount++
                     }
@@ -283,7 +296,7 @@ class HistoryViewModel(
                     val eatenCalories = meals.sumOf { it.calories }
                     val activity = activityByDate[checkDate]
                     val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-                    val tdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
+                    val tdee = calculateTargetCalories(activeCal)
                     totalNetCalories += (eatenCalories - tdee)
                     totalProteinG += meals.sumOf { it.proteinG }
                     trackedDaysCount++
@@ -314,7 +327,8 @@ class HistoryViewModel(
                 totalStrengthSets = totalStrengthSets
             )
 
-            frequentMeals = repository.getFrequentFoodTexts(3)
+            predictedFoods = repository.getPredictedFoods()
+
             updateSelectedSummary()
         }
     }

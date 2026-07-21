@@ -114,6 +114,13 @@ class DataRepository(
         return database.nutritionDao().getFrequentFoodTexts(limit)
     }
 
+    suspend fun getPredictedFoods(currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)): List<PredictedFood> {
+        val allEntries = getAllNutritionEntries()
+        return com.superfit.app.domain.FoodPredictor.predict(allEntries, currentHour)
+    }
+
+
+
     fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> {
         val zoneId = ZoneId.systemDefault()
         val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()

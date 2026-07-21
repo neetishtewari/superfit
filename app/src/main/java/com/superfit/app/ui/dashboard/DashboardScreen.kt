@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,11 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -246,6 +252,16 @@ fun DashboardScreen(
             )
     ) {
         if (showFavoritesDialog) {
+            var searchQuery by remember { mutableStateOf("") }
+            val allPredicted = viewModel.predictedFoods.collectAsState().value
+            val filteredFoods = remember(allPredicted, searchQuery) {
+                if (searchQuery.isBlank()) {
+                    allPredicted
+                } else {
+                    allPredicted.filter { it.foodText.contains(searchQuery, ignoreCase = true) }
+                }
+            }
+
             AlertDialog(
                 onDismissRequest = {
                     showFavoritesDialog = false
@@ -253,7 +269,7 @@ fun DashboardScreen(
                 },
                 title = {
                     Text(
-                        text = "LOG A FAVORITE MEAL",
+                        text = "MY FOOD HISTORY",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.5.sp,
@@ -266,52 +282,124 @@ fun DashboardScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Choose one of your frequently logged meals to track it instantly:",
+                            text = "Search and select a food from your history to log or fill:",
                             fontSize = 12.sp,
                             color = Color.Gray
                         )
-                        
-                        val meals = viewModel.frequentMeals.collectAsState().value
-                        if (meals.isEmpty()) {
-                            Text(
-                                text = "No frequent meals logged yet. Keep logging to see suggestions here!",
-                                fontSize = 13.sp,
-                                color = ThemeTextSecondary,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                            )
+
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search meals, e.g. eggs...", color = ThemeTextSecondary.copy(alpha = 0.5f)) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = ThemeTextSecondary) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = ThemeTextSecondary)
+                                    }
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonGreen,
+                                unfocusedBorderColor = ThemeGlassBorder,
+                                focusedTextColor = ThemeTextPrimary,
+                                unfocusedTextColor = ThemeTextPrimary,
+                                focusedLabelColor = NeonGreen,
+                                unfocusedLabelColor = ThemeTextSecondary
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (filteredFoods.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 120.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (searchQuery.isBlank()) 
+                                        "No foods logged yet. Keep tracking to build your history!" 
+                                        else "No matching meals found.",
+                                    fontSize = 13.sp,
+                                    color = ThemeTextSecondary,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
                         } else {
-                            meals.forEach { meal ->
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            viewModel.parseAndAddMeal(meal)
-                                            showFavoritesDialog = false
-                                            onFavoritesLogTriggeredHandled()
-                                        }
-                                        .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(14.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 280.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredFoods) { food ->
+                                    Card(
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
                                     ) {
-                                        Text(
-                                            text = meal,
-                                            color = ThemeTextPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = "Log",
-                                            tint = NeonGreen,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                Text(
+                                                    text = food.foodText,
+                                                    color = ThemeTextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                )
+                                                Text(
+                                                    text = "${food.calories.toInt()} kcal • ${food.proteinG.toInt()}g P • ${food.carbsG.toInt()}g C • ${food.fatG.toInt()}g F",
+                                                    color = ThemeTextSecondary,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                IconButton(
+                                                    onClick = {
+                                                        foodInputText = food.foodText
+                                                        showFavoritesDialog = false
+                                                        onFavoritesLogTriggeredHandled()
+                                                    },
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = "Fill input",
+                                                        tint = ThemeTextSecondary,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        viewModel.parseAndAddMeal(food.foodText)
+                                                        showFavoritesDialog = false
+                                                        onFavoritesLogTriggeredHandled()
+                                                    },
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = "Log instantly",
+                                                        tint = NeonGreen,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1165,8 +1253,8 @@ fun DashboardScreen(
                         }
 
                         // Suggestions chips
-                        val frequentMeals by viewModel.frequentMeals.collectAsState()
-                        if (frequentMeals.isNotEmpty()) {
+                        val predictedFoods by viewModel.predictedFoods.collectAsState()
+                        if (predictedFoods.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
                                     text = "Frequently Tracked (Tap to fill):",
@@ -1174,16 +1262,17 @@ fun DashboardScreen(
                                     color = Color.Gray,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Row(
+                                LazyRow(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    frequentMeals.forEach { meal ->
+                                    items(predictedFoods.take(6)) { predicted ->
                                         SuggestionChip(
-                                            onClick = { foodInputText = meal },
+                                            onClick = { foodInputText = predicted.foodText },
                                             label = {
                                                 Text(
-                                                    text = meal,
+                                                    text = predicted.foodText,
                                                     color = ThemeTextPrimary,
                                                     fontSize = 11.sp,
                                                     maxLines = 1
@@ -1195,6 +1284,27 @@ fun DashboardScreen(
                                             border = SuggestionChipDefaults.suggestionChipBorder(
                                                 enabled = true,
                                                 borderColor = ThemeGlassBorder
+                                            )
+                                        )
+                                    }
+                                    item {
+                                        SuggestionChip(
+                                            onClick = { showFavoritesDialog = true },
+                                            label = {
+                                                Text(
+                                                    text = "View All...",
+                                                    color = NeonGreen,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                            },
+                                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                                containerColor = NeonGreen.copy(alpha = 0.1f)
+                                            ),
+                                            border = SuggestionChipDefaults.suggestionChipBorder(
+                                                enabled = true,
+                                                borderColor = NeonGreen.copy(alpha = 0.3f)
                                             )
                                         )
                                     }

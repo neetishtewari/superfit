@@ -10,9 +10,12 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.MacroTargets
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.Instant
 
 class DailyReminderWorker(
     appContext: Context,
@@ -20,66 +23,105 @@ class DailyReminderWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val now = LocalTime.now()
-        val currentHour = now.hour
+        val sharedPrefs = getUserSharedPrefs(applicationContext)
 
-        // Target checking windows: 2:00 PM - 3:00 PM (14) and 8:00 PM - 9:00 PM (20)
-        val targetPeriod = when {
-            currentHour == 14 -> 14
-            currentHour == 20 -> 20
-            else -> null
+        // 1. Reschedule for tomorrow at the configured time
+        val reminderEnabled = sharedPrefs.getBoolean("reminder_enabled", true)
+        if (reminderEnabled) {
+            val hour = sharedPrefs.getInt("reminder_hour", 21)
+            val minute = sharedPrefs.getInt("reminder_minute", 0)
+            ReminderScheduler.scheduleReminder(applicationContext, hour, minute)
         }
 
-        if (targetPeriod != null) {
-            val sharedPrefs = getUserSharedPrefs(applicationContext)
-            val todayStr = LocalDate.now().toString()
-            val lastSentDate = sharedPrefs.getString("last_reminder_sent_date", "")
-            val lastSentPeriod = sharedPrefs.getInt("last_reminder_sent_period", -1)
+        // 2. Fetch today's logging data
+        val database = SuperfitDatabase.getDatabase(applicationContext)
+        val today = LocalDate.now()
+        val startOfDay = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val endOfDay = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
 
-            if (lastSentDate != todayStr || lastSentPeriod != targetPeriod) {
-                val database = SuperfitDatabase.getDatabase(applicationContext)
-                val today = LocalDate.now()
-                val startOfDay = today.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                val endOfDay = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+        val nutritionDao = database.nutritionDao()
+        val entries = nutritionDao.getEntriesForDay(startOfDay, endOfDay)
+        val totalCalories = entries.sumOf { it.calories }
 
-                val nutritionDao = database.nutritionDao()
-                val entries = nutritionDao.getEntriesForDay(startOfDay, endOfDay)
+        // Determine target calories
+        val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
+        val profile = database.profileDao().getProfile()
+        val targetCalories = if (customMacroEnabled) {
+            sharedPrefs.getInt("custom_calories", 2000).toDouble()
+        } else {
+            if (profile != null) {
+                val bmr = PhysiologyEngine.calculateBmr(profile)
+                val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier)
+                val targets = PhysiologyEngine.calculateMacroTargets(profile, tdee, 50)
+                targets.calories
+            } else {
+                2000.0
+            }
+        }
 
-                if (entries.isEmpty()) {
-                    sendNotification(
-                        title = "Superfit Smart Reminder",
-                        text = "No meals logged yet today! Tap to speak what you ate."
-                    )
-                } else if (targetPeriod == 20) {
-                    val totalCalories = entries.sumOf { it.calories }
-                    val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-                    val targetCalories = if (customMacroEnabled) {
-                        sharedPrefs.getInt("custom_calories", 2000).toDouble()
+        // 3. Decide notification style:
+        // Under-logged if total calories is less than 75% of target
+        if (totalCalories < 0.75 * targetCalories) {
+            sendNotification(
+                title = "📝 Complete your food log?",
+                text = "You've logged ${totalCalories.toInt()} / ${targetCalories.toInt()} kcal today. Did you forget to log a meal?"
+            )
+        } else {
+            // Log is complete -> Send Daily AI Coaching Summary
+            val apiKey = sharedPrefs.getString("gemini_api_key", "") ?: ""
+            if (apiKey.isBlank()) {
+                sendNotification(
+                    title = "⚡ Daily Focus Complete",
+                    text = "You've successfully hit your calorie targets today (${totalCalories.toInt()} kcal)! Make sure to prioritize sleep tonight for recovery."
+                )
+            } else {
+                try {
+                    val activity = database.telemetryDao().getActivity(today.toString()) 
+                        ?: com.superfit.app.data.ActivityTelemetryEntity(today.toString(), 0, 0.0)
+                    val sleep = database.telemetryDao().getSleep(today.toString())
+
+                    val bmr = if (profile != null) PhysiologyEngine.calculateBmr(profile) else 1500.0
+                    val tdee = if (profile != null) PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier) else 2000.0
+                    val targets = if (profile != null) {
+                        PhysiologyEngine.calculateMacroTargets(profile, tdee, sleep?.readinessScore ?: 50)
                     } else {
-                        val profile = database.profileDao().getProfile()
-                        if (profile != null) {
-                            val bmr = PhysiologyEngine.calculateBmr(profile)
-                            val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier)
-                            val targets = PhysiologyEngine.calculateMacroTargets(profile, tdee, 50)
-                            targets.calories
-                        } else {
-                            2000.0
-                        }
+                        MacroTargets(2000.0, 130.0, 200.0, 70.0)
                     }
 
-                    if (totalCalories < 0.5 * targetCalories) {
-                        sendNotification(
-                            title = "Superfit Daily Focus",
-                            text = "Your logged calories today are quite low (${totalCalories.toInt()} / ${targetCalories.toInt()} kcal). Did you enter all your meals?"
-                        )
-                    }
+                    val proteinEaten = entries.sumOf { it.proteinG }
+                    val carbsEaten = entries.sumOf { it.carbsG }
+                    val fatEaten = entries.sumOf { it.fatG }
+
+                    val coachingEngine = CoachingEngine(apiKey)
+                    val insight = coachingEngine.generateDailyInsight(
+                        profile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2),
+                        activity = activity,
+                        sleep = sleep,
+                        nutrition = entries,
+                        macroTargets = targets,
+                        caloriesEaten = totalCalories,
+                        proteinEaten = proteinEaten,
+                        carbsEaten = carbsEaten,
+                        fatEaten = fatEaten
+                    )
+
+                    // Cache generated insight in shared prefs for dashboard
+                    sharedPrefs.edit()
+                        .putString("coaching_insight_date", today.toString())
+                        .putString("coaching_insight_text", insight)
+                        .apply()
+
+                    sendNotification(
+                        title = "⚡ Daily AI Coaching Insight",
+                        text = insight
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("DailyReminderWorker", "AI Coaching notification generation failed", e)
+                    sendNotification(
+                        title = "⚡ Daily Focus Complete",
+                        text = "You've successfully hit your calorie targets today (${totalCalories.toInt()} kcal)! Prioritize sleep tonight for recovery."
+                    )
                 }
-
-                // Record that we evaluated/sent a reminder for this period
-                sharedPrefs.edit()
-                    .putString("last_reminder_sent_date", todayStr)
-                    .putInt("last_reminder_sent_period", targetPeriod)
-                    .apply()
             }
         }
 
@@ -142,6 +184,7 @@ class DailyReminderWorker(
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle(title)
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
@@ -160,3 +203,4 @@ class DailyReminderWorker(
         notificationManager.notify(notificationId, notification)
     }
 }
+

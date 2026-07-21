@@ -35,13 +35,15 @@ class SuperfitApplication : Application() {
     }
 
     private fun scheduleDailyReminder() {
-        val reminderRequest = PeriodicWorkRequestBuilder<DailyReminderWorker>(15, TimeUnit.MINUTES)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "DailyReminderWork",
-            ExistingPeriodicWorkPolicy.KEEP,
-            reminderRequest
-        )
+        val sharedPrefs = com.superfit.app.data.getUserSharedPrefs(this)
+        val enabled = sharedPrefs.getBoolean("reminder_enabled", true)
+        if (enabled) {
+            val hour = sharedPrefs.getInt("reminder_hour", 21) // default 9 PM
+            val minute = sharedPrefs.getInt("reminder_minute", 0)
+            com.superfit.app.data.ReminderScheduler.scheduleReminder(this, hour, minute)
+        } else {
+            com.superfit.app.data.ReminderScheduler.cancelReminder(this)
+        }
     }
+
 }

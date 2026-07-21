@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -908,8 +910,8 @@ fun DayBalanceCard(
                 }
 
                 // Suggestions chips
-                val frequentMeals = viewModel.frequentMeals
-                if (frequentMeals.isNotEmpty()) {
+                val predictedFoods = viewModel.predictedFoods
+                if (predictedFoods.isNotEmpty()) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.padding(top = 4.dp)
@@ -920,16 +922,16 @@ fun DayBalanceCard(
                             color = Color.Gray,
                             fontWeight = FontWeight.Bold
                         )
-                        Row(
+                        LazyRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            frequentMeals.forEach { meal ->
+                            items(predictedFoods.take(6)) { predicted ->
                                 SuggestionChip(
-                                    onClick = { foodText = meal },
+                                    onClick = { foodText = predicted.foodText },
                                     label = {
                                         Text(
-                                            text = meal,
+                                            text = predicted.foodText,
                                             color = ThemeTextPrimary,
                                             fontSize = 11.sp,
                                             maxLines = 1

@@ -2,6 +2,9 @@ package com.superfit.app.ui.dashboard
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.superfit.app.data.getUserSharedPrefs
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -60,6 +63,11 @@ fun SettingsScreen(
     var customFat by remember { mutableStateOf(sharedPrefs.getInt("custom_fat_g", 70).toString()) }
     var customCalories by remember { mutableStateOf(sharedPrefs.getInt("custom_calories", 2000).toString()) }
 
+    var reminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("reminder_enabled", true)) }
+    var reminderHour by remember { mutableStateOf(sharedPrefs.getInt("reminder_hour", 21)) }
+    var reminderMinute by remember { mutableStateOf(sharedPrefs.getInt("reminder_minute", 0)) }
+
+
     // Health Connect Permission Launcher
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
@@ -67,6 +75,22 @@ fun SettingsScreen(
         viewModel.checkPermissions()
         viewModel.syncTelemetry()
     }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            reminderEnabled = true
+            sharedPrefs.edit().putBoolean("reminder_enabled", true).apply()
+            com.superfit.app.data.ReminderScheduler.scheduleReminder(context, reminderHour, reminderMinute)
+            Toast.makeText(context, "Notification permission granted!", Toast.LENGTH_SHORT).show()
+        } else {
+            reminderEnabled = false
+            sharedPrefs.edit().putBoolean("reminder_enabled", false).apply()
+            Toast.makeText(context, "Notifications are disabled. Grant permission in App Info settings to receive alerts.", Toast.LENGTH_LONG).show()
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -580,7 +604,7 @@ fun SettingsScreen(
                 }
             }
 
-            // SECTION 5: Onboarding Preview & Diagnostics
+            // SECTION 4.5: Daily Reminder Notifications Settings
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
@@ -597,32 +621,171 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Diagnostics & User Testing",
+                        text = "Daily Reminder Notifications",
                         fontWeight = FontWeight.Bold,
                         color = SuperfitTheme.colors.textPrimary,
                         fontSize = 14.sp
                     )
+
                     Text(
-                        text = "Preview and test the onboarding flow (Health Connect settings, microphone permissions, BMR configuration, and Gemini key setups) for new users. Your existing meal and workout history will not be lost.",
+                        text = "Superfit will remind you to log meals at your scheduled time. If your logs are complete, you will receive your dynamic AI Coaching insight instead.",
                         fontSize = 11.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
-                    Button(
-                        onClick = onNavigateToOnboarding,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ElectricCyan.copy(alpha = 0.15f),
-                            contentColor = ElectricCyan
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(40.dp),
-                        shape = RoundedCornerShape(8.dp)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Preview Onboarding Flow",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            text = "Enable Reminders",
+                            fontWeight = FontWeight.Medium,
+                            color = SuperfitTheme.colors.textPrimary,
+                            fontSize = 13.sp
                         )
+                        Switch(
+                            checked = reminderEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        val hasPermission = ContextCompat.checkSelfPermission(
+                                            context,
+                                            "android.permission.POST_NOTIFICATIONS"
+                                        ) == PackageManager.PERMISSION_GRANTED
+
+                                        if (!hasPermission) {
+                                            notificationPermissionLauncher.launch("android.permission.POST_NOTIFICATIONS")
+                                        } else {
+                                            reminderEnabled = true
+                                            sharedPrefs.edit().putBoolean("reminder_enabled", true).apply()
+                                            com.superfit.app.data.ReminderScheduler.scheduleReminder(context, reminderHour, reminderMinute)
+                                        }
+                                    } else {
+                                        reminderEnabled = true
+                                        sharedPrefs.edit().putBoolean("reminder_enabled", true).apply()
+                                        com.superfit.app.data.ReminderScheduler.scheduleReminder(context, reminderHour, reminderMinute)
+                                    }
+                                } else {
+                                    reminderEnabled = false
+                                    sharedPrefs.edit().putBoolean("reminder_enabled", false).apply()
+                                    com.superfit.app.data.ReminderScheduler.cancelReminder(context)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = NeonMint,
+                                uncheckedThumbColor = SuperfitTheme.colors.textTertiary,
+                                uncheckedTrackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f)
+                            )
+                        )
+                    }
+
+                    if (reminderEnabled) {
+                        val amPm = if (reminderHour >= 12) "PM" else "AM"
+                        val displayHour = when {
+                            reminderHour == 0 -> 12
+                            reminderHour > 12 -> reminderHour - 12
+                            else -> reminderHour
+                        }
+                        val formattedTime = String.format("%02d:%02d %s", displayHour, reminderMinute, amPm)
+
+                        val timePickerDialog = remember(reminderHour, reminderMinute) {
+                            android.app.TimePickerDialog(
+                                context,
+                                { _, selectedHour, selectedMinute ->
+                                    reminderHour = selectedHour
+                                    reminderMinute = selectedMinute
+                                    sharedPrefs.edit()
+                                        .putInt("reminder_hour", selectedHour)
+                                        .putInt("reminder_minute", selectedMinute)
+                                        .apply()
+                                    com.superfit.app.data.ReminderScheduler.scheduleReminder(context, selectedHour, selectedMinute)
+                                    Toast.makeText(context, "Reminder scheduled for time selection", Toast.LENGTH_SHORT).show()
+                                },
+                                reminderHour,
+                                reminderMinute,
+                                false
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SuperfitTheme.colors.textPrimary.copy(alpha = 0.04f))
+                                .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(12.dp))
+                                .clickable { timePickerDialog.show() }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Reminder Time",
+                                color = SuperfitTheme.colors.textPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = formattedTime,
+                                color = NeonMint,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            val isDebug = remember {
+                (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            }
+
+            if (isDebug) {
+                // SECTION 5: Onboarding Preview & Diagnostics
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            1.dp,
+                            Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
+                            RoundedCornerShape(20.dp)
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Diagnostics & User Testing",
+                            fontWeight = FontWeight.Bold,
+                            color = SuperfitTheme.colors.textPrimary,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Preview and test the onboarding flow (Health Connect settings, microphone permissions, BMR configuration, and Gemini key setups) for new users. Your existing meal and workout history will not be lost.",
+                            fontSize = 11.sp,
+                            color = SuperfitTheme.colors.textSecondary
+                        )
+                        Button(
+                            onClick = onNavigateToOnboarding,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ElectricCyan.copy(alpha = 0.15f),
+                                contentColor = ElectricCyan
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "Preview Onboarding Flow",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }
