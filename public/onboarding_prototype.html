@@ -1,0 +1,1920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Superfit Onboarding Prototype</title>
+  <!-- Google Fonts Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-start: #040406;
+      --bg-end: #0A0A0F;
+      --card-bg: rgba(18, 18, 28, 0.7);
+      --neon-mint: #10B981;
+      --electric-cyan: #06B6D4;
+      --hyper-violet: #8B5CF6;
+      --coral-red: #ff476a;
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-border-glow: rgba(255, 255, 255, 0.18);
+      --text-primary: #FFFFFF;
+      --text-secondary: #D1D5DB;
+      --text-tertiary: #9CA3AF;
+      --orb-opacity: 0.15;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+    }
+
+    body {
+      background: var(--bg-start);
+      background: linear-gradient(185deg, var(--bg-start), var(--bg-end));
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 20px;
+    }
+
+    /* Top banner instructions style */
+    .top-banner {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 12px 18px;
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: center;
+      margin-bottom: 16px;
+      max-width: 420px;
+      color: var(--text-secondary);
+      z-index: 10;
+    }
+
+    /* Outer Container mimicking a premium responsive app viewport */
+    .app-container {
+      width: 100%;
+      max-width: 420px;
+      height: 760px;
+      background: var(--card-bg);
+      backdrop-filter: blur(30px);
+      border: 1px solid var(--glass-border);
+      border-radius: 44px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255,255,255,0.05);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 28px;
+    }
+
+    /* Ambient Pulsing Glow Orbs */
+    .glow-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: var(--orb-opacity);
+      pointer-events: none;
+      z-index: 1;
+      transition: opacity 0.4s ease;
+    }
+
+    .orb-1 {
+      top: -15%;
+      left: -15%;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, var(--hyper-violet) 0%, transparent 80%);
+      animation: drift 10s infinite alternate ease-in-out;
+    }
+
+    .orb-2 {
+      bottom: -15%;
+      right: -15%;
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, var(--electric-cyan) 0%, transparent 80%);
+      animation: drift 12s infinite alternate-reverse ease-in-out;
+    }
+
+    @keyframes drift {
+      0% { transform: scale(1) translate(0, 0); }
+      100% { transform: scale(1.2) translate(40px, 30px); }
+    }
+
+    /* App Header / Navigation */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      z-index: 10;
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .back-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-primary);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .back-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: var(--glass-border-glow);
+      transform: translateY(-1px);
+    }
+
+    .back-btn:active {
+      transform: scale(0.96);
+    }
+
+    .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 900;
+      font-size: 20px;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, var(--neon-mint), var(--electric-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .voice-toggle {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 20;
+    }
+
+    .voice-toggle.active {
+      background: rgba(6, 182, 212, 0.12);
+      border-color: var(--electric-cyan);
+      color: var(--electric-cyan);
+      box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+    }
+
+    /* Shifting Wave Equalizer Animation */
+    .eq-bar {
+      display: inline-block;
+      width: 2px;
+      height: 8px;
+      background: var(--text-secondary);
+      border-radius: 1px;
+      transition: background-color 0.3s ease;
+    }
+    .voice-toggle.active .eq-bar {
+      background: var(--electric-cyan);
+      animation: eq-bounce 1s infinite ease-in-out;
+    }
+    .voice-toggle.active .eq-bar:nth-child(1) { animation-delay: 0.1s; height: 10px; }
+    .voice-toggle.active .eq-bar:nth-child(2) { animation-delay: 0.3s; height: 14px; }
+    .voice-toggle.active .eq-bar:nth-child(3) { animation-delay: 0.2s; height: 8px; }
+
+    @keyframes eq-bounce {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.8); }
+    }
+
+    /* Single continuous glowing progress bar */
+    .progress-bar-container {
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      position: relative;
+      margin-top: 12px;
+      margin-bottom: 32px;
+      z-index: 10;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 14.3%; /* Dynamic width */
+      background: linear-gradient(90deg, var(--neon-mint), var(--electric-cyan));
+      border-radius: 10px;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+    }
+
+    /* Content Area with smart transitions */
+    .content-area {
+      flex: 1;
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .step-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 2;
+    }
+
+    /* Active Step View with Custom Scale/Slide Up Animation */
+    .step-view.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      animation: step-appear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      z-index: 5;
+    }
+
+    @keyframes step-appear {
+      0% { opacity: 0; transform: translateY(14px) scale(0.99); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Typography & Negative Space */
+    .step-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 25px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      line-height: 1.25;
+      letter-spacing: -0.3px;
+    }
+
+    .step-desc {
+      font-size: 13.5px;
+      color: var(--text-tertiary);
+      line-height: 1.6;
+      margin-bottom: 24px; /* Generous breathing room */
+    }
+
+    /* Cards / Elements styles */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    /* Form Fields styling */
+    .form-group {
+      margin-bottom: 20px; /* Breathe */
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .input-field {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 14px;
+      color: var(--text-primary);
+      font-size: 14.5px;
+      outline: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .input-field:focus {
+      border-color: var(--electric-cyan);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Animated Sliding Segment Switch */
+    .segmented-control-wrapper {
+      position: relative;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 3px;
+      height: 48px;
+      display: flex;
+    }
+
+    .segment-slider {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 3px;
+      width: calc(50% - 3px);
+      background: var(--neon-mint);
+      border-radius: 11px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+      z-index: 1;
+    }
+
+    /* Theme slider position styling */
+    .theme-slider {
+      width: calc(50% - 3px);
+      background: var(--hyper-violet);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+
+    .segment-option {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      color: var(--text-tertiary);
+      position: relative;
+      z-index: 2;
+      transition: color 0.3s ease;
+    }
+
+    .segment-option.selected {
+      color: #000000;
+    }
+
+    /* Slider track visual adjustments */
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slider-value {
+      font-weight: 700;
+      color: var(--neon-mint);
+    }
+
+    .slider-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .custom-range {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+      margin: 10px 0;
+    }
+
+    .custom-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--neon-mint);
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .custom-range::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .custom-range::-webkit-slider-thumb:active {
+      transform: scale(1.1);
+    }
+
+    /* Animated Radio Goal Cards */
+    .goal-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .goal-card:hover {
+      border-color: rgba(255,255,255,0.18);
+      transform: translateY(-1.5px);
+    }
+
+    .goal-card.selected {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: var(--neon-mint);
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .goal-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .goal-card.selected .goal-title {
+      color: var(--neon-mint);
+    }
+
+    .goal-subtitle {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    .radio-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--text-tertiary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .goal-card.selected .radio-dot {
+      border-color: var(--neon-mint);
+    }
+
+    .radio-dot::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-mint);
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .goal-card.selected .radio-dot::after {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Buttons / CTAs */
+    .button-group {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10;
+      position: relative;
+    }
+
+    .btn {
+      width: 100%;
+      height: 54px;
+      border-radius: 16px;
+      border: none;
+      outline: none;
+      font-size: 15.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--neon-mint), var(--hyper-violet));
+      color: #FFFFFF;
+      box-shadow: 0 8px 24px -6px rgba(139, 92, 246, 0.4);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 12px 28px -4px rgba(139, 92, 246, 0.55);
+      transform: translateY(-2px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 4px 12px -6px rgba(139, 92, 246, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(6, 182, 212, 0.08);
+      color: var(--electric-cyan);
+      border: 1px solid rgba(6, 182, 212, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(6, 182, 212, 0.14);
+      border-color: var(--electric-cyan);
+      transform: translateY(-1.5px);
+    }
+
+    .btn-secondary:active {
+      transform: translateY(0.5px) scale(0.99);
+    }
+
+    .btn-text {
+      background: transparent;
+      color: var(--text-tertiary);
+      height: auto;
+      padding: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+
+    .btn-text:hover {
+      color: var(--text-primary);
+    }
+
+    /* Welcome screen feature items */
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .feature-icon-wrapper {
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
+      border-radius: 11px;
+      background: rgba(139, 92, 246, 0.06);
+      border: 1px solid rgba(139, 92, 246, 0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--hyper-violet);
+      font-size: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .feature-item:nth-child(2) .feature-icon-wrapper {
+      background: rgba(6, 182, 212, 0.06);
+      border-color: rgba(6, 182, 212, 0.14);
+      color: var(--electric-cyan);
+    }
+
+    .feature-item:nth-child(3) .feature-icon-wrapper {
+      background: rgba(16, 185, 129, 0.06);
+      border-color: rgba(16, 185, 129, 0.14);
+      color: var(--neon-mint);
+    }
+
+    .feature-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .feature-title {
+      font-weight: 700;
+      font-size: 13.5px;
+      color: var(--text-primary);
+    }
+
+    .feature-desc {
+      font-size: 11.5px;
+      color: var(--text-tertiary);
+      line-height: 1.35;
+    }
+
+    /* Real-time TDEE banner */
+    .tdee-ticker {
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%);
+      border: 1px dashed rgba(6, 182, 212, 0.3);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .tdee-header-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tdee-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--electric-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .what-tdee-link {
+      font-size: 11px;
+      color: var(--hyper-violet);
+      cursor: pointer;
+      text-decoration: underline;
+      font-weight: 500;
+    }
+
+    .tdee-num {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-primary);
+      text-shadow: 0 0 10px rgba(255,255,255,0.1);
+    }
+
+    /* API Instruction steps styled list */
+    .instruction-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+      margin-bottom: 20px;
+    }
+
+    .inst-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .inst-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: rgba(139, 92, 246, 0.12);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      color: var(--hyper-violet);
+      font-weight: 700;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    /* Integration status indicators */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.connected {
+      color: var(--neon-mint);
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+
+    .status-badge.pending {
+      color: var(--text-tertiary);
+    }
+
+    /* Quick helper badges */
+    .helper-text {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      line-height: 1.45;
+      display: flex;
+      gap: 8px;
+    }
+
+    .helper-icon {
+      font-size: 14px;
+    }
+
+    /* Mock Permission Overlay modal with spring scaling */
+    .mock-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .mock-overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .mock-dialog {
+      background: #12121E;
+      border: 1px solid var(--glass-border-glow);
+      border-radius: 28px;
+      padding: 28px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+      text-align: center;
+      transform: scale(0.92);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .mock-overlay.visible .mock-dialog {
+      transform: scale(1);
+    }
+
+    .dialog-icon {
+      font-size: 36px;
+      margin-bottom: 14px;
+    }
+
+    .dialog-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .dialog-desc {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .dialog-btn {
+      flex: 1;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .dialog-btn-allow {
+      background: var(--electric-cyan);
+      color: #000;
+    }
+
+    .dialog-btn-allow:active {
+      transform: scale(0.97);
+    }
+
+    .dialog-btn-deny {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+
+    /* API Key check state */
+    .validation-state {
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+    
+    .validation-state.valid {
+      color: var(--neon-mint);
+    }
+    
+    .validation-state.invalid {
+      color: var(--coral-red);
+    }
+
+    .validation-state.empty {
+      color: var(--text-tertiary);
+    }
+
+    /* Clipboard Paste helper block */
+    .input-wrapper {
+      position: relative;
+    }
+
+    .paste-badge {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .paste-badge:hover {
+      background: rgba(255,255,255,0.12);
+      border-color: var(--glass-border-glow);
+    }
+
+    /* Success Dashboard simulation preview card */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .summary-tile {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 12px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .summary-tile:hover {
+      border-color: rgba(255,255,255,0.14);
+    }
+
+    .summary-tile-label {
+      font-size: 9.5px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-tile-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-top: 4px;
+    }
+
+    .macro-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .macro-row:last-child {
+      border-bottom: none;
+    }
+
+    .macro-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .p-color { background-color: var(--hyper-violet); box-shadow: 0 0 6px var(--hyper-violet); }
+    .c-color { background-color: var(--electric-cyan); box-shadow: 0 0 6px var(--electric-cyan); }
+    .f-color { background-color: var(--neon-mint); box-shadow: 0 0 6px var(--neon-mint); }
+
+    /* Trust Highlights Row */
+    .trust-bullets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .trust-bullet {
+      background: rgba(255,255,255,0.015);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.3s ease;
+    }
+
+    .trust-bullet:hover {
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    .trust-bullet-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .trust-bullet-desc {
+      font-size: 9.5px;
+      color: var(--text-tertiary);
+      line-height: 1.4;
+    }
+
+    /* Conversion cheat sheet table styles */
+    .cheat-sheet-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 11.5px;
+    }
+
+    .cheat-sheet-table th, .cheat-sheet-table td {
+      padding: 6px 8px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .cheat-sheet-table th {
+      color: var(--electric-cyan);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top simulation explanation -->
+  <div class="top-banner">
+    🧪 <strong>Interactive Onboarding Prototype</strong><br>
+    Reverted to a single centimeters input field. Typing triggers a <strong>live feet/inches equivalent readout</strong> below it, with a subtle cheat sheet link.
+  </div>
+
+  <!-- Main view mimicry -->
+  <div class="app-container">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <!-- Header bar -->
+    <div class="header">
+      <div class="back-btn" id="backBtn" onclick="prevStep()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </div>
+      <div class="logo-text">SUPERFIT</div>
+      <div class="voice-toggle active" id="voiceToggleBtn" onclick="toggleVoiceGuide()">
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span class="eq-bar"></span>
+        <span id="voiceStatus" style="margin-left: 2px;">Voice: On</span>
+      </div>
+    </div>
+
+    <!-- Single Glowing Progress Indicator -->
+    <div class="progress-bar-container">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content-area">
+
+      <!-- Step 0: Welcome -->
+      <div class="step-view active" id="step0">
+        <h2 class="step-title" style="margin-top: 10px; margin-bottom: 24px; font-size: 26px;">Easiest way to track your fitness & get personalized insights</h2>
+        
+        <!-- UPFRONT APPEARANCE CHOICE -->
+        <div class="form-group" style="margin-bottom: 28px;">
+          <label class="form-label">Choose Appearance</label>
+          <div class="segmented-control-wrapper" style="height: 44px;">
+            <div class="segment-slider theme-slider" id="themeSlider"></div>
+            <div class="segment-option selected" id="themeDark" onclick="setTheme(true)" style="font-size: 12.5px;">🌙 Dark Mode</div>
+            <div class="segment-option" id="themeLight" onclick="setTheme(false)" style="font-size: 12.5px;">☀️ Light Mode</div>
+          </div>
+        </div>
+
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 8px; margin-bottom: 20px;">
+          <div class="feature-item">
+            <div class="feature-icon-wrapper">🎙️</div>
+            <div class="feature-text">
+              <span class="feature-title">Multilingual Voice Log</span>
+              <span class="feature-desc">Speak naturally. Track macro entries in any Indian language.</span>
+            </div>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-icon-wrapper">🔒</div>
+            <div class="feature-text">
+              <span class="feature-title">100% On-Device Privacy</span>
+              <span class="feature-desc">Your health telemetry stays strictly on your device.</span>
+            </div>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-icon-wrapper">💸</div>
+            <div class="feature-text">
+              <span class="feature-title">Free & Ad-Free</span>
+              <span class="feature-desc">Full feature set with no paywalls or subscription barriers.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="button-group" style="margin-top: auto;">
+          <button class="btn btn-primary" onclick="nextStep()">Get Started</button>
+        </div>
+      </div>
+
+      <!-- Step 1: Physiology Metrics -->
+      <div class="step-view" id="step1">
+        <h2 class="step-title">Physiological Profile</h2>
+        <p class="step-desc" style="margin-bottom: 18px;">Enter your core physical metrics. We use these to calculate your baseline resting metabolism.</p>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">Biological Sex</label>
+          <div class="segmented-control-wrapper" style="height: 38px;">
+            <div class="segment-slider" id="sexSlider" style="border-radius: 9px; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px);"></div>
+            <div class="segment-option selected" id="sexMale" onclick="setSex(true)" style="font-size: 12px;">Male</div>
+            <div class="segment-option" id="sexFemale" onclick="setSex(false)" style="font-size: 12px;">Female</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">Age (Years)</label>
+          <input type="number" class="input-field" id="ageInput" placeholder="e.g. 28" value="28" style="padding: 10px;" oninput="calculateRealtimeMetrics()">
+        </div>
+
+        <!-- Metric height input ONLY -->
+        <div class="form-group" style="margin-bottom: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="form-label">Height (cm)</label>
+            <span style="font-size: 11px; color: var(--hyper-violet); cursor: pointer; text-decoration: underline;" onclick="showCheatSheet()">Foot/Inches Helper</span>
+          </div>
+          <input type="number" class="input-field" id="heightInput" placeholder="e.g. 175" value="175" style="padding: 10px;" oninput="updateHeightCalculations()">
+          
+          <!-- Dynamic Foot/Inches Equivalent Readout -->
+          <div style="font-size: 11.5px; color: var(--electric-cyan); font-weight: 500; margin-top: 4px; min-height: 16px;" id="heightFtReadout">
+            Equivalent: 5 ft 9 in
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">Weight (kg)</label>
+          <input type="number" class="input-field" id="weightInput" placeholder="e.g. 75" value="75" style="padding: 10px;" oninput="calculateRealtimeMetrics()">
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="validateStep1()">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Activity & Goals -->
+      <div class="step-view" id="step2">
+        <h2 class="step-title">Baseline Activity</h2>
+        <p class="step-desc">Configure your activity levels and goal to calculate your target calorie budget.</p>
+
+        <div class="slider-container" style="margin-bottom: 16px;">
+          <div class="slider-header">
+            <label class="form-label">Activity Level</label>
+            <span class="slider-value" id="activityVal">1.375</span>
+          </div>
+          <span class="slider-desc" id="activityDesc">Lightly Active (1-3 days/week)</span>
+          <input type="range" class="custom-range" id="activityRange" min="0" max="3" step="1" value="1" oninput="setActivityIndex(this.value)">
+        </div>
+
+        <label class="form-label" style="margin-bottom: 6px; display: block;">Fitness Goal</label>
+        
+        <div class="goal-card selected" id="goalDeficit" onclick="setGoal('LOSE_WEIGHT', -500)">
+          <div>
+            <div class="goal-title">Weight Loss</div>
+            <div class="goal-subtitle">Deficit: -500 kcal</div>
+          </div>
+          <div class="radio-dot"></div>
+        </div>
+
+        <div class="goal-card" id="goalMaintain" onclick="setGoal('MAINTAIN', 0)">
+          <div>
+            <div class="goal-title">Maintenance</div>
+            <div class="goal-subtitle">Target: Energy Balance</div>
+          </div>
+          <div class="radio-dot"></div>
+        </div>
+
+        <div class="goal-card" id="goalSurplus" onclick="setGoal('GAIN_MUSCLE', 300)">
+          <div>
+            <div class="goal-title">Muscle Gain</div>
+            <div class="goal-subtitle">Surplus: +300 kcal</div>
+          </div>
+          <div class="radio-dot"></div>
+        </div>
+
+        <!-- Real-time BMR Ticker -->
+        <div class="tdee-ticker">
+          <div class="tdee-header-row">
+            <span class="tdee-label">Daily TDEE</span>
+            <span class="what-tdee-link" onclick="showTdeePopup()">What is this?</span>
+          </div>
+          <div class="tdee-num" id="liveTdee">2,320 kcal</div>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Health Connect -->
+      <div class="step-view" id="step3">
+        <h2 class="step-title">Google Health Sync</h2>
+        <p class="step-desc">Sync your baseline activity telemetry. Superfit reads steps, sleep cycles, and active workouts locally from your device.</p>
+
+        <div class="glass-card" style="text-align: center; margin-bottom: 24px; padding: 24px;">
+          <div style="font-size: 36px; margin-bottom: 8px;">💚</div>
+          <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 6px;">Health Connect Status</h3>
+          <div class="status-badge pending" id="hcStatus">Disconnected</div>
+          
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 10px; line-height: 1.45;">
+            Connecting allows Superfit to auto-calculate metabolic offsets from sleep quality and daily workouts.
+          </p>
+        </div>
+
+        <div class="helper-text" style="margin-bottom: 20px;">
+          <span class="helper-icon">🔒</span>
+          <span>We respect your privacy. Health records stay strictly locally stored on your device. We have no backend server database.</span>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" id="hcConnectBtn" onclick="showMockPermission('healthconnect')">Connect Google Health Connect</button>
+          <button class="btn btn-text" onclick="nextStep()">Skip / Connect Later</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Gemini API Key -->
+      <div class="step-view" id="step4">
+        <h2 class="step-title">AI Assistant Setup</h2>
+        <p class="step-desc" style="margin-bottom: 18px;">Superfit uses Gemini for natural voice logging. Get a free API key in 2 clicks. Stored 100% securely on-device.</p>
+
+        <!-- Inline simplified instructions -->
+        <div class="instruction-list" style="margin-top: 0; margin-bottom: 24px; gap: 10px;">
+          <div class="inst-step">
+            <div class="inst-num">1</div>
+            <div>Tap <strong>Get Free API Key</strong> to open Google AI Studio.</div>
+          </div>
+          <div class="inst-step">
+            <div class="inst-num">2</div>
+            <div>Tap <strong>Create API Key</strong> in new project & copy it.</div>
+          </div>
+          <div class="inst-step">
+            <div class="inst-num">3</div>
+            <div>Return here and tap <strong>Paste</strong> to configure.</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="position: relative; margin-bottom: 24px;">
+          <div class="input-wrapper">
+            <input type="password" class="input-field" id="apiKeyInput" placeholder="Starts with AIzaSy or AQ..." oninput="checkApiKey(this.value)">
+            <span class="paste-badge" onclick="pasteKey()">Paste</span>
+          </div>
+          <div class="validation-state empty" id="keyValidationState">
+            Required for voice and AI features.
+          </div>
+        </div>
+
+        <div class="button-group" style="margin-top: auto;">
+          <button class="btn btn-secondary" onclick="openAiStudio()">Get Free API Key</button>
+          <button class="btn btn-primary" id="apiKeySubmitBtn" onclick="validateStep4()">Save & Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 5: Microphone Permission -->
+      <div class="step-view" id="step5">
+        <h2 class="step-title">Voice Permission</h2>
+        <p class="step-desc">Required to transcribe your speech when dictating meals. Say what you had, and AI does the calculations.</p>
+
+        <div class="glass-card" style="text-align: center; margin-bottom: 24px; padding: 24px;">
+          <div style="font-size: 40px; margin-bottom: 12px;">🎙️</div>
+          <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">Microphone Permission</h3>
+          <div class="status-badge pending" id="micStatus">Not Granted</div>
+          
+          <p style="font-size: 13px; color: var(--text-secondary); margin-top: 14px; line-height: 1.4;">
+            Superfit records audio only when you actively press the voice log button on your ledger. No background listening.
+          </p>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" id="micBtn" onclick="showMockPermission('microphone')">Grant Microphone Access</button>
+          <button class="btn btn-text" onclick="nextStep()">Skip / Grant Later</button>
+        </div>
+      </div>
+
+      <!-- Step 6: Summary & Start -->
+      <div class="step-view" id="step6">
+        <h2 class="step-title">Activate Your AI Advisor</h2>
+        <p class="step-desc">Tracking your meals and workouts is now easier than ever! By logging your entries regularly, you provide richer, more complete data for your personalized analysis—making Superfit vastly more useful and accurate in helping you reach your fitness goals.</p>
+
+        <!-- Summary stats -->
+        <div class="summary-grid">
+          <div class="summary-tile">
+            <span class="summary-tile-label">Calculated BMR</span>
+            <div class="summary-tile-val" id="summaryBmr">1,680 kcal</div>
+          </div>
+          <div class="summary-tile">
+            <span class="summary-tile-label">Daily Budget</span>
+            <div class="summary-tile-val" id="summaryCalories" style="color: var(--neon-mint);">1,820 kcal</div>
+          </div>
+        </div>
+
+        <!-- Macro breakdown -->
+        <div class="glass-card" style="margin-bottom: 16px; padding: 14px 18px;">
+          <h3 style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase;">Macronutrient Target Split</h3>
+          <div class="macro-row">
+            <span><span class="macro-indicator p-color"></span>Protein</span>
+            <span id="summaryProtein" style="font-weight: 700;">156g</span>
+          </div>
+          <div class="macro-row">
+            <span><span class="macro-indicator c-color"></span>Carbohydrates</span>
+            <span id="summaryCarbs" style="font-weight: 700;">185g</span>
+          </div>
+          <div class="macro-row">
+            <span><span class="macro-indicator f-color"></span>Fat</span>
+            <span id="summaryFat" style="font-weight: 700;">51g</span>
+          </div>
+        </div>
+
+        <!-- Integration Checklist status -->
+        <div class="glass-card" style="padding: 10px 14px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 6px;">
+            <span>💚 Health Connect</span>
+            <span id="summaryHcStatus" style="font-weight: 700; color: var(--text-tertiary);">Not Configured</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 6px;">
+            <span>🔑 Gemini AI Parser</span>
+            <span id="summaryKeyStatus" style="font-weight: 700; color: var(--text-tertiary);">Not Configured</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 0px;">
+            <span>🎙️ Microphone</span>
+            <span id="summaryMicStatus" style="font-weight: 700; color: var(--text-tertiary);">Not Granted</span>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="simulateComplete()">Activate Personal AI Coach</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mock Permission Overlay Dialog (Simulating Android native dialogs) -->
+  <div class="mock-overlay" id="permissionOverlay" onclick="closePermissionDialog(false)">
+    <div class="mock-dialog" onclick="event.stopPropagation()">
+      <div class="dialog-icon" id="dialogIcon">🛡️</div>
+      <h3 class="dialog-title" id="dialogTitle">Permission Request</h3>
+      <p class="dialog-desc" id="dialogDesc">Rationale text goes here.</p>
+      
+      <div class="dialog-actions">
+        <button class="dialog-btn dialog-btn-deny" onclick="closePermissionDialog(false)">Deny</button>
+        <button class="dialog-btn dialog-btn-allow" onclick="closePermissionDialog(true)">Allow Access</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TDEE Informational Popup -->
+  <div class="mock-overlay" id="tdeeOverlay" onclick="closeTdeePopup()">
+    <div class="mock-dialog" style="text-align: left;" onclick="event.stopPropagation()">
+      <div class="dialog-icon" style="text-align: center; font-size: 28px;">📊</div>
+      <h3 class="dialog-title" style="text-align: center; margin-bottom: 12px;">What is TDEE?</h3>
+      <p class="dialog-desc" style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+        <strong>Total Daily Energy Expenditure (TDEE)</strong> is the total number of calories your body burns in a single day. 
+        <br><br>
+        It is calculated by taking your <strong>BMR</strong> (calories burned at rest) and multiplying it by your <strong>Baseline Activity Level</strong>. 
+        <br><br>
+        This serves as the baseline budget from which we subtract/add calories depending on your fitness goals.
+      </p>
+      <button class="btn btn-primary" style="height: 40px; font-size: 13px;" onclick="closeTdeePopup()">Got it</button>
+    </div>
+  </div>
+
+  <!-- Height Cheat Sheet Popup -->
+  <div class="mock-overlay" id="cheatSheetOverlay" onclick="closeCheatSheet()">
+    <div class="mock-dialog" onclick="event.stopPropagation()" style="max-width: 340px;">
+      <div style="font-size: 26px; margin-bottom: 6px; text-align: center;">📏</div>
+      <h3 class="dialog-title" style="text-align: center; margin-bottom: 12px;">Height Conversion Chart</h3>
+      
+      <table class="cheat-sheet-table">
+        <thead>
+          <tr>
+            <th>Ft / In</th>
+            <th>Metric (cm)</th>
+            <th>Ft / In</th>
+            <th>Metric (cm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight: 700; color: var(--text-primary);">5'0"</td>
+            <td style="color: var(--text-secondary);">152 cm</td>
+            <td style="font-weight: 700; color: var(--text-primary);">5'8"</td>
+            <td style="color: var(--text-secondary);">173 cm</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 700; color: var(--text-primary);">5'2"</td>
+            <td style="color: var(--text-secondary);">157 cm</td>
+            <td style="font-weight: 700; color: var(--text-primary);">5'10"</td>
+            <td style="color: var(--text-secondary);">178 cm</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 700; color: var(--text-primary);">5'4"</td>
+            <td style="color: var(--text-secondary);">163 cm</td>
+            <td style="font-weight: 700; color: var(--text-primary);">6'0"</td>
+            <td style="color: var(--text-secondary);">183 cm</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 700; color: var(--text-primary);">5'6"</td>
+            <td style="color: var(--text-secondary);">168 cm</td>
+            <td style="font-weight: 700; color: var(--text-primary);">6'2"</td>
+            <td style="color: var(--text-secondary);">188 cm</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <button class="btn btn-primary" style="height: 40px; font-size: 13px; margin-top: 18px;" onclick="closeCheatSheet()">Done</button>
+    </div>
+  </div>
+
+  <script>
+    // State management variables
+    let currentStep = 0;
+    const totalSteps = 7;
+    
+    let isMale = true;
+    let age = 28;
+    let height = 175;
+    let weight = 75;
+    
+    const multipliers = [1.2, 1.375, 1.55, 1.725];
+    const activityLabels = [
+      "Sedentary (No formal exercise)",
+      "Lightly Active (1-3 days/week)",
+      "Moderately Active (3-5 days/week)",
+      "Very Active (6-7 days/week)"
+    ];
+    let activityIndex = 1; // Default to Lightly Active 1.375
+    let fitnessGoal = 'LOSE_WEIGHT';
+    let calorieOffset = -500;
+    
+    let isHcGranted = false;
+    let isMicGranted = false;
+    let apiKey = '';
+    let voiceGuideEnabled = true; // Turn voice ON by default
+    let isDarkTheme = true;
+
+    // Speech synthesis helper
+    const synth = window.speechSynthesis;
+
+    // Guidance text mappings per screen - Step 1 optimized to "essential stats" instead of listing inputs.
+    const guidanceVoices = {
+      0: "Welcome to Superfit! ... It is the absolute easiest way to track your fitness and get personalized, science-backed insights. Choose your appearance preference and tap Get Started to begin our journey!",
+      1: "Let's enter your essential stats so we can calculate your resting metabolism.",
+      2: "Awesome! Now, select your baseline activity level and fitness goals. We'll use these to find your daily energy budget.",
+      3: "Great. Now, let's sync your daily steps and sleep telemetry locally. Tap connect to auto-fill your physical details in one tap.",
+      4: "Let's configure your AI helper. Set up your free Gemini key to enable voice logging. It's super simple, completely free, and your key stays one hundred percent secure on your device. Note that this key is required to activate the assistant.",
+      5: "Perfect. Let's grant microphone access so you can speak your meals and workouts directly to your AI companion.",
+      6: "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
+    };
+
+    let activeChunkTimeout = null;
+
+    // Prioritized search for premium neural/high-quality voices
+    function getPremiumVoice() {
+      if (!synth) return null;
+      const voices = synth.getVoices();
+      
+      let premiumVoice = voices.find(v => v.name.includes("Google US English") && v.lang === "en-US") ||
+                         voices.find(v => v.name.includes("Natural") && v.lang.startsWith("en")) ||
+                         voices.find(v => v.name.includes("Premium") && v.lang.startsWith("en")) ||
+                         voices.find(v => v.name.includes("Siri") && v.lang.startsWith("en")) ||
+                         voices.find(v => v.name.includes("Samantha") && v.lang === "en-US") ||
+                         voices.find(v => v.lang.startsWith("en-US")) ||
+                         voices.find(v => v.lang.startsWith("en"));
+      return premiumVoice;
+    }
+
+    function speakGuidance(stepIdx) {
+      if (!voiceGuideEnabled || !synth) return;
+      
+      // Stop any running speech and clear active timeout queues
+      synth.cancel();
+      if (activeChunkTimeout) {
+        clearTimeout(activeChunkTimeout);
+        activeChunkTimeout = null;
+      }
+      
+      const phrase = guidanceVoices[stepIdx];
+      if (phrase) {
+        const chunks = phrase.split('...');
+        let currentChunkIndex = 0;
+        
+        function speakNextChunk() {
+          if (!voiceGuideEnabled || currentChunkIndex >= chunks.length) return;
+          
+          const chunkText = chunks[currentChunkIndex].trim();
+          if (chunkText.length === 0) {
+            currentChunkIndex++;
+            activeChunkTimeout = setTimeout(speakNextChunk, 1200);
+            return;
+          }
+          
+          const utterance = new SpeechSynthesisUtterance(chunkText);
+          
+          const selectedVoice = getPremiumVoice();
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+          }
+          
+          utterance.pitch = 1.05;
+          utterance.rate = 0.85;
+          
+          utterance.onend = function() {
+            currentChunkIndex++;
+            activeChunkTimeout = setTimeout(speakNextChunk, 1200);
+          };
+          
+          synth.speak(utterance);
+        }
+        
+        speakNextChunk();
+      }
+    }
+
+    // Pre-populate voices list asynchronously
+    let voicesList = [];
+    function populateVoices() {
+      if (!synth) return;
+      voicesList = synth.getVoices();
+      
+      try {
+        speakGuidance(0);
+      } catch(e) {}
+    }
+    populateVoices();
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = populateVoices;
+    }
+
+    // Auto-fallback trigger on first document click to bypass User Activation block
+    document.addEventListener('click', function initialSpeechTrigger() {
+      if (voiceGuideEnabled && synth && !synth.speaking) {
+        speakGuidance(currentStep);
+      }
+      document.removeEventListener('click', initialSpeechTrigger);
+    }, { once: true });
+
+    function toggleVoiceGuide() {
+      voiceGuideEnabled = !voiceGuideEnabled;
+      const btn = document.getElementById('voiceToggleBtn');
+      const text = document.getElementById('voiceStatus');
+
+      if (voiceGuideEnabled) {
+        btn.classList.add('active');
+        text.textContent = 'Voice: On';
+        speakGuidance(currentStep);
+      } else {
+        btn.classList.remove('active');
+        text.textContent = 'Voice: Off';
+        synth.cancel();
+        if (activeChunkTimeout) {
+          clearTimeout(activeChunkTimeout);
+          activeChunkTimeout = null;
+        }
+      }
+    }
+
+    // Theme Customizer
+    function setTheme(dark) {
+      isDarkTheme = dark;
+      const doc = document.documentElement;
+      
+      document.getElementById('themeDark').classList.toggle('selected', isDarkTheme);
+      document.getElementById('themeLight').classList.toggle('selected', !isDarkTheme);
+      
+      const slider = document.getElementById('themeSlider');
+      if (isDarkTheme) {
+        slider.style.transform = 'translateX(0)';
+        doc.style.setProperty('--bg-start', '#040406');
+        doc.style.setProperty('--bg-end', '#0A0A0F');
+        doc.style.setProperty('--card-bg', 'rgba(18, 18, 28, 0.7)');
+        doc.style.setProperty('--text-primary', '#FFFFFF');
+        doc.style.setProperty('--text-secondary', '#D1D5DB');
+        doc.style.setProperty('--text-tertiary', '#9CA3AF');
+        doc.style.setProperty('--glass-border', 'rgba(255, 255, 255, 0.08)');
+        doc.style.setProperty('--glass-border-glow', 'rgba(255, 255, 255, 0.18)');
+        doc.style.setProperty('--orb-opacity', '0.15');
+      } else {
+        slider.style.transform = 'translateX(100%)';
+        doc.style.setProperty('--bg-start', '#F8FAFC');
+        doc.style.setProperty('--bg-end', '#E2E8F0');
+        doc.style.setProperty('--card-bg', 'rgba(255, 255, 255, 0.85)');
+        doc.style.setProperty('--text-primary', '#0F172A');
+        doc.style.setProperty('--text-secondary', '#475569');
+        doc.style.setProperty('--text-tertiary', '#64748B');
+        doc.style.setProperty('--glass-border', 'rgba(15, 23, 42, 0.08)');
+        doc.style.setProperty('--glass-border-glow', 'rgba(15, 23, 42, 0.16)');
+        doc.style.setProperty('--orb-opacity', '0.04');
+      }
+    }
+
+    // Height calculations with live Foot/Inches translation
+    function updateHeightCalculations() {
+      const hInput = document.getElementById('heightInput');
+      const val = parseFloat(hInput.value) || 0;
+      const readout = document.getElementById('heightFtReadout');
+
+      if (val <= 0) {
+        readout.textContent = 'Equivalent: - ft - in';
+      } else {
+        // Convert cm to feet & inches
+        const totalInches = val / 2.54;
+        const ft = Math.floor(totalInches / 12);
+        const inches = Math.round(totalInches % 12);
+        
+        // Handle rounding rollover (e.g. 5'12" -> 6'0")
+        if (inches === 12) {
+          readout.textContent = `Equivalent: ${ft + 1} ft 0 in`;
+        } else {
+          readout.textContent = `Equivalent: ${ft} ft ${inches} in`;
+        }
+      }
+
+      calculateRealtimeMetrics();
+    }
+
+    function showCheatSheet() {
+      document.getElementById('cheatSheetOverlay').classList.add('visible');
+    }
+
+    function closeCheatSheet() {
+      document.getElementById('cheatSheetOverlay').classList.remove('visible');
+    }
+
+    // Navigation and Progression
+    function showStep(stepIdx) {
+      const currentActive = document.querySelector('.step-view.active');
+      if (currentActive) {
+        currentActive.classList.remove('active');
+      }
+
+      currentStep = stepIdx;
+
+      const targetStep = document.getElementById(`step${stepIdx}`);
+      if (targetStep) {
+        targetStep.classList.add('active');
+      }
+
+      const percentage = ((currentStep + 1) / totalSteps) * 100;
+      document.getElementById('progressFill').style.width = `${percentage}%`;
+
+      const backBtn = document.getElementById('backBtn');
+      if (currentStep > 0) {
+        backBtn.classList.add('visible');
+      } else {
+        backBtn.classList.remove('visible');
+      }
+
+      speakGuidance(currentStep);
+
+      if (currentStep === 6) {
+        updateFinalSummary();
+      }
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps - 1) {
+        showStep(currentStep + 1);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 0) {
+        showStep(currentStep - 1);
+      }
+    }
+
+    // Step 1 validation
+    function validateStep1() {
+      const ageVal = parseInt(document.getElementById('ageInput').value);
+      const heightVal = parseFloat(document.getElementById('heightInput').value);
+      const weightVal = parseFloat(document.getElementById('weightInput').value);
+
+      if (!ageVal || ageVal <= 0) {
+        alert("Please enter a valid age.");
+        return;
+      }
+      if (!heightVal || heightVal <= 0) {
+        alert("Please enter a valid height.");
+        return;
+      }
+      if (!weightVal || weightVal <= 0) {
+        alert("Please enter a valid weight.");
+        return;
+      }
+
+      age = ageVal;
+      height = heightVal;
+      weight = weightVal;
+
+      calculateRealtimeMetrics();
+      nextStep();
+    }
+
+    function validateStep4() {
+      if (apiKey === '') {
+        alert("Please enter a valid Gemini API Key starting with 'AIzaSy' or 'AQ.'. Skipping setup has been disabled because this key is required for voice and AI Coach features.");
+        return;
+      }
+      if (apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.')) {
+        nextStep();
+      } else {
+        alert("Invalid format. Please enter a valid Gemini API Key starting with 'AIzaSy' or 'AQ.' to proceed.");
+      }
+    }
+
+    // Real-time calculations
+    function calculateRealtimeMetrics() {
+      const a = parseInt(document.getElementById('ageInput').value) || age;
+      const w = parseFloat(document.getElementById('weightInput').value) || weight;
+      const h = parseFloat(document.getElementById('heightInput').value) || height;
+
+      // BMR Calculation (Mifflin-St Jeor)
+      let bmr = 0;
+      if (isMale) {
+        bmr = 10.0 * w + 6.25 * h - 5.0 * a + 5.0;
+      } else {
+        bmr = 10.0 * w + 6.25 * h - 5.0 * a - 161.0;
+      }
+
+      const activeMult = multipliers[activityIndex];
+      const tdee = bmr * activeMult;
+
+      document.getElementById('liveTdee').textContent = `${Math.round(tdee)} kcal`;
+      
+      return { bmr, tdee };
+    }
+
+    function setSex(male) {
+      isMale = male;
+      
+      document.getElementById('sexMale').classList.toggle('selected', isMale);
+      document.getElementById('sexFemale').classList.toggle('selected', !isMale);
+      
+      const slider = document.getElementById('sexSlider');
+      if (isMale) {
+        slider.style.transform = 'translateX(0)';
+      } else {
+        slider.style.transform = 'translateX(100%)';
+      }
+      
+      calculateRealtimeMetrics();
+    }
+
+    function setActivityIndex(val) {
+      activityIndex = parseInt(val);
+      document.getElementById('activityVal').textContent = multipliers[activityIndex];
+      document.getElementById('activityDesc').textContent = activityLabels[activityIndex];
+      calculateRealtimeMetrics();
+    }
+
+    function setGoal(goal, offset) {
+      fitnessGoal = goal;
+      calorieOffset = offset;
+      
+      document.getElementById('goalDeficit').classList.toggle('selected', goal === 'LOSE_WEIGHT');
+      document.getElementById('goalMaintain').classList.toggle('selected', goal === 'MAINTAIN');
+      document.getElementById('goalSurplus').classList.toggle('selected', goal === 'GAIN_MUSCLE');
+      
+      calculateRealtimeMetrics();
+    }
+
+    // TDEE Popup controls
+    function showTdeePopup() {
+      document.getElementById('tdeeOverlay').classList.add('visible');
+    }
+
+    function closeTdeePopup() {
+      document.getElementById('tdeeOverlay').classList.remove('visible');
+    }
+
+    // Permission simulation dialog overlays
+    let activePermissionType = '';
+
+    function showMockPermission(type) {
+      activePermissionType = type;
+      const overlay = document.getElementById('permissionOverlay');
+      const dialogTitle = document.getElementById('dialogTitle');
+      const dialogDesc = document.getElementById('dialogDesc');
+      const dialogIcon = document.getElementById('dialogIcon');
+
+      if (type === 'healthconnect') {
+        dialogIcon.textContent = '💚';
+        dialogTitle.textContent = 'Allow Superfit to access Health Connect?';
+        dialogDesc.textContent = 'Superfit will read your Height, Weight, Steps, Active Calories, and Sleep metrics to auto-adjust your daily nutritional targets.';
+      } else if (type === 'microphone') {
+        dialogIcon.textContent = '🎙️';
+        dialogTitle.textContent = 'Allow Superfit to record audio?';
+        dialogDesc.textContent = 'Required to transcribe and parse your meals via Gemini AI when you dictate voice logs.';
+      }
+
+      overlay.classList.add('visible');
+    }
+
+    function closePermissionDialog(granted) {
+      const overlay = document.getElementById('permissionOverlay');
+      overlay.classList.remove('visible');
+
+      if (activePermissionType === 'healthconnect') {
+        isHcGranted = granted;
+        const badge = document.getElementById('hcStatus');
+        const connectBtn = document.getElementById('hcConnectBtn');
+        if (isHcGranted) {
+          badge.textContent = 'Connected (All Access)';
+          badge.className = 'status-badge connected';
+          connectBtn.textContent = '✓ Sync Active';
+          connectBtn.classList.remove('btn-primary');
+          connectBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+          connectBtn.style.color = 'var(--neon-mint)';
+          connectBtn.style.border = '1px solid rgba(16, 185, 129, 0.2)';
+          
+          document.getElementById('heightInput').value = 178;
+          updateHeightCalculations();
+          weight = 78;
+          document.getElementById('weightInput').value = 78;
+          calculateRealtimeMetrics();
+        } else {
+          badge.textContent = 'Disconnected';
+          badge.className = 'status-badge pending';
+        }
+      } else if (activePermissionType === 'microphone') {
+        isMicGranted = granted;
+        const badge = document.getElementById('micStatus');
+        const micBtn = document.getElementById('micBtn');
+        if (isMicGranted) {
+          badge.textContent = 'Granted';
+          badge.className = 'status-badge connected';
+          micBtn.textContent = '✓ Microphone Synced';
+          micBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+          micBtn.style.color = 'var(--neon-mint)';
+          micBtn.style.border = '1px solid rgba(16, 185, 129, 0.2)';
+        } else {
+          badge.textContent = 'Not Granted';
+          badge.className = 'status-badge pending';
+        }
+      }
+
+      setTimeout(() => {
+        nextStep();
+      }, 450);
+    }
+
+    // API Key checkers
+    function checkApiKey(val) {
+      apiKey = val.trim();
+      const valState = document.getElementById('keyValidationState');
+      const submitBtn = document.getElementById('apiKeySubmitBtn');
+      
+      if (apiKey === '') {
+        valState.textContent = 'Required for voice and AI features.';
+        valState.className = 'validation-state empty';
+        submitBtn.textContent = 'Save & Continue';
+        return;
+      }
+
+      if (apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.')) {
+        valState.textContent = '✓ Valid Gemini API key format detected.';
+        valState.className = 'validation-state valid';
+        submitBtn.textContent = 'Save API Key & Continue';
+      } else {
+        valState.textContent = '✗ Invalid format. Must start with AIzaSy or AQ.';
+        valState.className = 'validation-state invalid';
+        submitBtn.textContent = 'Save & Continue';
+      }
+    }
+
+    function pasteKey() {
+      const sampleKeys = ["AIzaSyD-MockGeminiKeyForSuperfitTesting123", "AQ.InvalidFormatKeySample"];
+      const current = document.getElementById('apiKeyInput').value;
+      const targetKey = current.startsWith('AIzaSy') ? sampleKeys[1] : sampleKeys[0];
+      
+      document.getElementById('apiKeyInput').value = targetKey;
+      checkApiKey(targetKey);
+    }
+
+    // Final summary updater
+    function updateFinalSummary() {
+      const { bmr, tdee } = calculateRealtimeMetrics();
+      const finalCalories = Math.max(1200, tdee + calorieOffset);
+
+      const protein = Math.max(40, weight * 2.0);
+      const fat = Math.max(30, (finalCalories * 0.25) / 9.0);
+      const proteinCalories = protein * 4.0;
+      const fatCalories = fat * 9.0;
+      const carbs = Math.max(50, (finalCalories - proteinCalories - fatCalories) / 4.0);
+
+      document.getElementById('summaryBmr').textContent = `${Math.round(bmr)} kcal`;
+      document.getElementById('summaryCalories').textContent = `${Math.round(finalCalories)} kcal`;
+      
+      document.getElementById('summaryProtein').textContent = `${Math.round(protein)}g`;
+      document.getElementById('summaryCarbs').textContent = `${Math.round(carbs)}g`;
+      document.getElementById('summaryFat').textContent = `${Math.round(fat)}g`;
+
+      const hcStatus = document.getElementById('summaryHcStatus');
+      if (isHcGranted) {
+        hcStatus.textContent = 'Active Sync';
+        hcStatus.style.color = 'var(--neon-mint)';
+      } else {
+        hcStatus.textContent = 'Not Configured';
+        hcStatus.style.color = 'var(--text-tertiary)';
+      }
+
+      const keyStatus = document.getElementById('summaryKeyStatus');
+      if (apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.')) {
+        keyStatus.textContent = 'Configured (Encrypted)';
+        keyStatus.style.color = 'var(--neon-mint)';
+      } else {
+        keyStatus.textContent = 'Not Configured';
+        keyStatus.style.color = 'var(--text-tertiary)';
+      }
+
+      const micStatus = document.getElementById('summaryMicStatus');
+      if (isMicGranted) {
+        micStatus.textContent = 'Access Granted';
+        micStatus.style.color = 'var(--neon-mint)';
+      } else {
+        micStatus.textContent = 'Not Granted';
+        micStatus.style.color = 'var(--text-tertiary)';
+      }
+    }
+
+    function simulateComplete() {
+      alert("Simulation Completed!\nBaseline details and AI Coach activated.\nReturning to start.");
+      showStep(0);
+    }
+  </script>
+</body>
+</html>
