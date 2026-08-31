@@ -160,10 +160,11 @@ class DashboardViewModel(
                     - Daily Sleep: $sleepText
                     
                     Rules:
-                    1. CRITICAL: Keep answers extremely concise, short, and to the point. Do not write long essays or multiple paragraphs.
-                    2. Limit responses to exactly 2 to 3 sentences maximum (under 75 words).
-                    3. Do not include unnecessary pleasantries, greetings, or signature sign-offs.
-                    4. Use clean markdown formatting (bold, bullet points) sparingly where it adds clarity.
+                    1. CRITICAL: Distinguish between incomplete logging vs actual low calorie intake. If daily logged calories are low or missing, assume the user did not finish logging their meals, rather than assuming starvation, extreme dieting, or 'feast or famine' behavior.
+                    2. Keep answers extremely concise, short, and to the point. Do not write long essays or multiple paragraphs.
+                    3. Limit responses to exactly 2 to 3 sentences maximum (under 75 words).
+                    4. Do not include unnecessary pleasantries, greetings, or signature sign-offs.
+                    5. Use clean markdown formatting (bold, bullet points) sparingly where it adds clarity.
                 """.trimIndent()
 
                 val model = GenerativeModel(

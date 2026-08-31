@@ -25,7 +25,8 @@ class CoachingEngine(private val apiKey: String) {
             text(
                 "You are Superfit AI Coach, the world's best personal fitness trainer and health scientist.\n" +
                 "Your role is to analyze the user's daily metrics and weekly historical logs (nutrition, specific foods eaten, workouts, step counts, and sleep patterns) to provide a concise, highly analytical, and deeply meaningful coaching insight.\n" +
-                "CRITICAL: Think like an elite trainer. Look for non-obvious patterns, habits, or triggers that a casual user might miss (e.g., 'your habit of regularly eating desserts is pushing you back', 'the bread you are logging may not be as healthy as you think', workouts late in the evening disrupting sleep quality, protein targets missed on specific active days, or step counts dropping on weekends).\n" +
+                "CRITICAL - INCOMPLETE LOGGING VS DIET: Users often forget to log full meals or miss logging for entire days. When a day is tagged [NO MEALS LOGGED THIS DAY] or [PARTIAL / INCOMPLETE LOG] (or when daily calories logged are < 50% of target), NEVER accuse the user of 'feast or famine' behavior, 'wild calorie swings', or severe calorie restriction. Recognize that missing/low logged values usually reflect incomplete logging, not starvation or extreme dieting. Base dietary trend analysis strictly on fully logged days. If logging is inconsistent, give a quick, encouraging reminder on logging consistency without misinterpreting intake.\n" +
+                "CRITICAL: Think like an elite trainer. Look for non-obvious patterns, habits, or triggers on fully-logged days (e.g., 'your habit of regularly eating desserts is pushing you back', 'the bread you are logging may not be as healthy as you think', workouts late in the evening disrupting sleep quality, protein targets missed on specific active days, or step counts dropping on weekends).\n" +
                 "Keep the tone encouraging but scientifically precise, modern, and direct.\n" +
                 "You MUST limit your response to exactly 2 to 3 sentences (approx 50-80 words). Do not write a greeting or a signature (e.g. no 'Hey there,' or 'Best, Coach'). Use clean Markdown styling where appropriate (like bolding key insights or targets).\n" +
                 "CRITICAL: Be aware of the 'Current Time of Day' provided in the prompt. If the current time is in the morning, afternoon, or early evening (e.g., before 7:00 PM), do NOT flag low calorie or protein intake as a deficit or critical problem; instead, frame recommendations around what they should focus on eating for the rest of the day. Only diagnose definitive daily calorie/macronutrient deficits or surpluses when it is late in the evening (after 7:00 PM)."
@@ -58,7 +59,8 @@ class CoachingEngine(private val apiKey: String) {
             "Sleep: No sleep telemetry available today (assume baseline recovery)."
         }
 
-        val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} kcal (Target: ${macroTargets.calories.toInt()} kcal). " +
+        val todayStatus = if (caloriesEaten < macroTargets.calories * 0.5) " [LOG IN PROGRESS / PARTIAL]" else " [MOSTLY LOGGED]"
+        val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} kcal (Target: ${macroTargets.calories.toInt()} kcal)$todayStatus. " +
             "Protein: ${proteinEaten.toInt()}g (Target: ${macroTargets.proteinG.toInt()}g). " +
             "Carbs: ${carbsEaten.toInt()}g (Target: ${macroTargets.carbsG.toInt()}g). " +
             "Fat: ${fatEaten.toInt()}g (Target: ${macroTargets.fatG.toInt()}g)."
@@ -87,7 +89,10 @@ class CoachingEngine(private val apiKey: String) {
                     val cals = dayNutrition.sumOf { it.calories }.toInt()
                     val p = dayNutrition.sumOf { it.proteinG }.toInt()
                     val foods = dayNutrition.map { it.foodText }.joinToString(", ")
-                    sb.append("  • Nutrition: $cals kcal, ${p}g Protein. Foods logged: $foods\n")
+                    val status = if (cals < macroTargets.calories * 0.5) " [PARTIAL / INCOMPLETE LOG]" else " [FULL LOG]"
+                    sb.append("  • Nutrition: $cals kcal, ${p}g Protein. Foods logged: $foods$status\n")
+                } else {
+                    sb.append("  • Nutrition: 0 kcal logged [NO MEALS LOGGED THIS DAY]\n")
                 }
                 // Workouts
                 val dayWorkouts = historyWorkouts.filter { dateFormatter.format(Instant.ofEpochMilli(it.timestamp)) == dateStr }
