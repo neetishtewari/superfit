@@ -15,8 +15,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.0.11"
+        versionCode = 17
+        versionName = "1.0.13"
     }
 
     signingConfigs {
@@ -69,6 +69,7 @@ dependencies {
 
   // Core Android dependencies
   implementation(libs.androidx.core.ktx)
+  implementation(libs.google.material)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
 

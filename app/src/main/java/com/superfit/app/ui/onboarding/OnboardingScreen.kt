@@ -176,6 +176,7 @@ fun OnboardingScreen(
         viewModel.checkPermissions()
         if (granted.isNotEmpty()) {
             viewModel.autofillFromHealthConnect()
+            currentStep = 4
         }
     }
 
@@ -242,6 +243,7 @@ fun OnboardingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
@@ -998,6 +1000,7 @@ private fun HealthConnectStep(
     requestPermissionsLauncher: androidx.activity.result.ActivityResultLauncher<Set<String>>,
     onNext: () -> Unit
 ) {
+    val isHcSynced = uiState.hasHealthConnectPermissions
     Text(
         text = "Google Health Sync",
         fontSize = 22.sp,
@@ -1024,7 +1027,6 @@ private fun HealthConnectStep(
         Text(text = "💚", fontSize = 42.sp)
         Text(text = "Health Connect Status", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ThemeTextPrimary)
         
-        val isHcSynced = uiState.hasHealthConnectPermissions
         val badgeColor = if (isHcSynced) NeonGreen else Color.Gray
         Box(
             modifier = Modifier
@@ -1058,9 +1060,8 @@ private fun HealthConnectStep(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
-                if (uiState.grantedPermissions.isNotEmpty()) {
-                    // Trigger dynamic values sync
-                    requestPermissionsLauncher.launch(healthConnectManager.permissions)
+                if (isHcSynced) {
+                    onNext()
                 } else {
                     requestPermissionsLauncher.launch(healthConnectManager.permissions)
                 }
@@ -1078,12 +1079,21 @@ private fun HealthConnectStep(
                     .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd))),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "Connect Google Health Connect", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = if (isHcSynced) "Continue" else "Connect Google Health Connect",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
         }
 
         TextButton(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Skip / Connect Later", color = Color.Gray, fontSize = 13.sp)
+            Text(
+                text = if (isHcSynced) "Skip / Connect Later" else "Skip / Connect Later",
+                color = Color.Gray,
+                fontSize = 13.sp
+            )
         }
     }
 }
@@ -1221,6 +1231,7 @@ private fun MicrophonePermissionStep(
     micPermissionLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     onNext: () -> Unit
 ) {
+    val granted = uiState.isMicPermissionGranted
     Text(
         text = "Voice Permission",
         fontSize = 22.sp,
@@ -1247,7 +1258,6 @@ private fun MicrophonePermissionStep(
         Text(text = "🎙️", fontSize = 42.sp)
         Text(text = "Microphone Permission", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ThemeTextPrimary)
 
-        val granted = uiState.isMicPermissionGranted
         val badgeColor = if (granted) NeonGreen else Color.Gray
         Box(
             modifier = Modifier
@@ -1276,7 +1286,11 @@ private fun MicrophonePermissionStep(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
-                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                if (granted) {
+                    onNext()
+                } else {
+                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -1291,7 +1305,12 @@ private fun MicrophonePermissionStep(
                     .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd))),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "Grant Microphone Access", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = if (granted) "Continue" else "Grant Microphone Access",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
         }
 
