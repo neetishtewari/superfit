@@ -5,14 +5,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 object ThemeConfig {
-    private val _isDarkTheme = MutableStateFlow(true)
+    private val _isDarkTheme = MutableStateFlow(false)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme
 
     fun initialize(context: Context) {
         val prefs = context.getSharedPreferences("superfit_prefs", Context.MODE_PRIVATE)
-        // Default to dark theme (true)
-        val mode = prefs.getString("theme_mode", "dark")
-        _isDarkTheme.value = (mode != "light")
+        // Default to light theme for new installs
+        val mode = prefs.getString("theme_mode", "light")
+        _isDarkTheme.value = (mode == "dark")
     }
 
     fun setThemeMode(context: Context, isDark: Boolean) {

@@ -44,7 +44,7 @@ private val LightColorScheme = lightColorScheme(
     onError = Color.White
 )
 
-val LocalThemeIsDark = staticCompositionLocalOf { true }
+val LocalThemeIsDark = staticCompositionLocalOf { false }
 
 object SuperfitTheme {
     val isDark: Boolean
@@ -60,7 +60,7 @@ object SuperfitTheme {
 
 @Composable
 fun SuperfitTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     // Keep dynamic color disabled to enforce our custom premium visual system
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
