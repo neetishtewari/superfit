@@ -98,6 +98,8 @@ class DataRepository(
         firebaseSyncManager.clearAllCloudData()
     }
 
+    val allNutritionEntriesFlow: Flow<List<NutritionEntryEntity>> = database.nutritionDao().getAllEntriesFlow()
+
     suspend fun getAllNutritionEntries(): List<NutritionEntryEntity> {
         return database.nutritionDao().getAllEntries()
     }
@@ -140,6 +142,60 @@ class DataRepository(
 
     suspend fun getAllWorkoutEntries(): List<WorkoutEntryEntity> {
         return database.workoutDao().getAllEntries()
+    }
+
+    val weightEntriesFlow: Flow<List<WeightEntryEntity>> get() = database.weightDao().getAllWeightEntriesFlow()
+
+    suspend fun addWeightEntry(weightKg: Double, note: String = "") {
+        val entry = WeightEntryEntity(
+            weightKg = weightKg,
+            timestamp = System.currentTimeMillis(),
+            note = note
+        )
+        database.weightDao().insertWeight(entry)
+        // Also update current weight on UserProfile
+        val profile = getProfile()
+        if (profile != null) {
+            saveProfile(profile.copy(weightKg = weightKg))
+        }
+    }
+
+    suspend fun deleteWeightEntry(entry: WeightEntryEntity) {
+        database.weightDao().deleteWeight(entry)
+    }
+
+    suspend fun getAllWeightEntries(): List<WeightEntryEntity> {
+        return database.weightDao().getAllWeightEntries()
+    }
+
+    val streakStateFlow: Flow<StreakStateEntity?> get() = database.streakDao().getStreakStateFlow()
+
+    suspend fun saveStreakState(state: StreakStateEntity) {
+        database.streakDao().insertStreakState(state)
+    }
+
+    fun getHabitEntryFlow(date: String): Flow<HabitEntryEntity?> {
+        return database.habitDao().getHabitEntryFlow(date)
+    }
+
+    suspend fun getHabitEntry(date: String): HabitEntryEntity? {
+        return database.habitDao().getHabitEntry(date)
+    }
+
+    suspend fun saveHabitEntry(entry: HabitEntryEntity) {
+        database.habitDao().insertHabitEntry(entry)
+    }
+
+    suspend fun addWater(date: String, addMl: Int) {
+        val current = database.habitDao().getHabitEntry(date) ?: HabitEntryEntity(date = date)
+        val updated = current.copy(waterMl = current.waterMl + addMl)
+        database.habitDao().insertHabitEntry(updated)
+    }
+
+    suspend fun toggleCleanEats(date: String) {
+        val current = database.habitDao().getHabitEntry(date) ?: HabitEntryEntity(date = date)
+        val updated = current.copy(cleanEatsCompleted = !current.cleanEatsCompleted)
+        database.habitDao().insertHabitEntry(updated)
     }
 }
 

@@ -599,7 +599,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Voice Quick Log Card
+                    // Voice Quick Log Card (MEAL / WORKOUT tab switcher)
                     val isProcessing = parsingState is ParsingState.Loading || workoutParsingState is ParsingState.Loading
                     VoiceQuickLogCard(
                         logType = logType,
@@ -623,281 +623,297 @@ fun DashboardScreen(
                         }
                     )
 
-                    // Health Connect Permission Alert Card (if missing permissions)
-                    if (!hasHealthConnectPermissions) {
-                        Row(
+                    if (logType == "MEAL") {
+                        // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
+                        // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(ThemeCardBgTranslucent)
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            ThemeGlassBorder,
+                                            ThemeGlassBorderGlow
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(24.dp)
+                                )
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = "Warning",
-                                tint = EnergeticCoral,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Telemetry Sync Paused",
-                                    color = ThemeTextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "Grant Health Connect permissions to sync steps and sleep data.",
-                                    color = ThemeTextSecondary,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
-                                )
-                            }
-                            Button(
-                                onClick = {
-                                    requestPermissionsLauncher.launch(viewModel.healthConnectManager.permissions)
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = EnergeticCoral),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier.height(36.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(20.dp)
                             ) {
-                                Text(
-                                    text = "Grant",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                val stepsTarget = 10000.0
+                                val caloriesTarget = state.macroTargets.calories
+
+                                val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
+                                val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
+                                val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
+
+                                ConcentricActivityRings(
+                                    caloriesEatenProgress = caloriesProgress,
+                                    stepsProgress = stepsProgress,
+                                    caloriesRemaining = caloriesRemaining,
+                                    modifier = Modifier.size(160.dp)
                                 )
+
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    RingLegendItem(
+                                        label = "Eaten",
+                                        value = "${state.caloriesEaten.toInt()} / ${caloriesTarget.toInt()} kcal",
+                                        color = NeonGreen
+                                    )
+                                    RingLegendItem(
+                                        label = "Steps",
+                                        value = "${state.activity.steps} / 10K",
+                                        color = ElectricCyan
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    // Circular Activity & Target Rings
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        ThemeGlassBorder,
-                                        ThemeGlassBorderGlow
-                                    )
-                                ),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                    ) {
-                        Row(
+                        // 2. Daily Streak Header Card (Narrow Band)
+                        StreakHeaderCard(
+                            streakState = state.streakState
+                        )
+
+                        // 3. Daily Nutrient Ledger
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(ThemeCardBgTranslucent)
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            ThemeGlassBorder,
+                                            ThemeGlassBorderGlow
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
                                 .padding(20.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(20.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Concentric rings canvas
-                            val stepsTarget = 10000.0
-                            val caloriesTarget = state.macroTargets.calories
-
-                            val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
-                            val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
-                            val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
-
-                            ConcentricActivityRings(
-                                caloriesEatenProgress = caloriesProgress,
-                                stepsProgress = stepsProgress,
-                                caloriesRemaining = caloriesRemaining,
-                                modifier = Modifier.size(160.dp)
-                            )
-
-                            // Ring descriptions/legends
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                RingLegendItem(
-                                    label = "Eaten",
-                                    value = "${state.caloriesEaten.toInt()} / ${caloriesTarget.toInt()} kcal",
-                                    color = NeonGreen
-                                )
-                                RingLegendItem(
-                                    label = "Steps",
-                                    value = "${state.activity.steps} / 10K",
-                                    color = ElectricCyan
-                                )
-                            }
-                        }
-                    }
-
-                    // Nutrition & Dynamic Macros Budget Card
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        ThemeGlassBorder,
-                                        ThemeGlassBorderGlow
-                                    )
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Daily Nutrient Ledger",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = ThemeTextPrimary
-                        )
-
-                        // Protein
-                        MacroProgressBar(
-                            label = "Protein",
-                            eaten = state.proteinEaten,
-                            target = state.macroTargets.proteinG,
-                            color = NeonGreen,
-                            unit = "g",
-                            entries = state.nutritionList,
-                            macroSelector = { it.proteinG }
-                        )
-
-                        // Carbs
-                        MacroProgressBar(
-                            label = "Carbohydrates",
-                            eaten = state.carbsEaten,
-                            target = state.macroTargets.carbsG,
-                            color = CarbYellow,
-                            unit = "g",
-                            entries = state.nutritionList,
-                            macroSelector = { it.carbsG }
-                        )
-
-                        // Fat
-                        MacroProgressBar(
-                            label = "Fats",
-                            eaten = state.fatEaten,
-                            target = state.macroTargets.fatG,
-                            color = ElectricCyan,
-                            unit = "g",
-                            entries = state.nutritionList,
-                            macroSelector = { it.fatG }
-                        )
-                    }
-
-                    // Activity & Performance Card
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        ThemeGlassBorder,
-                                        ThemeGlassBorderGlow
-                                    )
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Column {
                             Text(
-                                text = "Activity & Performance",
+                                text = "Daily Nutrient Ledger",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
                                 color = ThemeTextPrimary
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            val distanceKm = state.activity.steps * 0.00075
-                            Text(
-                                text = String.format("Estimated Distance: %.2f km", distanceKm),
+
+                            // Protein
+                            MacroProgressBar(
+                                label = "Protein",
+                                eaten = state.proteinEaten,
+                                target = state.macroTargets.proteinG,
+                                color = NeonGreen,
+                                unit = "g",
+                                entries = state.nutritionList,
+                                macroSelector = { it.proteinG }
+                            )
+
+                            // Carbs
+                            MacroProgressBar(
+                                label = "Carbohydrates",
+                                eaten = state.carbsEaten,
+                                target = state.macroTargets.carbsG,
+                                color = CarbYellow,
+                                unit = "g",
+                                entries = state.nutritionList,
+                                macroSelector = { it.carbsG }
+                            )
+
+                            // Fat
+                            MacroProgressBar(
+                                label = "Fats",
+                                eaten = state.fatEaten,
+                                target = state.macroTargets.fatG,
                                 color = ElectricCyan,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                unit = "g",
+                                entries = state.nutritionList,
+                                macroSelector = { it.fatG }
                             )
                         }
 
-                        // Steps Progress
-                        ActivityProgressBar(
-                            label = "Steps",
-                            current = state.activity.steps.toDouble(),
-                            target = 10000.0,
-                            color = ElectricCyan,
-                            unit = "steps"
-                        )
+                        // 4. AI Daily Coach Insights Card
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(ThemeCardBgTranslucent)
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            ThemeGlassBorder,
+                                            ThemeGlassBorderGlow
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "✨ AI Daily Coach",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp,
+                                        color = ThemeTextPrimary
+                                    )
+                                }
 
-                        if (state.workoutList.isNotEmpty()) {
-                            HorizontalDivider(
-                                color = ThemeTextPrimary.copy(alpha = 0.05f),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
+                                val isCoachingLoading = coachingState is CoachingInsightState.Loading
+                                val infiniteTransition = rememberInfiniteTransition(label = "RefreshRotation")
+                                val rotationAngle by if (isCoachingLoading) {
+                                    infiniteTransition.animateFloat(
+                                        initialValue = 0f,
+                                        targetValue = 360f,
+                                        animationSpec = infiniteRepeatable(
+                                            animation = tween(1200, easing = LinearEasing),
+                                            repeatMode = RepeatMode.Restart
+                                        ),
+                                        label = "Rotation"
+                                    )
+                                } else {
+                                    remember { mutableStateOf(0f) }
+                                }
 
-                            Text(
-                                text = "TODAY'S WORKOUTS",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Gray,
-                                letterSpacing = 0.5.sp
-                            )
+                                IconButton(
+                                    onClick = { viewModel.refreshCoachingInsight() },
+                                    modifier = Modifier.rotate(rotationAngle),
+                                    enabled = !isCoachingLoading,
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        contentColor = ElectricCyan
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Refresh Insights"
+                                    )
+                                }
+                            }
 
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                state.workoutList.forEach { entry ->
-                                    Row(
+                            when (val cState = coachingState) {
+                                CoachingInsightState.Idle -> {
+                                    Text(
+                                        text = "Generate your personalized AI coaching advice based on today's physical and nutritional telemetry.",
+                                        color = Color.Gray,
+                                        fontSize = 13.sp
+                                    )
+                                    Button(
+                                        onClick = { viewModel.refreshCoachingInsight() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = ElectricCyan.copy(alpha = 0.15f),
+                                            contentColor = ElectricCyan
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Analyze & Generate Insights", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                CoachingInsightState.Loading -> {
+                                    Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                                            .padding(8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() },
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = ThemeTextPrimary
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                color = ElectricCyan,
+                                                strokeWidth = 3.dp
                                             )
-                                            val subText = if (entry.workoutType == "Strength") {
-                                                "Strength | ${entry.setsCount} sets x ${entry.repsCount} reps"
-                                            } else {
-                                                "Cardio"
-                                            }
                                             Text(
-                                                text = subText,
-                                                fontSize = 10.sp,
-                                                color = Color.Gray
+                                                text = "Analyzing physiological telemetry with Gemini...",
+                                                color = Color.Gray,
+                                                fontSize = 12.sp
                                             )
                                         }
+                                    }
+                                }
+                                is CoachingInsightState.Success -> {
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Text(
+                                            text = cState.insight,
+                                            color = ThemeTextPrimary,
+                                            fontSize = 14.sp,
+                                            lineHeight = 20.sp
+                                        )
+                                        Button(
+                                            onClick = { showChatBottomSheet = true },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = NeonGreen,
+                                                contentColor = Color.Black
+                                            ),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text("Chat with Coach 💬", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                is CoachingInsightState.Error -> {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            Text(
-                                                text = "~${entry.caloriesBurned.toInt()} kcal",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = EnergeticCoral
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = null,
+                                                tint = EnergeticCoral
                                             )
-                                            IconButton(
-                                                onClick = { viewModel.deleteWorkout(entry) },
-                                                modifier = Modifier.size(24.dp)
+                                            Text(
+                                                text = cState.message,
+                                                color = EnergeticCoral,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                        if (cState.message.contains("Settings", ignoreCase = true) || cState.message.contains("API Key", ignoreCase = true)) {
+                                            Button(
+                                                onClick = {
+                                                    showChatBottomSheet = false
+                                                    onNavigateToSettings()
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = EnergeticCoral.copy(alpha = 0.15f),
+                                                    contentColor = EnergeticCoral
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(32.dp)
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = "Delete Workout",
-                                                    tint = EnergeticCoral,
-                                                    modifier = Modifier.size(16.dp)
+                                                Text(
+                                                    text = "Open API Settings",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
                                                 )
                                             }
                                         }
@@ -905,141 +921,151 @@ fun DashboardScreen(
                                 }
                             }
                         }
-                    }
 
-                    // AI Daily Coach Insights Card
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        ThemeGlassBorder,
-                                        ThemeGlassBorderGlow
-                                    )
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        // 5. Diet Quality Index Card (7-Day Rolling)
+                        FoodQualityCard(
+                            metrics = state.dietQualityMetrics,
+                            onLogSwap = { alternative ->
+                                viewModel.parseAndAddMeal(alternative)
+                            }
+                        )
+
+                        // 6. Track Your Meals Card (With Text Box, Chips, and Logged List)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(ThemeCardBgTranslucent)
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            ThemeGlassBorder,
+                                            ThemeGlassBorderGlow
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            Text(
+                                text = "Track Your Meals",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = ThemeTextPrimary
+                            )
+
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = "✨ AI Daily Coach",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    color = ThemeTextPrimary
-                                )
-                            }
-
-                            val isCoachingLoading = coachingState is CoachingInsightState.Loading
-                            val infiniteTransition = rememberInfiniteTransition(label = "RefreshRotation")
-                            val rotationAngle by if (isCoachingLoading) {
-                                infiniteTransition.animateFloat(
-                                    initialValue = 0f,
-                                    targetValue = 360f,
-                                    animationSpec = infiniteRepeatable(
-                                        animation = tween(1200, easing = LinearEasing),
-                                        repeatMode = RepeatMode.Restart
+                                OutlinedTextField(
+                                    value = foodInputText,
+                                    onValueChange = { foodInputText = it },
+                                    label = { Text("Log food in natural language...") },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = NeonGreen,
+                                        unfocusedBorderColor = ThemeGlassBorder,
+                                        focusedTextColor = ThemeTextPrimary,
+                                        unfocusedTextColor = ThemeTextPrimary,
+                                        focusedLabelColor = NeonGreen,
+                                        unfocusedLabelColor = ThemeTextSecondary
                                     ),
-                                    label = "Rotation"
+                                    placeholder = { Text("e.g. 2 eggs and a banana") },
+                                    modifier = Modifier.weight(1f)
                                 )
-                            } else {
-                                remember { mutableStateOf(0f) }
-                            }
 
-                            IconButton(
-                                onClick = { viewModel.refreshCoachingInsight() },
-                                modifier = Modifier.rotate(rotationAngle),
-                                enabled = !isCoachingLoading,
-                                colors = IconButtonDefaults.iconButtonColors(
-                                    contentColor = ElectricCyan
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh Insights"
-                                )
-                            }
-                        }
-
-                        when (val cState = coachingState) {
-                            CoachingInsightState.Idle -> {
-                                Text(
-                                    text = "Generate your personalized AI coaching advice based on today's physical and nutritional telemetry.",
-                                    color = Color.Gray,
-                                    fontSize = 13.sp
-                                )
                                 Button(
-                                    onClick = { viewModel.refreshCoachingInsight() },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = ElectricCyan.copy(alpha = 0.15f),
-                                        contentColor = ElectricCyan
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
+                                    onClick = {
+                                        if (foodInputText.isNotBlank()) {
+                                            viewModel.parseAndAddMeal(foodInputText)
+                                            foodInputText = ""
+                                        }
+                                    },
+                                    modifier = Modifier.height(56.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                                    enabled = parsingState != ParsingState.Loading
                                 ) {
-                                    Text("Analyze & Generate Insights", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            CoachingInsightState.Loading -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
+                                    if (parsingState == ParsingState.Loading) {
                                         CircularProgressIndicator(
-                                            modifier = Modifier.size(32.dp),
-                                            color = ElectricCyan,
-                                            strokeWidth = 3.dp
+                                            modifier = Modifier.size(24.dp),
+                                            color = Color.Black,
+                                            strokeWidth = 2.dp
                                         )
-                                        Text(
-                                            text = "Analyzing physiological telemetry with Gemini...",
-                                            color = Color.Gray,
-                                            fontSize = 12.sp
-                                        )
+                                    } else {
+                                        Text("Track", color = Color.Black, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
-                            is CoachingInsightState.Success -> {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                            // Suggestions chips
+                            val predictedFoods by viewModel.predictedFoods.collectAsState()
+                            if (predictedFoods.isNotEmpty()) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text(
-                                        text = cState.insight,
-                                        color = ThemeTextPrimary,
-                                        fontSize = 14.sp,
-                                        lineHeight = 20.sp
+                                        text = "Frequently Tracked (Tap to fill):",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        fontWeight = FontWeight.Bold
                                     )
-                                    Button(
-                                        onClick = { showChatBottomSheet = true },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = NeonMint,
-                                            contentColor = Color.Black
-                                        ),
+                                    LazyRow(
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Chat with Coach 💬", fontWeight = FontWeight.Bold)
+                                        items(predictedFoods.take(6)) { predicted ->
+                                            SuggestionChip(
+                                                onClick = { foodInputText = predicted.foodText },
+                                                label = {
+                                                    Text(
+                                                        text = predicted.foodText,
+                                                        color = ThemeTextPrimary,
+                                                        fontSize = 11.sp,
+                                                        maxLines = 1
+                                                    )
+                                                },
+                                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                                    containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
+                                                ),
+                                                border = SuggestionChipDefaults.suggestionChipBorder(
+                                                    enabled = true,
+                                                    borderColor = ThemeGlassBorder
+                                                )
+                                            )
+                                        }
+                                        item {
+                                            SuggestionChip(
+                                                onClick = { showFavoritesDialog = true },
+                                                label = {
+                                                    Text(
+                                                        text = "View All...",
+                                                        color = NeonGreen,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 1
+                                                    )
+                                                },
+                                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                                    containerColor = NeonGreen.copy(alpha = 0.1f)
+                                                ),
+                                                border = SuggestionChipDefaults.suggestionChipBorder(
+                                                    enabled = true,
+                                                    borderColor = NeonGreen.copy(alpha = 0.3f)
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             }
-                            is CoachingInsightState.Error -> {
+
+                            // Display parsing state messages
+                            AnimatedVisibility(visible = parsingState is ParsingState.Error) {
+                                val errMsg = (parsingState as? ParsingState.Error)?.message ?: "Error"
                                 Column(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -1051,14 +1077,14 @@ fun DashboardScreen(
                                             tint = EnergeticCoral
                                         )
                                         Text(
-                                            text = cState.message,
+                                            text = errMsg,
                                             color = EnergeticCoral,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
-                                    if (cState.message.contains("Settings", ignoreCase = true) || cState.message.contains("API Key", ignoreCase = true)) {
+                                    if (errMsg.contains("Settings", ignoreCase = true)) {
                                         Button(
                                             onClick = {
                                                 showChatBottomSheet = false
@@ -1080,308 +1106,259 @@ fun DashboardScreen(
                                     }
                                 }
                             }
-                        }
-                    }
 
-
-                    // Sleep & Readiness Recovery Dashboard
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        ThemeGlassBorder,
-                                        ThemeGlassBorderGlow
-                                    )
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                            // Meals logged today list
                             Text(
-                                text = "Sleep & Recovery",
+                                text = "Today's Ledger Entries",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
+                                fontSize = 14.sp,
                                 color = ThemeTextPrimary
                             )
 
-                            // Status Pill
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        when (state.readinessScore) {
-                                            in 85..100 -> NeonGreen.copy(alpha = 0.2f)
-                                            in 70..84 -> ElectricCyan.copy(alpha = 0.2f)
-                                            else -> EnergeticCoral.copy(alpha = 0.2f)
-                                        }
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
+                            if (state.nutritionList.isEmpty()) {
                                 Text(
-                                    text = "Readiness: ${state.readinessScore}%",
-                                    color = when (state.readinessScore) {
-                                        in 85..100 -> NeonGreen
-                                        in 70..84 -> ElectricCyan
-                                        else -> EnergeticCoral
-                                    },
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    text = "No meals logged today yet.",
+                                    fontSize = 13.sp,
+                                    color = ThemeTextSecondary
                                 )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    state.nutritionList.forEach { entry ->
+                                        MealItemRow(
+                                            entry = entry,
+                                            onDelete = { viewModel.deleteMeal(entry) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // WORKOUT VIEW: AI Trainer Workout, Activity & Performance, Sleep & Recovery
+                        // 1. AI Recommended Workout Card
+                        if (state.showAiWorkoutRecommendations) {
+                            WorkoutRecommendationCard(
+                                recommendation = state.workoutRecommendation,
+                                onLogWorkout = { workoutInput, difficulty ->
+                                    viewModel.parseAndAddWorkout(workoutInput, difficulty)
+                                },
+                                onDisableClick = {
+                                    viewModel.setWorkoutRecommendationsEnabled(false)
+                                }
+                            )
+                        }
+
+                        // 2. Activity & Performance Card
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(ThemeCardBgTranslucent)
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            ThemeGlassBorder,
+                                            ThemeGlassBorderGlow
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Activity & Performance",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = ThemeTextPrimary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                val distanceKm = state.activity.steps * 0.00075
+                                Text(
+                                    text = String.format("Estimated Distance: %.2f km", distanceKm),
+                                    color = ElectricCyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            // Steps Progress
+                            ActivityProgressBar(
+                                label = "Steps",
+                                current = state.activity.steps.toDouble(),
+                                target = 10000.0,
+                                color = ElectricCyan,
+                                unit = "steps"
+                            )
+
+                            if (state.workoutList.isNotEmpty()) {
+                                HorizontalDivider(
+                                    color = ThemeTextPrimary.copy(alpha = 0.05f),
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+
+                                Text(
+                                    text = "TODAY'S WORKOUTS",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Gray,
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    state.workoutList.forEach { entry ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                                                .padding(8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() },
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = ThemeTextPrimary
+                                                )
+                                                val subText = if (entry.workoutType == "Strength") {
+                                                    "Strength | ${entry.setsCount} sets x ${entry.repsCount} reps"
+                                                } else {
+                                                    "Cardio"
+                                                }
+                                                Text(
+                                                    text = subText,
+                                                    fontSize = 10.sp,
+                                                    color = Color.Gray
+                                                )
+                                            }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "~${entry.caloriesBurned.toInt()} kcal",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = EnergeticCoral
+                                                )
+                                                IconButton(
+                                                    onClick = { viewModel.deleteWorkout(entry) },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Delete Workout",
+                                                        tint = EnergeticCoral,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        val readinessDesc = when (state.readinessScore) {
-                            in 85..100 -> "Optimum Recovery - Max training capacity authorized."
-                            in 70..84 -> "Stable Homeostasis - Baseline performance capacity."
-                            in 50..69 -> "Suboptimal Sleep - Focus on active recovery."
-                            else -> "Critical Exhaustion - Rest day strongly recommended."
-                        }
-
-                        Text(
-                            text = readinessDesc,
-                            fontSize = 13.sp,
-                            color = ThemeTextSecondary
-                        )
-
-                        if (state.sleep != null) {
-                            val hours = state.sleep.sleepDurationSeconds / 3600
-                            val minutes = (state.sleep.sleepDurationSeconds % 3600) / 60
+                        // 3. Sleep & Readiness Recovery Dashboard
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(ThemeCardBgTranslucent)
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(
+                                            ThemeGlassBorder,
+                                            ThemeGlassBorderGlow
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                SleepMetricPill(
-                                    label = "Duration",
-                                    value = "${hours}h ${minutes}m",
-                                    modifier = Modifier.weight(1.0f)
-                                )
-                                val deepHours = state.sleep.deepSleepDurationSeconds / 3600
-                                val deepMins = (state.sleep.deepSleepDurationSeconds % 3600) / 60
-                                SleepMetricPill(
-                                    label = "Deep Sleep (Est)",
-                                    value = "${deepHours}h ${deepMins}m",
-                                    modifier = Modifier.weight(1.0f)
-                                )
-                            }
-                        } else {
-                            Text(
-                                text = "No sleep record synced for today. Connect Google Sleep or record sleep details to enable active recovery shifting.",
-                                fontSize = 12.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-
-                    // Food Ledger & Real-time AI Entry Logger
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        ThemeGlassBorder,
-                                        ThemeGlassBorderGlow
-                                    )
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Track Your Meals",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = ThemeTextPrimary
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = foodInputText,
-                                onValueChange = { foodInputText = it },
-                                label = { Text("Log food in natural language...") },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = NeonGreen,
-                                    unfocusedBorderColor = ThemeGlassBorder,
-                                    focusedTextColor = ThemeTextPrimary,
-                                    unfocusedTextColor = ThemeTextPrimary,
-                                    focusedLabelColor = NeonGreen,
-                                    unfocusedLabelColor = ThemeTextSecondary
-                                ),
-                                placeholder = { Text("e.g. 2 eggs and a banana") },
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            Button(
-                                onClick = {
-                                    if (foodInputText.isNotBlank()) {
-                                        viewModel.parseAndAddMeal(foodInputText)
-                                        foodInputText = ""
-                                    }
-                                },
-                                modifier = Modifier.height(56.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                                enabled = parsingState != ParsingState.Loading
-                            ) {
-                                if (parsingState == ParsingState.Loading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        color = Color.Black,
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Text("Track", color = Color.Black, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        // Suggestions chips
-                        val predictedFoods by viewModel.predictedFoods.collectAsState()
-                        if (predictedFoods.isNotEmpty()) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = "Frequently Tracked (Tap to fill):",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray,
-                                    fontWeight = FontWeight.Bold
+                                    text = "Sleep & Recovery",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = ThemeTextPrimary
                                 )
-                                LazyRow(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    items(predictedFoods.take(6)) { predicted ->
-                                        SuggestionChip(
-                                            onClick = { foodInputText = predicted.foodText },
-                                            label = {
-                                                Text(
-                                                    text = predicted.foodText,
-                                                    color = ThemeTextPrimary,
-                                                    fontSize = 11.sp,
-                                                    maxLines = 1
-                                                )
-                                            },
-                                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                                containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
-                                            ),
-                                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                                enabled = true,
-                                                borderColor = ThemeGlassBorder
-                                            )
-                                        )
-                                    }
-                                    item {
-                                        SuggestionChip(
-                                            onClick = { showFavoritesDialog = true },
-                                            label = {
-                                                Text(
-                                                    text = "View All...",
-                                                    color = NeonGreen,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1
-                                                )
-                                            },
-                                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                                containerColor = NeonGreen.copy(alpha = 0.1f)
-                                            ),
-                                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                                enabled = true,
-                                                borderColor = NeonGreen.copy(alpha = 0.3f)
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
 
-                        // Display parsing state messages
-                        AnimatedVisibility(visible = parsingState is ParsingState.Error) {
-                            val errMsg = (parsingState as? ParsingState.Error)?.message ?: "Error"
-                            Column(
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                // Status Pill
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            when (state.readinessScore) {
+                                                in 85..100 -> NeonGreen.copy(alpha = 0.2f)
+                                                in 70..84 -> ElectricCyan.copy(alpha = 0.2f)
+                                                else -> EnergeticCoral.copy(alpha = 0.2f)
+                                            }
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = EnergeticCoral
-                                    )
                                     Text(
-                                        text = errMsg,
-                                        color = EnergeticCoral,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.weight(1f)
+                                        text = "Readiness: ${state.readinessScore}%",
+                                        color = when (state.readinessScore) {
+                                            in 85..100 -> NeonGreen
+                                            in 70..84 -> ElectricCyan
+                                            else -> EnergeticCoral
+                                        },
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
                                     )
                                 }
-                                if (errMsg.contains("Settings", ignoreCase = true)) {
-                                    Button(
-                                        onClick = {
-                                            showChatBottomSheet = false
-                                            onNavigateToSettings()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = EnergeticCoral.copy(alpha = 0.15f),
-                                            contentColor = EnergeticCoral
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text(
-                                            text = "Open API Settings",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
                             }
-                        }
 
-                        // Meals logged today list
-                        Text(
-                            text = "Today's Ledger Entries",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = ThemeTextPrimary
-                        )
+                            val readinessDesc = when (state.readinessScore) {
+                                in 85..100 -> "Optimum Recovery - Max training capacity authorized."
+                                in 70..84 -> "Stable Homeostasis - Baseline performance capacity."
+                                in 50..69 -> "Suboptimal Sleep - Focus on active recovery."
+                                else -> "Critical Exhaustion - Rest day strongly recommended."
+                            }
 
-                        if (state.nutritionList.isEmpty()) {
                             Text(
-                                text = "No meals logged today yet.",
+                                text = readinessDesc,
                                 fontSize = 13.sp,
                                 color = ThemeTextSecondary
                             )
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                state.nutritionList.forEach { entry ->
-                                    MealItemRow(
-                                        entry = entry,
-                                        onDelete = { viewModel.deleteMeal(entry) }
+
+                            if (state.sleep != null) {
+                                val hours = state.sleep.sleepDurationSeconds / 3600
+                                val minutes = (state.sleep.sleepDurationSeconds % 3600) / 60
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    SleepMetricPill(
+                                        label = "Duration",
+                                        value = "${hours}h ${minutes}m",
+                                        modifier = Modifier.weight(1.0f)
+                                    )
+                                    val deepHours = state.sleep.deepSleepDurationSeconds / 3600
+                                    val deepMins = (state.sleep.deepSleepDurationSeconds % 3600) / 60
+                                    SleepMetricPill(
+                                        label = "Deep Sleep (Est)",
+                                        value = "${deepHours}h ${deepMins}m",
+                                        modifier = Modifier.weight(1.0f)
                                     )
                                 }
+                            } else {
+                                Text(
+                                    text = "No sleep record synced for today. Connect Google Sleep or record sleep details to enable active recovery shifting.",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
                             }
                         }
                     }
@@ -1406,9 +1383,11 @@ fun DashboardScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxHeight(0.75f)
+                        .fillMaxHeight(0.80f)
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .navigationBarsPadding()
+                        .imePadding(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
@@ -1529,21 +1508,23 @@ fun DashboardScreen(
                     
                     // Input panel
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedTextField(
                             value = chatInputText,
                             onValueChange = { chatInputText = it },
-                            label = { Text("Ask Coach about diet or recovery...") },
+                            placeholder = { Text("Ask Coach about diet or recovery...", fontSize = 13.sp) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = NeonGreen,
                                 unfocusedBorderColor = ThemeGlassBorder,
                                 focusedTextColor = ThemeTextPrimary,
                                 unfocusedTextColor = ThemeTextPrimary,
-                                focusedLabelColor = NeonGreen,
-                                unfocusedLabelColor = ThemeTextSecondary
+                                focusedPlaceholderColor = ThemeTextSecondary,
+                                unfocusedPlaceholderColor = ThemeTextSecondary
                             ),
                             modifier = Modifier.weight(1f),
                             singleLine = true
@@ -1563,7 +1544,6 @@ fun DashboardScreen(
                             Text("Send", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                     }
-                    Spacer(modifier = Modifier.navigationBarsPadding())
                 }
             }
         }
@@ -2073,6 +2053,10 @@ class SpeechRecognizerHelper(
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                // Speed up recognition response: finish 800ms after speech ends instead of waiting 3000ms
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L)
             }
             recognizer.startListening(intent)
         } catch (e: Exception) {

@@ -320,6 +320,61 @@ fun SettingsScreen(
                 }
             }
 
+            // SECTION: AI Workout Recommendations Toggle
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        1.dp,
+                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
+                        RoundedCornerShape(20.dp)
+                    )
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "AI WORKOUT SUGGESTIONS",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SuperfitTheme.colors.textPrimary
+                            )
+                            Text(
+                                text = "Show dynamic AI trainer workout recommendations on dashboard. Turn off if you follow your own routine.",
+                                fontSize = 11.sp,
+                                color = SuperfitTheme.colors.textSecondary,
+                                lineHeight = 15.sp
+                            )
+                        }
+
+                        var showWorkoutRecs by remember {
+                            mutableStateOf(sharedPrefs.getBoolean("show_ai_workout_recommendations", true))
+                        }
+
+                        Switch(
+                            checked = showWorkoutRecs,
+                            onCheckedChange = { isChecked ->
+                                showWorkoutRecs = isChecked
+                                viewModel.setWorkoutRecommendationsEnabled(isChecked)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = ElectricCyan
+                            )
+                        )
+                    }
+                }
+            }
+
             // SECTION 3: Fitness Goals and Targets Overrides
             Card(
                 shape = RoundedCornerShape(20.dp),

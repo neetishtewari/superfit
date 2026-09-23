@@ -361,8 +361,9 @@ class HistoryViewModel(
         viewModelScope.launch {
             _parsingState.value = HistoryParsingState.Loading
             try {
+                val history = repository.getAllNutritionEntries()
                 val parser = com.superfit.app.domain.NutritionParser(key)
-                val result = parser.parseFoodInput(input)
+                val result = parser.parseFoodInput(input, history)
 
                 if (result.foodText == "invalid") {
                     _parsingState.value = HistoryParsingState.Error("Could not recognize any food items. Please try typing something like 'one apple and greek yogurt'.")
@@ -387,16 +388,7 @@ class HistoryViewModel(
                 loadData()
                 _parsingState.value = HistoryParsingState.Success(result.foodText)
             } catch (e: Exception) {
-                val msg = e.localizedMessage ?: ""
-                val friendlyMsg = when {
-                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
-                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
-                    }
-                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
-                        "Invalid API Key. Please update your API key in Settings."
-                    }
-                    else -> "Unable to track meal: ${e.localizedMessage ?: "Unknown error"}"
-                }
+                val friendlyMsg = com.superfit.app.domain.GeminiClient.sanitizeError(e)
                 _parsingState.value = HistoryParsingState.Error(friendlyMsg)
             }
         }

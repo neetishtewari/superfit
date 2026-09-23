@@ -84,6 +84,9 @@ interface NutritionDao {
     @Query("SELECT * FROM nutrition_entries")
     suspend fun getAllEntries(): List<NutritionEntryEntity>
 
+    @Query("SELECT * FROM nutrition_entries ORDER BY timestamp DESC")
+    fun getAllEntriesFlow(): Flow<List<NutritionEntryEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntries(entries: List<NutritionEntryEntity>)
 
@@ -116,5 +119,47 @@ interface WorkoutDao {
 
     @Query("DELETE FROM workout_entries")
     suspend fun deleteAllEntries()
+}
+
+@Dao
+interface WeightDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWeight(entry: WeightEntryEntity)
+
+    @Delete
+    suspend fun deleteWeight(entry: WeightEntryEntity)
+
+    @Query("SELECT * FROM weight_entries ORDER BY timestamp DESC")
+    fun getAllWeightEntriesFlow(): Flow<List<WeightEntryEntity>>
+
+    @Query("SELECT * FROM weight_entries ORDER BY timestamp DESC")
+    suspend fun getAllWeightEntries(): List<WeightEntryEntity>
+
+    @Query("SELECT * FROM weight_entries ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestWeightEntry(): WeightEntryEntity?
+}
+
+@Dao
+interface StreakDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStreakState(state: StreakStateEntity)
+
+    @Query("SELECT * FROM streak_state WHERE id = 0")
+    fun getStreakStateFlow(): Flow<StreakStateEntity?>
+
+    @Query("SELECT * FROM streak_state WHERE id = 0")
+    suspend fun getStreakState(): StreakStateEntity?
+}
+
+@Dao
+interface HabitDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHabitEntry(entry: HabitEntryEntity)
+
+    @Query("SELECT * FROM habit_entries WHERE date = :date")
+    fun getHabitEntryFlow(date: String): Flow<HabitEntryEntity?>
+
+    @Query("SELECT * FROM habit_entries WHERE date = :date")
+    suspend fun getHabitEntry(date: String): HabitEntryEntity?
 }
 

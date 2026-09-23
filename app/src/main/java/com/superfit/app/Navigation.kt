@@ -177,8 +177,12 @@ fun MainNavigation(
                 val historyViewModel: HistoryViewModel = viewModel {
                     HistoryViewModel(repository, context.applicationContext)
                 }
+                val dashboardViewModel: DashboardViewModel = viewModel {
+                    DashboardViewModel(repository, context.applicationContext)
+                }
                 HistoryScreen(
                     viewModel = historyViewModel,
+                    dashboardViewModel = dashboardViewModel,
                     onBack = {
                         backStack.removeLastOrNull()
                     }

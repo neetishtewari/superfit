@@ -11,9 +11,12 @@ import androidx.room.RoomDatabase
         ActivityTelemetryEntity::class,
         SleepTelemetryEntity::class,
         NutritionEntryEntity::class,
-        WorkoutEntryEntity::class
+        WorkoutEntryEntity::class,
+        WeightEntryEntity::class,
+        StreakStateEntity::class,
+        HabitEntryEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class SuperfitDatabase : RoomDatabase() {
@@ -22,6 +25,9 @@ abstract class SuperfitDatabase : RoomDatabase() {
     abstract fun telemetryDao(): TelemetryDao
     abstract fun nutritionDao(): NutritionDao
     abstract fun workoutDao(): WorkoutDao
+    abstract fun weightDao(): WeightDao
+    abstract fun streakDao(): StreakDao
+    abstract fun habitDao(): HabitDao
 
     companion object {
         @Volatile

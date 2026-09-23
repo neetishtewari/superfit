@@ -42,6 +42,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.theme.*
+import com.superfit.app.ui.dashboard.DashboardViewModel
+import com.superfit.app.ui.dashboard.DashboardUiState
+import com.superfit.app.ui.dashboard.GoalProgressCard
+import com.superfit.app.ui.dashboard.FoodQualityCard
+import com.superfit.app.ui.dashboard.FoodSwapCard
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -50,10 +55,13 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel,
+    dashboardViewModel: DashboardViewModel? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    var selectedTab by remember { mutableStateOf(0) } // 0 = LOG HISTORY, 1 = PROGRESS & ANALYTICS
+    val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
 
     // Refresh data when navigating to this screen
     LaunchedEffect(Unit) {
@@ -96,7 +104,7 @@ fun HistoryScreen(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = "HISTORY LEDGER",
+                            text = if (selectedTab == 0) "HISTORY LEDGER" else "PROGRESS METRICS",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 2.sp,
@@ -127,16 +135,92 @@ fun HistoryScreen(
                     .padding(paddingValues)
                     .verticalScroll(scrollState)
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. Consistency Score Gauge
-                ConsistencyScoreGauge(
-                    deficitScore = viewModel.consistencyScore,
-                    deficitDays = viewModel.deficitDaysCount,
-                    loggedDays = viewModel.loggedDaysCount,
-                    trainingScore = viewModel.workoutConsistencyScore
-                )
+                // Top Segmented Control Tab Switcher
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ThemeCardBgTranslucent)
+                        .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
+                        .padding(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(if (selectedTab == 0) NeonMint else Color.Transparent)
+                            .clickable { selectedTab = 0 },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "LOG HISTORY",
+                            color = if (selectedTab == 0) Color.Black else ThemeTextSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(if (selectedTab == 1) NeonMint else Color.Transparent)
+                            .clickable { selectedTab = 1 },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "PROGRESS",
+                            color = if (selectedTab == 1) Color.Black else ThemeTextSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                if (selectedTab == 1 && dashboardState is DashboardUiState.Success) {
+                    val state = dashboardState as DashboardUiState.Success
+
+                    // Goal & Weight Tracker Card
+                    GoalProgressCard(
+                        metrics = state.weightMetrics,
+                        onLogWeight = { weight, note ->
+                            dashboardViewModel?.logWeight(weight, note)
+                        },
+                        onUpdateGoal = { start, target ->
+                            dashboardViewModel?.updateWeightGoal(start, target)
+                        }
+                    )
+
+                    // Food Quality Index Card
+                    FoodQualityCard(
+                        metrics = state.dietQualityMetrics
+                    )
+
+                    // Smart Food Swaps
+                    state.dietQualityMetrics.swapSuggestions.forEach { swap ->
+                        FoodSwapCard(
+                            swap = swap,
+                            onLogSwap = { foodText ->
+                                dashboardViewModel?.parseAndAddMeal(foodText)
+                            }
+                        )
+                    }
+                } else {
+                    // 1. Consistency Score Gauge
+                    ConsistencyScoreGauge(
+                        deficitScore = viewModel.consistencyScore,
+                        deficitDays = viewModel.deficitDaysCount,
+                        loggedDays = viewModel.loggedDaysCount,
+                        trainingScore = viewModel.workoutConsistencyScore
+                    )
+                }
 
                 // Calorie Trend Chart
                 val daysInMonth = viewModel.daysInMonth

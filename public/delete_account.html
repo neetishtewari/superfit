@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account & Data Deletion - Superfit</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #d1d5db;
+            background-color: #0B0F19;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1, h2, h3 {
+            color: #ffffff;
+            font-weight: 800;
+        }
+        h1 {
+            font-size: 2.5rem;
+            border-bottom: 1px solid #1f2937;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, #10B981, #06B6D4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        h2 {
+            font-size: 1.5rem;
+            margin-top: 30px;
+            border-bottom: 1px solid #1f2937;
+            padding-bottom: 5px;
+        }
+        p, li {
+            font-size: 1.05rem;
+            color: #9ca3af;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight {
+            color: #10B981;
+            font-weight: 600;
+        }
+        .container {
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .method-box {
+            background-color: #1F2937;
+            border-left: 4px solid #10B981;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .method-box h3 {
+            margin-top: 0;
+            color: #10B981;
+        }
+        .btn {
+            display: inline-block;
+            background: linear-gradient(to right, #10B981, #06B6D4);
+            color: #ffffff;
+            font-weight: 700;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            margin-top: 15px;
+            transition: opacity 0.2s ease;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Account & Data Deletion</h1>
+        <p>At Superfit, we believe you own your data. If you decide to stop using our app, we provide options to delete your account and all associated physical, health, and fitness metrics.</p>
+
+        <h2>How to Delete Your Data</h2>
+        <p>You can request account and data deletion through either of the two methods below:</p>
+
+        <div class="method-box">
+            <h3>Method 1: Immediate In-App Deletion (Recommended)</h3>
+            <p>You can delete your account and clear all local and cloud data instantly within the Superfit mobile application:</p>
+            <ul>
+                <li>Open the Superfit app and navigate to the <strong>Settings</strong> screen.</li>
+                <li>Tap <strong>Logout (Clear Cloud Data)</strong>.</li>
+                <li>This immediately deletes your entire cloud profile, synced calories, macro targets, workouts, steps, and sleep telemetry from our Firestore servers, wipes the local SQLite storage on your device, and signs you out.</li>
+            </ul>
+        </div>
+
+        <div class="method-box" style="border-left-color: #06B6D4;">
+            <h3>Method 2: Web Deletion Request</h3>
+            <p>If you have uninstalled the app and want to request deletion of your synced data directly from the web, click the button below to send a request. We will verify your identity and process the deletion within 7 business days.</p>
+            <p>Please make sure to send the request from the email address registered with your Superfit account.</p>
+            <a href="mailto:support@superfitapp.com?subject=Superfit%20Account%20Deletion%20Request&body=Please%20delete%20my%20Superfit%20account%20and%20all%20associated%20personal%20and%20fitness%20data.%0A%0AMy%20registered%20email%20address%20is%3A%20[Enter%20your%20email]%0AMy%20user%20ID%20(optional)%3A%20[Enter%20user%20ID%20if%20known]" class="btn">Request Deletion via Email</a>
+        </div>
+
+        <h2>What Data is Deleted?</h2>
+        <p>Upon processing your request, all of the following records associated with your account are permanently erased from our systems:</p>
+        <ul>
+            <li><strong>Personal Info:</strong> Registered email address, unique Firebase User ID, age, and gender.</li>
+            <li><strong>Health Metrics:</strong> Height and weight history.</li>
+            <li><strong>Fitness & Telemetry:</strong> Logged workouts, steps, active calories burned, sleep quality metrics, and nutrition logs.</li>
+        </ul>
+        <p class="highlight">Note: Account deletion is permanent. Once deleted, your telemetry history and custom metabolic target profiles cannot be recovered.</p>
+
+        <div class="footer">
+            <p>Superfit Applications - Built for Premium Privacy and Local Processing.</p>
+        </div>
+    </div>
+</body>
+</html>

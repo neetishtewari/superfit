@@ -12,6 +12,7 @@ import com.superfit.app.domain.MacroTargets
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.GeminiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -167,34 +168,44 @@ class DashboardViewModel(
                     5. Use clean markdown formatting (bold, bullet points) sparingly where it adds clarity.
                 """.trimIndent()
 
-                val model = GenerativeModel(
-                    modelName = "gemini-3.1-flash-lite",
-                    apiKey = key,
-                    systemInstruction = content { text(systemInstructionText) }
-                )
-
                 val history = _chatMessages.value.dropLast(1).map { msg ->
                     content(role = if (msg.sender == MessageSender.User) "user" else "model") {
                         text(msg.text)
                     }
                 }
 
-                val chatSession = model.startChat(history = history)
-                val response = chatSession.sendMessage(text)
-                val coachResponseText = response.text ?: "I'm not sure, could you please rephrase?"
-                _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, coachResponseText)
+                var coachResponseText: String? = null
+                var lastChatError: Exception? = null
+
+                for (modelName in GeminiClient.MODEL_CASCADE) {
+                    try {
+                        val model = GenerativeModel(
+                            modelName = modelName,
+                            apiKey = key,
+                            systemInstruction = content { text(systemInstructionText) }
+                        )
+                        val chatSession = model.startChat(history = history)
+                        val response = chatSession.sendMessage(text)
+                        val candidate = response.text
+                        if (!candidate.isNullOrBlank()) {
+                            coachResponseText = candidate
+                            break
+                        }
+                    } catch (e: Exception) {
+                        lastChatError = e
+                        android.util.Log.w("DashboardViewModel", "Chat model $modelName failed: ${e.message}")
+                    }
+                }
+
+                if (coachResponseText != null) {
+                    _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, coachResponseText)
+                } else {
+                    val friendlyMsg = GeminiClient.sanitizeError(lastChatError)
+                    _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, friendlyMsg)
+                }
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Chat message failed", e)
-                val msg = e.localizedMessage ?: ""
-                val friendlyMsg = when {
-                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
-                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
-                    }
-                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
-                        "Invalid API Key. Please update your API key in Settings."
-                    }
-                    else -> "Error: ${e.localizedMessage ?: "Unknown error"}"
-                }
+                val friendlyMsg = GeminiClient.sanitizeError(e)
                 _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, friendlyMsg)
             } finally {
                 _chatLoading.value = false
@@ -236,7 +247,11 @@ class DashboardViewModel(
         repository.getSleepFlow(LocalDate.now().toString()),
         repository.getNutritionEntriesForDay(LocalDate.now()),
         repository.getWorkoutEntriesForDay(LocalDate.now()),
-        _customMacroTrigger
+        repository.weightEntriesFlow,
+        repository.streakStateFlow,
+        repository.getHabitEntryFlow(LocalDate.now().toString()),
+        _customMacroTrigger,
+        repository.allNutritionEntriesFlow
     ) { array ->
         val profile = array[0] as? UserProfileEntity
         val activity = array[1] as? ActivityTelemetryEntity
@@ -245,10 +260,17 @@ class DashboardViewModel(
         val nutrition = array[3] as? List<NutritionEntryEntity> ?: emptyList()
         @Suppress("UNCHECKED_CAST")
         val workouts = array[4] as? List<WorkoutEntryEntity> ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val weightEntries = array[5] as? List<WeightEntryEntity> ?: emptyList()
+        val rawStreak = array[6] as? StreakStateEntity
+        val rawHabit = array[7] as? HabitEntryEntity
+        @Suppress("UNCHECKED_CAST")
+        val allNutritionHistory = array[9] as? List<NutritionEntryEntity> ?: emptyList()
 
         if (profile == null) {
             DashboardUiState.NotInitialized
         } else {
+            val todayStr = LocalDate.now().toString()
             // Live physiological calculations
             val bmr = PhysiologyEngine.calculateBmr(profile)
             val manualCal = workouts.sumOf { it.caloriesBurned }
@@ -281,12 +303,48 @@ class DashboardViewModel(
             val carbsEaten = nutrition.sumOf { it.carbsG }
             val fatEaten = nutrition.sumOf { it.fatG }
 
+            val weightMetrics = com.superfit.app.domain.WeightTrendEngine.calculateMetrics(profile, weightEntries)
+
+            // Streak & Habit Evaluation
+            val hasLoggedToday = nutrition.isNotEmpty() || workouts.isNotEmpty()
+            val streakState = com.superfit.app.domain.StreakEngine.evaluateStreak(rawStreak, hasLoggedToday)
+
+            val currentSteps = activity?.steps ?: 0
+            val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
+            val workoutMins = (workouts.size * 25)
+
+            val habitEntry = (rawHabit ?: HabitEntryEntity(date = todayStr)).copy(
+                stepsCompleted = currentSteps >= 8000,
+                sleepCompleted = currentSleepSecs >= (7 * 3600),
+                workoutMins = workoutMins
+            )
+
+            val workoutRecommendation = com.superfit.app.domain.WorkoutRecommenderEngine.generateRecommendation(
+                profile = profile,
+                workoutsLoggedToday = workouts,
+                historyWorkouts = workouts // Live day's workouts & past history
+            )
+
+            val showWorkoutRecs = sharedPrefs.getBoolean("show_ai_workout_recommendations", true)
+
+            val dietQualityMetrics = com.superfit.app.domain.FoodQualityEngine.analyzeDietQuality(
+                nutritionHistory = allNutritionHistory,
+                userGoal = profile.goal
+            )
+
             DashboardUiState.Success(
                 profile = profile,
-                activity = activity ?: ActivityTelemetryEntity(LocalDate.now().toString(), 0, 0.0),
+                activity = activity ?: ActivityTelemetryEntity(todayStr, 0, 0.0),
                 sleep = sleep,
                 nutritionList = nutrition,
                 workoutList = workouts,
+                weightEntries = weightEntries,
+                weightMetrics = weightMetrics,
+                streakState = streakState,
+                habitEntry = habitEntry,
+                workoutRecommendation = workoutRecommendation,
+                showAiWorkoutRecommendations = showWorkoutRecs,
+                dietQualityMetrics = dietQualityMetrics,
                 bmr = bmr,
                 tdee = tdee,
                 readinessScore = readiness,
@@ -303,6 +361,43 @@ class DashboardViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState.Loading
     )
+
+    fun setWorkoutRecommendationsEnabled(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean("show_ai_workout_recommendations", enabled).apply()
+        _customMacroTrigger.value = System.currentTimeMillis()
+    }
+
+    fun addWater(addMl: Int) {
+        viewModelScope.launch {
+            repository.addWater(LocalDate.now().toString(), addMl)
+        }
+    }
+
+    fun toggleCleanEats() {
+        viewModelScope.launch {
+            repository.toggleCleanEats(LocalDate.now().toString())
+        }
+    }
+
+    fun logWeight(weightKg: Double, note: String = "") {
+        viewModelScope.launch {
+            repository.addWeightEntry(weightKg, note)
+        }
+    }
+
+    fun updateWeightGoal(startingWeightKg: Double, targetWeightKg: Double) {
+        viewModelScope.launch {
+            val currentProfile = repository.getProfile()
+            if (currentProfile != null) {
+                repository.saveProfile(
+                    currentProfile.copy(
+                        startingWeightKg = startingWeightKg,
+                        targetWeightKg = targetWeightKg
+                    )
+                )
+            }
+        }
+    }
 
     fun syncTelemetry() {
         viewModelScope.launch {
@@ -324,8 +419,9 @@ class DashboardViewModel(
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
             try {
+                val history = repository.getAllNutritionEntries()
                 val parser = NutritionParser(key)
-                val result = parser.parseFoodInput(input)
+                val result = parser.parseFoodInput(input, history)
                 
                 if (result.foodText == "invalid") {
                     _parsingState.value = ParsingState.Error("Could not recognize any food items. Please try saying 'one apple and some greek yogurt'.")
@@ -345,16 +441,7 @@ class DashboardViewModel(
                 _parsingState.value = ParsingState.Success(result.foodText)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Meal parsing failed", e)
-                val msg = e.localizedMessage ?: ""
-                val friendlyMsg = when {
-                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
-                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
-                    }
-                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
-                        "Invalid API Key. Please update your API key in Settings."
-                    }
-                    else -> "Unable to track meal: ${e.localizedMessage ?: "Unknown error"}"
-                }
+                val friendlyMsg = GeminiClient.sanitizeError(e)
                 _parsingState.value = ParsingState.Error(friendlyMsg)
             }
         }
@@ -371,7 +458,7 @@ class DashboardViewModel(
         _parsingState.value = ParsingState.Idle
     }
 
-    fun parseAndAddWorkout(input: String) {
+    fun parseAndAddWorkout(input: String, difficultyRating: String = "JUST_RIGHT") {
         val key = _apiKey.value
         if (key.isBlank()) {
             _workoutParsingState.value = ParsingState.Error("Please enter your Gemini API Key in Settings first.")
@@ -395,22 +482,14 @@ class DashboardViewModel(
                     workoutType = result.workoutType,
                     setsCount = result.setsCount,
                     repsCount = result.repsCount,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    difficultyRating = difficultyRating
                 )
                 repository.addWorkoutEntry(entry)
                 _workoutParsingState.value = ParsingState.Success(result.workoutText)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Workout parsing failed", e)
-                val msg = e.localizedMessage ?: ""
-                val friendlyMsg = when {
-                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
-                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
-                    }
-                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
-                        "Invalid API Key. Please update your API key in Settings."
-                    }
-                    else -> "Unable to track workout: ${e.localizedMessage ?: "Unknown error"}"
-                }
+                val friendlyMsg = GeminiClient.sanitizeError(e)
                 _workoutParsingState.value = ParsingState.Error(friendlyMsg)
             }
         }
@@ -526,6 +605,13 @@ sealed interface DashboardUiState {
         val sleep: SleepTelemetryEntity?,
         val nutritionList: List<NutritionEntryEntity>,
         val workoutList: List<WorkoutEntryEntity>,
+        val weightEntries: List<WeightEntryEntity> = emptyList(),
+        val weightMetrics: com.superfit.app.domain.WeightGoalMetrics,
+        val streakState: StreakStateEntity = StreakStateEntity(),
+        val habitEntry: HabitEntryEntity = HabitEntryEntity(date = ""),
+        val workoutRecommendation: com.superfit.app.domain.TrainerWorkoutRecommendation,
+        val showAiWorkoutRecommendations: Boolean = true,
+        val dietQualityMetrics: com.superfit.app.domain.DietQualityMetrics = com.superfit.app.domain.DietQualityMetrics(85, "BALANCED", emptyList(), emptyList(), emptyList()),
         val bmr: Double,
         val tdee: Double,
         val readinessScore: Int,
