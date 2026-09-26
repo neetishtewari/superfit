@@ -68,7 +68,7 @@ class DailyReminderWorker(
             )
         } else {
             // Log is complete -> Send Daily AI Coaching Summary
-            val apiKey = sharedPrefs.getString("gemini_api_key", "") ?: ""
+            val apiKey = GeminiKeyStore(applicationContext).get()
             if (apiKey.isBlank()) {
                 sendNotification(
                     title = "⚡ Daily Focus Complete",

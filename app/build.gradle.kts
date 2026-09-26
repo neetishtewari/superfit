@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
@@ -7,6 +9,13 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingSecret(property: String, envVar: String): String? =
+    localProperties.getProperty(property) ?: System.getenv(envVar)
 
 android {
     namespace = "com.superfit.app"
@@ -19,12 +28,20 @@ android {
         versionName = "1.0.14"
     }
 
+    // Release signing secrets come from local.properties (gitignored) or environment variables,
+    // never from this file. Without them, release builds are produced unsigned.
+    val releaseStorePassword = signingSecret("superfit.storePassword", "SUPERFIT_STORE_PASSWORD")
+    val releaseKeyPassword = signingSecret("superfit.keyPassword", "SUPERFIT_KEY_PASSWORD")
     signingConfigs {
-        create("release") {
-            storeFile = file("../superfit-release.jks")
-            storePassword = "superfitkey2026"
-            keyAlias = "superfit-key"
-            keyPassword = "superfitkey2026"
+        if (releaseStorePassword != null && releaseKeyPassword != null) {
+            create("release") {
+                storeFile = rootProject.file(
+                    signingSecret("superfit.storeFile", "SUPERFIT_STORE_FILE") ?: "superfit-release.jks"
+                )
+                storePassword = releaseStorePassword
+                keyAlias = signingSecret("superfit.keyAlias", "SUPERFIT_KEY_ALIAS") ?: "superfit-key"
+                keyPassword = releaseKeyPassword
+            }
         }
     }
 
@@ -37,7 +54,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
     compileOptions {
@@ -51,6 +68,12 @@ android {
       shaders = false
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     packaging {
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -60,6 +83,13 @@ android {
 
 kotlin {
     jvmToolchain(17)
+}
+
+kapt {
+    arguments {
+        // Room writes each schema version here; commit the JSON so schema changes show up in review.
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
@@ -92,6 +122,8 @@ dependencies {
   // Local tests: jUnit, coroutines, Android runner
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.robolectric)
+  testImplementation(libs.androidx.test.core)
 
   // Instrumented tests: jUnit rules and runners
   androidTestImplementation(libs.androidx.test.core)

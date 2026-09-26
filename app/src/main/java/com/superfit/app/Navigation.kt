@@ -14,6 +14,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.google.firebase.auth.FirebaseAuth
 import com.superfit.app.data.DataRepository
+import com.superfit.app.data.GeminiKeyStore
 import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.auth.LoginViewModel
@@ -47,7 +48,7 @@ fun MainNavigation(
             startDestination = Login
         } else {
             val localProfile = repository.getProfile()
-            val hasApiKey = !getUserSharedPrefs(context).getString("gemini_api_key", "").isNullOrBlank()
+            val hasApiKey = GeminiKeyStore(context).hasKey()
             if (localProfile != null && hasApiKey) {
                 startDestination = Dashboard
             } else {
@@ -58,7 +59,7 @@ fun MainNavigation(
                     e.printStackTrace()
                 }
                 val hasProfile = repository.getProfile() != null
-                val hasApiKeyAfterSync = !getUserSharedPrefs(context).getString("gemini_api_key", "").isNullOrBlank()
+                val hasApiKeyAfterSync = GeminiKeyStore(context).hasKey()
                 startDestination = if (hasProfile && hasApiKeyAfterSync) Dashboard else Onboarding
             }
         }
@@ -92,7 +93,7 @@ fun MainNavigation(
                                 e.printStackTrace()
                             }
                             val hasProfile = repository.getProfile() != null
-                            val hasApiKey = !getUserSharedPrefs(context).getString("gemini_api_key", "").isNullOrBlank()
+                            val hasApiKey = GeminiKeyStore(context).hasKey()
                             backStack.removeLastOrNull()
                             if (hasProfile && hasApiKey) {
                                 backStack.add(Dashboard)
@@ -154,6 +155,7 @@ fun MainNavigation(
                             repository.clearAllLocalData()
                             val prefs = getUserSharedPrefs(context)
                             prefs.edit().clear().commit()
+                            GeminiKeyStore(context).clear()
                             FirebaseAuth.getInstance().signOut()
                             backStack.removeLastOrNull() // pop Settings
                             backStack.removeLastOrNull() // pop Dashboard

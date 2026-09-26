@@ -30,8 +30,9 @@ class DashboardViewModel(
     val healthConnectManager = repository.healthConnectManager
 
     private val sharedPrefs = getUserSharedPrefs(context)
+    private val geminiKeyStore = GeminiKeyStore(context)
 
-    private val _apiKey = MutableStateFlow(sharedPrefs.getString("gemini_api_key", "") ?: "")
+    private val _apiKey = MutableStateFlow(geminiKeyStore.get())
     val apiKey: StateFlow<String> = _apiKey
 
     private val _parsingState = MutableStateFlow<ParsingState>(ParsingState.Idle)
@@ -237,7 +238,7 @@ class DashboardViewModel(
     fun updateApiKey(key: String) {
         val trimmed = key.trim()
         _apiKey.value = trimmed
-        sharedPrefs.edit().putString("gemini_api_key", trimmed).apply()
+        geminiKeyStore.set(trimmed)
     }
 
     // Dynamic state combinations
