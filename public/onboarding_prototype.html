@@ -1442,18 +1442,50 @@
 
     let activeChunkTimeout = null;
 
-    // Prioritized search for premium neural/high-quality voices
+    // Prioritized search for natural, deeper male fitness trainer voices
     function getPremiumVoice() {
       if (!synth) return null;
       const voices = synth.getVoices();
-      
-      let premiumVoice = voices.find(v => v.name.includes("Google US English") && v.lang === "en-US") ||
-                         voices.find(v => v.name.includes("Natural") && v.lang.startsWith("en")) ||
-                         voices.find(v => v.name.includes("Premium") && v.lang.startsWith("en")) ||
-                         voices.find(v => v.name.includes("Siri") && v.lang.startsWith("en")) ||
-                         voices.find(v => v.name.includes("Samantha") && v.lang === "en-US") ||
-                         voices.find(v => v.lang.startsWith("en-US")) ||
-                         voices.find(v => v.lang.startsWith("en"));
+      if (!voices || voices.length === 0) return null;
+
+      const englishVoices = voices.filter(v => v.lang && v.lang.startsWith("en"));
+      const nonFemaleVoices = englishVoices.filter(v => {
+        const name = v.name.toLowerCase();
+        return !name.includes("female") &&
+               !name.includes("woman") &&
+               !name.includes("samantha") &&
+               !name.includes("victoria") &&
+               !name.includes("zira") &&
+               !name.includes("karen") &&
+               !name.includes("hazel") &&
+               !name.includes("susan") &&
+               !name.includes("linda") &&
+               !name.includes("jenny") &&
+               !name.includes("aria") &&
+               !name.includes("eva") &&
+               !name.includes("cora") &&
+               !name.includes("sarah") &&
+               !name.includes("google us english"); // Exclude default robotic female Google voice
+      });
+
+      // High quality natural male voices across Edge, Chrome, Safari, macOS, Windows, Android
+      const maleKeywords = ["male", "guy", "christopher", "davis", "jason", "ryan", "david", "mark", "alex", "daniel", "tom", "oliver", "aaron", "arthur", "nathan", "george", "iom", "iol", "tpd", "iob"];
+
+      let premiumVoice = nonFemaleVoices.find(v => {
+        const name = v.name.toLowerCase();
+        return (v.lang === "en-US" || v.lang === "en_US") && maleKeywords.some(kw => name.includes(kw));
+      }) || nonFemaleVoices.find(v => {
+        const name = v.name.toLowerCase();
+        return maleKeywords.some(kw => name.includes(kw));
+      }) || nonFemaleVoices.find(v => {
+        const name = v.name.toLowerCase();
+        return name.includes("natural") || name.includes("premium");
+      }) || nonFemaleVoices.find(v => v.lang.startsWith("en-US")) ||
+      nonFemaleVoices[0] ||
+      englishVoices.find(v => v.lang.startsWith("en-US")) ||
+      englishVoices[0] ||
+      voices[0];
+
       return premiumVoice;
     }
 
@@ -1489,8 +1521,8 @@
             utterance.voice = selectedVoice;
           }
           
-          utterance.pitch = 1.05;
-          utterance.rate = 0.85;
+          utterance.pitch = 0.86; // Deeper, resonant pitch for fitness coach persona
+          utterance.rate = 0.98;  // Confident, natural pacing instead of sluggish robotic cadence
           
           utterance.onend = function() {
             currentChunkIndex++;
