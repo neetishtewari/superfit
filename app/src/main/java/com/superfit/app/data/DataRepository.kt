@@ -153,6 +153,7 @@ class DataRepository(
             note = note
         )
         database.weightDao().insertWeight(entry)
+        firebaseSyncManager.uploadWeight(entry)
         // Also update current weight on UserProfile
         val profile = getProfile()
         if (profile != null) {
@@ -162,6 +163,7 @@ class DataRepository(
 
     suspend fun deleteWeightEntry(entry: WeightEntryEntity) {
         database.weightDao().deleteWeight(entry)
+        firebaseSyncManager.deleteWeight(entry)
     }
 
     suspend fun getAllWeightEntries(): List<WeightEntryEntity> {
@@ -172,6 +174,7 @@ class DataRepository(
 
     suspend fun saveStreakState(state: StreakStateEntity) {
         database.streakDao().insertStreakState(state)
+        firebaseSyncManager.uploadStreakState(state)
     }
 
     fun getHabitEntryFlow(date: String): Flow<HabitEntryEntity?> {
@@ -184,18 +187,21 @@ class DataRepository(
 
     suspend fun saveHabitEntry(entry: HabitEntryEntity) {
         database.habitDao().insertHabitEntry(entry)
+        firebaseSyncManager.uploadHabitEntry(entry)
     }
 
     suspend fun addWater(date: String, addMl: Int) {
         val current = database.habitDao().getHabitEntry(date) ?: HabitEntryEntity(date = date)
         val updated = current.copy(waterMl = current.waterMl + addMl)
         database.habitDao().insertHabitEntry(updated)
+        firebaseSyncManager.uploadHabitEntry(updated)
     }
 
     suspend fun toggleCleanEats(date: String) {
         val current = database.habitDao().getHabitEntry(date) ?: HabitEntryEntity(date = date)
         val updated = current.copy(cleanEatsCompleted = !current.cleanEatsCompleted)
         database.habitDao().insertHabitEntry(updated)
+        firebaseSyncManager.uploadHabitEntry(updated)
     }
 }
 

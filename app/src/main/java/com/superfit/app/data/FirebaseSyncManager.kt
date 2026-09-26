@@ -64,6 +64,24 @@ class FirebaseSyncManager(private val context: Context) {
         for (workout in workouts) {
             uploadWorkout(workout)
         }
+
+        // 6. Sync Weight Entries
+        val weights = database.weightDao().getAllWeightEntries()
+        for (weight in weights) {
+            uploadWeight(weight)
+        }
+
+        // 7. Sync Streak State
+        val streak = database.streakDao().getStreakState()
+        if (streak != null) {
+            uploadStreakState(streak)
+        }
+
+        // 8. Sync Habit Entries
+        val habits = database.habitDao().getAllHabitEntries()
+        for (habit in habits) {
+            uploadHabitEntry(habit)
+        }
     }
 
     /**
@@ -113,6 +131,31 @@ class FirebaseSyncManager(private val context: Context) {
             database.workoutDao().deleteAllEntries()
             if (workouts.isNotEmpty()) {
                 database.workoutDao().insertEntries(workouts)
+            }
+
+            // 6. Weight Entries
+            val weightSnap = firestore.collection("users").document(userId).collection("weights").get().await()
+            val weights = weightSnap.documents.mapNotNull { it.data?.toWeightEntry() }
+            if (weights.isNotEmpty()) {
+                database.weightDao().deleteAllWeights()
+                database.weightDao().insertWeights(weights)
+            }
+
+            // 7. Streak State
+            val streakDoc = firestore.collection("users").document(userId).collection("streak").document("current").get().await()
+            if (streakDoc.exists()) {
+                val data = streakDoc.data
+                if (data != null) {
+                    database.streakDao().insertStreakState(data.toStreakState())
+                }
+            }
+
+            // 8. Habit Entries
+            val habitSnap = firestore.collection("users").document(userId).collection("habits").get().await()
+            val habits = habitSnap.documents.mapNotNull { it.data?.toHabitEntry() }
+            if (habits.isNotEmpty()) {
+                database.habitDao().deleteAllHabits()
+                database.habitDao().insertHabitEntries(habits)
             }
 
             Log.d(tag, "Full bi-directional sync down complete.")
@@ -199,6 +242,50 @@ class FirebaseSyncManager(private val context: Context) {
         }
     }
 
+    suspend fun uploadWeight(entry: WeightEntryEntity) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("weights").document(entry.id.toString()).set(entry.toMap()).await()
+            Log.d(tag, "Weight entry uploaded with ID: ${entry.id}.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading weight: ${e.message}")
+        }
+    }
+
+    suspend fun deleteWeight(entry: WeightEntryEntity) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("weights").document(entry.id.toString()).delete().await()
+            Log.d(tag, "Weight entry deleted from Firestore with ID: ${entry.id}.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting weight: ${e.message}")
+        }
+    }
+
+    suspend fun uploadStreakState(state: StreakStateEntity) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("streak").document("current").set(state.toMap()).await()
+            Log.d(tag, "Streak state uploaded to Firestore.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading streak state: ${e.message}")
+        }
+    }
+
+    suspend fun uploadHabitEntry(entry: HabitEntryEntity) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("habits").document(entry.date).set(entry.toMap()).await()
+            Log.d(tag, "Habit entry uploaded for date: ${entry.date}.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading habit entry: ${e.message}")
+        }
+    }
+
     suspend fun clearAllCloudData() {
         val userId = auth.currentUser?.uid ?: return
         try {
@@ -229,6 +316,24 @@ class FirebaseSyncManager(private val context: Context) {
                 doc.reference.delete().await()
             }
 
+            // 6. Delete weight documents
+            val weightSnap = firestore.collection("users").document(userId).collection("weights").get().await()
+            for (doc in weightSnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 7. Delete streak documents
+            val streakSnap = firestore.collection("users").document(userId).collection("streak").get().await()
+            for (doc in streakSnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 8. Delete habit documents
+            val habitSnap = firestore.collection("users").document(userId).collection("habits").get().await()
+            for (doc in habitSnap.documents) {
+                doc.reference.delete().await()
+            }
+
             // Wait for all deletes to sync to the server (up to 5 seconds)
             try {
                 kotlinx.coroutines.withTimeoutOrNull(5000) {
@@ -254,7 +359,11 @@ class FirebaseSyncManager(private val context: Context) {
         "isMale" to isMale,
         "activityMultiplier" to activityMultiplier,
         "goal" to goal,
-        "calorieOffset" to calorieOffset
+        "calorieOffset" to calorieOffset,
+        "startingWeightKg" to startingWeightKg,
+        "targetWeightKg" to targetWeightKg,
+        "startDateTimestamp" to startDateTimestamp,
+        "fitnessLevel" to fitnessLevel
     )
 
     private fun Map<String, Any>.toUserProfileEntity(): UserProfileEntity = UserProfileEntity(
@@ -265,7 +374,11 @@ class FirebaseSyncManager(private val context: Context) {
         isMale = this["isMale"] as? Boolean ?: true,
         activityMultiplier = (this["activityMultiplier"] as? Number)?.toDouble() ?: 1.2,
         goal = this["goal"] as? String ?: "LOSE_WEIGHT",
-        calorieOffset = (this["calorieOffset"] as? Number)?.toInt() ?: -500
+        calorieOffset = (this["calorieOffset"] as? Number)?.toInt() ?: -500,
+        startingWeightKg = (this["startingWeightKg"] as? Number)?.toDouble() ?: (this["weightKg"] as? Number)?.toDouble() ?: 75.0,
+        targetWeightKg = (this["targetWeightKg"] as? Number)?.toDouble() ?: 70.0,
+        startDateTimestamp = (this["startDateTimestamp"] as? Number)?.toLong() ?: 0L,
+        fitnessLevel = this["fitnessLevel"] as? String ?: "INTERMEDIATE"
     )
 
     private fun ActivityTelemetryEntity.toMap(): Map<String, Any> = mapOf(
@@ -321,7 +434,8 @@ class FirebaseSyncManager(private val context: Context) {
         "workoutType" to workoutType,
         "setsCount" to setsCount,
         "repsCount" to repsCount,
-        "timestamp" to timestamp
+        "timestamp" to timestamp,
+        "difficultyRating" to difficultyRating
     )
 
     private fun Map<String, Any>.toWorkoutEntry(): WorkoutEntryEntity = WorkoutEntryEntity(
@@ -331,6 +445,59 @@ class FirebaseSyncManager(private val context: Context) {
         workoutType = this["workoutType"] as? String ?: "Cardio",
         setsCount = (this["setsCount"] as? Number)?.toInt() ?: 0,
         repsCount = (this["repsCount"] as? Number)?.toInt() ?: 0,
-        timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L
+        timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L,
+        difficultyRating = this["difficultyRating"] as? String ?: "JUST_RIGHT"
+    )
+
+    private fun WeightEntryEntity.toMap(): Map<String, Any> = mapOf(
+        "id" to id,
+        "weightKg" to weightKg,
+        "timestamp" to timestamp,
+        "note" to note
+    )
+
+    private fun Map<String, Any>.toWeightEntry(): WeightEntryEntity = WeightEntryEntity(
+        id = (this["id"] as? Number)?.toLong() ?: 0L,
+        weightKg = (this["weightKg"] as? Number)?.toDouble() ?: 0.0,
+        timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L,
+        note = this["note"] as? String ?: ""
+    )
+
+    private fun StreakStateEntity.toMap(): Map<String, Any> = mapOf(
+        "id" to id,
+        "currentStreak" to currentStreak,
+        "longestStreak" to longestStreak,
+        "masteryStreak" to masteryStreak,
+        "graceDaysRemaining" to graceDaysRemaining,
+        "lastLoggedDate" to lastLoggedDate,
+        "lastGraceUsedDate" to lastGraceUsedDate
+    )
+
+    private fun Map<String, Any>.toStreakState(): StreakStateEntity = StreakStateEntity(
+        id = (this["id"] as? Number)?.toInt() ?: 0,
+        currentStreak = (this["currentStreak"] as? Number)?.toInt() ?: 0,
+        longestStreak = (this["longestStreak"] as? Number)?.toInt() ?: 0,
+        masteryStreak = (this["masteryStreak"] as? Number)?.toInt() ?: 0,
+        graceDaysRemaining = (this["graceDaysRemaining"] as? Number)?.toInt() ?: 1,
+        lastLoggedDate = this["lastLoggedDate"] as? String ?: "",
+        lastGraceUsedDate = this["lastGraceUsedDate"] as? String ?: ""
+    )
+
+    private fun HabitEntryEntity.toMap(): Map<String, Any> = mapOf(
+        "date" to date,
+        "waterMl" to waterMl,
+        "workoutMins" to workoutMins,
+        "cleanEatsCompleted" to cleanEatsCompleted,
+        "stepsCompleted" to stepsCompleted,
+        "sleepCompleted" to sleepCompleted
+    )
+
+    private fun Map<String, Any>.toHabitEntry(): HabitEntryEntity = HabitEntryEntity(
+        date = this["date"] as? String ?: "",
+        waterMl = (this["waterMl"] as? Number)?.toInt() ?: 0,
+        workoutMins = (this["workoutMins"] as? Number)?.toInt() ?: 0,
+        cleanEatsCompleted = this["cleanEatsCompleted"] as? Boolean ?: false,
+        stepsCompleted = this["stepsCompleted"] as? Boolean ?: false,
+        sleepCompleted = this["sleepCompleted"] as? Boolean ?: false
     )
 }

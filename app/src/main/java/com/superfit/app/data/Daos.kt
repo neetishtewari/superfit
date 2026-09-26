@@ -126,8 +126,14 @@ interface WeightDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWeight(entry: WeightEntryEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWeights(entries: List<WeightEntryEntity>)
+
     @Delete
     suspend fun deleteWeight(entry: WeightEntryEntity)
+
+    @Query("DELETE FROM weight_entries")
+    suspend fun deleteAllWeights()
 
     @Query("SELECT * FROM weight_entries ORDER BY timestamp DESC")
     fun getAllWeightEntriesFlow(): Flow<List<WeightEntryEntity>>
@@ -144,6 +150,9 @@ interface StreakDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStreakState(state: StreakStateEntity)
 
+    @Query("DELETE FROM streak_state")
+    suspend fun deleteAllStreak()
+
     @Query("SELECT * FROM streak_state WHERE id = 0")
     fun getStreakStateFlow(): Flow<StreakStateEntity?>
 
@@ -155,6 +164,15 @@ interface StreakDao {
 interface HabitDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHabitEntry(entry: HabitEntryEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHabitEntries(entries: List<HabitEntryEntity>)
+
+    @Query("SELECT * FROM habit_entries")
+    suspend fun getAllHabitEntries(): List<HabitEntryEntity>
+
+    @Query("DELETE FROM habit_entries")
+    suspend fun deleteAllHabits()
 
     @Query("SELECT * FROM habit_entries WHERE date = :date")
     fun getHabitEntryFlow(date: String): Flow<HabitEntryEntity?>
