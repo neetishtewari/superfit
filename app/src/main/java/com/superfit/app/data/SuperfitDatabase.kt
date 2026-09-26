@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         HabitEntryEntity::class
     ],
     version = 5,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class SuperfitDatabase : RoomDatabase() {
 
@@ -43,6 +43,8 @@ abstract class SuperfitDatabase : RoomDatabase() {
             }
         }
 
+        // Creates workout_entries as it was at version 3, before difficultyRating existed;
+        // MIGRATION_3_5 adds that column, so the 1->5 and 2->5 paths must not create it here.
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -53,8 +55,7 @@ abstract class SuperfitDatabase : RoomDatabase() {
                     "`workoutType` TEXT NOT NULL, " +
                     "`setsCount` INTEGER NOT NULL, " +
                     "`repsCount` INTEGER NOT NULL, " +
-                    "`timestamp` INTEGER NOT NULL, " +
-                    "`difficultyRating` TEXT NOT NULL DEFAULT 'JUST_RIGHT')"
+                    "`timestamp` INTEGER NOT NULL)"
                 )
             }
         }
@@ -123,6 +124,15 @@ abstract class SuperfitDatabase : RoomDatabase() {
             }
         }
 
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_5,
+            MIGRATION_4_5,
+            MIGRATION_1_5,
+            MIGRATION_2_5
+        )
+
         fun getDatabase(context: Context): SuperfitDatabase {
             val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
             return INSTANCE?.takeIf { activeUserId == currentUserId } ?: synchronized(this) {
@@ -136,14 +146,7 @@ abstract class SuperfitDatabase : RoomDatabase() {
                     SuperfitDatabase::class.java,
                     "superfit_database_$currentUserId"
                 )
-                .addMigrations(
-                    MIGRATION_1_2,
-                    MIGRATION_2_3,
-                    MIGRATION_3_5,
-                    MIGRATION_4_5,
-                    MIGRATION_1_5,
-                    MIGRATION_2_5
-                )
+                .addMigrations(*ALL_MIGRATIONS)
                 .fallbackToDestructiveMigrationOnDowngrade(true)
                 .build()
                 INSTANCE = instance

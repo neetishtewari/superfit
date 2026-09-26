@@ -13,11 +13,11 @@ class OnboardingViewModel(
     context: android.content.Context
 ) : ViewModel() {
 
-    private val sharedPrefs = getUserSharedPrefs(context)
+    private val geminiKeyStore = GeminiKeyStore(context)
 
     private val _uiState = MutableStateFlow(
         OnboardingUiState(
-            apiKey = sharedPrefs.getString("gemini_api_key", "") ?: ""
+            apiKey = geminiKeyStore.get()
         )
     )
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
@@ -136,7 +136,7 @@ class OnboardingViewModel(
         viewModelScope.launch {
             try {
                 // Persist the API Key configured by the user (trimmed to prevent spaces/newlines causing exceptions)
-                sharedPrefs.edit().putString("gemini_api_key", trimmedKey).apply()
+                geminiKeyStore.set(trimmedKey)
 
                 val profile = UserProfileEntity(
                     id = 0,

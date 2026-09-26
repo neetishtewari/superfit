@@ -66,6 +66,7 @@ class HistoryViewModel(
 ) : ViewModel() {
 
     private val sharedPrefs = getUserSharedPrefs(context)
+    private val geminiKeyStore = GeminiKeyStore(context)
 
     private val _parsingState = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
     val parsingState: StateFlow<HistoryParsingState> = _parsingState.asStateFlow()
@@ -352,7 +353,7 @@ class HistoryViewModel(
     }
 
     fun parseAndAddMeal(input: String) {
-        val key = sharedPrefs.getString("gemini_api_key", "") ?: ""
+        val key = geminiKeyStore.get()
         if (key.isBlank()) {
             _parsingState.value = HistoryParsingState.Error("Please enter your Gemini API Key in Settings first.")
             return
