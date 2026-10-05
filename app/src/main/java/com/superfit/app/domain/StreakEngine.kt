@@ -1,89 +1,64 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.StreakStateEntity
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 object StreakEngine {
 
-    fun evaluateStreak(
-        savedState: StreakStateEntity?,
-        hasLoggedToday: Boolean,
-        today: LocalDate = LocalDate.now()
+    // Days with a meal logged stay in the same streak as long as the gap between them is at
+    // most this many days, i.e. one missed day is forgiven but two in a row end the streak.
+    private const val MAX_GAP_DAYS = 2L
+
+    /**
+     * Computes the streak from the meal log itself rather than from a stored counter, so it is
+     * always right after reinstalls, cloud sync or edits to past days.
+     *
+     * The streak counts days with at least one meal logged. A single missed day keeps the streak
+     * alive (grace day); two missed days in a row end it. Today not being logged yet never breaks it.
+     */
+    fun fromMealTimestamps(
+        mealTimestamps: List<Long>,
+        today: LocalDate = LocalDate.now(),
+        zoneId: ZoneId = ZoneId.systemDefault()
     ): StreakStateEntity {
-        val todayStr = today.toString()
-        if (savedState == null) {
-            val initialStreak = if (hasLoggedToday) 1 else 0
-            return StreakStateEntity(
-                id = 0,
-                currentStreak = initialStreak,
-                longestStreak = initialStreak,
-                masteryStreak = initialStreak,
-                graceDaysRemaining = 1,
-                lastLoggedDate = if (hasLoggedToday) todayStr else "",
-                lastGraceUsedDate = ""
-            )
+        val dates = mealTimestamps
+            .map { Instant.ofEpochMilli(it).atZone(zoneId).toLocalDate() }
+            .filter { !it.isAfter(today) }
+        return fromLoggedDates(dates, today)
+    }
+
+    fun fromLoggedDates(loggedDates: Collection<LocalDate>, today: LocalDate = LocalDate.now()): StreakStateEntity {
+        val days = loggedDates.filter { !it.isAfter(today) }.distinct().sorted()
+        if (days.isEmpty()) return StreakStateEntity(id = 0, graceDaysRemaining = 1)
+
+        var longest = 0
+        var run = 0
+        var previous: LocalDate? = null
+        for (day in days) {
+            run = if (previous != null && ChronoUnit.DAYS.between(previous, day) <= MAX_GAP_DAYS) run + 1 else 1
+            longest = maxOf(longest, run)
+            previous = day
         }
 
-        val lastLoggedDate = if (savedState.lastLoggedDate.isBlank()) null else LocalDate.parse(savedState.lastLoggedDate)
-        
-        if (lastLoggedDate == null) {
-            val streak = if (hasLoggedToday) 1 else 0
-            return savedState.copy(
-                currentStreak = streak,
-                longestStreak = maxOf(savedState.longestStreak, streak),
-                lastLoggedDate = if (hasLoggedToday) todayStr else ""
-            )
-        }
+        val lastLogged = days.last()
+        val daysSinceLast = ChronoUnit.DAYS.between(lastLogged, today)
+        val current = if (daysSinceLast <= MAX_GAP_DAYS) run else 0
 
-        val daysBetween = ChronoUnit.DAYS.between(lastLoggedDate, today)
+        // Yesterday was missed and nothing is logged today yet: the grace day is in use and the
+        // streak ends unless a meal is logged today.
+        val graceInUse = current > 0 && daysSinceLast == MAX_GAP_DAYS
 
-        return when {
-            // Logged today already
-            daysBetween == 0L -> savedState
-
-            // Consecutive day log (Yesterday -> Today)
-            daysBetween == 1L && hasLoggedToday -> {
-                val newStreak = savedState.currentStreak + 1
-                savedState.copy(
-                    currentStreak = newStreak,
-                    longestStreak = maxOf(savedState.longestStreak, newStreak),
-                    lastLoggedDate = todayStr
-                )
-            }
-
-            // Missed 1 day (e.g., Day before yesterday -> Today)
-            daysBetween == 2L -> {
-                if (savedState.graceDaysRemaining > 0) {
-                    // Consume 1 Grace Day! Streak is preserved!
-                    val newStreak = if (hasLoggedToday) savedState.currentStreak + 1 else savedState.currentStreak
-                    savedState.copy(
-                        currentStreak = newStreak,
-                        longestStreak = maxOf(savedState.longestStreak, newStreak),
-                        graceDaysRemaining = savedState.graceDaysRemaining - 1,
-                        lastLoggedDate = if (hasLoggedToday) todayStr else savedState.lastLoggedDate,
-                        lastGraceUsedDate = today.minusDays(1).toString()
-                    )
-                } else {
-                    // Grace days exhausted, streak resets
-                    val newStreak = if (hasLoggedToday) 1 else 0
-                    savedState.copy(
-                        currentStreak = newStreak,
-                        lastLoggedDate = if (hasLoggedToday) todayStr else ""
-                    )
-                }
-            }
-
-            // Missed > 1 day
-            daysBetween > 2L -> {
-                val newStreak = if (hasLoggedToday) 1 else 0
-                savedState.copy(
-                    currentStreak = newStreak,
-                    lastLoggedDate = if (hasLoggedToday) todayStr else ""
-                )
-            }
-
-            else -> savedState
-        }
+        return StreakStateEntity(
+            id = 0,
+            currentStreak = current,
+            longestStreak = longest,
+            masteryStreak = current,
+            graceDaysRemaining = if (graceInUse) 0 else 1,
+            lastLoggedDate = lastLogged.toString(),
+            lastGraceUsedDate = if (graceInUse) today.minusDays(1).toString() else ""
+        )
     }
 }

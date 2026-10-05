@@ -243,7 +243,6 @@ class DashboardViewModel(
         val workouts = array[4] as? List<WorkoutEntryEntity> ?: emptyList()
         @Suppress("UNCHECKED_CAST")
         val weightEntries = array[5] as? List<WeightEntryEntity> ?: emptyList()
-        val rawStreak = array[6] as? StreakStateEntity
         val rawHabit = array[7] as? HabitEntryEntity
         @Suppress("UNCHECKED_CAST")
         val allNutritionHistory = array[9] as? List<NutritionEntryEntity> ?: emptyList()
@@ -286,9 +285,10 @@ class DashboardViewModel(
 
             val weightMetrics = com.superfit.app.domain.WeightTrendEngine.calculateMetrics(profile, weightEntries)
 
-            // Streak & Habit Evaluation
-            val hasLoggedToday = nutrition.isNotEmpty() || workouts.isNotEmpty()
-            val streakState = com.superfit.app.domain.StreakEngine.evaluateStreak(rawStreak, hasLoggedToday)
+            // Streak is derived from the full meal log (one missed day forgiven, two end it)
+            val streakState = com.superfit.app.domain.StreakEngine.fromMealTimestamps(
+                allNutritionHistory.map { it.timestamp }
+            )
 
             val currentSteps = activity?.steps ?: 0
             val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
