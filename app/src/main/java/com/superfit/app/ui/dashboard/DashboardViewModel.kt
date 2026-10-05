@@ -175,35 +175,15 @@ class DashboardViewModel(
                     }
                 }
 
-                var coachResponseText: String? = null
-                var lastChatError: Exception? = null
-
-                for (modelName in GeminiClient.MODEL_CASCADE) {
-                    try {
-                        val model = GenerativeModel(
-                            modelName = modelName,
-                            apiKey = key,
-                            systemInstruction = content { text(systemInstructionText) }
-                        )
-                        val chatSession = model.startChat(history = history)
-                        val response = chatSession.sendMessage(text)
-                        val candidate = response.text
-                        if (!candidate.isNullOrBlank()) {
-                            coachResponseText = candidate
-                            break
-                        }
-                    } catch (e: Exception) {
-                        lastChatError = e
-                        android.util.Log.w("DashboardViewModel", "Chat model $modelName failed: ${e.message}")
-                    }
+                val coachResponseText = GeminiClient.runWithFailover { modelName ->
+                    val model = GenerativeModel(
+                        modelName = modelName,
+                        apiKey = key,
+                        systemInstruction = content { text(systemInstructionText) }
+                    )
+                    model.startChat(history = history).sendMessage(text).text
                 }
-
-                if (coachResponseText != null) {
-                    _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, coachResponseText)
-                } else {
-                    val friendlyMsg = GeminiClient.sanitizeError(lastChatError)
-                    _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, friendlyMsg)
-                }
+                _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, coachResponseText)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Chat message failed", e)
                 val friendlyMsg = GeminiClient.sanitizeError(e)
@@ -569,16 +549,7 @@ class DashboardViewModel(
                 _coachingState.value = CoachingInsightState.Success(insight)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Coaching insight refresh failed", e)
-                val msg = e.localizedMessage ?: ""
-                val friendlyMsg = when {
-                    msg.contains("429", ignoreCase = true) || msg.contains("quota", ignoreCase = true) || msg.contains("exhausted", ignoreCase = true) -> {
-                        "Quota exceeded. Please configure your own free Gemini API Key in Settings."
-                    }
-                    msg.contains("API key", ignoreCase = true) || msg.contains("invalid", ignoreCase = true) || msg.contains("400", ignoreCase = true) -> {
-                        "Invalid API Key. Please update your API key in Settings."
-                    }
-                    else -> "Failed to load insight: ${e.localizedMessage ?: "Unknown error"}"
-                }
+                val friendlyMsg = GeminiClient.sanitizeError(e)
                 _coachingState.value = CoachingInsightState.Error(friendlyMsg)
             }
         }
