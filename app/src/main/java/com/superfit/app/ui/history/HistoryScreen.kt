@@ -187,6 +187,25 @@ fun HistoryScreen(
                 if (selectedTab == 1 && dashboardState is DashboardUiState.Success) {
                     val state = dashboardState as DashboardUiState.Success
 
+                    // Meal logging streaks
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TrendItem(
+                            label = "CURRENT STREAK",
+                            value = "${state.streakState.currentStreak} ${if (state.streakState.currentStreak == 1) "day" else "days"}",
+                            valueColor = CoralRed,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TrendItem(
+                            label = "LONGEST STREAK",
+                            value = "${state.streakState.longestStreak} ${if (state.streakState.longestStreak == 1) "day" else "days"}",
+                            valueColor = ElectricCyan,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
                     // Goal & Weight Tracker Card
                     GoalProgressCard(
                         metrics = state.weightMetrics,

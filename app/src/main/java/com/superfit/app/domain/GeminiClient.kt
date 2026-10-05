@@ -5,6 +5,7 @@ import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 
 import java.util.concurrent.ConcurrentHashMap
 
@@ -24,11 +25,40 @@ object GeminiClient {
         "gemini-2.0-flash"
     )
 
-    // Per-model timeout (5s) to guarantee fast failover if a model queues or hangs
-    private const val PER_MODEL_TIMEOUT_MS = 5000L
+    // Per-attempt timeout. Long prompts (coaching with full history) can legitimately take
+    // well over 5s, so a short limit turned slow answers into "busy" errors.
+    private const val PER_ATTEMPT_TIMEOUT_MS = 20_000L
 
-    // Cache GenerativeModel instances to maintain warm HTTP/2 & TLS connection pools
+    // Attempts per model when Gemini says it is overloaded (503) or the call times out.
+    private const val ATTEMPTS_PER_MODEL = 3
+
+    // Backoff before the 2nd and 3rd attempt on the same model, as Google recommends for 503s.
+    private val RETRY_DELAYS_MS = listOf(1_000L, 2_000L)
+
+    // Short pause before moving to the next model after a rate limit, so the cascade
+    // doesn't burn through every model's per-minute quota in the same second.
+    private const val MODEL_SWITCH_DELAY_MS = 1_000L
+
+    // Overall budget across all models and retries, so a bad spell never leaves the user
+    // staring at a spinner for minutes.
+    private const val TOTAL_BUDGET_MS = 45_000L
+
+    // Cache GenerativeModel instances to maintain warm HTTP/2 & TLS connection pools.
+    // The key includes the API key so a changed key takes effect immediately.
     private val modelCache = ConcurrentHashMap<String, GenerativeModel>()
+
+    enum class ErrorKind {
+        /** Server overloaded / unavailable or timed out: wait and retry the same model. */
+        BUSY,
+        /** Rate limit or quota hit on this model: move on to the next model. */
+        RATE_LIMITED,
+        /** Model name not found or retired: move on to the next model. */
+        MODEL_UNAVAILABLE,
+        /** Bad key, bad request, blocked prompt: other models won't help, stop. */
+        FATAL,
+        /** Anything else: try the next model once. */
+        OTHER
+    }
 
     private fun getOrCreateModel(
         modelName: String,
@@ -36,7 +66,7 @@ object GeminiClient {
         systemInstructionText: String?,
         isJson: Boolean
     ): GenerativeModel {
-        val cacheKey = "$modelName:${systemInstructionText?.hashCode() ?: 0}:$isJson"
+        val cacheKey = "$modelName:${apiKey.hashCode()}:${systemInstructionText?.hashCode() ?: 0}:$isJson"
         return modelCache.getOrPut(cacheKey) {
             GenerativeModel(
                 modelName = modelName,
@@ -54,89 +84,163 @@ object GeminiClient {
     }
 
     /**
-     * Executes generation with an automatic multi-model failover cascade.
-     * Prioritizes sub-second latency with warm connection pooling and rapid failover.
+     * Executes generation with retries and an automatic multi-model failover cascade.
      */
     suspend fun generateContent(
         apiKey: String,
         prompt: String,
         systemInstructionText: String? = null,
         isJson: Boolean = true
+    ): String = runWithFailover { modelName ->
+        val model = getOrCreateModel(modelName, apiKey, systemInstructionText, isJson)
+        model.generateContent(prompt).text
+    }
+
+    /**
+     * Runs [call] against each model in [models] until one returns non-blank text.
+     *
+     * Busy/timeout errors are retried on the same model with backoff; rate limits and
+     * missing models move on to the next model; fatal errors (bad key, bad request)
+     * stop immediately. Throws an exception carrying a user-friendly message if all fail.
+     */
+    suspend fun runWithFailover(
+        models: List<String> = MODEL_CASCADE,
+        timeoutMs: Long = PER_ATTEMPT_TIMEOUT_MS,
+        totalBudgetMs: Long = TOTAL_BUDGET_MS,
+        call: suspend (modelName: String) -> String?
     ): String {
         var lastException: Exception? = null
+        var elapsedMs = 0L
 
-        for (modelName in MODEL_CASCADE) {
-            try {
-                val startTime = System.currentTimeMillis()
-                Log.d(TAG, "Attempting generation with model: $modelName")
+        cascade@ for ((index, modelName) in models.withIndex()) {
+            if (index > 0 && lastException != null && classifyError(lastException) == ErrorKind.RATE_LIMITED) {
+                delay(MODEL_SWITCH_DELAY_MS)
+                elapsedMs += MODEL_SWITCH_DELAY_MS
+            }
 
-                val model = getOrCreateModel(modelName, apiKey, systemInstructionText, isJson)
-                val response = kotlinx.coroutines.withTimeout(PER_MODEL_TIMEOUT_MS) {
-                    model.generateContent(prompt)
+            for (attempt in 0 until ATTEMPTS_PER_MODEL) {
+                if (attempt > 0) {
+                    val wait = RETRY_DELAYS_MS[minOf(attempt - 1, RETRY_DELAYS_MS.lastIndex)]
+                    Log.d(TAG, "Retrying $modelName in ${wait}ms (attempt ${attempt + 1}/$ATTEMPTS_PER_MODEL)")
+                    delay(wait)
+                    elapsedMs += wait
                 }
-                val text = response.text
+                if (elapsedMs >= totalBudgetMs) break@cascade
 
-                val elapsed = System.currentTimeMillis() - startTime
+                val startTime = System.currentTimeMillis()
+                val outcome = try {
+                    // withTimeoutOrNull returns null on timeout, so wrap the result to tell
+                    // "timed out" apart from "model returned null text".
+                    withTimeoutOrNull(timeoutMs) { Result.success(call(modelName)) }
+                        ?: Result.failure(Exception("Model $modelName timed out after ${timeoutMs}ms"))
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
+
+                val text = outcome.getOrNull()
+                elapsedMs += if (outcome.exceptionOrNull()?.message?.contains("timed out") == true) {
+                    timeoutMs
+                } else {
+                    System.currentTimeMillis() - startTime
+                }
                 if (!text.isNullOrBlank()) {
-                    Log.d(TAG, "Successfully generated content using $modelName in ${elapsed}ms")
+                    Log.d(TAG, "Generated content using $modelName in ${System.currentTimeMillis() - startTime}ms")
                     return text
                 }
-            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                lastException = Exception("Model $modelName timed out after ${PER_MODEL_TIMEOUT_MS}ms")
-                Log.w(TAG, "Model $modelName timed out after ${PER_MODEL_TIMEOUT_MS}ms. Failing over immediately to next model in cascade...")
-            } catch (e: Exception) {
-                lastException = e
-                Log.w(TAG, "Model $modelName failed: ${e.message}. Failing over immediately to next model in cascade...")
+
+                val error = outcome.exceptionOrNull() as? Exception
+                    ?: Exception("Model $modelName returned an empty response")
+                lastException = error
+                val kind = classifyError(error)
+                Log.w(TAG, "Model $modelName attempt ${attempt + 1} failed ($kind): ${error.message}")
+
+                when (kind) {
+                    ErrorKind.BUSY -> continue
+                    ErrorKind.FATAL -> throw Exception(sanitizeError(error), error)
+                    ErrorKind.RATE_LIMITED, ErrorKind.MODEL_UNAVAILABLE, ErrorKind.OTHER -> break
+                }
             }
         }
 
-        // If all models in the cascade failed, throw a sanitized exception
-        val sanitizedMessage = sanitizeError(lastException)
-        throw Exception(sanitizedMessage, lastException)
+        throw Exception(sanitizeError(lastException), lastException)
     }
 
-    private fun isRecoverableError(e: Exception): Boolean {
-        val msg = e.message ?: ""
-        // Non-recoverable on the same model - failover immediately to next model
-        if (msg.contains("404", ignoreCase = true) ||
-            msg.contains("NOT_FOUND", ignoreCase = true) ||
-            msg.contains("no longer available", ignoreCase = true)) {
-            return false
+    fun classifyError(e: Throwable): ErrorKind {
+        // The SDK reports most failures as typed exceptions whose message is just Google's
+        // text (e.g. "The model is overloaded."), so check the type names along the cause chain too.
+        val chain = generateSequence(e) { it.cause }.take(5).toList()
+        val types = chain.joinToString(" ") { it.javaClass.simpleName }
+        val msg = chain.joinToString(" ") { it.message ?: "" }
+
+        fun has(vararg needles: String) = needles.any { msg.contains(it, ignoreCase = true) }
+
+        return when {
+            types.contains("InvalidAPIKeyException") ||
+            types.contains("PromptBlockedException") ||
+            types.contains("UnsupportedUserLocationException") ||
+            has("API key not valid", "API_KEY_INVALID", "PERMISSION_DENIED", "INVALID_ARGUMENT") -> ErrorKind.FATAL
+
+            types.contains("QuotaExceededException") ||
+            has("429", "RESOURCE_EXHAUSTED", "quota", "rate limit") -> ErrorKind.RATE_LIMITED
+
+            has("404", "NOT_FOUND", "is not found", "no longer available") -> ErrorKind.MODEL_UNAVAILABLE
+
+            types.contains("RequestTimeoutException") ||
+            has("503", "UNAVAILABLE", "overloaded", "high demand", "try again later",
+                "INTERNAL", "timed out", "timeout") -> ErrorKind.BUSY
+
+            types.contains("ServerException") -> ErrorKind.BUSY
+
+            else -> ErrorKind.OTHER
         }
-        return msg.contains("503", ignoreCase = true) ||
-                msg.contains("UNAVAILABLE", ignoreCase = true) ||
-                msg.contains("high demand", ignoreCase = true) ||
-                msg.contains("timeout", ignoreCase = true)
     }
 
     fun sanitizeError(e: Throwable?): String {
         if (e == null) return "AI service is currently busy. Please try again shortly."
         val msg = e.localizedMessage ?: e.message ?: ""
 
-        return when {
-            msg.contains("503", ignoreCase = true) ||
-            msg.contains("UNAVAILABLE", ignoreCase = true) ||
-            msg.contains("high demand", ignoreCase = true) -> {
-                "AI servers are currently experiencing high demand. Please try again shortly."
+        // Already a friendly message from runWithFailover: pass it through unchanged.
+        if (msg in FRIENDLY_MESSAGES) return msg
+
+        return when (classifyError(e)) {
+            ErrorKind.BUSY -> {
+                if (msg.contains("timed out", ignoreCase = true) || msg.contains("timeout", ignoreCase = true)) {
+                    "The AI took too long to respond. Please check your connection and try again."
+                } else {
+                    "AI servers are currently experiencing high demand. Please try again shortly."
+                }
             }
-            msg.contains("429", ignoreCase = true) ||
-            msg.contains("quota", ignoreCase = true) ||
-            msg.contains("exhausted", ignoreCase = true) -> {
-                "Quota exceeded. Please check your Gemini API key in Settings."
+            ErrorKind.RATE_LIMITED -> "You've hit your Gemini key's usage limit. Please wait a minute and try again."
+            ErrorKind.FATAL -> {
+                val chain = generateSequence(e) { it.cause }.take(5).toList()
+                val isKeyProblem = chain.any {
+                    it.javaClass.simpleName == "InvalidAPIKeyException" ||
+                        (it.message ?: "").contains("API key", ignoreCase = true) ||
+                        (it.message ?: "").contains("API_KEY", ignoreCase = true) ||
+                        (it.message ?: "").contains("PERMISSION_DENIED", ignoreCase = true)
+                }
+                if (isKeyProblem) "Invalid API Key. Please update your API key in Settings."
+                else "The AI couldn't process this request. Please rephrase and try again."
             }
-            msg.contains("API key", ignoreCase = true) ||
-            msg.contains("invalid", ignoreCase = true) ||
-            msg.contains("400", ignoreCase = true) -> {
-                "Invalid API Key. Please update your API key in Settings."
-            }
-            msg.contains("network", ignoreCase = true) ||
-            msg.contains("timeout", ignoreCase = true) ||
-            msg.contains("connect", ignoreCase = true) -> {
-                "Connection timeout. Please check your internet connection."
-            }
-            else -> {
-                "AI service is temporarily busy. Please try again."
+            else -> when {
+                msg.contains("network", ignoreCase = true) ||
+                msg.contains("connect", ignoreCase = true) ||
+                msg.contains("host", ignoreCase = true) -> "Connection problem. Please check your internet connection."
+                else -> "AI service is temporarily busy. Please try again."
             }
         }
     }
+
+    private val FRIENDLY_MESSAGES = setOf(
+        "AI servers are currently experiencing high demand. Please try again shortly.",
+        "The AI took too long to respond. Please check your connection and try again.",
+        "You've hit your Gemini key's usage limit. Please wait a minute and try again.",
+        "Invalid API Key. Please update your API key in Settings.",
+        "The AI couldn't process this request. Please rephrase and try again.",
+        "Connection problem. Please check your internet connection.",
+        "AI service is temporarily busy. Please try again.",
+        "AI service is currently busy. Please try again shortly."
+    )
 }

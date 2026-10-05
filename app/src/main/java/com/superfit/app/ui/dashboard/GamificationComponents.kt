@@ -74,7 +74,7 @@ fun StreakHeaderCard(
             }
 
             if (streakState.graceDaysRemaining == 0 && streakState.currentStreak > 0) {
-                // Grace day was consumed to protect the streak!
+                // Yesterday was missed: the grace day is holding the streak until a meal is logged today
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = CoralRed.copy(alpha = 0.15f)
@@ -91,7 +91,7 @@ fun StreakHeaderCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Grace Used",
+                            text = "Log today to keep it",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = CoralRed,
