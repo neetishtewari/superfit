@@ -6,6 +6,9 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.google.firebase.Firebase
+import com.google.firebase.appcheck.appCheck
+import com.google.firebase.initialize
 import com.superfit.app.data.TelemetrySyncWorker
 import com.superfit.app.data.DailyReminderWorker
 import java.util.concurrent.TimeUnit
@@ -14,8 +17,21 @@ class SuperfitApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installAppCheck()
         scheduleTelemetrySync()
         scheduleDailyReminder()
+    }
+
+    // App Check lets Firebase reject requests that don't come from the real Superfit app, which
+    // protects the Gemini calls billed to Superfit's Firebase project. It must be installed
+    // before any Firebase call is made.
+    private fun installAppCheck() {
+        try {
+            Firebase.initialize(this)
+            Firebase.appCheck.installAppCheckProviderFactory(AppCheckProviders.factory())
+        } catch (e: Exception) {
+            android.util.Log.e("SuperfitApplication", "App Check setup failed", e)
+        }
     }
 
     private fun scheduleTelemetrySync() {

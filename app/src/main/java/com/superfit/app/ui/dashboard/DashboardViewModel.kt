@@ -9,8 +9,6 @@ import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.WorkoutParser
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.MacroTargets
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.content
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.GeminiClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -100,10 +98,6 @@ class DashboardViewModel(
         _chatMessages.value = _chatMessages.value + userMsg
         
         val key = _apiKey.value
-        if (key.isBlank()) {
-            _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, "Error: Please enter your Gemini API Key in Settings first.")
-            return
-        }
 
         val currentState = dashboardState.value
         if (currentState !is DashboardUiState.Success) {
@@ -170,19 +164,15 @@ class DashboardViewModel(
                 """.trimIndent()
 
                 val history = _chatMessages.value.dropLast(1).map { msg ->
-                    content(role = if (msg.sender == MessageSender.User) "user" else "model") {
-                        text(msg.text)
-                    }
+                    GeminiClient.ChatTurn(fromUser = msg.sender == MessageSender.User, text = msg.text)
                 }
 
-                val coachResponseText = GeminiClient.runWithFailover { modelName ->
-                    val model = GenerativeModel(
-                        modelName = modelName,
-                        apiKey = key,
-                        systemInstruction = content { text(systemInstructionText) }
-                    )
-                    model.startChat(history = history).sendMessage(text).text
-                }
+                val coachResponseText = GeminiClient.chat(
+                    apiKey = key,
+                    systemInstructionText = systemInstructionText,
+                    history = history,
+                    message = text
+                )
                 _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, coachResponseText)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Chat message failed", e)
@@ -392,10 +382,6 @@ class DashboardViewModel(
 
     fun parseAndAddMeal(input: String) {
         val key = _apiKey.value
-        if (key.isBlank()) {
-            _parsingState.value = ParsingState.Error("Please enter your Gemini API Key in Settings first.")
-            return
-        }
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
@@ -441,10 +427,6 @@ class DashboardViewModel(
 
     fun parseAndAddWorkout(input: String, difficultyRating: String = "JUST_RIGHT") {
         val key = _apiKey.value
-        if (key.isBlank()) {
-            _workoutParsingState.value = ParsingState.Error("Please enter your Gemini API Key in Settings first.")
-            return
-        }
 
         viewModelScope.launch {
             _workoutParsingState.value = ParsingState.Loading
@@ -504,10 +486,6 @@ class DashboardViewModel(
 
     fun refreshCoachingInsight() {
         val key = _apiKey.value
-        if (key.isBlank()) {
-            _coachingState.value = CoachingInsightState.Error("Please enter your Gemini API Key in Settings first.")
-            return
-        }
 
         val currentState = dashboardState.value
         if (currentState !is DashboardUiState.Success) {

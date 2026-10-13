@@ -73,7 +73,7 @@ fun OnboardingScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     
-    // Wizard step state (0 to 6)
+    // Wizard step state (0 to 4)
     var currentStep by remember { mutableIntStateOf(0) }
     var validationError by remember { mutableStateOf<String?>(null) }
     var voiceGuideEnabled by remember { mutableStateOf(true) }
@@ -108,9 +108,7 @@ fun OnboardingScreen(
             1 to "Let's enter your essential stats so we can calculate your resting metabolism.",
             2 to "Awesome! Now, select your baseline activity level and fitness goals. We'll use these to find your daily energy budget.",
             3 to "Great. Now, let's sync your daily steps and sleep telemetry locally. Tap connect to auto-fill your physical details in one tap.",
-            4 to "Let's configure your AI helper. Set up your free Gemini key to enable voice logging. It's super simple, completely free, and your key stays one hundred percent secure on your device. Note that this key is required to activate the assistant.",
-            5 to "Perfect. Let's grant microphone access so you can speak your meals and workouts directly to your AI companion.",
-            6 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
+            4 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
         )
     }
 
@@ -160,35 +158,6 @@ fun OnboardingScreen(
             viewModel.autofillFromHealthConnect()
             currentStep = 4
         }
-    }
-
-    // Microphone Permission Launcher
-    val micPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        viewModel.onMicPermissionStateChanged(isGranted)
-        if (isGranted) {
-            currentStep = 6
-        } else {
-            Toast.makeText(context, "Opening Settings to grant microphone permission...", Toast.LENGTH_LONG).show()
-            try {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                }
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Please open Settings and grant microphone permissions manually.", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    // Auto check permissions on entry
-    LaunchedEffect(Unit) {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        viewModel.onMicPermissionStateChanged(hasPermission)
     }
 
     Box(
@@ -314,7 +283,7 @@ fun OnboardingScreen(
 
             // Segmented progress indicator bar
             val animatedProgress by animateFloatAsState(
-                targetValue = (currentStep + 1) / 7f,
+                targetValue = (currentStep + 1) / 5f,
                 label = "progressBarGlow"
             )
             Box(
@@ -399,26 +368,7 @@ fun OnboardingScreen(
                                 requestPermissionsLauncher = requestPermissionsLauncher,
                                 onNext = { currentStep = 4 }
                             )
-                            4 -> GeminiApiKeyStep(
-                                uiState = uiState,
-                                viewModel = viewModel,
-                                validationError = validationError,
-                                onNext = {
-                                    val trimmed = uiState.apiKey.trim()
-                                    if (trimmed.isEmpty() || (!trimmed.startsWith("AIzaSy") && !trimmed.startsWith("AQ."))) {
-                                        validationError = "Please enter a valid Gemini API Key starting with 'AIzaSy' or 'AQ.'."
-                                    } else {
-                                        validationError = null
-                                        currentStep = 5
-                                    }
-                                }
-                            )
-                            5 -> MicrophonePermissionStep(
-                                uiState = uiState,
-                                micPermissionLauncher = micPermissionLauncher,
-                                onNext = { currentStep = 6 }
-                            )
-                            6 -> OnboardingSummaryStep(
+                            4 -> OnboardingSummaryStep(
                                 uiState = uiState,
                                 onStartClick = { viewModel.saveProfile(onOnboardingComplete) }
                             )

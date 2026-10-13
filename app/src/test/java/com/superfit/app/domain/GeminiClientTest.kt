@@ -19,6 +19,7 @@ class GeminiClientTest {
     private class ServerException(message: String) : Exception(message)
     private class QuotaExceededException(message: String) : Exception(message)
     private class InvalidAPIKeyException(message: String) : Exception(message)
+    private class ServiceDisabledException(message: String) : Exception(message)
 
     private val models = listOf("model-a", "model-b")
 
@@ -83,5 +84,20 @@ class GeminiClientTest {
         assertEquals(GeminiClient.ErrorKind.RATE_LIMITED, GeminiClient.classifyError(QuotaExceededException("Quota exceeded")))
         assertEquals(GeminiClient.ErrorKind.MODEL_UNAVAILABLE, GeminiClient.classifyError(Exception("models/x is not found for API version v1beta")))
         assertEquals(GeminiClient.ErrorKind.FATAL, GeminiClient.classifyError(InvalidAPIKeyException("bad key")))
+    }
+
+    @Test
+    fun `Firebase AI being switched off stops at once without blaming the user's key`() = runTest {
+        var callCount = 0
+        try {
+            GeminiClient.runWithFailover(models) {
+                callCount++
+                throw ServiceDisabledException("Firebase AI Logic API has not been used in project superfit before or it is disabled.")
+            }
+            fail("expected an exception")
+        } catch (e: Exception) {
+            assertEquals("The AI assistant is unavailable right now. Please try again later.", e.message)
+        }
+        assertEquals(1, callCount)
     }
 }

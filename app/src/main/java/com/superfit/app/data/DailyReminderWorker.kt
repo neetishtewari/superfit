@@ -69,68 +69,61 @@ class DailyReminderWorker(
         } else {
             // Log is complete -> Send Daily AI Coaching Summary
             val apiKey = GeminiKeyStore(applicationContext).get()
-            if (apiKey.isBlank()) {
+            try {
+                val activity = database.telemetryDao().getActivity(today.toString()) 
+                    ?: com.superfit.app.data.ActivityTelemetryEntity(today.toString(), 0, 0.0)
+                val sleep = database.telemetryDao().getSleep(today.toString())
+
+                val bmr = if (profile != null) PhysiologyEngine.calculateBmr(profile) else 1500.0
+                val tdee = if (profile != null) PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier) else 2000.0
+                val targets = if (profile != null) {
+                    PhysiologyEngine.calculateMacroTargets(profile, tdee, sleep?.readinessScore ?: 50)
+                } else {
+                    MacroTargets(2000.0, 130.0, 200.0, 70.0)
+                }
+
+                val proteinEaten = entries.sumOf { it.proteinG }
+                val carbsEaten = entries.sumOf { it.carbsG }
+                val fatEaten = entries.sumOf { it.fatG }
+
+                val historyNutrition = database.nutritionDao().getAllEntries()
+                val historyWorkouts = database.workoutDao().getAllEntries()
+                val historyActivity = database.telemetryDao().getAllActivity()
+                val historySleep = database.telemetryDao().getAllSleep()
+
+                val coachingEngine = CoachingEngine(apiKey)
+                val insight = coachingEngine.generateDailyInsight(
+                    profile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2),
+                    activity = activity,
+                    sleep = sleep,
+                    nutrition = entries,
+                    macroTargets = targets,
+                    caloriesEaten = totalCalories,
+                    proteinEaten = proteinEaten,
+                    carbsEaten = carbsEaten,
+                    fatEaten = fatEaten,
+                    historyNutrition = historyNutrition,
+                    historyWorkouts = historyWorkouts,
+                    historyActivity = historyActivity,
+                    historySleep = historySleep
+                )
+
+                // Cache generated insight in shared prefs for dashboard
+                sharedPrefs.edit()
+                    .putString("coaching_insight_date", today.toString())
+                    .putString("coaching_insight_text", insight)
+                    .apply()
+
+                sendNotification(
+                    title = "⚡ Daily AI Coaching Insight",
+                    text = insight
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("DailyReminderWorker", "AI Coaching notification generation failed", e)
                 sendNotification(
                     title = "⚡ Daily Focus Complete",
-                    text = "You've successfully hit your calorie targets today (${totalCalories.toInt()} kcal)! Make sure to prioritize sleep tonight for recovery."
+                    text = "You've successfully hit your calorie targets today (${totalCalories.toInt()} kcal)! Prioritize sleep tonight for recovery."
                 )
-            } else {
-                try {
-                    val activity = database.telemetryDao().getActivity(today.toString()) 
-                        ?: com.superfit.app.data.ActivityTelemetryEntity(today.toString(), 0, 0.0)
-                    val sleep = database.telemetryDao().getSleep(today.toString())
-
-                    val bmr = if (profile != null) PhysiologyEngine.calculateBmr(profile) else 1500.0
-                    val tdee = if (profile != null) PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier) else 2000.0
-                    val targets = if (profile != null) {
-                        PhysiologyEngine.calculateMacroTargets(profile, tdee, sleep?.readinessScore ?: 50)
-                    } else {
-                        MacroTargets(2000.0, 130.0, 200.0, 70.0)
-                    }
-
-                    val proteinEaten = entries.sumOf { it.proteinG }
-                    val carbsEaten = entries.sumOf { it.carbsG }
-                    val fatEaten = entries.sumOf { it.fatG }
-
-                    val historyNutrition = database.nutritionDao().getAllEntries()
-                    val historyWorkouts = database.workoutDao().getAllEntries()
-                    val historyActivity = database.telemetryDao().getAllActivity()
-                    val historySleep = database.telemetryDao().getAllSleep()
-
-                    val coachingEngine = CoachingEngine(apiKey)
-                    val insight = coachingEngine.generateDailyInsight(
-                        profile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2),
-                        activity = activity,
-                        sleep = sleep,
-                        nutrition = entries,
-                        macroTargets = targets,
-                        caloriesEaten = totalCalories,
-                        proteinEaten = proteinEaten,
-                        carbsEaten = carbsEaten,
-                        fatEaten = fatEaten,
-                        historyNutrition = historyNutrition,
-                        historyWorkouts = historyWorkouts,
-                        historyActivity = historyActivity,
-                        historySleep = historySleep
-                    )
-
-                    // Cache generated insight in shared prefs for dashboard
-                    sharedPrefs.edit()
-                        .putString("coaching_insight_date", today.toString())
-                        .putString("coaching_insight_text", insight)
-                        .apply()
-
-                    sendNotification(
-                        title = "⚡ Daily AI Coaching Insight",
-                        text = insight
-                    )
-                } catch (e: Exception) {
-                    android.util.Log.e("DailyReminderWorker", "AI Coaching notification generation failed", e)
-                    sendNotification(
-                        title = "⚡ Daily Focus Complete",
-                        text = "You've successfully hit your calorie targets today (${totalCalories.toInt()} kcal)! Prioritize sleep tonight for recovery."
-                    )
-                }
             }
         }
 

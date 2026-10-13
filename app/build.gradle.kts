@@ -147,7 +147,7 @@ dependencies {
   // Google Health Connect
   implementation(libs.androidx.health.connect)
 
-  // Google AI (Gemini) SDK
+  // Google AI (Gemini) SDK, used only when someone adds their own Gemini key in Settings
   implementation(libs.google.generativeai)
 
   // Firebase
@@ -155,5 +155,9 @@ dependencies {
   implementation(libs.firebase.auth)
   implementation(libs.play.services.auth)
   implementation(libs.firebase.firestore)
+  // Gemini through Firebase AI Logic (billed to Superfit's Firebase project), protected by App Check
+  implementation(libs.firebase.ai)
+  implementation(libs.firebase.appcheck.playintegrity)
+  debugImplementation(libs.firebase.appcheck.debug)
 }
 

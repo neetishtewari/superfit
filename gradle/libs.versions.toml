@@ -18,7 +18,7 @@ room = "2.7.0"
 work = "2.9.0"
 healthConnect = "1.1.0-alpha11"
 generativeai = "0.9.0"
-firebaseBom = "33.1.0"
+firebaseBom = "34.19.0"
 googleServices = "4.4.2"
 playServicesAuth = "21.2.0"
 material = "1.12.0"
@@ -62,13 +62,16 @@ androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref
 # Google Health Connect
 androidx-health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 
-# Google AI (Gemini) SDK
+# Google AI (Gemini) SDK, used only when someone adds their own Gemini key in Settings
 google-generativeai = { module = "com.google.ai.client.generativeai:generativeai", version.ref = "generativeai" }
 
 # Firebase
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+firebase-ai = { module = "com.google.firebase:firebase-ai" }
+firebase-appcheck-playintegrity = { module = "com.google.firebase:firebase-appcheck-playintegrity" }
+firebase-appcheck-debug = { module = "com.google.firebase:firebase-appcheck-debug" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 
 

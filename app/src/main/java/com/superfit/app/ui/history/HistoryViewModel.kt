@@ -354,10 +354,6 @@ class HistoryViewModel(
 
     fun parseAndAddMeal(input: String) {
         val key = geminiKeyStore.get()
-        if (key.isBlank()) {
-            _parsingState.value = HistoryParsingState.Error("Please enter your Gemini API Key in Settings first.")
-            return
-        }
 
         viewModelScope.launch {
             _parsingState.value = HistoryParsingState.Loading
