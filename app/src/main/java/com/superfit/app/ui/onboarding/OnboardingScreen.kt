@@ -76,7 +76,8 @@ fun OnboardingScreen(
     // Wizard step state (0 to 4)
     var currentStep by remember { mutableIntStateOf(0) }
     var validationError by remember { mutableStateOf<String?>(null) }
-    var voiceGuideEnabled by remember { mutableStateOf(true) }
+    // Spoken guidance is opt-in: it starts off and the "Voice" chip turns it on.
+    var voiceGuideEnabled by remember { mutableStateOf(false) }
     
     // Tooltip / Cheat Sheet dialog states
     var showHeightHelper by remember { mutableStateOf(false) }
