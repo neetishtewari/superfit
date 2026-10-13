@@ -100,4 +100,19 @@ class GeminiClientTest {
         }
         assertEquals(1, callCount)
     }
+
+    @Test
+    fun `rejected App Check token stops at once instead of retrying as busy`() = runTest {
+        var callCount = 0
+        try {
+            GeminiClient.runWithFailover(models) {
+                callCount++
+                throw ServerException("Firebase App Check token is invalid.")
+            }
+            fail("expected an exception")
+        } catch (e: Exception) {
+            assertEquals("The AI assistant is unavailable right now. Please try again later.", e.message)
+        }
+        assertEquals(1, callCount)
+    }
 }

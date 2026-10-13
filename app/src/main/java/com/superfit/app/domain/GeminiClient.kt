@@ -276,6 +276,7 @@ object GeminiClient {
             types.contains("PromptBlockedException") ||
             types.contains("UnsupportedUserLocationException") ||
             types.contains("ServiceDisabledException") ||
+            has("App Check", "attestation") ||
             has("API key not valid", "API_KEY_INVALID", "PERMISSION_DENIED", "INVALID_ARGUMENT") -> ErrorKind.FATAL
 
             types.contains("QuotaExceededException") ||
@@ -317,7 +318,13 @@ object GeminiClient {
                         (it.message ?: "").contains("API_KEY", ignoreCase = true) ||
                         (it.message ?: "").contains("PERMISSION_DENIED", ignoreCase = true)
                 }
-                val isServiceProblem = chain.any { it.javaClass.simpleName == "ServiceDisabledException" }
+                // A disabled Firebase AI service or a rejected App Check token: the user can't fix
+                // either by rephrasing or retrying.
+                val isServiceProblem = chain.any {
+                    it.javaClass.simpleName == "ServiceDisabledException" ||
+                        (it.message ?: "").contains("App Check", ignoreCase = true) ||
+                        (it.message ?: "").contains("attestation", ignoreCase = true)
+                }
                 when {
                     isServiceProblem -> AI_UNAVAILABLE_MESSAGE
                     isKeyProblem -> INVALID_KEY_MESSAGE
