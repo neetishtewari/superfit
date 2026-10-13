@@ -13,13 +13,7 @@ class OnboardingViewModel(
     context: android.content.Context
 ) : ViewModel() {
 
-    private val geminiKeyStore = GeminiKeyStore(context)
-
-    private val _uiState = MutableStateFlow(
-        OnboardingUiState(
-            apiKey = geminiKeyStore.get()
-        )
-    )
+    private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     init {
@@ -101,14 +95,6 @@ class OnboardingViewModel(
         }
     }
 
-    fun onApiKeyChanged(key: String) {
-        _uiState.value = _uiState.value.copy(apiKey = key)
-    }
-
-    fun onMicPermissionStateChanged(granted: Boolean) {
-        _uiState.value = _uiState.value.copy(isMicPermissionGranted = granted)
-    }
-
     fun saveProfile(onSuccess: () -> Unit) {
         val state = _uiState.value
         val ageInt = state.age.toIntOrNull()
@@ -127,17 +113,9 @@ class OnboardingViewModel(
             _uiState.value = _uiState.value.copy(error = "Please enter a valid weight in kg.")
             return
         }
-        val trimmedKey = state.apiKey.trim()
-        if (trimmedKey.isBlank() || (!trimmedKey.startsWith("AIzaSy") && !trimmedKey.startsWith("AQ."))) {
-            _uiState.value = _uiState.value.copy(error = "Please enter a valid Gemini API Key starting with 'AIzaSy' or 'AQ.'.")
-            return
-        }
 
         viewModelScope.launch {
             try {
-                // Persist the API Key configured by the user (trimmed to prevent spaces/newlines causing exceptions)
-                geminiKeyStore.set(trimmedKey)
-
                 val profile = UserProfileEntity(
                     id = 0,
                     age = ageInt,
@@ -168,7 +146,5 @@ data class OnboardingUiState(
     val hasHealthConnectPermissions: Boolean = false,
     val grantedPermissions: Set<String> = emptySet(),
     val isAutofilling: Boolean = false,
-    val apiKey: String = "",
-    val isMicPermissionGranted: Boolean = false,
     val error: String? = null
 )

@@ -48,8 +48,7 @@ fun MainNavigation(
             startDestination = Login
         } else {
             val localProfile = repository.getProfile()
-            val hasApiKey = GeminiKeyStore(context).hasKey()
-            if (localProfile != null && hasApiKey) {
+            if (localProfile != null) {
                 startDestination = Dashboard
             } else {
                 // If local database was wiped but user is logged in, attempt to restore from Firestore
@@ -59,8 +58,7 @@ fun MainNavigation(
                     e.printStackTrace()
                 }
                 val hasProfile = repository.getProfile() != null
-                val hasApiKeyAfterSync = GeminiKeyStore(context).hasKey()
-                startDestination = if (hasProfile && hasApiKeyAfterSync) Dashboard else Onboarding
+                startDestination = if (hasProfile) Dashboard else Onboarding
             }
         }
     }
@@ -93,9 +91,8 @@ fun MainNavigation(
                                 e.printStackTrace()
                             }
                             val hasProfile = repository.getProfile() != null
-                            val hasApiKey = GeminiKeyStore(context).hasKey()
                             backStack.removeLastOrNull()
-                            if (hasProfile && hasApiKey) {
+                            if (hasProfile) {
                                 backStack.add(Dashboard)
                             } else {
                                 backStack.add(Onboarding)

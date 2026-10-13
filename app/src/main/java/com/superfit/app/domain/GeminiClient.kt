@@ -4,11 +4,21 @@ import android.util.Log
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * All Gemini calls go through here.
+ *
+ * With no key of the user's own (the normal case), requests go through Firebase AI Logic and are
+ * billed to Superfit's Firebase project, protected by App Check. If someone has added their own
+ * Gemini key in Settings, requests go straight to Google with that key instead.
+ */
 object GeminiClient {
 
     private const val TAG = "GeminiClient"
@@ -46,6 +56,10 @@ object GeminiClient {
     // Cache GenerativeModel instances to maintain warm HTTP/2 & TLS connection pools.
     // The key includes the API key so a changed key takes effect immediately.
     private val modelCache = ConcurrentHashMap<String, GenerativeModel>()
+    private val firebaseModelCache = ConcurrentHashMap<String, com.google.firebase.ai.GenerativeModel>()
+
+    /** One message in a coach conversation, for [chat]. */
+    data class ChatTurn(val fromUser: Boolean, val text: String)
 
     enum class ErrorKind {
         /** Server overloaded / unavailable or timed out: wait and retry the same model. */
@@ -83,17 +97,98 @@ object GeminiClient {
         }
     }
 
+    private fun getOrCreateFirebaseModel(
+        modelName: String,
+        systemInstructionText: String?,
+        isJson: Boolean
+    ): com.google.firebase.ai.GenerativeModel {
+        val cacheKey = "$modelName:${systemInstructionText?.hashCode() ?: 0}:$isJson"
+        return firebaseModelCache.getOrPut(cacheKey) {
+            buildFirebaseModel(modelName, systemInstructionText, isJson)
+        }
+    }
+
+    private fun buildFirebaseModel(
+        modelName: String,
+        systemInstructionText: String?,
+        isJson: Boolean
+    ): com.google.firebase.ai.GenerativeModel =
+        Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
+            modelName = modelName,
+            generationConfig = com.google.firebase.ai.type.generationConfig {
+                if (isJson) {
+                    responseMimeType = "application/json"
+                }
+            },
+            systemInstruction = if (systemInstructionText != null) {
+                com.google.firebase.ai.type.content { text(systemInstructionText) }
+            } else null
+        )
+
     /**
      * Executes generation with retries and an automatic multi-model failover cascade.
+     * A blank [apiKey] means "use Superfit's own AI access through Firebase".
      */
     suspend fun generateContent(
         apiKey: String,
         prompt: String,
         systemInstructionText: String? = null,
         isJson: Boolean = true
-    ): String = runWithFailover { modelName ->
-        val model = getOrCreateModel(modelName, apiKey, systemInstructionText, isJson)
-        model.generateContent(prompt).text
+    ): String = withFirebaseWording(apiKey) {
+        runWithFailover { modelName ->
+            if (apiKey.isBlank()) {
+                getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(prompt).text
+            } else {
+                getOrCreateModel(modelName, apiKey, systemInstructionText, isJson).generateContent(prompt).text
+            }
+        }
+    }
+
+    /**
+     * Sends [message] in a coach conversation that already contains [history], with the same
+     * retries and failover as [generateContent]. A blank [apiKey] uses Firebase.
+     */
+    suspend fun chat(
+        apiKey: String,
+        systemInstructionText: String,
+        history: List<ChatTurn>,
+        message: String
+    ): String = withFirebaseWording(apiKey) {
+        runWithFailover { modelName ->
+            if (apiKey.isBlank()) {
+                // Not cached: the coach's instructions carry today's live numbers, so they change often.
+                val model = buildFirebaseModel(modelName, systemInstructionText, isJson = false)
+                val firebaseHistory = history.map { turn ->
+                    com.google.firebase.ai.type.content(role = if (turn.fromUser) "user" else "model") { text(turn.text) }
+                }
+                model.startChat(history = firebaseHistory).sendMessage(message).text
+            } else {
+                val model = GenerativeModel(
+                    modelName = modelName,
+                    apiKey = apiKey,
+                    systemInstruction = content { text(systemInstructionText) }
+                )
+                val keyHistory = history.map { turn ->
+                    content(role = if (turn.fromUser) "user" else "model") { text(turn.text) }
+                }
+                model.startChat(history = keyHistory).sendMessage(message).text
+            }
+        }
+    }
+
+    /**
+     * People using Superfit's own AI access have no key to fix, so a refused request
+     * (for example an App Check rejection) must not tell them to update their API key.
+     */
+    private suspend fun withFirebaseWording(apiKey: String, block: suspend () -> String): String {
+        if (apiKey.isNotBlank()) return block()
+        return try {
+            block()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (e.message == INVALID_KEY_MESSAGE) throw Exception(AI_UNAVAILABLE_MESSAGE, e) else throw e
+        }
     }
 
     /**
@@ -180,6 +275,8 @@ object GeminiClient {
             types.contains("InvalidAPIKeyException") ||
             types.contains("PromptBlockedException") ||
             types.contains("UnsupportedUserLocationException") ||
+            types.contains("ServiceDisabledException") ||
+            has("App Check", "attestation") ||
             has("API key not valid", "API_KEY_INVALID", "PERMISSION_DENIED", "INVALID_ARGUMENT") -> ErrorKind.FATAL
 
             types.contains("QuotaExceededException") ||
@@ -212,7 +309,7 @@ object GeminiClient {
                     "AI servers are currently experiencing high demand. Please try again shortly."
                 }
             }
-            ErrorKind.RATE_LIMITED -> "You've hit your Gemini key's usage limit. Please wait a minute and try again."
+            ErrorKind.RATE_LIMITED -> "Too many AI requests right now. Please wait a minute and try again."
             ErrorKind.FATAL -> {
                 val chain = generateSequence(e) { it.cause }.take(5).toList()
                 val isKeyProblem = chain.any {
@@ -221,8 +318,18 @@ object GeminiClient {
                         (it.message ?: "").contains("API_KEY", ignoreCase = true) ||
                         (it.message ?: "").contains("PERMISSION_DENIED", ignoreCase = true)
                 }
-                if (isKeyProblem) "Invalid API Key. Please update your API key in Settings."
-                else "The AI couldn't process this request. Please rephrase and try again."
+                // A disabled Firebase AI service or a rejected App Check token: the user can't fix
+                // either by rephrasing or retrying.
+                val isServiceProblem = chain.any {
+                    it.javaClass.simpleName == "ServiceDisabledException" ||
+                        (it.message ?: "").contains("App Check", ignoreCase = true) ||
+                        (it.message ?: "").contains("attestation", ignoreCase = true)
+                }
+                when {
+                    isServiceProblem -> AI_UNAVAILABLE_MESSAGE
+                    isKeyProblem -> INVALID_KEY_MESSAGE
+                    else -> "The AI couldn't process this request. Please rephrase and try again."
+                }
             }
             else -> when {
                 msg.contains("network", ignoreCase = true) ||
@@ -233,11 +340,15 @@ object GeminiClient {
         }
     }
 
+    private const val INVALID_KEY_MESSAGE = "Invalid API Key. Please update your API key in Settings."
+    private const val AI_UNAVAILABLE_MESSAGE = "The AI assistant is unavailable right now. Please try again later."
+
     private val FRIENDLY_MESSAGES = setOf(
+        AI_UNAVAILABLE_MESSAGE,
         "AI servers are currently experiencing high demand. Please try again shortly.",
         "The AI took too long to respond. Please check your connection and try again.",
-        "You've hit your Gemini key's usage limit. Please wait a minute and try again.",
-        "Invalid API Key. Please update your API key in Settings.",
+        "Too many AI requests right now. Please wait a minute and try again.",
+        INVALID_KEY_MESSAGE,
         "The AI couldn't process this request. Please rephrase and try again.",
         "Connection problem. Please check your internet connection.",
         "AI service is temporarily busy. Please try again.",

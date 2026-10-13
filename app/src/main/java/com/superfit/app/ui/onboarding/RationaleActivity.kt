@@ -132,7 +132,7 @@ fun RationaleScreen(
                         color = textPrimary
                     )
                     Text(
-                        text = "To build a complete physiological ledger, Superfit reads specific health statistics. This allows our offline AI engine to adjust your daily target macronutrients based on real-time activity and sleep telemetry.",
+                        text = "To build a complete physiological ledger, Superfit reads specific health statistics. This allows Superfit's AI coach (powered by Google Gemini) to adjust your daily target macronutrients based on real-time activity and sleep telemetry.",
                         fontSize = 14.sp,
                         color = textSecondary,
                         lineHeight = 20.sp
@@ -227,7 +227,7 @@ fun RationaleScreen(
             }
             
             Text(
-                text = "Superfit strictly complies with Google Play Health Connect developer policies. Your data is stored locally and is never uploaded to any remote servers.",
+                text = "Superfit complies with Google Play Health Connect developer policies. Your data is stored on your phone and backed up to your private Superfit account (Google Firebase). To create your coaching insights, a summary of your recent activity, sleep and meals is sent to Google's Gemini AI.",
                 fontSize = 11.sp,
                 color = textTertiary,
                 textAlign = TextAlign.Center,

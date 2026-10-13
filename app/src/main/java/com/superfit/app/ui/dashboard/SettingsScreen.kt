@@ -154,7 +154,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Gemini API Configuration",
+                        text = "Your own Gemini key (optional)",
                         fontWeight = FontWeight.Bold,
                         color = SuperfitTheme.colors.textPrimary,
                         fontSize = 14.sp
@@ -189,11 +189,10 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = "🔒 Security & Cost Details:\n" +
-                               "• Stored securely on-device (never sent to our servers).\n" +
-                               "• Transmitted directly to Google's official Gemini API endpoints.\n" +
-                               "• Google AI Studio keys are 100% free with no credit card or billing details required.\n" +
-                               "If the default key has exceeded its quota, providing your own key restores full natural language features.",
+                        text = "Superfit's AI works without a key. If you add your own Google AI Studio key, " +
+                               "AI requests go straight to Google using your key instead.\n" +
+                               "• Your key is stored only on this phone and is never sent to Superfit.\n" +
+                               "• Leave this empty to use Superfit's built-in AI.",
                         fontSize = 11.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )
@@ -820,7 +819,7 @@ fun SettingsScreen(
                             fontSize = 14.sp
                         )
                         Text(
-                            text = "Preview and test the onboarding flow (Health Connect settings, microphone permissions, BMR configuration, and Gemini key setups) for new users. Your existing meal and workout history will not be lost.",
+                            text = "Preview and test the onboarding flow (body stats, goals and Health Connect) for new users. Your existing meal and workout history will not be lost.",
                             fontSize = 11.sp,
                             color = SuperfitTheme.colors.textSecondary
                         )
