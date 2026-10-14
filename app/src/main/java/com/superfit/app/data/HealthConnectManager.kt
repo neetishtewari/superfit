@@ -44,14 +44,23 @@ class HealthConnectManager(private val context: Context) {
         return granted.containsAll(permissions)
     }
 
-    suspend fun readDailyTelemetry(localDate: LocalDate): ActivityTelemetryEntity {
-        val client = healthConnectClient ?: return ActivityTelemetryEntity(localDate.toString(), 0, 0.0)
-        
+    /**
+     * Returns null when Health Connect refuses or fails the steps read (for example when called
+     * from the background), so callers keep the last good value instead of saving 0 steps.
+     */
+    suspend fun readDailyTelemetry(localDate: LocalDate): ActivityTelemetryEntity? {
+        val client = healthConnectClient ?: return null
+
         val zoneId = ZoneId.systemDefault()
         val startTime = localDate.atStartOfDay(zoneId).toInstant()
         val endTime = localDate.plusDays(1).atStartOfDay(zoneId).toInstant()
 
-        val steps = readStepsAggregate(client, startTime, endTime)
+        val steps = try {
+            readStepsTotal(client, startTime, endTime)
+        } catch (e: Exception) {
+            android.util.Log.e("HealthConnectManager", "Reading steps for $localDate failed", e)
+            return null
+        }
         val activeCalories = readActiveCaloriesAggregate(client, startTime, endTime)
 
         return ActivityTelemetryEntity(
@@ -121,41 +130,16 @@ class HealthConnectManager(private val context: Context) {
         return null
     }
 
-    private suspend fun readStepsAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long {
-        return try {
-            // Health Connect returns records a page at a time; a day of minute-by-minute step
-            // records can run past one page, so read every page.
-            val records = mutableListOf<StepsRecord>()
-            var pageToken: String? = null
-            do {
-                val response = client.readRecords(
-                    ReadRecordsRequest(
-                        recordType = StepsRecord::class,
-                        timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
-                        pageToken = pageToken
-                    )
-                )
-                records += response.records
-                pageToken = response.pageToken
-            } while (pageToken != null)
-
-            // Group records by package name and sum the count for each package name
-            val stepsByPackage = records.groupBy { it.metadata.dataOrigin.packageName }
-                .mapValues { entry -> entry.value.sumOf { it.count } }
-            android.util.Log.d("HealthConnectManager", "Steps by source: $stepsByPackage")
-
-            // Prioritize Samsung Health
-            val shealthSteps = stepsByPackage["com.sec.android.app.shealth"]
-            if (shealthSteps != null) {
-                shealthSteps
-            } else {
-                // Fallback to the maximum single source count
-                stepsByPackage.values.maxOrNull() ?: 0L
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("HealthConnectManager", "Reading steps failed", e)
-            0L
-        }
+    // Health Connect's own daily total: the same number its Steps screen shows, with steps
+    // recorded by several apps (phone, watch, Samsung Health) counted once.
+    private suspend fun readStepsTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long {
+        val response = client.aggregate(
+            AggregateRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+            )
+        )
+        return response[StepsRecord.COUNT_TOTAL] ?: 0L
     }
 
     private suspend fun readActiveCaloriesAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Double {

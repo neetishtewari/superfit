@@ -23,13 +23,12 @@ class TelemetrySyncWorker(
             val today = LocalDate.now()
 
             // Sync today's activity telemetry
-            val todayActivity = healthConnectManager.readDailyTelemetry(today)
-            telemetryDao.insertActivity(todayActivity)
+            // A failed read returns null; skip it rather than overwrite today's steps with 0.
+            healthConnectManager.readDailyTelemetry(today)?.let { telemetryDao.insertActivity(it) }
 
             // Sync yesterday's activity telemetry to ensure final values are captured
             val yesterday = today.minusDays(1)
-            val yesterdayActivity = healthConnectManager.readDailyTelemetry(yesterday)
-            telemetryDao.insertActivity(yesterdayActivity)
+            healthConnectManager.readDailyTelemetry(yesterday)?.let { telemetryDao.insertActivity(it) }
 
             // Sync today's sleep telemetry
             val todaySleep = healthConnectManager.readSleepTelemetry(today)
