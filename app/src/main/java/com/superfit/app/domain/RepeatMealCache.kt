@@ -8,6 +8,8 @@ object RepeatMealCache {
     private val numberWordMap = mapOf(
         "one" to 1.0,
         "two" to 2.0,
+        // Speech-to-text often hears "two" as "tu" (common with Indian English accents)
+        "tu" to 2.0,
         "three" to 3.0,
         "four" to 4.0,
         "five" to 5.0,
@@ -191,15 +193,12 @@ object RepeatMealCache {
         return null
     }
 
+    // Both meals must name the same foods. A looser "one contains the other" match let
+    // "tandoori roti" borrow plain roti's numbers, or "2 rotis" copy a whole past meal of
+    // "roti with dal and paneer". Anything that isn't the same food goes to Gemini instead.
     private fun areKeywordListsEquivalent(a: List<String>, b: List<String>): Boolean {
-        if (a == b) return true
         if (a.isEmpty() || b.isEmpty()) return false
-        // Match if all keywords of shorter list are present in the other
-        if (a.size == b.size) {
-            return a.toSet() == b.toSet()
-        }
-        val (smaller, larger) = if (a.size < b.size) Pair(a, b) else Pair(b, a)
-        return larger.containsAll(smaller)
+        return a.toSet() == b.toSet()
     }
 
     private fun roundOneDecimal(value: Double): Double {

@@ -69,8 +69,10 @@ class DataRepository(
                 // Separate sync steps to support partial permissions gracefully
                 try {
                     val activity = healthConnectManager.readDailyTelemetry(date)
-                    database.telemetryDao().insertActivity(activity)
-                    firebaseSyncManager.uploadActivity(activity)
+                    if (activity != null) {
+                        database.telemetryDao().insertActivity(activity)
+                        firebaseSyncManager.uploadActivity(activity)
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
