@@ -54,6 +54,12 @@ class DataRepository(
         firebaseSyncManager.uploadNutrition(entry.copy(id = id))
     }
 
+    /** Saves the AI's quality tags on an existing meal and updates its cloud backup. */
+    suspend fun saveMealTags(entry: NutritionEntryEntity, tags: String) {
+        database.nutritionDao().setQualityTags(entry.id, tags)
+        firebaseSyncManager.uploadNutrition(entry.copy(qualityTags = tags))
+    }
+
     suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) {
         database.nutritionDao().deleteEntry(entry)
         firebaseSyncManager.deleteNutrition(entry)

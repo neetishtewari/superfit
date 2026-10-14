@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StreakStateEntity::class,
         HabitEntryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class SuperfitDatabase : RoomDatabase() {
@@ -124,13 +124,21 @@ abstract class SuperfitDatabase : RoomDatabase() {
             }
         }
 
+        // Meal quality tags for Diet Quality and the coach. Older meals keep NULL until tagged.
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `nutrition_entries` ADD COLUMN `qualityTags` TEXT")
+            }
+        }
+
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_5,
             MIGRATION_4_5,
             MIGRATION_1_5,
-            MIGRATION_2_5
+            MIGRATION_2_5,
+            MIGRATION_5_6
         )
 
         fun getDatabase(context: Context): SuperfitDatabase {

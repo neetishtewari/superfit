@@ -148,7 +148,8 @@ object RepeatMealCache {
                 calories = exactMatch.calories,
                 proteinG = exactMatch.proteinG,
                 carbsG = exactMatch.carbsG,
-                fatG = exactMatch.fatG
+                fatG = exactMatch.fatG,
+                tags = MealTags.decode(exactMatch.qualityTags)
             )
         }
 

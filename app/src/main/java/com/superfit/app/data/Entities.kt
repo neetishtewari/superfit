@@ -71,7 +71,9 @@ data class NutritionEntryEntity(
     val proteinG: Double,
     val carbsG: Double,
     val fatG: Double,
-    val timestamp: Long // epoch millis
+    val timestamp: Long, // epoch millis
+    // What kind of food this is (see MealTags), set by the AI when the meal is logged. Null for older meals.
+    val qualityTags: String? = null
 )
 
 @Entity(tableName = "workout_entries")

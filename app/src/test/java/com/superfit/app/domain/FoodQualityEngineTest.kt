@@ -17,7 +17,8 @@ class FoodQualityEngineTest {
     @Test
     fun testEmptyHistoryReturnsDefaultMetrics() {
         val result = FoodQualityEngine.analyzeDietQuality(emptyList(), zoneId = zoneId)
-        assertEquals(85, result.overallScore)
+        assertEquals(0, result.overallScore)
+        assertFalse(result.hasEnoughData)
         assertEquals(0, result.distinctDaysLogged)
         assertTrue(result.allRatedItems.isEmpty())
         assertTrue(result.swapSuggestions.isEmpty())
