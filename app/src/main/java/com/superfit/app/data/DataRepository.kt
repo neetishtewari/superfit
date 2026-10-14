@@ -48,8 +48,10 @@ class DataRepository(
     }
 
     suspend fun addNutritionEntry(entry: NutritionEntryEntity) {
-        database.nutritionDao().insertEntry(entry)
-        firebaseSyncManager.uploadNutrition(entry)
+        // Back up under the id Room just assigned. A new entry still has id 0 here, and uploading
+        // it as-is wrote every meal to the same cloud document, so only the latest one was kept.
+        val id = database.nutritionDao().insertEntry(entry)
+        firebaseSyncManager.uploadNutrition(entry.copy(id = id))
     }
 
     suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) {
@@ -131,8 +133,8 @@ class DataRepository(
     }
 
     suspend fun addWorkoutEntry(entry: WorkoutEntryEntity) {
-        database.workoutDao().insertEntry(entry)
-        firebaseSyncManager.uploadWorkout(entry)
+        val id = database.workoutDao().insertEntry(entry)
+        firebaseSyncManager.uploadWorkout(entry.copy(id = id))
     }
 
     suspend fun deleteWorkoutEntry(entry: WorkoutEntryEntity) {
@@ -152,8 +154,8 @@ class DataRepository(
             timestamp = System.currentTimeMillis(),
             note = note
         )
-        database.weightDao().insertWeight(entry)
-        firebaseSyncManager.uploadWeight(entry)
+        val id = database.weightDao().insertWeight(entry)
+        firebaseSyncManager.uploadWeight(entry.copy(id = id))
         // Also update current weight on UserProfile
         val profile = getProfile()
         if (profile != null) {

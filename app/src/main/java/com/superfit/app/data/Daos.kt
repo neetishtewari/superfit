@@ -57,8 +57,9 @@ interface TelemetryDao {
 
 @Dao
 interface NutritionDao {
+    // Returns the row id, which the cloud backup uses as the entry's document name.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEntry(entry: NutritionEntryEntity)
+    suspend fun insertEntry(entry: NutritionEntryEntity): Long
 
     @Delete
     suspend fun deleteEntry(entry: NutritionEntryEntity)
@@ -90,6 +91,10 @@ interface NutritionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntries(entries: List<NutritionEntryEntity>)
 
+    // Used by the cloud restore: never overwrites an entry already on the phone.
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEntriesIfMissing(entries: List<NutritionEntryEntity>)
+
     @Query("DELETE FROM nutrition_entries")
     suspend fun deleteAllEntries()
 
@@ -99,8 +104,9 @@ interface NutritionDao {
 
 @Dao
 interface WorkoutDao {
+    // Returns the row id, which the cloud backup uses as the entry's document name.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEntry(entry: WorkoutEntryEntity)
+    suspend fun insertEntry(entry: WorkoutEntryEntity): Long
 
     @Delete
     suspend fun deleteEntry(entry: WorkoutEntryEntity)
@@ -117,17 +123,26 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntries(entries: List<WorkoutEntryEntity>)
 
+    // Used by the cloud restore: never overwrites an entry already on the phone.
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEntriesIfMissing(entries: List<WorkoutEntryEntity>)
+
     @Query("DELETE FROM workout_entries")
     suspend fun deleteAllEntries()
 }
 
 @Dao
 interface WeightDao {
+    // Returns the row id, which the cloud backup uses as the entry's document name.
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertWeight(entry: WeightEntryEntity)
+    suspend fun insertWeight(entry: WeightEntryEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWeights(entries: List<WeightEntryEntity>)
+
+    // Used by the cloud restore: never overwrites an entry already on the phone.
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertWeightsIfMissing(entries: List<WeightEntryEntity>)
 
     @Delete
     suspend fun deleteWeight(entry: WeightEntryEntity)
