@@ -50,10 +50,18 @@ fun MainNavigation(
             val localProfile = repository.getProfile()
             if (localProfile != null) {
                 startDestination = Dashboard
+                // Keep the cloud backup complete in the background (merges, never deletes)
+                coroutineScope.launch {
+                    try {
+                        repository.firebaseSyncManager.syncAll()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
             } else {
-                // If local database was wiped but user is logged in, attempt to restore from Firestore
+                // If local database was wiped but user is logged in, restore from Firestore
                 try {
-                    repository.firebaseSyncManager.syncAllDown()
+                    repository.firebaseSyncManager.syncAll()
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -86,7 +94,7 @@ fun MainNavigation(
                     onLoginSuccess = {
                         coroutineScope.launch {
                             try {
-                                repository.firebaseSyncManager.syncAllDown()
+                                repository.firebaseSyncManager.syncAll()
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }

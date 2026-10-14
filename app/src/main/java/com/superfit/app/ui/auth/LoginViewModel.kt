@@ -64,7 +64,7 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                         viewModelScope.launch {
                             viewModelScope.launch {
                                 try {
-                                    repository.firebaseSyncManager.syncAllDown()
+                                    repository.firebaseSyncManager.syncAll()
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -90,7 +90,7 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                             viewModelScope.launch {
                                 try {
                                     // Upload default/empty profile or existing local db
-                                    repository.firebaseSyncManager.syncAllUp()
+                                    repository.firebaseSyncManager.syncAll()
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -140,7 +140,7 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                     viewModelScope.launch {
                         viewModelScope.launch {
                             try {
-                                repository.firebaseSyncManager.syncAllDown()
+                                repository.firebaseSyncManager.syncAll()
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }

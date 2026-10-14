@@ -4,8 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -16,6 +19,12 @@ class FirebaseSyncManager(private val context: Context) {
     private val firestore: FirebaseFirestore get() = FirebaseFirestore.getInstance()
 
     private val tag = "FirebaseSyncManager"
+
+    companion object {
+        // Sign-in and app start can both start a sync; running two at once would restore the
+        // same cloud items twice.
+        private val syncMutex = Mutex()
+    }
 
     // Helper for converting Tasks into coroutines suspend functions
     private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->
@@ -29,138 +38,148 @@ class FirebaseSyncManager(private val context: Context) {
     }
 
     /**
-     * Uploads the entire local database to Firestore.
+     * Brings the phone and the cloud copy in line without deleting anything on either side:
+     * items only in the cloud are copied onto the phone, items only on the phone are uploaded.
+     * Safe to run on every launch and after every sign-in.
      */
-    suspend fun syncAllUp() {
-        val userId = auth.currentUser?.uid ?: return
-        Log.d(tag, "Syncing local database up to Firestore for user: $userId")
+    suspend fun syncAll() = syncMutex.withLock {
+        val userId = auth.currentUser?.uid ?: return@withLock
+        val userDoc = firestore.collection("users").document(userId)
+        Log.d(tag, "Syncing local database with Firestore for user: $userId")
 
-        // 1. Sync Profile
-        val profile = database.profileDao().getProfile()
-        if (profile != null) {
-            uploadProfile(profile)
+        // 1. Profile: the phone's copy wins; the cloud copy is only used to fill an empty phone
+        try {
+            val localProfile = database.profileDao().getProfile()
+            if (localProfile != null) {
+                uploadProfile(localProfile)
+            } else {
+                userDoc.get().await().data?.let { database.profileDao().insertProfile(it.toUserProfileEntity()) }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error syncing profile: ${e.message}", e)
         }
 
-        // 2. Sync Activity Telemetry
-        val activities = database.telemetryDao().getAllActivity()
-        for (activity in activities) {
-            uploadActivity(activity)
+        // 2. Activity and sleep telemetry (one document per day)
+        try {
+            val localDates = database.telemetryDao().getAllActivity().map { it.date }.toSet()
+            val cloud = userDoc.collection("activity").get().await().documents.mapNotNull { it.data?.toActivityTelemetry() }
+            val missing = cloud.filter { it.date.isNotBlank() && it.date !in localDates }
+            if (missing.isNotEmpty()) database.telemetryDao().insertActivities(missing)
+        } catch (e: Exception) {
+            Log.e(tag, "Error syncing activity: ${e.message}", e)
+        }
+        try {
+            val localDates = database.telemetryDao().getAllSleep().map { it.date }.toSet()
+            val cloud = userDoc.collection("sleep").get().await().documents.mapNotNull { it.data?.toSleepTelemetry() }
+            val missing = cloud.filter { it.date.isNotBlank() && it.date !in localDates }
+            if (missing.isNotEmpty()) database.telemetryDao().insertSleeps(missing)
+        } catch (e: Exception) {
+            Log.e(tag, "Error syncing sleep: ${e.message}", e)
         }
 
-        // 3. Sync Sleep Telemetry
-        val sleeps = database.telemetryDao().getAllSleep()
-        for (sleep in sleeps) {
-            uploadSleep(sleep)
+        // 3. Logged items: meals, workouts and weigh-ins
+        syncLog(
+            collection = userDoc.collection("nutrition"),
+            local = database.nutritionDao().getAllEntries(),
+            timestampOf = { it.timestamp },
+            fromCloud = { it.toNutritionEntry().copy(id = 0L) },
+            toCloud = { it.toMap() },
+            insertLocal = { database.nutritionDao().insertEntries(it) }
+        )
+        syncLog(
+            collection = userDoc.collection("workouts"),
+            local = database.workoutDao().getAllEntries(),
+            timestampOf = { it.timestamp },
+            fromCloud = { it.toWorkoutEntry().copy(id = 0L) },
+            toCloud = { it.toMap() },
+            insertLocal = { database.workoutDao().insertEntries(it) }
+        )
+        syncLog(
+            collection = userDoc.collection("weights"),
+            local = database.weightDao().getAllWeightEntries(),
+            timestampOf = { it.timestamp },
+            fromCloud = { it.toWeightEntry().copy(id = 0L) },
+            toCloud = { it.toMap() },
+            insertLocal = { database.weightDao().insertWeights(it) }
+        )
+
+        // 4. Streak: the phone's copy wins; the cloud copy is only used to fill an empty phone
+        try {
+            val localStreak = database.streakDao().getStreakState()
+            if (localStreak != null) {
+                uploadStreakState(localStreak)
+            } else {
+                userDoc.collection("streak").document("current").get().await().data?.let {
+                    database.streakDao().insertStreakState(it.toStreakState())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error syncing streak: ${e.message}", e)
         }
 
-        // 4. Sync Nutrition Entries
-        val entries = database.nutritionDao().getAllEntries()
-        for (entry in entries) {
-            uploadNutrition(entry)
+        // 5. Habits (one document per day)
+        try {
+            val local = database.habitDao().getAllHabitEntries()
+            val localDates = local.map { it.date }.toSet()
+            val snapshot = userDoc.collection("habits").get().await()
+            val cloudDates = snapshot.documents.map { it.id }.toSet()
+            val missing = snapshot.documents.mapNotNull { it.data?.toHabitEntry() }
+                .filter { it.date.isNotBlank() && it.date !in localDates }
+            if (missing.isNotEmpty()) database.habitDao().insertHabitEntries(missing)
+            local.filter { it.date !in cloudDates }.forEach { uploadHabitEntry(it) }
+        } catch (e: Exception) {
+            Log.e(tag, "Error syncing habits: ${e.message}", e)
         }
 
-        // 5. Sync Workout Entries
-        val workouts = database.workoutDao().getAllEntries()
-        for (workout in workouts) {
-            uploadWorkout(workout)
-        }
-
-        // 6. Sync Weight Entries
-        val weights = database.weightDao().getAllWeightEntries()
-        for (weight in weights) {
-            uploadWeight(weight)
-        }
-
-        // 7. Sync Streak State
-        val streak = database.streakDao().getStreakState()
-        if (streak != null) {
-            uploadStreakState(streak)
-        }
-
-        // 8. Sync Habit Entries
-        val habits = database.habitDao().getAllHabitEntries()
-        for (habit in habits) {
-            uploadHabitEntry(habit)
-        }
+        Log.d(tag, "Sync complete.")
     }
 
-    /**
-     * Downloads all data from Firestore and replaces/merges into Room.
-     */
-    suspend fun syncAllDown() {
-        val userId = auth.currentUser?.uid ?: return
-        Log.d(tag, "Syncing Firestore down to local Room for user: $userId")
-
+    private suspend fun <T> syncLog(
+        collection: CollectionReference,
+        local: List<T>,
+        timestampOf: (T) -> Long,
+        fromCloud: (Map<String, Any>) -> T,
+        toCloud: (T) -> Map<String, Any>,
+        insertLocal: suspend (List<T>) -> Unit
+    ) {
         try {
-            // 1. Profile
-            val profileDoc = firestore.collection("users").document(userId).get().await()
-            if (profileDoc.exists()) {
-                val data = profileDoc.data
-                if (data != null) {
-                    database.profileDao().insertProfile(data.toUserProfileEntity())
+            val docs = collection.get().await().documents
+            val cloudDocs = docs.mapNotNull { doc ->
+                val timestamp = (doc.data?.get("timestamp") as? Number)?.toLong() ?: return@mapNotNull null
+                CloudLogMerge.CloudDoc(doc.id, timestamp)
+            }
+            val plan = CloudLogMerge.plan(local.map(timestampOf), cloudDocs)
+
+            val cloudByTimestamp = docs.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                val timestamp = (data["timestamp"] as? Number)?.toLong() ?: return@mapNotNull null
+                timestamp to data
+            }.toMap()
+            val restored = plan.restoreTimestamps.mapNotNull { cloudByTimestamp[it]?.let(fromCloud) }
+            if (restored.isNotEmpty()) insertLocal(restored)
+
+            val localByTimestamp = local.associateBy(timestampOf)
+            val uploaded = mutableSetOf<Long>()
+            for (timestamp in plan.uploadTimestamps) {
+                val data = localByTimestamp[timestamp]?.let(toCloud) ?: cloudByTimestamp[timestamp] ?: continue
+                try {
+                    collection.document(CloudLogMerge.cloudKey(timestamp)).set(data).await()
+                    uploaded += timestamp
+                } catch (e: Exception) {
+                    Log.e(tag, "Error uploading ${collection.id} item $timestamp: ${e.message}")
                 }
             }
 
-            // 2. Activity Telemetry
-            val activitySnap = firestore.collection("users").document(userId).collection("activity").get().await()
-            val activities = activitySnap.documents.mapNotNull { it.data?.toActivityTelemetry() }
-            if (activities.isNotEmpty()) {
-                database.telemetryDao().insertActivities(activities)
-            }
-
-            // 3. Sleep Telemetry
-            val sleepSnap = firestore.collection("users").document(userId).collection("sleep").get().await()
-            val sleeps = sleepSnap.documents.mapNotNull { it.data?.toSleepTelemetry() }
-            if (sleeps.isNotEmpty()) {
-                database.telemetryDao().insertSleeps(sleeps)
-            }
-
-            // 4. Nutrition Entries
-            val nutritionSnap = firestore.collection("users").document(userId).collection("nutrition").get().await()
-            val entries = nutritionSnap.documents.mapNotNull { it.data?.toNutritionEntry() }
-            // Clear local nutrition entries first to ensure an exact sync match
-            database.nutritionDao().deleteAllEntries()
-            if (entries.isNotEmpty()) {
-                database.nutritionDao().insertEntries(entries)
-            }
-
-            // 5. Workout Entries
-            val workoutSnap = firestore.collection("users").document(userId).collection("workouts").get().await()
-            val workouts = workoutSnap.documents.mapNotNull { it.data?.toWorkoutEntry() }
-            // Clear local workout entries first to ensure an exact sync match
-            database.workoutDao().deleteAllEntries()
-            if (workouts.isNotEmpty()) {
-                database.workoutDao().insertEntries(workouts)
-            }
-
-            // 6. Weight Entries
-            val weightSnap = firestore.collection("users").document(userId).collection("weights").get().await()
-            val weights = weightSnap.documents.mapNotNull { it.data?.toWeightEntry() }
-            if (weights.isNotEmpty()) {
-                database.weightDao().deleteAllWeights()
-                database.weightDao().insertWeights(weights)
-            }
-
-            // 7. Streak State
-            val streakDoc = firestore.collection("users").document(userId).collection("streak").document("current").get().await()
-            if (streakDoc.exists()) {
-                val data = streakDoc.data
-                if (data != null) {
-                    database.streakDao().insertStreakState(data.toStreakState())
+            // Old documents named by Room id are removed only once the same item is safely saved
+            // under its new name.
+            for (stale in plan.staleDocs) {
+                if (stale.timestamp in uploaded || stale.timestamp !in plan.uploadTimestamps) {
+                    collection.document(stale.id).delete().await()
                 }
             }
-
-            // 8. Habit Entries
-            val habitSnap = firestore.collection("users").document(userId).collection("habits").get().await()
-            val habits = habitSnap.documents.mapNotNull { it.data?.toHabitEntry() }
-            if (habits.isNotEmpty()) {
-                database.habitDao().deleteAllHabits()
-                database.habitDao().insertHabitEntries(habits)
-            }
-
-            Log.d(tag, "Full bi-directional sync down complete.")
+            Log.d(tag, "${collection.id}: restored ${restored.size}, uploaded ${uploaded.size}, tidied ${plan.staleDocs.size}.")
         } catch (e: Exception) {
-            Log.e(tag, "Error syncing data down: ${e.message}", e)
+            Log.e(tag, "Error syncing ${collection.id}: ${e.message}", e)
         }
     }
 
@@ -202,8 +221,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("nutrition").document(entry.id.toString()).set(entry.toMap()).await()
-            Log.d(tag, "Nutrition entry uploaded with ID: ${entry.id}.")
+                .collection("nutrition").document(CloudLogMerge.cloudKey(entry.timestamp)).set(entry.toMap()).await()
+            Log.d(tag, "Nutrition entry uploaded for ${entry.timestamp}.")
         } catch (e: Exception) {
             Log.e(tag, "Error uploading nutrition: ${e.message}")
         }
@@ -212,9 +231,8 @@ class FirebaseSyncManager(private val context: Context) {
     suspend fun deleteNutrition(entry: NutritionEntryEntity) {
         val userId = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(userId)
-                .collection("nutrition").document(entry.id.toString()).delete().await()
-            Log.d(tag, "Nutrition entry deleted from Firestore with ID: ${entry.id}.")
+            deleteLogItem(firestore.collection("users").document(userId).collection("nutrition"), entry.timestamp)
+            Log.d(tag, "Nutrition entry deleted from Firestore for ${entry.timestamp}.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting nutrition: ${e.message}")
         }
@@ -224,8 +242,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("workouts").document(entry.id.toString()).set(entry.toMap()).await()
-            Log.d(tag, "Workout entry uploaded with ID: ${entry.id}.")
+                .collection("workouts").document(CloudLogMerge.cloudKey(entry.timestamp)).set(entry.toMap()).await()
+            Log.d(tag, "Workout entry uploaded for ${entry.timestamp}.")
         } catch (e: Exception) {
             Log.e(tag, "Error uploading workout: ${e.message}")
         }
@@ -234,9 +252,8 @@ class FirebaseSyncManager(private val context: Context) {
     suspend fun deleteWorkout(entry: WorkoutEntryEntity) {
         val userId = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(userId)
-                .collection("workouts").document(entry.id.toString()).delete().await()
-            Log.d(tag, "Workout entry deleted from Firestore with ID: ${entry.id}.")
+            deleteLogItem(firestore.collection("users").document(userId).collection("workouts"), entry.timestamp)
+            Log.d(tag, "Workout entry deleted from Firestore for ${entry.timestamp}.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting workout: ${e.message}")
         }
@@ -246,8 +263,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("weights").document(entry.id.toString()).set(entry.toMap()).await()
-            Log.d(tag, "Weight entry uploaded with ID: ${entry.id}.")
+                .collection("weights").document(CloudLogMerge.cloudKey(entry.timestamp)).set(entry.toMap()).await()
+            Log.d(tag, "Weight entry uploaded for ${entry.timestamp}.")
         } catch (e: Exception) {
             Log.e(tag, "Error uploading weight: ${e.message}")
         }
@@ -256,11 +273,19 @@ class FirebaseSyncManager(private val context: Context) {
     suspend fun deleteWeight(entry: WeightEntryEntity) {
         val userId = auth.currentUser?.uid ?: return
         try {
-            firestore.collection("users").document(userId)
-                .collection("weights").document(entry.id.toString()).delete().await()
-            Log.d(tag, "Weight entry deleted from Firestore with ID: ${entry.id}.")
+            deleteLogItem(firestore.collection("users").document(userId).collection("weights"), entry.timestamp)
+            Log.d(tag, "Weight entry deleted from Firestore for ${entry.timestamp}.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting weight: ${e.message}")
+        }
+    }
+
+    // Removes the item's document and any older copy saved under its Room id.
+    private suspend fun deleteLogItem(collection: CollectionReference, timestamp: Long) {
+        collection.document(CloudLogMerge.cloudKey(timestamp)).delete().await()
+        val oldCopies = collection.whereEqualTo("timestamp", timestamp).get().await()
+        for (doc in oldCopies.documents) {
+            doc.reference.delete().await()
         }
     }
 
