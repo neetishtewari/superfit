@@ -9,6 +9,8 @@ import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.WorkoutParser
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.MacroTargets
+import com.superfit.app.domain.CoachInsight
+import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.GeminiClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -161,7 +163,21 @@ class DashboardViewModel(
                     3. Limit responses to exactly 2 to 3 sentences maximum (under 75 words).
                     4. Do not include unnecessary pleasantries, greetings, or signature sign-offs.
                     5. Use clean markdown formatting (bold, bullet points) sparingly where it adds clarity.
-                """.trimIndent()
+                    6. When the user asks whether a number is good or bad (like "is 50g of protein enough?"), answer for them specifically: compare it with their target and goal using the notes below, and look at the pattern over days rather than one day.
+                """.trimIndent() + "\n\n" + CoachingEngine.chatContext(
+                    CoachPatternEngine.analyze(
+                        today = LocalDate.now(),
+                        now = java.time.LocalTime.now(),
+                        weightKg = profile.weightKg,
+                        goal = profile.goal,
+                        targets = macroTargets,
+                        maintenanceCalories = if (sharedPrefs.getBoolean("custom_macro_enabled", false)) null else currentState.tdee,
+                        nutrition = repository.getAllNutritionEntries(),
+                        workouts = repository.getAllWorkoutEntries(),
+                        activity = repository.getAllActivityTelemetry(),
+                        sleep = repository.getAllSleepTelemetry()
+                    )
+                )
 
                 val history = _chatMessages.value.dropLast(1).map { msg ->
                     GeminiClient.ChatTurn(fromUser = msg.sender == MessageSender.User, text = msg.text)
@@ -185,13 +201,8 @@ class DashboardViewModel(
     }
 
     private fun loadCachedCoachingInsight() {
-        val todayStr = LocalDate.now().toString()
-        val cachedDate = sharedPrefs.getString("coaching_insight_date", "")
-        if (cachedDate == todayStr) {
-            val text = sharedPrefs.getString("coaching_insight_text", "")
-            if (!text.isNullOrBlank()) {
-                _coachingState.value = CoachingInsightState.Success(text)
-            }
+        CoachInsightStore.loadForDay(sharedPrefs, LocalDate.now())?.let {
+            _coachingState.value = CoachingInsightState.Success(it)
         }
     }
 
@@ -250,7 +261,7 @@ class DashboardViewModel(
             val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, totalActiveCal)
             val readiness = sleep?.readinessScore ?: 50 // Default 50% if no sleep session found
 
-            // Compute dynamic macro targets based on live TDEE and sleep readiness
+            // Macro targets from live TDEE and goal (or the user's own numbers)
             val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
             val macroTargets = if (customMacroEnabled) {
                 val customProtein = sharedPrefs.getInt("custom_protein_g", 130).toDouble()
@@ -264,7 +275,7 @@ class DashboardViewModel(
                     fatG = customFat
                 )
             } else {
-                PhysiologyEngine.calculateMacroTargets(profile, tdee, readiness, totalActiveCal)
+                PhysiologyEngine.calculateMacroTargets(profile, tdee, totalActiveCal)
             }
 
             // Aggregate nutrition eaten today
@@ -496,33 +507,19 @@ class DashboardViewModel(
         viewModelScope.launch {
             _coachingState.value = CoachingInsightState.Loading
             try {
-                val historyNutrition = repository.getAllNutritionEntries()
-                val historyWorkouts = repository.getAllWorkoutEntries()
-                val historyActivity = repository.getAllActivityTelemetry()
-                val historySleep = repository.getAllSleepTelemetry()
-
-                val engine = CoachingEngine(key)
-                val insight = engine.generateDailyInsight(
+                val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
+                val insight = CoachingEngine(key).generateDailyInsight(
                     profile = currentState.profile,
-                    activity = currentState.activity,
-                    sleep = currentState.sleep,
-                    nutrition = currentState.nutritionList,
                     macroTargets = currentState.macroTargets,
-                    caloriesEaten = currentState.caloriesEaten,
-                    proteinEaten = currentState.proteinEaten,
-                    carbsEaten = currentState.carbsEaten,
-                    fatEaten = currentState.fatEaten,
-                    historyNutrition = historyNutrition,
-                    historyWorkouts = historyWorkouts,
-                    historyActivity = historyActivity,
-                    historySleep = historySleep
+                    maintenanceCalories = if (customMacroEnabled) null else currentState.tdee,
+                    historyNutrition = repository.getAllNutritionEntries(),
+                    historyWorkouts = repository.getAllWorkoutEntries(),
+                    historyActivity = repository.getAllActivityTelemetry(),
+                    historySleep = repository.getAllSleepTelemetry(),
+                    memory = CoachInsightStore.memory(sharedPrefs)
                 )
 
-                val todayStr = LocalDate.now().toString()
-                sharedPrefs.edit()
-                    .putString("coaching_insight_date", todayStr)
-                    .putString("coaching_insight_text", insight)
-                    .apply()
+                CoachInsightStore.save(sharedPrefs, LocalDate.now(), insight)
 
                 _coachingState.value = CoachingInsightState.Success(insight)
             } catch (e: Exception) {
@@ -577,7 +574,7 @@ sealed interface DashboardUiState {
 sealed interface CoachingInsightState {
     object Idle : CoachingInsightState
     object Loading : CoachingInsightState
-    data class Success(val insight: String) : CoachingInsightState
+    data class Success(val insight: CoachInsight) : CoachingInsightState
     data class Error(val message: String) : CoachingInsightState
 }
 

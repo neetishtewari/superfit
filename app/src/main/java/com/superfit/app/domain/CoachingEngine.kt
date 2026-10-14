@@ -1,134 +1,314 @@
 package com.superfit.app.domain
 
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.content
-import com.google.ai.client.generativeai.type.generationConfig
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WorkoutEntryEntity
-import java.time.Instant
+import org.json.JSONObject
+import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
+
+/** What the coach card shows: one headline, one thing to do, and the numbers behind it. */
+data class CoachInsight(
+    val headline: String,
+    val action: String,
+    val why: List<String>,
+    val focusId: String,
+    val focusKind: FindingKind,
+    /** Set when the AI couldn't be reached and the plain summary is shown instead. */
+    val note: String? = null
+) {
+    /** One-line text for notifications and older screens. */
+    fun asText(): String = listOf(headline, action).filter { it.isNotBlank() }.joinToString(" ")
+}
+
+/** What the coach said on a given day, so it can follow up instead of repeating itself. */
+data class CoachMemoryEntry(
+    val date: LocalDate,
+    val focusId: String,
+    val focusKind: FindingKind,
+    val headline: String
+)
+
+object CoachMemory {
+    private const val KEEP = 14
+
+    fun decode(raw: String?): List<CoachMemoryEntry> =
+        raw.orEmpty().lines().mapNotNull { line ->
+            val parts = line.split('\t')
+            if (parts.size < 4) return@mapNotNull null
+            val date = runCatching { LocalDate.parse(parts[0]) }.getOrNull() ?: return@mapNotNull null
+            val kind = runCatching { FindingKind.valueOf(parts[2]) }.getOrNull() ?: return@mapNotNull null
+            CoachMemoryEntry(date, parts[1], kind, parts[3])
+        }
+
+    fun encode(entries: List<CoachMemoryEntry>): String =
+        entries.joinToString("\n") { e ->
+            listOf(e.date.toString(), e.focusId, e.focusKind.name, e.headline.replace('\t', ' ').replace('\n', ' '))
+                .joinToString("\t")
+        }
+
+    /** Adds [entry], replacing anything already saved for the same day, and keeps the newest [KEEP]. */
+    fun remember(existing: List<CoachMemoryEntry>, entry: CoachMemoryEntry): List<CoachMemoryEntry> =
+        (existing.filter { it.date != entry.date } + entry).sortedByDescending { it.date }.take(KEEP)
+}
 
 class CoachingEngine(private val apiKey: String) {
 
-    private val systemInstructionText =
-        "You are Superfit AI Coach, the world's best personal fitness trainer and health scientist.\n" +
-        "Your role is to analyze the user's daily metrics and weekly historical logs (nutrition, specific foods eaten, workouts, step counts, and sleep patterns) to provide a concise, highly analytical, and deeply meaningful coaching insight.\n" +
-        "CRITICAL - INCOMPLETE LOGGING VS DIET: Users often forget to log full meals or miss logging for entire days. When a day is tagged [NO MEALS LOGGED THIS DAY] or [PARTIAL / INCOMPLETE LOG] (or when daily calories logged are < 50% of target), NEVER accuse the user of 'feast or famine' behavior, 'wild calorie swings', or severe calorie restriction. Recognize that missing/low logged values usually reflect incomplete logging, not starvation or extreme dieting. Base dietary trend analysis strictly on fully logged days. If logging is inconsistent, give a quick, encouraging reminder on logging consistency without misinterpreting intake.\n" +
-        "CRITICAL: Think like an elite trainer. Look for non-obvious patterns, habits, or triggers on fully-logged days (e.g., 'your habit of regularly eating desserts is pushing you back', 'the bread you are logging may not be as healthy as you think', workouts late in the evening disrupting sleep quality, protein targets missed on specific active days, or step counts dropping on weekends).\n" +
-        "Keep the tone encouraging but scientifically precise, modern, and direct.\n" +
-        "You MUST limit your response to exactly 2 to 3 sentences (approx 50-80 words). Do not write a greeting or a signature (e.g. no 'Hey there,' or 'Best, Coach'). Use clean Markdown styling where appropriate (like bolding key insights or targets).\n" +
-        "CRITICAL: Be aware of the 'Current Time of Day' provided in the prompt. If the current time is in the morning, afternoon, or early evening (e.g., before 7:00 PM), do NOT flag low calorie or protein intake as a deficit or critical problem; instead, frame recommendations around what they should focus on eating for the rest of the day. Only diagnose definitive daily calorie/macronutrient deficits or surpluses when it is late in the evening (after 7:00 PM)."
-
     suspend fun generateDailyInsight(
         profile: UserProfileEntity,
-        activity: ActivityTelemetryEntity,
-        sleep: SleepTelemetryEntity?,
-        nutrition: List<NutritionEntryEntity>,
         macroTargets: MacroTargets,
-        caloriesEaten: Double,
-        proteinEaten: Double,
-        carbsEaten: Double,
-        fatEaten: Double,
-        historyNutrition: List<NutritionEntryEntity> = emptyList(),
-        historyWorkouts: List<WorkoutEntryEntity> = emptyList(),
-        historyActivity: List<ActivityTelemetryEntity> = emptyList(),
-        historySleep: List<SleepTelemetryEntity> = emptyList()
-    ): String {
-        val currentTime = LocalTime.now()
-        val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
-        val formattedTime = currentTime.format(timeFormatter)
+        maintenanceCalories: Double?,
+        historyNutrition: List<NutritionEntryEntity>,
+        historyWorkouts: List<WorkoutEntryEntity>,
+        historyActivity: List<ActivityTelemetryEntity>,
+        historySleep: List<SleepTelemetryEntity>,
+        memory: List<CoachMemoryEntry>,
+        today: LocalDate = LocalDate.now(),
+        now: LocalTime = LocalTime.now()
+    ): CoachInsight {
+        val report = CoachPatternEngine.analyze(
+            today = today,
+            now = now,
+            weightKg = profile.weightKg,
+            goal = profile.goal,
+            targets = macroTargets,
+            maintenanceCalories = maintenanceCalories,
+            nutrition = historyNutrition,
+            workouts = historyWorkouts,
+            activity = historyActivity,
+            sleep = historySleep
+        )
+        val focus = chooseFocus(report, memory, today)
+        val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
+        val why = whyLines(focus, report)
 
-        val sleepText = if (sleep != null) {
-            "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h (Deep Sleep: ${sleep.deepSleepDurationSeconds / 60}m), Sleep Readiness Score: ${sleep.readinessScore}%"
-        } else {
-            "Sleep: No sleep telemetry available today (assume baseline recovery)."
-        }
-
-        val todayStatus = if (caloriesEaten < macroTargets.calories * 0.5) " [LOG IN PROGRESS / PARTIAL]" else " [MOSTLY LOGGED]"
-        val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} kcal (Target: ${macroTargets.calories.toInt()} kcal)$todayStatus. " +
-            "Protein: ${proteinEaten.toInt()}g (Target: ${macroTargets.proteinG.toInt()}g). " +
-            "Carbs: ${carbsEaten.toInt()}g (Target: ${macroTargets.carbsG.toInt()}g). " +
-            "Fat: ${fatEaten.toInt()}g (Target: ${macroTargets.fatG.toInt()}g)."
-
-        val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
-
-        val goalText = "Current Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)."
-
-        val historyText = if (historyNutrition.isNotEmpty() || historyWorkouts.isNotEmpty() || historyActivity.isNotEmpty()) {
-            val sb = StringBuilder()
-            sb.append("\nWeekly Historical Trends (Past 7 Days):\n")
-
-            val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.systemDefault())
-            
-            // Extract unique dates from the last 7 days of logs
-            val allDates = (historyNutrition.map { dateFormatter.format(Instant.ofEpochMilli(it.timestamp)) } +
-                    historyWorkouts.map { dateFormatter.format(Instant.ofEpochMilli(it.timestamp)) } +
-                    historyActivity.map { it.date } +
-                    historySleep.map { it.date }).distinct().sortedDescending().take(7)
-
-            allDates.forEach { dateStr ->
-                sb.append("- Date: $dateStr\n")
-                // Nutrition
-                val dayNutrition = historyNutrition.filter { dateFormatter.format(Instant.ofEpochMilli(it.timestamp)) == dateStr }
-                if (dayNutrition.isNotEmpty()) {
-                    val cals = dayNutrition.sumOf { it.calories }.toInt()
-                    val p = dayNutrition.sumOf { it.proteinG }.toInt()
-                    val foods = dayNutrition.map { it.foodText }.joinToString(", ")
-                    val status = if (cals < macroTargets.calories * 0.5) " [PARTIAL / INCOMPLETE LOG]" else " [FULL LOG]"
-                    sb.append("  • Nutrition: $cals kcal, ${p}g Protein. Foods logged: $foods$status\n")
-                } else {
-                    sb.append("  • Nutrition: 0 kcal logged [NO MEALS LOGGED THIS DAY]\n")
-                }
-                // Workouts
-                val dayWorkouts = historyWorkouts.filter { dateFormatter.format(Instant.ofEpochMilli(it.timestamp)) == dateStr }
-                if (dayWorkouts.isNotEmpty()) {
-                    val details = dayWorkouts.map { "${it.workoutType} (${it.description}, ${it.caloriesBurned.toInt()} kcal)" }.joinToString(", ")
-                    sb.append("  • Workouts: $details\n")
-                }
-                // Activity & Sleep
-                val dayAct = historyActivity.find { it.date == dateStr }
-                val daySleep = historySleep.find { it.date == dateStr }
-                if (dayAct != null) {
-                    sb.append("  • Activity: ${dayAct.steps} steps, ${dayAct.activeCalories.toInt()} kcal burned\n")
-                }
-                if (daySleep != null) {
-                    sb.append("  • Sleep: ${String.format("%.1f", daySleep.sleepDurationSeconds / 3600.0)}h, Readiness: ${daySleep.readinessScore}%\n")
-                }
-            }
-            sb.toString()
-        } else {
-            "\nWeekly Historical Trends: No historical logs available yet."
-        }
-
-        val prompt = """
-            Current Time of Day: $formattedTime
-            User Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm, Activity Level Multiplier ${profile.activityMultiplier}.
-            Goal: $goalText
-            Daily Physical Metrics:
-            - $activityText
-            - $sleepText
-            Daily Nutrition:
-            - $nutritionText
-            $historyText
-
-            Based on these daily and weekly historical metrics, think like the world's best personal trainer. Spot key patterns or bad habits in their logs, and write their Coaching Insight.
-        """.trimIndent()
-
+        val prompt = buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition)
         return try {
-            val responseText = GeminiClient.generateContent(
+            val response = GeminiClient.generateContent(
                 apiKey = apiKey,
                 prompt = prompt,
-                systemInstructionText = systemInstructionText,
-                isJson = false
+                systemInstructionText = SYSTEM_INSTRUCTION,
+                isJson = true
             )
-            responseText.ifBlank { "Your daily metrics are looking solid! Keep moving, eat to your target macros, and get quality sleep tonight." }
+            parseResponse(response, focus, why)
         } catch (e: Exception) {
-            throw e
+            android.util.Log.e("CoachingEngine", "Coach AI call failed, showing the plain summary", e)
+            fallbackInsight(focus, why, note = GeminiClient.sanitizeError(e))
+        }
+    }
+
+    companion object {
+
+        val SYSTEM_INSTRUCTION = """
+            You are the coach inside Superfit, a fitness and nutrition app. You write the one short message the user reads on their home screen today.
+            The app has already studied the user's last few weeks of logs and picked THE FOCUS: the single most useful thing to talk about today. Your job is to say it the way a good personal coach texts a client: warm, direct, specific and in plain everyday words.
+
+            Rules:
+            1. Talk about THE FOCUS. Use its numbers and say briefly why it matters for this user's goal, using the "why it matters" note. Do not switch to a different topic.
+            2. Only use numbers that are given to you. Never invent or recalculate numbers.
+            3. Days without logs are unknown, not days without food. Never say or imply the user is under-eating or skipping meals because something wasn't logged.
+            4. Don't recite today's totals. Mention today only when it's needed for the action.
+            5. If THE FOCUS is a win, celebrate it specifically and don't add a criticism.
+            6. Don't repeat your recent messages. If THE FOCUS was also a recent topic, say it's still going on and give a different, more concrete tip than before.
+            7. Avoid jargon such as bioavailable, thermic, macronutrients, glycemic, telemetry.
+            8. The action is one concrete thing for the rest of today, or for tomorrow if it's after 9 PM. Prefer foods the user already eats.
+
+            Reply with JSON only, in this exact shape:
+            {"headline": "1 or 2 sentences, at most 40 words, may put one key phrase in **bold**", "action": "one sentence, at most 25 words, no bold"}
+        """.trimIndent()
+
+        private const val REPEAT_PENALTY = 25
+
+        private val areaLabels = mapOf(
+            "protein" to "your protein",
+            "calories" to "your calories",
+            "treats" to "treat meals",
+            "veg" to "vegetables and fruit",
+            "steps" to "your steps",
+            "sleep" to "your sleep",
+            "workouts" to "your workouts"
+        )
+
+        /**
+         * Picks what to talk about today. The highest-priority finding wins, but one that was
+         * the focus yesterday is marked down so the coach doesn't nag about the same thing every
+         * day, and a concern that has since cleared up becomes a follow-up win.
+         */
+        fun chooseFocus(report: CoachReport, memory: List<CoachMemoryEntry>, today: LocalDate): CoachFinding {
+            val past = memory.filter { it.date < today }.sortedByDescending { it.date }
+            val yesterday = past.firstOrNull { it.date == today.minusDays(1) }?.focusId
+            val dayBefore = past.firstOrNull { it.date == today.minusDays(2) }?.focusId
+
+            val candidates = report.findings + followUps(report, past, today)
+            if (candidates.isEmpty()) return gettingStarted(report)
+
+            return candidates.maxBy { f ->
+                var score = f.priority
+                if (f.id == yesterday) score -= REPEAT_PENALTY
+                if (f.id == yesterday && f.id == dayBefore) score -= REPEAT_PENALTY
+                score
+            }
+        }
+
+        /** Concerns the coach raised in the last two weeks that the latest logs no longer show. */
+        fun followUps(report: CoachReport, past: List<CoachMemoryEntry>, today: LocalDate): List<CoachFinding> {
+            val recentConcerns = past
+                .filter { it.focusKind == FindingKind.CONCERN && ChronoUnit.DAYS.between(it.date, today) <= 14 }
+            return recentConcerns
+                .groupBy { areaOf(it.focusId) }
+                .mapNotNull { (area, entries) ->
+                    val label = areaLabels[area] ?: return@mapNotNull null
+                    if (area !in report.checkedAreas) return@mapNotNull null
+                    if (report.findings.any { it.area == area && it.kind == FindingKind.CONCERN }) return@mapNotNull null
+                    val flaggedOn = entries.maxOf { it.date }
+                    val id = "followup_$area"
+                    // Only celebrate once per concern.
+                    if (past.any { it.focusId == id && it.date >= flaggedOn }) return@mapNotNull null
+                    val currentWin = report.findings.firstOrNull { it.area == area && it.kind == FindingKind.WIN }
+                    val daysAgo = ChronoUnit.DAYS.between(flaggedOn, today)
+                    val whenText = if (daysAgo <= 1) "Yesterday" else "$daysAgo days ago"
+                    CoachFinding(
+                        id = id,
+                        area = area,
+                        kind = FindingKind.WIN,
+                        priority = 65,
+                        fact = "$whenText I flagged $label. " +
+                            (currentWin?.fact ?: "Your latest logs no longer show that pattern."),
+                        meaning = "You acted on it, and it shows. That's exactly how lasting habits are built.",
+                        suggestion = currentWin?.suggestion ?: "Keep doing what you changed."
+                    )
+                }
+        }
+
+        fun areaOf(focusId: String): String = focusId.substringBefore('_')
+
+        private fun gettingStarted(report: CoachReport): CoachFinding {
+            val t = report.today
+            return CoachFinding(
+                id = "getting_started",
+                area = "logging",
+                kind = FindingKind.LOGGING,
+                priority = 0,
+                fact = "There isn't enough history yet to spot patterns (${report.loggedDaysLastWeek} of the last 7 days have logs). " +
+                    "Today so far: ${t.caloriesSoFar} kcal and ${t.proteinSoFar}g protein.",
+                meaning = report.targetMeanings.first(),
+                suggestion = "Log every meal for the next few days and I'll start spotting your patterns."
+            )
+        }
+
+        fun whyLines(focus: CoachFinding, report: CoachReport): List<String> {
+            val lines = mutableListOf(focus.fact, focus.meaning)
+            if (focus.area in setOf("protein", "calories", "veg")) {
+                lines += "Based on ${report.completeDaysLastWeek} fully logged days in the last week. " +
+                    "Days with missing meals aren't counted against you."
+            }
+            return lines
+        }
+
+        fun fallbackInsight(focus: CoachFinding, why: List<String>, note: String? = null) = CoachInsight(
+            headline = focus.fact,
+            action = focus.suggestion,
+            why = why.drop(1),
+            focusId = focus.id,
+            focusKind = focus.kind,
+            note = note
+        )
+
+        fun parseResponse(response: String, focus: CoachFinding, why: List<String>): CoachInsight {
+            val cleaned = response.trim()
+                .removePrefix("```json").removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            val parsed = runCatching {
+                val json = JSONObject(cleaned)
+                json.optString("headline").trim() to json.optString("action").trim()
+            }.getOrNull()
+            val (headline, action) = when {
+                parsed != null && parsed.first.isNotBlank() -> parsed
+                cleaned.isNotBlank() && !cleaned.startsWith("{") -> cleaned to ""
+                else -> return fallbackInsight(focus, why)
+            }
+            return CoachInsight(
+                headline = headline,
+                action = action.ifBlank { focus.suggestion },
+                why = why,
+                focusId = focus.id,
+                focusKind = focus.kind
+            )
+        }
+
+        fun buildPrompt(
+            profile: UserProfileEntity,
+            report: CoachReport,
+            focus: CoachFinding,
+            support: CoachFinding?,
+            memory: List<CoachMemoryEntry>,
+            today: LocalDate,
+            now: LocalTime,
+            nutrition: List<NutritionEntryEntity>
+        ): String {
+            val t = report.today
+            val goalText = when (profile.goal) {
+                "LOSE_WEIGHT" -> "lose weight"
+                "GAIN_MUSCLE" -> "build muscle"
+                else -> "maintain weight and stay fit"
+            }
+            val meals = if (t.mealsLogged.isEmpty()) "none yet" else t.mealsLogged.joinToString { it.name.lowercase() }
+            val treats = if (t.treatsToday.isEmpty()) "none" else t.treatsToday.joinToString()
+            val dayName = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
+            val recentMessages = memory.filter { it.date < today }.sortedByDescending { it.date }.take(5)
+                .joinToString("\n") { "- ${it.date.format(dayName)}: ${it.headline}" }
+                .ifBlank { "- none yet" }
+
+            return buildString {
+                appendLine("Current time: ${now.format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))}")
+                appendLine("User: goal is to $goalText. Age ${profile.age}, ${profile.weightKg.toInt()} kg.")
+                appendLine()
+                appendLine("THE FOCUS (${focus.kind.name.lowercase()}): ${focus.fact}")
+                appendLine("Why it matters: ${focus.meaning}")
+                appendLine("A tip you can use or improve on: ${focus.suggestion}")
+                if (support != null && focus.kind != FindingKind.WIN) {
+                    appendLine()
+                    appendLine("Also going well (mention only if it fits naturally in a few words): ${support.fact}")
+                }
+                appendLine()
+                appendLine("Today so far: ${t.caloriesSoFar} kcal, ${t.proteinSoFar}g protein (${t.proteinStillNeeded}g more to reach the target). Meals logged today: $meals. Treats today: $treats.")
+                appendLine("Logging: ${report.completeDaysLastWeek} of the last 7 days look fully logged, ${report.loggedDaysLastWeek} have some logs.")
+                appendLine()
+                appendLine("What their targets mean:")
+                report.targetMeanings.forEach { appendLine("- $it") }
+                appendLine()
+                appendLine("Foods they often eat: ${commonFoods(nutrition, today).ifBlank { "not enough logs yet" }}")
+                appendLine()
+                appendLine("Your recent messages (newest first):")
+                appendLine(recentMessages)
+            }
+        }
+
+        /** The user's most-logged foods over the last two weeks, so tips fit what they actually eat. */
+        fun commonFoods(nutrition: List<NutritionEntryEntity>, today: LocalDate): String {
+            val cutoff = today.minusDays(14).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            return nutrition.filter { it.timestamp >= cutoff }
+                .groupingBy { it.foodText.trim().lowercase().take(40) }
+                .eachCount()
+                .entries.sortedByDescending { it.value }
+                .take(10)
+                .joinToString { it.key }
+        }
+
+        /** Short summary of the latest patterns, for the coach chat. */
+        fun chatContext(report: CoachReport): String = buildString {
+            appendLine("What the app has noticed over the last few weeks:")
+            if (report.findings.isEmpty()) appendLine("- Not enough logs yet to see patterns.")
+            report.findings.take(5).forEach { appendLine("- ${it.fact}") }
+            appendLine("- ${report.completeDaysLastWeek} of the last 7 days look fully logged; days with missing meals are unknown, not days without food.")
+            appendLine("What their targets mean:")
+            report.targetMeanings.forEach { appendLine("- $it") }
         }
     }
 }

@@ -374,7 +374,7 @@ internal fun CoachInsightsCard(
         when (val cState = coachingState) {
             CoachingInsightState.Idle -> {
                 Text(
-                    text = "Generate your personalized AI coaching advice based on today's physical and nutritional telemetry.",
+                    text = "Your coach looks at your last few weeks of meals, steps, sleep and workouts and tells you the one thing that matters most right now.",
                     color = Color.Gray,
                     fontSize = 13.sp
                 )
@@ -386,7 +386,7 @@ internal fun CoachInsightsCard(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Analyze & Generate Insights", fontWeight = FontWeight.Bold)
+                    Text("Get today's coaching", fontWeight = FontWeight.Bold)
                 }
             }
             CoachingInsightState.Loading -> {
@@ -406,7 +406,7 @@ internal fun CoachInsightsCard(
                             strokeWidth = 3.dp
                         )
                         Text(
-                            text = "Analyzing physiological telemetry with Gemini...",
+                            text = "Looking over your last few weeks...",
                             color = Color.Gray,
                             fontSize = 12.sp
                         )
@@ -414,13 +414,70 @@ internal fun CoachInsightsCard(
                 }
             }
             is CoachingInsightState.Success -> {
+                val insight = cState.insight
+                var showWhy by remember(insight) { mutableStateOf(false) }
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = boldMarkdown(cState.insight),
+                        text = boldMarkdown(insight.headline),
                         color = ThemeTextPrimary,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
+                        fontSize = 15.sp,
+                        lineHeight = 21.sp
                     )
+                    if (insight.action.isNotBlank()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ElectricCyan.copy(alpha = 0.10f))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Today",
+                                color = ElectricCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = boldMarkdown(insight.action),
+                                color = ThemeTextPrimary,
+                                fontSize = 14.sp,
+                                lineHeight = 19.sp
+                            )
+                        }
+                    }
+                    if (insight.why.isNotEmpty()) {
+                        Text(
+                            text = if (showWhy) "Hide why" else "Why?",
+                            color = ElectricCyan,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showWhy = !showWhy }
+                                .padding(vertical = 4.dp)
+                        )
+                        if (showWhy) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                insight.why.forEach { line ->
+                                    Text(
+                                        text = "• $line",
+                                        color = Color.Gray,
+                                        fontSize = 12.sp,
+                                        lineHeight = 17.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (insight.note != null) {
+                        Text(
+                            text = "Couldn't reach the AI just now, so this is a plain summary. ${insight.note}",
+                            color = Color.Gray,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
                     Button(
                         onClick = onOpenChat,
                         colors = ButtonDefaults.buttonColors(

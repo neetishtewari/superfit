@@ -57,35 +57,37 @@ class PhysiologyEngineTest {
     }
 
     @Test
-    fun testMacroTargetsShiftBasedOnReadiness() {
+    fun testProteinTargetIsSteadyAndFollowsGoal() {
         val profile = UserProfileEntity(
             id = 0,
             age = 30,
             heightCm = 180.0,
             weightKg = 80.0,
             isMale = true,
-            activityMultiplier = 1.2
+            activityMultiplier = 1.2,
+            goal = "LOSE_WEIGHT"
         )
 
-        // Scenario 1: Perfect readiness (100) -> higher protein target
-        val targetsHighReadiness = PhysiologyEngine.calculateMacroTargets(
-            profile = profile,
-            tdee = 2500.0,
-            readinessScore = 100,
-            activeCalories = 0.0
-        )
-        // Protein should be 80 * 2.2 = 176g
-        assertEquals(176.0, targetsHighReadiness.proteinG, 0.01)
+        // Losing weight or maintaining: 80 * 1.6 = 128g, whatever the night's sleep was
+        assertEquals(128.0, PhysiologyEngine.calculateMacroTargets(profile, 2500.0).proteinG, 0.01)
+        assertEquals(128.0, PhysiologyEngine.calculateMacroTargets(profile.copy(goal = "MAINTAIN"), 2500.0).proteinG, 0.01)
 
-        // Scenario 2: Zero readiness (0) -> lower protein target
-        val targetsLowReadiness = PhysiologyEngine.calculateMacroTargets(
-            profile = profile,
-            tdee = 2500.0,
-            readinessScore = 0,
-            activeCalories = 0.0
+        // Building muscle: 80 * 2.0 = 160g
+        assertEquals(160.0, PhysiologyEngine.calculateMacroTargets(profile.copy(goal = "GAIN_MUSCLE"), 2500.0).proteinG, 0.01)
+    }
+
+    @Test
+    fun testProteinTargetUsesHealthyWeightAboveBmi27() {
+        // 120kg at 175cm is BMI 39; protein is based on the weight at BMI 27: 27 * 1.75^2 = 82.69kg
+        val profile = UserProfileEntity(
+            id = 0,
+            age = 40,
+            heightCm = 175.0,
+            weightKg = 120.0,
+            isMale = true,
+            goal = "LOSE_WEIGHT"
         )
-        // Protein should be 80 * 1.6 = 128g
-        assertEquals(128.0, targetsLowReadiness.proteinG, 0.01)
+        assertEquals(82.69 * 1.6, PhysiologyEngine.calculateMacroTargets(profile, 2800.0).proteinG, 0.05)
     }
 
     @Test
@@ -102,7 +104,7 @@ class PhysiologyEngineTest {
         // BMR is 1780.0
         // TDEE = BMR * Multiplier = 1780.0 * 1.2 = 2136.0 (active calories ignored in target)
         // Target Calories = TDEE + Calorie Offset = 2136.0
-        // Readiness = 100 (readinessFactor = 1.0) -> Base Protein = 80 * 2.2 = 176g
+        // Default goal (lose weight) -> Protein = 80 * 1.6 = 128g
         // Active calories are ignored for macro target scaling
         
         val tdee = PhysiologyEngine.calculateTdee(1780.0, 1.2, 500.0)
@@ -111,17 +113,16 @@ class PhysiologyEngineTest {
         val targets = PhysiologyEngine.calculateMacroTargets(
             profile = profile,
             tdee = tdee,
-            readinessScore = 100,
             activeCalories = 500.0
         )
 
         assertEquals(2136.0, targets.calories, 0.01)
-        assertEquals(176.0, targets.proteinG, 0.01)
+        assertEquals(128.0, targets.proteinG, 0.01)
         
         // Fat target: 2136.0 * 0.25 / 9 = 59.33g
         assertEquals(59.33, targets.fatG, 0.01)
         
-        // Carbs target: (2136.0 - (176.0 * 4) - (59.33 * 9)) / 4 = (2136.0 - 704 - 533.97) / 4 = 224.5g
-        assertEquals(224.50, targets.carbsG, 0.01)
+        // Carbs target: (2136.0 - (128.0 * 4) - (59.33 * 9)) / 4 = (2136.0 - 512 - 534.0) / 4 = 272.5g
+        assertEquals(272.50, targets.carbsG, 0.01)
     }
 }

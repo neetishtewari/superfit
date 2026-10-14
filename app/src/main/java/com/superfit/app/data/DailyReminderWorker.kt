@@ -52,8 +52,7 @@ class DailyReminderWorker(
             if (profile != null) {
                 val bmr = PhysiologyEngine.calculateBmr(profile)
                 val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier)
-                val targets = PhysiologyEngine.calculateMacroTargets(profile, tdee, 50)
-                targets.calories
+                PhysiologyEngine.calculateMacroTargets(profile, tdee).calories
             } else {
                 2000.0
             }
@@ -70,53 +69,37 @@ class DailyReminderWorker(
             // Log is complete -> Send Daily AI Coaching Summary
             val apiKey = GeminiKeyStore(applicationContext).get()
             try {
-                val activity = database.telemetryDao().getActivity(today.toString()) 
-                    ?: com.superfit.app.data.ActivityTelemetryEntity(today.toString(), 0, 0.0)
-                val sleep = database.telemetryDao().getSleep(today.toString())
-
-                val bmr = if (profile != null) PhysiologyEngine.calculateBmr(profile) else 1500.0
-                val tdee = if (profile != null) PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier) else 2000.0
-                val targets = if (profile != null) {
-                    PhysiologyEngine.calculateMacroTargets(profile, tdee, sleep?.readinessScore ?: 50)
+                val coachProfile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2)
+                val bmr = PhysiologyEngine.calculateBmr(coachProfile)
+                val tdee = PhysiologyEngine.calculateTdee(bmr, coachProfile.activityMultiplier)
+                val targets = if (customMacroEnabled) {
+                    MacroTargets(
+                        calories = sharedPrefs.getInt("custom_calories", 2000).toDouble(),
+                        proteinG = sharedPrefs.getInt("custom_protein_g", 130).toDouble(),
+                        carbsG = sharedPrefs.getInt("custom_carbs_g", 200).toDouble(),
+                        fatG = sharedPrefs.getInt("custom_fat_g", 70).toDouble()
+                    )
                 } else {
-                    MacroTargets(2000.0, 130.0, 200.0, 70.0)
+                    PhysiologyEngine.calculateMacroTargets(coachProfile, tdee)
                 }
 
-                val proteinEaten = entries.sumOf { it.proteinG }
-                val carbsEaten = entries.sumOf { it.carbsG }
-                val fatEaten = entries.sumOf { it.fatG }
-
-                val historyNutrition = database.nutritionDao().getAllEntries()
-                val historyWorkouts = database.workoutDao().getAllEntries()
-                val historyActivity = database.telemetryDao().getAllActivity()
-                val historySleep = database.telemetryDao().getAllSleep()
-
-                val coachingEngine = CoachingEngine(apiKey)
-                val insight = coachingEngine.generateDailyInsight(
-                    profile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2),
-                    activity = activity,
-                    sleep = sleep,
-                    nutrition = entries,
+                val insight = CoachingEngine(apiKey).generateDailyInsight(
+                    profile = coachProfile,
                     macroTargets = targets,
-                    caloriesEaten = totalCalories,
-                    proteinEaten = proteinEaten,
-                    carbsEaten = carbsEaten,
-                    fatEaten = fatEaten,
-                    historyNutrition = historyNutrition,
-                    historyWorkouts = historyWorkouts,
-                    historyActivity = historyActivity,
-                    historySleep = historySleep
+                    maintenanceCalories = if (customMacroEnabled) null else tdee,
+                    historyNutrition = database.nutritionDao().getAllEntries(),
+                    historyWorkouts = database.workoutDao().getAllEntries(),
+                    historyActivity = database.telemetryDao().getAllActivity(),
+                    historySleep = database.telemetryDao().getAllSleep(),
+                    memory = CoachInsightStore.memory(sharedPrefs)
                 )
 
-                // Cache generated insight in shared prefs for dashboard
-                sharedPrefs.edit()
-                    .putString("coaching_insight_date", today.toString())
-                    .putString("coaching_insight_text", insight)
-                    .apply()
+                // Cache for the home screen, and remember what was said
+                CoachInsightStore.save(sharedPrefs, today, insight)
 
                 sendNotification(
-                    title = "⚡ Daily AI Coaching Insight",
-                    text = insight
+                    title = "⚡ Your coach",
+                    text = insight.asText().replace("**", "")
                 )
             } catch (e: Exception) {
                 android.util.Log.e("DailyReminderWorker", "AI Coaching notification generation failed", e)

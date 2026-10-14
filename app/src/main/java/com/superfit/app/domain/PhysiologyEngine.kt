@@ -58,23 +58,21 @@ object PhysiologyEngine {
     }
 
     /**
-     * Computes macronutrient targets based on TDEE, bodyweight, sleep readiness, and active calories.
-     * Higher sleep readiness shifts recommendations towards support for higher training volume (more carbs & protein).
-     * Lower sleep readiness shifts macronutrients to conserve energy and promote recovery.
-     * Includes a recovery protein bonus of 0.05g per active calorie.
+     * Computes macronutrient targets from TDEE, body weight and goal.
+     * Protein is a steady daily number (it no longer moves with the night's sleep), so the
+     * coach can judge it over days and weeks: about 1.6g per kg to lose weight or maintain,
+     * 2.0g per kg to build muscle. Above a BMI of 27 it is based on the weight at BMI 27,
+     * so the target stays realistic for people with a lot of weight to lose.
      */
     fun calculateMacroTargets(
         profile: UserProfileEntity,
         tdee: Double,
-        readinessScore: Int,
         activeCalories: Double = 0.0
     ): MacroTargets {
         // Apply the calorie offset to the computed TDEE
         val adjustedTargetCalories = (tdee + profile.calorieOffset).coerceAtLeast(1200.0)
 
-        // Protein: 1.6g/kg to 2.2g/kg depending on readiness
-        val readinessFactor = readinessScore / 100.0
-        val proteinG = (profile.weightKg * (1.6 + 0.6 * readinessFactor)).coerceAtLeast(40.0)
+        val proteinG = (proteinReferenceWeightKg(profile) * proteinPerKg(profile.goal)).coerceAtLeast(40.0)
 
         // Fat: hormonal baseline, 25% of adjusted target calories
         val fatCalories = adjustedTargetCalories * 0.25
@@ -92,6 +90,14 @@ object PhysiologyEngine {
             carbsG = carbsG,
             fatG = fatG
         )
+    }
+
+    fun proteinPerKg(goal: String): Double = if (goal == "GAIN_MUSCLE") 2.0 else 1.6
+
+    fun proteinReferenceWeightKg(profile: UserProfileEntity): Double {
+        val heightM = profile.heightCm / 100.0
+        if (heightM <= 0.0) return profile.weightKg
+        return minOf(profile.weightKg, 27.0 * heightM * heightM)
     }
 }
 
