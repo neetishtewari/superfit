@@ -91,6 +91,7 @@ class DailyReminderWorker(
                     historyWorkouts = database.workoutDao().getAllEntries(),
                     historyActivity = database.telemetryDao().getAllActivity(),
                     historySleep = database.telemetryDao().getAllSleep(),
+                    historyWeights = database.weightDao().getAllWeightEntries(),
                     memory = CoachInsightStore.memory(sharedPrefs)
                 )
 

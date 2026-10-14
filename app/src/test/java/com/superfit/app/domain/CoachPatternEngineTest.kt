@@ -2,6 +2,7 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.WeightEntryEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -39,7 +40,8 @@ class CoachPatternEngineTest {
     private fun analyze(
         nutrition: List<NutritionEntryEntity>,
         activity: List<ActivityTelemetryEntity> = emptyList(),
-        goal: String = "LOSE_WEIGHT"
+        goal: String = "LOSE_WEIGHT",
+        weights: List<WeightEntryEntity> = emptyList()
     ) = CoachPatternEngine.analyze(
         today = today,
         now = LocalTime.of(18, 0),
@@ -51,8 +53,14 @@ class CoachPatternEngineTest {
         workouts = emptyList(),
         activity = activity,
         sleep = emptyList(),
+        weights = weights,
+        targetWeightKg = 75.0,
         zone = zone
     )
+
+    private fun weighIns(vararg pairs: Pair<Int, Double>) = pairs.map { (daysAgo, kg) ->
+        WeightEntryEntity(weightKg = kg, timestamp = today.minusDays(daysAgo.toLong()).atTime(7, 0).toInstant(zone).toEpochMilli())
+    }
 
     private fun CoachReport.ids() = findings.map { it.id }
 
@@ -184,5 +192,36 @@ class CoachPatternEngineTest {
         val report = analyze(emptyList())
         assertTrue(report.findings.isEmpty())
         assertEquals(0, report.loggedDaysLastWeek)
+    }
+
+    // ---- Weight -----------------------------------------------------------------------------
+
+    @Test
+    fun `scale not moving while logged calories look on target points at unlogged food`() {
+        val logs = (1..6).flatMap { fullDay(it, 130.0) }
+        val weights = weighIns(21 to 80.2, 14 to 79.8, 7 to 80.3, 1 to 80.0)
+        val finding = analyze(logs, weights = weights).findings.first { it.id == "weight_stalled" }
+        assertTrue(finding.meaning, finding.meaning.contains("isn't getting logged"))
+    }
+
+    @Test
+    fun `steady loss is a win and says how far there is to go`() {
+        val weights = weighIns(28 to 82.0, 21 to 81.5, 14 to 81.0, 7 to 80.5, 0 to 80.0)
+        val finding = analyze(emptyList(), weights = weights).findings.first { it.id == "weight_on_track" }
+        assertEquals(FindingKind.WIN, finding.kind)
+        assertTrue(finding.fact, finding.fact.contains("0.5 kg a week"))
+        assertTrue(finding.fact, finding.fact.contains("5.0 kg to go"))
+    }
+
+    @Test
+    fun `losing too fast is flagged`() {
+        val weights = weighIns(21 to 85.0, 14 to 83.4, 7 to 81.6, 0 to 80.0)
+        assertTrue(analyze(emptyList(), weights = weights).ids().contains("weight_fast"))
+    }
+
+    @Test
+    fun `too few weigh-ins give no trend, and an old one asks for a new reading`() {
+        assertTrue(analyze(emptyList(), weights = weighIns(10 to 81.0, 3 to 79.5)).findings.none { it.area == "weight" })
+        assertEquals(listOf("weight_stale"), analyze(emptyList(), weights = weighIns(20 to 80.0)).ids())
     }
 }

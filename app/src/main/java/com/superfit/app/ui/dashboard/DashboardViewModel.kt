@@ -175,7 +175,9 @@ class DashboardViewModel(
                         nutrition = repository.getAllNutritionEntries(),
                         workouts = repository.getAllWorkoutEntries(),
                         activity = repository.getAllActivityTelemetry(),
-                        sleep = repository.getAllSleepTelemetry()
+                        sleep = repository.getAllSleepTelemetry(),
+                        weights = repository.getAllWeightEntries(),
+                        targetWeightKg = profile.targetWeightKg
                     )
                 )
 
@@ -516,6 +518,7 @@ class DashboardViewModel(
                     historyWorkouts = repository.getAllWorkoutEntries(),
                     historyActivity = repository.getAllActivityTelemetry(),
                     historySleep = repository.getAllSleepTelemetry(),
+                    historyWeights = repository.getAllWeightEntries(),
                     memory = CoachInsightStore.memory(sharedPrefs)
                 )
 

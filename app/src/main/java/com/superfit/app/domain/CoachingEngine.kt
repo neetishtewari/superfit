@@ -4,6 +4,7 @@ import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.UserProfileEntity
+import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import org.json.JSONObject
 import java.time.LocalDate
@@ -67,6 +68,7 @@ class CoachingEngine(private val apiKey: String) {
         historyWorkouts: List<WorkoutEntryEntity>,
         historyActivity: List<ActivityTelemetryEntity>,
         historySleep: List<SleepTelemetryEntity>,
+        historyWeights: List<WeightEntryEntity>,
         memory: List<CoachMemoryEntry>,
         today: LocalDate = LocalDate.now(),
         now: LocalTime = LocalTime.now()
@@ -81,7 +83,9 @@ class CoachingEngine(private val apiKey: String) {
             nutrition = historyNutrition,
             workouts = historyWorkouts,
             activity = historyActivity,
-            sleep = historySleep
+            sleep = historySleep,
+            weights = historyWeights,
+            targetWeightKg = profile.targetWeightKg
         )
         val focus = chooseFocus(report, memory, today)
         val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
@@ -131,7 +135,8 @@ class CoachingEngine(private val apiKey: String) {
             "veg" to "vegetables and fruit",
             "steps" to "your steps",
             "sleep" to "your sleep",
-            "workouts" to "your workouts"
+            "workouts" to "your workouts",
+            "weight" to "your weight trend"
         )
 
         /**

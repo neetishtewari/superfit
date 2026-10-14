@@ -3,6 +3,7 @@ package com.superfit.app.domain
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.SleepTelemetryEntity
+import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import java.time.DayOfWeek
 import java.time.Instant
@@ -96,6 +97,8 @@ object CoachPatternEngine {
         workouts: List<WorkoutEntryEntity>,
         activity: List<ActivityTelemetryEntity>,
         sleep: List<SleepTelemetryEntity>,
+        weights: List<WeightEntryEntity> = emptyList(),
+        targetWeightKg: Double? = null,
         zone: ZoneId = ZoneId.systemDefault()
     ): CoachReport {
         val byDate = nutrition.groupBy { dateOf(it.timestamp, zone) }
@@ -116,6 +119,7 @@ object CoachPatternEngine {
         checkLogging(lastWeek, days.take(14), completeLastWeek.size, zone, findings)
         checkProtein(completeLastWeek, lastWeek, targets, weightKg, goal, zone, findings, checked)
         checkCalories(completeLastWeek, days.take(28), targets, maintenanceCalories, goal, findings, checked)
+        checkWeight(today, weights, goal, targetWeightKg, zone, findings, checked)
         checkTreats(today, byDate, zone, goal, days.take(7).any { it.status == DayLogStatus.BLANK }, findings, checked)
         checkVegAndFruit(completeLastWeek, findings, checked)
         checkSteps(today, activity, weightKg, findings, checked)
@@ -376,6 +380,119 @@ object CoachPatternEngine {
                     fact = "Weekends average ${num(weekendAvg.roundToInt())} kcal vs ${num(weekdayAvg.roundToInt())} on weekdays.",
                     meaning = "The two weekend days add about ${num(extraPerWeek)} kcal a week on top of your weekdays, which can quietly undo the week's progress.",
                     suggestion = "Plan one weekend treat meal in advance and keep the other weekend meals like a normal weekday."
+                )
+            }
+        }
+    }
+
+    /**
+     * The scale, read as a trend: a straight line through the last 4 weeks of weigh-ins, so
+     * day-to-day water swings don't count. Needs at least 3 weigh-ins spread over 2+ weeks.
+     */
+    private fun checkWeight(
+        today: LocalDate,
+        weights: List<WeightEntryEntity>,
+        goal: String,
+        targetWeightKg: Double?,
+        zone: ZoneId,
+        out: MutableList<CoachFinding>,
+        checked: MutableSet<String>
+    ) {
+        if (weights.isEmpty()) return
+        val readings = weights.map { dateOf(it.timestamp, zone) to it.weightKg }.sortedBy { it.first }
+        val lastDate = readings.last().first
+        val daysSinceLast = java.time.temporal.ChronoUnit.DAYS.between(lastDate, today).toInt()
+        val trendMeaning = "Weight jumps around by a kilo or more from day to day with water and food, so I go by the trend over weeks, not single readings."
+
+        val recent = readings.filter { java.time.temporal.ChronoUnit.DAYS.between(it.first, today) <= 28 }
+        val span = if (recent.size >= 2) java.time.temporal.ChronoUnit.DAYS.between(recent.first().first, recent.last().first).toInt() else 0
+        if (recent.size < 3 || span < 14) {
+            if (daysSinceLast >= 14) {
+                out += CoachFinding(
+                    id = "weight_stale", area = "weight", kind = FindingKind.LOGGING, priority = 25,
+                    fact = "Your last weigh-in was $daysSinceLast days ago.",
+                    meaning = "Weighing in once or twice a week, at the same time of day, is how I can tell whether the plan is working. $trendMeaning",
+                    suggestion = "Weigh yourself tomorrow morning, before eating, and log it."
+                )
+            }
+            return
+        }
+        checked += "weight"
+
+        // Least-squares slope in kg per day.
+        val xs = recent.map { java.time.temporal.ChronoUnit.DAYS.between(recent.first().first, it.first).toDouble() }
+        val ys = recent.map { it.second }
+        val xMean = xs.average()
+        val yMean = ys.average()
+        val denominator = xs.sumOf { (it - xMean) * (it - xMean) }
+        if (denominator == 0.0) return
+        val slopePerDay = xs.indices.sumOf { (xs[it] - xMean) * (ys[it] - yMean) } / denominator
+        val perWeek = slopePerDay * 7
+        val current = yMean + slopePerDay * (xs.last() - xMean)
+        val weeks = (span / 7.0).roundToInt().coerceAtLeast(2)
+        val change = slopePerDay * span
+        val onePercent = current * 0.01
+        val start = fmtKg(recent.first().second)
+        val end = fmtKg(recent.last().second)
+        val toGo = targetWeightKg?.takeIf { it > 0 && abs(current - it) >= 0.5 }?.let {
+            " About ${fmtKg(abs(current - it))} kg to go to your target of ${fmtKg(it)} kg."
+        } ?: ""
+        val caloriesOnTrack = out.any { it.id == "calories_on_track" }
+        val caloriesHigh = out.any { it.id == "calories_high" }
+
+        when (goal) {
+            "LOSE_WEIGHT" -> when {
+                perWeek > -0.1 -> out += CoachFinding(
+                    id = "weight_stalled", area = "weight", kind = FindingKind.CONCERN, priority = 78,
+                    fact = "Your weight has held at about ${fmtKg(current)} kg over the last $weeks weeks ($start kg to $end kg).",
+                    meaning = when {
+                        caloriesHigh -> "That fits with eating above your calorie target. Bringing the weekly average down is what will get the scale moving again."
+                        caloriesOnTrack -> "Your logged calories look on target, so the gap is most likely food that isn't getting logged (cooking oil, ghee, drinks, nibbles) or a lower daily burn than estimated. Trimming about 150 to 200 kcal a day usually restarts progress."
+                        else -> "To lose weight, the weekly calorie average has to sit below what you burn. $trendMeaning"
+                    },
+                    suggestion = if (caloriesOnTrack) "For the next few days, log everything, including oil, ghee, tea, drinks and small bites."
+                    else "Aim for your calorie target today and log every meal, so we can see where the gap is."
+                )
+                perWeek < -onePercent -> out += CoachFinding(
+                    id = "weight_fast", area = "weight", kind = FindingKind.CONCERN, priority = 70,
+                    fact = "You're losing about ${fmtKg(-perWeek)} kg a week ($start kg to $end kg over $weeks weeks).",
+                    meaning = "Faster than about 1% of body weight a week (${fmtKg(onePercent)} kg for you) tends to cost muscle and is hard to keep up. A steady 0.5 to 0.75 kg a week lasts.",
+                    suggestion = "Eat up to your full calorie target today, with protein in every meal."
+                )
+                perWeek <= -0.2 -> out += CoachFinding(
+                    id = "weight_on_track", area = "weight", kind = FindingKind.WIN, priority = 58,
+                    fact = "You're down about ${fmtKg(-change)} kg over the last $weeks weeks, roughly ${fmtKg(-perWeek)} kg a week.$toGo",
+                    meaning = "That's a healthy pace you can keep up, and the kind of loss that stays off.",
+                    suggestion = "Keep the same routine today."
+                )
+            }
+            "GAIN_MUSCLE" -> when {
+                perWeek > current * 0.005 -> out += CoachFinding(
+                    id = "weight_gain_fast", area = "weight", kind = FindingKind.CONCERN, priority = 60,
+                    fact = "You're gaining about ${fmtKg(perWeek)} kg a week ($start kg to $end kg over $weeks weeks).",
+                    meaning = "Muscle builds slowly, about 0.25 to 0.5% of body weight a week at most. Gaining faster than that is mostly fat.",
+                    suggestion = "Trim your surplus a little: keep the protein, cut back on extras like sweets or fried snacks."
+                )
+                perWeek < 0.05 -> out += CoachFinding(
+                    id = "weight_gain_stalled", area = "weight", kind = FindingKind.CONCERN, priority = 60,
+                    fact = "Your weight has held at about ${fmtKg(current)} kg over the last $weeks weeks.",
+                    meaning = "Building muscle needs a small, steady gain. If the scale isn't moving, your training doesn't have the extra fuel it needs.",
+                    suggestion = "Add one extra snack today, like curd with nuts or a banana with peanut butter."
+                )
+                else -> out += CoachFinding(
+                    id = "weight_gain_on_track", area = "weight", kind = FindingKind.WIN, priority = 50,
+                    fact = "You're gaining about ${fmtKg(perWeek)} kg a week, a lean pace for building muscle.$toGo",
+                    meaning = "Slow and steady keeps the gain mostly muscle.",
+                    suggestion = "Keep the same routine today."
+                )
+            }
+            else -> if (abs(change) >= 1.5) {
+                val direction = if (change > 0) "up" else "down"
+                out += CoachFinding(
+                    id = "weight_drift", area = "weight", kind = FindingKind.CONCERN, priority = 50,
+                    fact = "Your weight has drifted $direction about ${fmtKg(abs(change))} kg over the last $weeks weeks ($start kg to $end kg).",
+                    meaning = "You're aiming to maintain, so a steady drift like this is worth correcting early while it's small.",
+                    suggestion = if (change > 0) "Keep portions close to your calorie target today." else "Make sure today has three full meals."
                 )
             }
         }
@@ -695,6 +812,8 @@ object CoachPatternEngine {
     private fun dateOf(timestamp: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
 
     private fun parseDate(text: String): LocalDate? = runCatching { LocalDate.parse(text) }.getOrNull()
+
+    private fun fmtKg(value: Double): String = String.format(Locale.US, "%.1f", value)
 
     private fun num(value: Int): String = String.format(Locale.US, "%,d", value)
 
