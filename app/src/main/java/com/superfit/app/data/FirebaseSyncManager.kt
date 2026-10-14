@@ -118,28 +118,29 @@ class FirebaseSyncManager(private val context: Context) {
             // 4. Nutrition Entries
             val nutritionSnap = firestore.collection("users").document(userId).collection("nutrition").get().await()
             val entries = nutritionSnap.documents.mapNotNull { it.data?.toNutritionEntry() }
-            // Clear local nutrition entries first to ensure an exact sync match
-            database.nutritionDao().deleteAllEntries()
-            if (entries.isNotEmpty()) {
-                database.nutritionDao().insertEntries(entries)
-            }
+            // Merge only: add what the phone is missing and never delete or overwrite what it has.
+            // The cloud copy can be incomplete (older versions backed up just the latest entry),
+            // so treating it as the full history would throw away the user's own log.
+            val localNutritionTimes = database.nutritionDao().getAllEntries().map { it.timestamp }.toSet()
+            database.nutritionDao().insertEntriesIfMissing(
+                withoutLegacyDuplicates(entries, localNutritionTimes, { it.id }, { it.timestamp })
+            )
 
             // 5. Workout Entries
             val workoutSnap = firestore.collection("users").document(userId).collection("workouts").get().await()
             val workouts = workoutSnap.documents.mapNotNull { it.data?.toWorkoutEntry() }
-            // Clear local workout entries first to ensure an exact sync match
-            database.workoutDao().deleteAllEntries()
-            if (workouts.isNotEmpty()) {
-                database.workoutDao().insertEntries(workouts)
-            }
+            val localWorkoutTimes = database.workoutDao().getAllEntries().map { it.timestamp }.toSet()
+            database.workoutDao().insertEntriesIfMissing(
+                withoutLegacyDuplicates(workouts, localWorkoutTimes, { it.id }, { it.timestamp })
+            )
 
             // 6. Weight Entries
             val weightSnap = firestore.collection("users").document(userId).collection("weights").get().await()
             val weights = weightSnap.documents.mapNotNull { it.data?.toWeightEntry() }
-            if (weights.isNotEmpty()) {
-                database.weightDao().deleteAllWeights()
-                database.weightDao().insertWeights(weights)
-            }
+            val localWeightTimes = database.weightDao().getAllWeightEntries().map { it.timestamp }.toSet()
+            database.weightDao().insertWeightsIfMissing(
+                withoutLegacyDuplicates(weights, localWeightTimes, { it.id }, { it.timestamp })
+            )
 
             // 7. Streak State
             val streakDoc = firestore.collection("users").document(userId).collection("streak").document("current").get().await()
@@ -153,14 +154,52 @@ class FirebaseSyncManager(private val context: Context) {
             // 8. Habit Entries
             val habitSnap = firestore.collection("users").document(userId).collection("habits").get().await()
             val habits = habitSnap.documents.mapNotNull { it.data?.toHabitEntry() }
+            // Habits are stored one per date, so the cloud copy of a day replaces that day only.
             if (habits.isNotEmpty()) {
-                database.habitDao().deleteAllHabits()
                 database.habitDao().insertHabitEntries(habits)
             }
 
             Log.d(tag, "Full bi-directional sync down complete.")
         } catch (e: Exception) {
             Log.e(tag, "Error syncing data down: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Older versions uploaded every new meal, workout and weight before Room gave it an id, so
+     * they all landed in the cloud document "0" and only the latest one survived. Uploads every
+     * local entry under its real id so the backup holds the full history. The stale "0" documents
+     * are left alone; [syncAllDown] skips them when the entry they hold is already present.
+     *
+     * Runs once per user (tracked in their prefs) and is retried on the next launch if any
+     * upload fails.
+     */
+    suspend fun repairEntryBackupsOnce() {
+        val userId = auth.currentUser?.uid ?: return
+        val prefs = getUserSharedPrefs(context)
+        if (prefs.getBoolean(PREF_ENTRY_BACKUP_REPAIRED, false)) return
+        try {
+            val userDoc = firestore.collection("users").document(userId)
+            val writes = mutableListOf<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any>>>()
+            database.nutritionDao().getAllEntries().filter { it.id != 0L }.forEach {
+                writes += userDoc.collection("nutrition").document(it.id.toString()) to it.toMap()
+            }
+            database.workoutDao().getAllEntries().filter { it.id != 0L }.forEach {
+                writes += userDoc.collection("workouts").document(it.id.toString()) to it.toMap()
+            }
+            database.weightDao().getAllWeightEntries().filter { it.id != 0L }.forEach {
+                writes += userDoc.collection("weights").document(it.id.toString()) to it.toMap()
+            }
+            // Firestore allows at most 500 writes per batch.
+            for (chunk in writes.chunked(400)) {
+                val batch = firestore.batch()
+                chunk.forEach { (ref, data) -> batch.set(ref, data) }
+                batch.commit().await()
+            }
+            prefs.edit().putBoolean(PREF_ENTRY_BACKUP_REPAIRED, true).apply()
+            Log.d(tag, "Backed up ${writes.size} meals, workouts and weights under their own ids.")
+        } catch (e: Exception) {
+            Log.e(tag, "Error repairing entry backups: ${e.message}", e)
         }
     }
 
@@ -500,4 +539,8 @@ class FirebaseSyncManager(private val context: Context) {
         stepsCompleted = this["stepsCompleted"] as? Boolean ?: false,
         sleepCompleted = this["sleepCompleted"] as? Boolean ?: false
     )
+
+    companion object {
+        private const val PREF_ENTRY_BACKUP_REPAIRED = "entry_backup_repaired_v1"
+    }
 }

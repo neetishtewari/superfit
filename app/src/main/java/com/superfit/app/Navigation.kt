@@ -60,6 +60,10 @@ fun MainNavigation(
                 val hasProfile = repository.getProfile() != null
                 startDestination = if (hasProfile) Dashboard else Onboarding
             }
+            // Re-upload meals, workouts and weights that older versions failed to back up.
+            coroutineScope.launch {
+                repository.firebaseSyncManager.repairEntryBackupsOnce()
+            }
         }
     }
 
