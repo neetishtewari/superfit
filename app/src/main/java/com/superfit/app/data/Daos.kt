@@ -64,6 +64,9 @@ interface NutritionDao {
     @Delete
     suspend fun deleteEntry(entry: NutritionEntryEntity)
 
+    @Query("UPDATE nutrition_entries SET qualityTags = :tags WHERE id = :id")
+    suspend fun setQualityTags(id: Long, tags: String)
+
     @Query("SELECT * FROM nutrition_entries WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
     fun getEntriesForDayFlow(startOfDay: Long, endOfDay: Long): Flow<List<NutritionEntryEntity>>
 

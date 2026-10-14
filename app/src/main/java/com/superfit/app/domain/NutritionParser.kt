@@ -14,6 +14,7 @@ class NutritionParser(private val apiKey: String) {
         "- \"protein\": Double\n" +
         "- \"carbs\": Double\n" +
         "- \"fat\": Double\n" +
+        MealTags.PROMPT_FIELDS +
         "Provide reasonable estimations if quantities or specific types are not detailed by the user.\n" +
         "CRITICAL: If the user's input is gibberish, background noise, or completely unrelated to food, meals, or beverages, set the \"foodText\" field to exactly \"invalid\" and set \"calories\", \"protein\", \"carbs\", and \"fat\" all to 0.0."
 
@@ -53,13 +54,15 @@ class NutritionParser(private val apiKey: String) {
         val protein = jsonObject.optDouble("protein", 0.0)
         val carbs = jsonObject.optDouble("carbs", 0.0)
         val fat = jsonObject.optDouble("fat", 0.0)
+        val tags = runCatching { MealTags.fromJson(jsonObject) }.getOrNull()
 
         return ParsedNutritionResult(
             foodText = foodText,
             calories = calories,
             proteinG = protein,
             carbsG = carbs,
-            fatG = fat
+            fatG = fat,
+            tags = tags
         )
     }
 }
@@ -69,5 +72,6 @@ data class ParsedNutritionResult(
     val calories: Double,
     val proteinG: Double,
     val carbsG: Double,
-    val fatG: Double
+    val fatG: Double,
+    val tags: MealTags? = null
 )

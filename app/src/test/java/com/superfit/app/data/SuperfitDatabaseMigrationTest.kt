@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,7 +86,7 @@ class SuperfitDatabaseMigrationTest {
         try {
             // Opening the database runs the migrations and Room's schema validation.
             val db = database.openHelper.writableDatabase
-            assertEquals(5, db.version)
+            assertEquals(6, db.version)
 
             db.query("SELECT weightKg, startingWeightKg, fitnessLevel FROM user_profile WHERE id = 0").use { cursor ->
                 assertEquals(1, cursor.count)
@@ -97,6 +98,11 @@ class SuperfitDatabaseMigrationTest {
             db.query("SELECT COUNT(*) FROM nutrition_entries").use { cursor ->
                 cursor.moveToFirst()
                 assertEquals(1, cursor.getInt(0))
+            }
+            // Meals logged before quality tags existed have none until the AI tags them.
+            db.query("SELECT qualityTags FROM nutrition_entries").use { cursor ->
+                cursor.moveToFirst()
+                assertTrue(cursor.isNull(0))
             }
             db.query("SELECT difficultyRating FROM workout_entries").use { cursor ->
                 assertEquals(if (expectWorkoutRow) 1 else 0, cursor.count)

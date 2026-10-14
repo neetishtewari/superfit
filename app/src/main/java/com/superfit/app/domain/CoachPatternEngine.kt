@@ -133,7 +133,7 @@ object CoachPatternEngine {
             proteinSoFar = proteinSoFar.roundToInt(),
             proteinStillNeeded = (targets.proteinG - proteinSoFar).coerceAtLeast(0.0).roundToInt(),
             mealsLogged = todayEntries.map { slotOf(it.timestamp, zone) }.distinct().sorted(),
-            treatsToday = todayEntries.mapNotNull { treatCategory(it.foodText) }.distinct(),
+            treatsToday = todayEntries.mapNotNull { treatCategoryOf(it) }.distinct(),
             hour = now.hour
         )
 
@@ -517,7 +517,7 @@ object CoachPatternEngine {
                 byDate[date].orEmpty()
                     .groupBy { slotOf(it.timestamp, zone) }
                     .values.mapNotNull { meal ->
-                        val cats = meal.mapNotNull { treatCategory(it.foodText) }.toSet()
+                        val cats = meal.mapNotNull { treatCategoryOf(it) }.toSet()
                         if (cats.isEmpty()) null else TreatMeal(date, cats)
                     }
             }
@@ -549,7 +549,7 @@ object CoachPatternEngine {
             )
         } else {
             // A category that turns up every single week for the last three weeks.
-            val everyWeek = treatCategories.map { it.first }.firstOrNull { cat ->
+            val everyWeek = thisWeek.flatMap { it.categories }.distinct().firstOrNull { cat ->
                 (listOf(thisWeek) + previousWeeks.take(2)).all { week -> week.any { cat in it.categories } }
             }
             if (everyWeek != null) {
@@ -587,7 +587,7 @@ object CoachPatternEngine {
     private fun checkVegAndFruit(completeDays: List<DayLog>, out: MutableList<CoachFinding>, checked: MutableSet<String>) {
         if (completeDays.size < MIN_COMPLETE_DAYS) return
         checked += "veg"
-        val withVeg = completeDays.count { day -> day.entries.any { isVegOrFruit(it.foodText) } }
+        val withVeg = completeDays.count { day -> day.entries.any { hasVegOrFruit(it) } }
         if (withVeg * 2 < completeDays.size) {
             out += CoachFinding(
                 id = "veg_low", area = "veg", kind = FindingKind.CONCERN, priority = 60,
@@ -800,6 +800,16 @@ object CoachPatternEngine {
     )
 
     fun isVegOrFruit(foodText: String): Boolean = vegOrFruit.containsMatchIn(foodText)
+
+    /** Treat category of a logged meal, using the AI's tags when the meal has them. */
+    fun treatCategoryOf(entry: NutritionEntryEntity): String? {
+        val tags = MealTags.decode(entry.qualityTags) ?: return treatCategory(entry.foodText)
+        if (!tags.treat) return null
+        return treatCategory(entry.foodText) ?: tags.foodType.ifBlank { "treat" }
+    }
+
+    fun hasVegOrFruit(entry: NutritionEntryEntity): Boolean =
+        MealTags.decode(entry.qualityTags)?.let { it.vegFruitServings >= 0.5 } ?: isVegOrFruit(entry.foodText)
 
     // ---------------------------------------------------------------------------------------
     // Helpers

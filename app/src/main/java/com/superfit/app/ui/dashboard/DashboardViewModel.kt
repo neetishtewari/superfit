@@ -78,7 +78,34 @@ class DashboardViewModel(
         checkPermissions()
         loadCachedCoachingInsight()
         loadFrequentMeals()
+        tagOlderMeals()
         sharedPrefs.registerOnSharedPreferenceChangeListener(preferenceListener)
+    }
+
+    /**
+     * Meals logged before quality tags existed are judged from their names, which is rough.
+     * Once a day, ask the AI to tag the last 4 weeks of them in a few batches.
+     */
+    private fun tagOlderMeals() {
+        val todayStr = LocalDate.now().toString()
+        if (sharedPrefs.getString("meal_tag_backfill_date", "") == todayStr) return
+        viewModelScope.launch {
+            try {
+                val cutoff = System.currentTimeMillis() - 28L * 24 * 3600 * 1000
+                val untagged = repository.getAllNutritionEntries()
+                    .filter { it.qualityTags == null && it.timestamp >= cutoff && it.id != 0L }
+                    .sortedByDescending { it.timestamp }
+                    .take(60)
+                val tagger = com.superfit.app.domain.MealTagger(_apiKey.value)
+                untagged.chunked(20).forEach { batch ->
+                    val tags = tagger.tag(batch)
+                    batch.forEach { entry -> tags[entry.id]?.let { repository.saveMealTags(entry, it.encode()) } }
+                }
+                sharedPrefs.edit().putString("meal_tag_backfill_date", todayStr).apply()
+            } catch (e: Exception) {
+                android.util.Log.w("DashboardViewModel", "Tagging older meals failed; will retry next launch", e)
+            }
+        }
     }
 
     fun loadFrequentMeals() {
@@ -313,7 +340,9 @@ class DashboardViewModel(
 
             val dietQualityMetrics = com.superfit.app.domain.FoodQualityEngine.analyzeDietQuality(
                 nutritionHistory = allNutritionHistory,
-                userGoal = profile.goal
+                userGoal = profile.goal,
+                proteinTargetG = macroTargets.proteinG,
+                calorieTarget = macroTargets.calories
             )
 
             DashboardUiState.Success(
@@ -414,7 +443,8 @@ class DashboardViewModel(
                     proteinG = result.proteinG,
                     carbsG = result.carbsG,
                     fatG = result.fatG,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    qualityTags = result.tags?.encode()
                 )
                 repository.addNutritionEntry(entry)
                 loadFrequentMeals()

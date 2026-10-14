@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.DietQualityMetrics
+import com.superfit.app.domain.DietScorePart
 import com.superfit.app.domain.FoodItemRating
 import com.superfit.app.domain.FoodSwapSuggestion
 import com.superfit.app.theme.*
@@ -75,12 +76,7 @@ fun FoodQualityCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    val headerTitle = when {
-                        metrics.allRatedItems.isEmpty() -> "DIET QUALITY INDEX"
-                        metrics.distinctDaysLogged <= 1 -> "DIET QUALITY INDEX (TODAY)"
-                        metrics.distinctDaysLogged < 7 -> "DIET QUALITY INDEX (${metrics.distinctDaysLogged}-DAY ROLLING)"
-                        else -> "DIET QUALITY INDEX (7-DAY ROLLING)"
-                    }
+                    val headerTitle = "DIET QUALITY · LAST 7 DAYS"
                     Text(
                         text = headerTitle,
                         fontSize = 11.sp,
@@ -96,7 +92,7 @@ fun FoodQualityCard(
                         color = NeonMint.copy(alpha = 0.15f)
                     ) {
                         Text(
-                            text = "${metrics.overallScore} / 100",
+                            text = if (metrics.hasEnoughData) "${metrics.overallScore} / 100" else "– / 100",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = NeonMint,
@@ -115,49 +111,88 @@ fun FoodQualityCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Score Category Pill & Linear Gauge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (!metrics.hasEnoughData) {
                 Text(
-                    text = metrics.scoreCategory,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = SuperfitTheme.colors.textPrimary,
-                    modifier = Modifier.weight(1f)
+                    text = "Log your meals on at least 3 days this week to see your score. It looks at the pattern of your week, so one meal or one day can't make or break it.",
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = SuperfitTheme.colors.textSecondary
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = metrics.scoreCategory,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = SuperfitTheme.colors.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    metrics.changeFromLastWeek?.let { change ->
+                        Text(
+                            text = when {
+                                change > 0 -> "▲ $change vs last week"
+                                change < 0 -> "▼ ${-change} vs last week"
+                                else -> "Same as last week"
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (change >= 0) NeonMint else SolarAmber,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LinearProgressIndicator(
+                    progress = { metrics.overallScore / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(CircleShape),
+                    color = if (metrics.overallScore >= 75) NeonMint else SolarAmber,
+                    trackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.1f)
                 )
 
-                val tapHint = when {
-                    metrics.allRatedItems.isEmpty() -> "Log meals to see items ➔"
-                    metrics.distinctDaysLogged <= 1 -> "Tap for tracked items ➔"
-                    metrics.distinctDaysLogged < 7 -> "Tap for ${metrics.distinctDaysLogged}-day items ➔"
-                    else -> "Tap for 7-day items ➔"
+                metrics.focusTip?.let { tip ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Biggest win available: $tip",
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = SuperfitTheme.colors.textPrimary
+                    )
                 }
+
+                if (metrics.breakdown.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        metrics.breakdown.forEach { part -> DietScorePartRow(part) }
+                    }
+                }
+
+                if (metrics.estimatedShare >= 0.3) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Some older meals are still being analysed, so this score may shift a little.",
+                        fontSize = 11.sp,
+                        color = SuperfitTheme.colors.textTertiary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = tapHint,
+                    text = "Tap to see each food ➔",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ElectricCyan,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .widthIn(max = 140.dp)
+                    color = ElectricCyan
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LinearProgressIndicator(
-                progress = { metrics.overallScore / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
-                color = if (metrics.overallScore >= 75) NeonMint else SolarAmber,
-                trackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.1f)
-            )
 
             // Top Clean Foods Row
             if (metrics.topCleanFoods.isNotEmpty()) {
@@ -185,6 +220,47 @@ fun FoodQualityCard(
             metrics = metrics,
             onDismiss = { showDetailBottomSheet = false },
             onLogSwap = onLogSwap
+        )
+    }
+}
+
+@Composable
+private fun DietScorePartRow(part: DietScorePart) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = part.label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = SuperfitTheme.colors.textPrimary,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${part.points} / ${part.maxPoints}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (part.points * 10 >= part.maxPoints * 8) NeonMint else SolarAmber,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+        LinearProgressIndicator(
+            progress = { part.points.toFloat() / part.maxPoints },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(CircleShape),
+            color = if (part.points * 10 >= part.maxPoints * 8) NeonMint else SolarAmber,
+            trackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.1f)
+        )
+        Text(
+            text = part.detail,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = SuperfitTheme.colors.textSecondary
         )
     }
 }

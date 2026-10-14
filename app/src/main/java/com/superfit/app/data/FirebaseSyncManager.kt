@@ -446,15 +446,16 @@ class FirebaseSyncManager(private val context: Context) {
         readinessScore = (this["readinessScore"] as? Number)?.toInt() ?: 0
     )
 
-    private fun NutritionEntryEntity.toMap(): Map<String, Any> = mapOf(
-        "id" to id,
-        "foodText" to foodText,
-        "calories" to calories,
-        "proteinG" to proteinG,
-        "carbsG" to carbsG,
-        "fatG" to fatG,
-        "timestamp" to timestamp
-    )
+    private fun NutritionEntryEntity.toMap(): Map<String, Any> = buildMap {
+        put("id", id)
+        put("foodText", foodText)
+        put("calories", calories)
+        put("proteinG", proteinG)
+        put("carbsG", carbsG)
+        put("fatG", fatG)
+        put("timestamp", timestamp)
+        qualityTags?.let { put("qualityTags", it) }
+    }
 
     private fun Map<String, Any>.toNutritionEntry(): NutritionEntryEntity = NutritionEntryEntity(
         id = (this["id"] as? Number)?.toLong() ?: 0L,
@@ -463,7 +464,8 @@ class FirebaseSyncManager(private val context: Context) {
         proteinG = (this["proteinG"] as? Number)?.toDouble() ?: 0.0,
         carbsG = (this["carbsG"] as? Number)?.toDouble() ?: 0.0,
         fatG = (this["fatG"] as? Number)?.toDouble() ?: 0.0,
-        timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L
+        timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L,
+        qualityTags = this["qualityTags"] as? String
     )
 
     private fun WorkoutEntryEntity.toMap(): Map<String, Any> = mapOf(

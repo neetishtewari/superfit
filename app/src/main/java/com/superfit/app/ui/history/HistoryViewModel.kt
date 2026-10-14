@@ -379,7 +379,8 @@ class HistoryViewModel(
                     proteinG = result.proteinG,
                     carbsG = result.carbsG,
                     fatG = result.fatG,
-                    timestamp = targetTimestamp
+                    timestamp = targetTimestamp,
+                    qualityTags = result.tags?.encode()
                 )
                 repository.addNutritionEntry(entry)
                 loadData()

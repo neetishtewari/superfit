@@ -42,20 +42,33 @@ data class DietQualityMetrics(
     val flaggedHabitualFoods: List<FoodItemRating>,
     val swapSuggestions: List<FoodSwapSuggestion>,
     val allRatedItems: List<FoodItemRating> = emptyList(),
-    val distinctDaysLogged: Int = 0
+    val distinctDaysLogged: Int = 0,
+    /** False until meals are logged on enough days (see DietScoreEngine.MIN_DAYS) to give a fair score. */
+    val hasEnoughData: Boolean = false,
+    /** Where the points came from and where they were lost. */
+    val breakdown: List<DietScorePart> = emptyList(),
+    /** Change against the 7 days before, when both weeks have enough logs. */
+    val changeFromLastWeek: Int? = null,
+    /** The one change that would lift the score most. */
+    val focusTip: String? = null,
+    val treatMealsThisWeek: Int = 0,
+    val estimatedShare: Double = 0.0
 )
 
 object FoodQualityEngine {
 
     fun analyzeDietQuality(
         nutritionHistory: List<NutritionEntryEntity> = emptyList(),
-        userGoal: String = "LOSE_WEIGHT", // "LOSE_WEIGHT", "BUILD_MUSCLE", "MAINTAIN"
-        zoneId: ZoneId = ZoneId.systemDefault()
+        userGoal: String = "LOSE_WEIGHT", // "LOSE_WEIGHT", "GAIN_MUSCLE", "MAINTAIN"
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        proteinTargetG: Double = 120.0,
+        calorieTarget: Double = 2000.0,
+        today: LocalDate = LocalDate.now(zoneId)
     ): DietQualityMetrics {
         if (nutritionHistory.isEmpty()) {
             return DietQualityMetrics(
-                overallScore = 85,
-                scoreCategory = "BALANCED",
+                overallScore = 0,
+                scoreCategory = "NOT ENOUGH DATA",
                 topCleanFoods = emptyList(),
                 flaggedHabitualFoods = emptyList(),
                 swapSuggestions = emptyList(),
@@ -91,7 +104,9 @@ object FoodQualityEngine {
             val isHighProtein = avgProtein >= 14.0 || proteinCalsRatio >= 0.25
 
             // Coach perspective: evaluate base score considering whole food status and protein utility
-            val baseScore = evaluateCoachScore(foodName, isHighProtein, avgCals, userGoal)
+            val tags = entries.firstNotNullOfOrNull { MealTags.decode(it.qualityTags) }
+            val baseScore = tags?.let { scoreFromTags(it, isHighProtein) }
+                ?: evaluateCoachScore(foodName, isHighProtein, avgCals, userGoal)
             val tier = evaluateTier(baseScore)
 
             // Number of distinct calendar days this specific food was logged
@@ -155,20 +170,17 @@ object FoodQualityEngine {
             .sortedByDescending { it.habitRiskScore }
             .take(3)
 
-        // Calculate overall score taking ALL food items into account proportionally
-        val totalWeightedPoints = ratedItems.sumOf { it.cleanlinessScore.toDouble() * it.weeklyFrequency }
-        val totalMealsCount = ratedItems.sumOf { it.weeklyFrequency }
-        val weightedAverageCleanScore = if (totalMealsCount > 0) totalWeightedPoints / totalMealsCount else 8.0
-
-        // Habitual penalty: only applied when user has established multi-day logging (>= 3 days) and has recurring habitual foods
-        val habitPenalty = if (totalDistinctDaysLogged >= 3) flaggedHabitual.size * 4 else 0
-        val finalOverallScore = max(35, min(99, ((weightedAverageCleanScore / 10.0) * 100).toInt() - habitPenalty))
+        // The overall score judges the week's eating pattern, not an average of single foods.
+        val thisWeek = DietScoreEngine.score(nutritionHistory, today, proteinTargetG, calorieTarget, zoneId)
+        val lastWeek = DietScoreEngine.score(nutritionHistory, today, proteinTargetG, calorieTarget, zoneId, weeksAgo = 1)
+        val finalOverallScore = thisWeek?.score ?: 0
 
         val scoreCategory = when {
-            finalOverallScore >= 85 -> "CLEANEST & NUTRIENT DENSE"
-            finalOverallScore >= 70 -> "BALANCED & NOURISHING"
-            finalOverallScore >= 55 -> "MODERATELY PROCESSED"
-            else -> "HIGH PROCESS / NEEDS ATTENTION"
+            thisWeek == null -> "NOT ENOUGH DATA"
+            finalOverallScore >= 85 -> "EXCELLENT"
+            finalOverallScore >= 70 -> "GOOD"
+            finalOverallScore >= 55 -> "FAIR"
+            else -> "NEEDS ATTENTION"
         }
 
         // Generate Smart Food Swaps for relevant lower-quality foods:
@@ -201,7 +213,13 @@ object FoodQualityEngine {
             flaggedHabitualFoods = flaggedHabitual,
             swapSuggestions = swapSuggestions,
             allRatedItems = ratedItems,
-            distinctDaysLogged = totalDistinctDaysLogged
+            distinctDaysLogged = totalDistinctDaysLogged,
+            hasEnoughData = thisWeek != null,
+            breakdown = thisWeek?.parts.orEmpty(),
+            changeFromLastWeek = if (thisWeek != null && lastWeek != null) thisWeek.score - lastWeek.score else null,
+            focusTip = thisWeek?.let { DietScoreEngine.biggestGain(it) },
+            treatMealsThisWeek = thisWeek?.treatMeals ?: 0,
+            estimatedShare = thisWeek?.estimatedShare ?: 0.0
         )
     }
 
@@ -216,7 +234,7 @@ object FoodQualityEngine {
         // High protein foods receive goal-tailored coach praise
         if (isHighProtein && score >= 8) {
             return when (userGoal) {
-                "BUILD_MUSCLE" -> Pair("Prime muscle builder — complete bioavailable protein (Keep regular)", "GREEN")
+                "GAIN_MUSCLE" -> Pair("Prime muscle builder — complete bioavailable protein (Keep regular)", "GREEN")
                 "LOSE_WEIGHT" -> Pair("High satiety & lean mass preservation — essential staple", "GREEN")
                 else -> Pair("Clean whole protein — premier foundation for daily recovery", "GREEN")
             }
@@ -259,6 +277,24 @@ object FoodQualityEngine {
             }
         }
     }
+
+    /** Score for a food from the AI's tags: whole and home-cooked food high, ultra-processed and treats low. */
+    fun scoreFromTags(tags: MealTags, isHighProtein: Boolean): Int {
+        var score = when (tags.processing) {
+            1 -> if (tags.vegFruitServings >= 1.0) 10 else 9
+            2 -> 6
+            else -> 3
+        }
+        if (isHighProtein && tags.processing <= 2) score += 1
+        if (tags.fried) score -= 1
+        if (tags.addedSugar) score -= 1
+        if (tags.treat) score = minOf(score, 4)
+        return score.coerceIn(1, 10)
+    }
+
+    /** The old word-list score, used for meals without AI tags. */
+    fun keywordScore(foodText: String, isHighProtein: Boolean): Int =
+        evaluateCoachScore(foodText.trim().lowercase(), isHighProtein, 0, "")
 
     private fun evaluateCoachScore(foodName: String, isHighProtein: Boolean, calories: Int, userGoal: String): Int {
         val name = foodName.lowercase()
