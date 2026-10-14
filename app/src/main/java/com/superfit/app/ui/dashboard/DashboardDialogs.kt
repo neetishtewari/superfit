@@ -266,7 +266,8 @@ internal fun CoachChatSheet(
                     text = "💬 Chat with Coach",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    color = ThemeTextPrimary
+                    color = ThemeTextPrimary,
+                    modifier = Modifier.weight(1f)
                 )
                 IconButton(
                     onClick = { viewModel.clearChat() }

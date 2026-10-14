@@ -243,6 +243,7 @@ fun MacroProgressBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -262,7 +263,8 @@ fun MacroProgressBar(
                 text = "${eaten.toInt()}${unit} / ${target.toInt()}${unit}",
                 fontSize = 12.sp,
                 color = color,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp)
             )
         }
 
@@ -373,6 +375,7 @@ fun SleepMetricPill(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MealItemRow(
     entry: NutritionEntryEntity,
@@ -395,7 +398,7 @@ fun MealItemRow(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp
             )
-            Row(
+            FlowRow(
                 modifier = Modifier.padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -461,13 +464,15 @@ fun ActivityProgressBar(
                 text = label,
                 fontSize = 12.sp,
                 color = ThemeTextSecondary,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
             )
             Text(
                 text = "${current.toInt()} / ${target.toInt()} $unit",
                 fontSize = 12.sp,
                 color = color,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp)
             )
         }
 

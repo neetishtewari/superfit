@@ -224,7 +224,10 @@ fun SettingsScreen(
                             text = "Google Health Connect",
                             fontWeight = FontWeight.Bold,
                             color = SuperfitTheme.colors.textPrimary,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
                         )
                         Box(
                             modifier = Modifier
@@ -696,7 +699,8 @@ fun SettingsScreen(
                             text = "Enable Reminders",
                             fontWeight = FontWeight.Medium,
                             color = SuperfitTheme.colors.textPrimary,
-                            fontSize = 13.sp
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f)
                         )
                         Switch(
                             checked = reminderEnabled,
@@ -778,7 +782,8 @@ fun SettingsScreen(
                                 text = "Reminder Time",
                                 color = SuperfitTheme.colors.textPrimary,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
                             )
                             Text(
                                 text = formattedTime,

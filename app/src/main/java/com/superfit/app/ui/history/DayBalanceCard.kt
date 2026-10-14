@@ -95,7 +95,10 @@ fun DayBalanceCard(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                 )
 
                 Text(
@@ -116,19 +119,19 @@ fun DayBalanceCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(text = "EATEN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.caloriesEaten.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(text = "TDEE", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.tdee.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(text = "STEPS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = String.format("%,d", summary.steps), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(text = "BURN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.activeBurn.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CoralRed)
                 }

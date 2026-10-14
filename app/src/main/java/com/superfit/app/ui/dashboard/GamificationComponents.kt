@@ -378,7 +378,8 @@ fun WorkoutRecommendationCard(
                         text = "Session Feedback",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = SuperfitTheme.colors.textPrimary
+                        color = SuperfitTheme.colors.textPrimary,
+                        modifier = Modifier.weight(1f)
                     )
                     IconButton(
                         onClick = { showRpeDialog = false },
