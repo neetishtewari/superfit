@@ -132,4 +132,42 @@ class RepeatMealCacheTest {
         val result = RepeatMealCache.findRepeatMeal("Dragonfruit smoothie bowl with spirulina", emptyList())
         assertNull(result)
     }
+
+    @Test
+    fun testTwoRotisUsesStaple() {
+        val result = RepeatMealCache.findRepeatMeal("2 rotis", emptyList())
+        assertNotNull(result)
+        assertEquals(200.0, result!!.calories, 0.5)
+    }
+
+    @Test
+    fun testTuIsReadAsTwo() {
+        val result = RepeatMealCache.findRepeatMeal("tu rotis", emptyList())
+        assertNotNull(result)
+        assertEquals(200.0, result!!.calories, 0.5)
+    }
+
+    @Test
+    fun testTandooriRotiDoesNotBorrowPlainRoti() {
+        // Speech-to-text heard "two tandoori rotis" as "tu tandoori rotis"; this must go to Gemini
+        assertNull(RepeatMealCache.findRepeatMeal("tu tandoori rotis", emptyList()))
+    }
+
+    @Test
+    fun testPlainRotiDoesNotCopyLargerPastMeal() {
+        val history = listOf(
+            NutritionEntryEntity(
+                foodText = "1 roti with dal and paneer",
+                calories = 550.0,
+                proteinG = 25.0,
+                carbsG = 50.0,
+                fatG = 25.0,
+                timestamp = System.currentTimeMillis()
+            )
+        )
+        val result = RepeatMealCache.findRepeatMeal("2 rotis", history)
+        assertNotNull(result)
+        // Uses the plain roti staple (2 x 100), not 2 x the whole past meal
+        assertEquals(200.0, result!!.calories, 0.5)
+    }
 }

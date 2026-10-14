@@ -41,6 +41,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -412,7 +416,7 @@ internal fun CoachInsightsCard(
             is CoachingInsightState.Success -> {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = cState.insight,
+                        text = boldMarkdown(cState.insight),
                         color = ThemeTextPrimary,
                         fontSize = 14.sp,
                         lineHeight = 20.sp
@@ -905,6 +909,19 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
                 fontSize = 12.sp,
                 color = Color.Gray
             )
+        }
+    }
+}
+
+/** Gemini marks key phrases as **bold**; show them bold instead of with raw asterisks. */
+internal fun boldMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+    val parts = text.split("**")
+    parts.forEachIndexed { index, part ->
+        // Odd-numbered parts sit between a pair of ** markers. A lone unmatched ** is dropped.
+        if (index % 2 == 1 && index < parts.lastIndex) {
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
+        } else {
+            append(part)
         }
     }
 }

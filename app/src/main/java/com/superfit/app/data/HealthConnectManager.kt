@@ -123,15 +123,26 @@ class HealthConnectManager(private val context: Context) {
 
     private suspend fun readStepsAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long {
         return try {
-            val response = client.readRecords(
-                ReadRecordsRequest(
-                    recordType = StepsRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+            // Health Connect returns records a page at a time; a day of minute-by-minute step
+            // records can run past one page, so read every page.
+            val records = mutableListOf<StepsRecord>()
+            var pageToken: String? = null
+            do {
+                val response = client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = StepsRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                        pageToken = pageToken
+                    )
                 )
-            )
+                records += response.records
+                pageToken = response.pageToken
+            } while (pageToken != null)
+
             // Group records by package name and sum the count for each package name
-            val stepsByPackage = response.records.groupBy { it.metadata.dataOrigin.packageName }
+            val stepsByPackage = records.groupBy { it.metadata.dataOrigin.packageName }
                 .mapValues { entry -> entry.value.sumOf { it.count } }
+            android.util.Log.d("HealthConnectManager", "Steps by source: $stepsByPackage")
 
             // Prioritize Samsung Health
             val shealthSteps = stepsByPackage["com.sec.android.app.shealth"]
@@ -142,6 +153,7 @@ class HealthConnectManager(private val context: Context) {
                 stepsByPackage.values.maxOrNull() ?: 0L
             }
         } catch (e: Exception) {
+            android.util.Log.e("HealthConnectManager", "Reading steps failed", e)
             0L
         }
     }
