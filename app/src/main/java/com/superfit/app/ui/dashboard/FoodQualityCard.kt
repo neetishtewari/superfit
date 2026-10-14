@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.DietQualityMetrics
@@ -124,7 +125,8 @@ fun FoodQualityCard(
                     text = metrics.scoreCategory,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = SuperfitTheme.colors.textPrimary
+                    color = SuperfitTheme.colors.textPrimary,
+                    modifier = Modifier.weight(1f)
                 )
 
                 val tapHint = when {
@@ -137,7 +139,11 @@ fun FoodQualityCard(
                     text = tapHint,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ElectricCyan
+                    color = ElectricCyan,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .widthIn(max = 140.dp)
                 )
             }
 

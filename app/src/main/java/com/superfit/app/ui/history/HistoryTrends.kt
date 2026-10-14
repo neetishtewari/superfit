@@ -382,7 +382,10 @@ fun CalorieTrendChart(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

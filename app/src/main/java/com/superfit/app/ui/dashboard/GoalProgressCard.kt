@@ -175,7 +175,10 @@ fun GoalProgressCard(
                 Text(
                     text = "Start: ${String.format("%.1f", metrics.startingWeightKg)} kg",
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                 )
 
                 Row(

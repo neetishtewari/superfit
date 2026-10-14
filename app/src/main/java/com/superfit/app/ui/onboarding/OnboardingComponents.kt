@@ -110,7 +110,7 @@ internal fun MacroSplitRow(color: Color, label: String, value: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -130,7 +130,7 @@ internal fun ChecklistRow(label: String, value: String, isOk: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = 12.sp, color = ThemeTextSecondary)
+        Text(text = label, fontSize = 12.sp, color = ThemeTextSecondary, modifier = Modifier.weight(1f).padding(end = 8.dp))
         Text(
             text = value,
             fontWeight = FontWeight.Bold,

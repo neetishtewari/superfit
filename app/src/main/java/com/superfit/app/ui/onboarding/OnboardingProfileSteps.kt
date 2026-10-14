@@ -436,7 +436,7 @@ internal fun ActivityGoalsStep(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .heightIn(min = 56.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(cardBg)
                         .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
@@ -445,7 +445,7 @@ internal fun ActivityGoalsStep(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = goalLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (isSelected) NeonGreen else ThemeTextPrimary)
+                    Text(text = goalLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (isSelected) NeonGreen else ThemeTextPrimary, modifier = Modifier.weight(1f))
                     RadioButton(
                         selected = isSelected,
                         onClick = { viewModel.onGoalChanged(goalKey, offset) },

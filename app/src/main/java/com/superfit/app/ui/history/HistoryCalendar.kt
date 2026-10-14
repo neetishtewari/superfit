@@ -94,7 +94,9 @@ fun CalendarCard(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
                     color = ThemeTextPrimary,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
                 )
 
                 IconButton(
