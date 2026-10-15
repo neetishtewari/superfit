@@ -120,6 +120,49 @@ class CoachPatternEngineTest {
         assertTrue(analyze(logs).ids().contains("protein_meals_light"))
     }
 
+    // ---- Fibre ------------------------------------------------------------------------------
+
+    /** A full day where the AI tagged each meal, adding up to [fibre] grams. */
+    private fun taggedDay(daysAgo: Int, fibre: Double) = fullDay(daysAgo, protein = 130.0).map {
+        it.copy(qualityTags = MealTags(1, false, false, 1.0, fibre / 3, false, "dal").encode())
+    }
+
+    @Test
+    fun `fibre target scales with calories within sensible limits`() {
+        assertEquals(28.0, CoachPatternEngine.fibreTargetG(2000.0), 0.01)
+        assertEquals(25.0, CoachPatternEngine.fibreTargetG(1200.0), 0.01)
+        assertEquals(38.0, CoachPatternEngine.fibreTargetG(3500.0), 0.01)
+    }
+
+    @Test
+    fun `one low fibre day is not flagged`() {
+        val logs = (1..6).flatMap { d -> taggedDay(d, if (d == 2) 8.0 else 30.0) }
+        val report = analyze(logs)
+        assertFalse(report.ids().contains("fibre_low"))
+    }
+
+    @Test
+    fun `fibre short on most recent full days is flagged with what to eat`() {
+        val logs = (1..6).flatMap { d -> taggedDay(d, if (d <= 4) 10.0 else 30.0) }
+        val finding = analyze(logs).findings.first { it.id == "fibre_low" }
+        assertEquals(FindingKind.CONCERN, finding.kind)
+        assertTrue(finding.fact, finding.fact.contains("4 of your last 5"))
+        assertTrue(finding.suggestion, finding.suggestion.contains("dal"))
+    }
+
+    @Test
+    fun `fibre on target every day is a win`() {
+        val logs = (1..5).flatMap { d -> taggedDay(d, 30.0) }
+        assertTrue(analyze(logs).ids().contains("fibre_good"))
+    }
+
+    @Test
+    fun `untagged meals never count as low fibre`() {
+        // Old meals without AI tags only have a rough guess from the name, so they're not judged.
+        val logs = (1..6).flatMap { d -> fullDay(d, protein = 130.0, dinner = "white rice and curry") }
+        assertTrue(analyze(logs).findings.none { it.area == "fibre" })
+    }
+
     // ---- Treats -----------------------------------------------------------------------------
 
     @Test

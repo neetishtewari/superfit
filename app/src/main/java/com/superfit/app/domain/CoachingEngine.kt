@@ -133,6 +133,7 @@ class CoachingEngine(private val apiKey: String) {
             "calories" to "your calories",
             "treats" to "treat meals",
             "veg" to "vegetables and fruit",
+            "fibre" to "your fibre",
             "steps" to "your steps",
             "sleep" to "your sleep",
             "workouts" to "your workouts",
@@ -208,7 +209,7 @@ class CoachingEngine(private val apiKey: String) {
 
         fun whyLines(focus: CoachFinding, report: CoachReport): List<String> {
             val lines = mutableListOf(focus.fact, focus.meaning)
-            if (focus.area in setOf("protein", "calories", "veg")) {
+            if (focus.area in setOf("protein", "calories", "veg", "fibre")) {
                 lines += "Based on ${report.completeDaysLastWeek} fully logged days in the last week. " +
                     "Days with missing meals aren't counted against you."
             }

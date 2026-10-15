@@ -71,6 +71,8 @@ import androidx.core.content.ContextCompat
 import android.provider.Settings
 import android.net.Uri
 import com.superfit.app.data.PredictedFood
+import com.superfit.app.domain.CoachPatternEngine
+import com.superfit.app.domain.MealTags
 
 @Composable
 internal fun DashboardHeader(
@@ -293,6 +295,18 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.fatG }
+        )
+
+        // Fibre: estimated per meal from the AI's tags (or a guess from the name for older meals).
+        val fibreEaten = remember(state.nutritionList) { state.nutritionList.sumOf { MealTags.of(it).fiberG } }
+        MacroProgressBar(
+            label = "Fibre",
+            eaten = fibreEaten,
+            target = CoachPatternEngine.fibreTargetG(state.macroTargets.calories),
+            color = HyperViolet,
+            unit = "g",
+            entries = state.nutritionList,
+            macroSelector = { MealTags.of(it).fiberG }
         )
     }
 }
