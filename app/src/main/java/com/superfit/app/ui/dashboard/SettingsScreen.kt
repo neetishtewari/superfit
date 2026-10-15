@@ -6,6 +6,8 @@ import android.os.Build
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.superfit.app.data.getUserSharedPrefs
+import com.superfit.app.data.ReminderNotifications
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,6 +68,13 @@ fun SettingsScreen(
     var reminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("reminder_enabled", true)) }
     var reminderHour by remember { mutableStateOf(sharedPrefs.getInt("reminder_hour", 21)) }
     var reminderMinute by remember { mutableStateOf(sharedPrefs.getInt("reminder_minute", 0)) }
+    // Whether the phone lets Superfit show notifications at all. Re-checked when coming back
+    // from the phone's settings.
+    var notificationsAllowed by remember { mutableStateOf(ReminderNotifications.canPost(context)) }
+    LifecycleResumeEffect(Unit) {
+        notificationsAllowed = ReminderNotifications.canPost(context)
+        onPauseOrDispose { }
+    }
 
 
     // Health Connect Permission Launcher
@@ -79,6 +88,7 @@ fun SettingsScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        notificationsAllowed = ReminderNotifications.canPost(context)
         if (isGranted) {
             reminderEnabled = true
             sharedPrefs.edit().putBoolean("reminder_enabled", true).apply()
@@ -703,26 +713,32 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         )
                         Switch(
-                            checked = reminderEnabled,
+                            checked = reminderEnabled && notificationsAllowed,
                             onCheckedChange = { enabled ->
                                 if (enabled) {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        val hasPermission = ContextCompat.checkSelfPermission(
+                                    val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                        ContextCompat.checkSelfPermission(
                                             context,
-                                            "android.permission.POST_NOTIFICATIONS"
-                                        ) == PackageManager.PERMISSION_GRANTED
+                                            ReminderNotifications.PERMISSION
+                                        ) != PackageManager.PERMISSION_GRANTED
+                                    // After two "Don't allow" taps Android stops showing the prompt,
+                                    // so the only way left is the phone's own settings page.
+                                    val promptBlocked = needsPermission &&
+                                        ReminderNotifications.wasAsked(context) &&
+                                        (context as? android.app.Activity)
+                                            ?.shouldShowRequestPermissionRationale(ReminderNotifications.PERMISSION) == false
 
-                                        if (!hasPermission) {
-                                            notificationPermissionLauncher.launch("android.permission.POST_NOTIFICATIONS")
-                                        } else {
-                                            reminderEnabled = true
-                                            sharedPrefs.edit().putBoolean("reminder_enabled", true).apply()
-                                            com.superfit.app.data.ReminderScheduler.scheduleReminder(context, reminderHour, reminderMinute)
-                                        }
+                                    if (needsPermission && !promptBlocked) {
+                                        ReminderNotifications.markAsked(context)
+                                        notificationPermissionLauncher.launch(ReminderNotifications.PERMISSION)
                                     } else {
                                         reminderEnabled = true
                                         sharedPrefs.edit().putBoolean("reminder_enabled", true).apply()
                                         com.superfit.app.data.ReminderScheduler.scheduleReminder(context, reminderHour, reminderMinute)
+                                        if (!ReminderNotifications.canPost(context)) {
+                                            Toast.makeText(context, "Turn on notifications for Superfit to get your reminder", Toast.LENGTH_LONG).show()
+                                            ReminderNotifications.openSystemSettings(context)
+                                        }
                                     }
                                 } else {
                                     reminderEnabled = false
@@ -736,6 +752,18 @@ fun SettingsScreen(
                                 uncheckedThumbColor = SuperfitTheme.colors.textTertiary,
                                 uncheckedTrackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f)
                             )
+                        )
+                    }
+
+                    if (reminderEnabled && !notificationsAllowed) {
+                        Text(
+                            text = "Notifications are turned off for Superfit on this phone, so the reminder can't appear. Tap here to turn them on.",
+                            color = NeonMint,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { ReminderNotifications.openSystemSettings(context) }
+                                .padding(vertical = 4.dp)
                         )
                     }
 

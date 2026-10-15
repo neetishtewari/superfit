@@ -1,11 +1,9 @@
 package com.superfit.app.data
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -31,6 +29,12 @@ class DailyReminderWorker(
             val hour = sharedPrefs.getInt("reminder_hour", 21)
             val minute = sharedPrefs.getInt("reminder_minute", 0)
             ReminderScheduler.scheduleReminder(applicationContext, hour, minute)
+        }
+
+        // Nothing can be shown, so don't spend an AI call on it.
+        if (!ReminderNotifications.canPost(applicationContext)) {
+            android.util.Log.w("DailyReminderWorker", "Notifications are turned off for Superfit; skipping reminder")
+            return Result.success()
         }
 
         // 2. Fetch today's logging data
@@ -115,7 +119,7 @@ class DailyReminderWorker(
     }
 
     private fun sendNotification(title: String, text: String) {
-        val channelId = "superfit_alerts"
+        val channelId = ReminderNotifications.CHANNEL_ID
         val notificationId = 1001
 
         val intent = Intent(applicationContext, Class.forName("com.superfit.app.MainActivity")).apply {
@@ -153,18 +157,12 @@ class DailyReminderWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Superfit Smart Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Reminders to log your meals"
-            }
-            notificationManager.createNotificationChannel(channel)
+        ReminderNotifications.ensureChannel(applicationContext)
+        if (!ReminderNotifications.canPost(applicationContext)) {
+            android.util.Log.w("DailyReminderWorker", "Notifications are turned off for Superfit; reminder not shown")
+            return
         }
+        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)

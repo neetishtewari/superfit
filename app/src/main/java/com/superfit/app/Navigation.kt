@@ -28,6 +28,9 @@ import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.ui.onboarding.OnboardingScreen
 import com.superfit.app.ui.onboarding.OnboardingViewModel
 import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.superfit.app.data.ReminderNotifications
 
 @Composable
 fun MainNavigation(
@@ -120,6 +123,7 @@ fun MainNavigation(
                 )
             }
             entry<Dashboard> {
+                AskForNotificationPermissionOnce()
                 val dashboardViewModel: DashboardViewModel = viewModel {
                     DashboardViewModel(repository, context.applicationContext)
                 }
@@ -193,4 +197,20 @@ fun MainNavigation(
             }
         }
     )
+}
+
+/**
+ * Shows Android's "Allow notifications?" prompt the first time the home screen opens, so the
+ * daily reminder (on by default) can actually appear.
+ */
+@Composable
+private fun AskForNotificationPermissionOnce() {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (ReminderNotifications.shouldAskOnLaunch(context)) {
+            ReminderNotifications.markAsked(context)
+            launcher.launch(ReminderNotifications.PERMISSION)
+        }
+    }
 }
