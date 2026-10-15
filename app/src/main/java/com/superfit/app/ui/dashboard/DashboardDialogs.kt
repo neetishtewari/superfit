@@ -4,6 +4,7 @@ package com.superfit.app.ui.dashboard
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -335,7 +336,7 @@ internal fun CoachChatSheet(
                                     .padding(12.dp)
                             ) {
                                 Text(
-                                    text = message.text,
+                                    text = if (isUser) AnnotatedString(message.text) else chatMarkdown(message.text),
                                     color = ThemeTextPrimary,
                                     fontSize = 13.sp,
                                     lineHeight = 18.sp
