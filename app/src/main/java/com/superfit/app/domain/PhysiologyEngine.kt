@@ -1,6 +1,7 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.UserProfileEntity
+import kotlin.math.roundToInt
 
 object PhysiologyEngine {
 
@@ -92,6 +93,12 @@ object PhysiologyEngine {
         )
     }
 
+    /**
+     * Daily fibre target: about 14g per 1,000 kcal eaten (the usual dietary guideline), kept
+     * between 25g and 38g so it stays sensible on very low or very high calorie targets.
+     */
+    fun fiberTargetG(calories: Double): Double = (calories / 1000.0 * 14.0).coerceIn(25.0, 38.0).roundToInt().toDouble()
+
     fun proteinPerKg(goal: String): Double = if (goal == "GAIN_MUSCLE") 2.0 else 1.6
 
     fun proteinReferenceWeightKg(profile: UserProfileEntity): Double {
@@ -105,5 +112,6 @@ data class MacroTargets(
     val calories: Double,
     val proteinG: Double,
     val carbsG: Double,
-    val fatG: Double
+    val fatG: Double,
+    val fiberG: Double = PhysiologyEngine.fiberTargetG(calories)
 )

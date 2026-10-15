@@ -125,4 +125,12 @@ class PhysiologyEngineTest {
         // Carbs target: (2136.0 - (128.0 * 4) - (59.33 * 9)) / 4 = (2136.0 - 512 - 534.0) / 4 = 272.5g
         assertEquals(272.50, targets.carbsG, 0.01)
     }
+
+    @Test
+    fun `fibre target is 14g per 1000 kcal, kept between 25g and 38g`() {
+        assertEquals(28.0, PhysiologyEngine.fiberTargetG(2000.0), 0.01)
+        assertEquals(25.0, PhysiologyEngine.fiberTargetG(1400.0), 0.01)
+        assertEquals(38.0, PhysiologyEngine.fiberTargetG(3500.0), 0.01)
+        assertEquals(28.0, MacroTargets(calories = 2000.0, proteinG = 130.0, carbsG = 200.0, fatG = 60.0).fiberG, 0.01)
+    }
 }

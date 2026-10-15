@@ -146,6 +146,7 @@ class DashboardViewModel(
                 val proteinEaten = currentState.proteinEaten
                 val carbsEaten = currentState.carbsEaten
                 val fatEaten = currentState.fatEaten
+                val fiberEaten = currentState.fiberEaten
 
                 val sleepText = if (sleep != null) {
                     "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h, Readiness Score: ${sleep.readinessScore}%"
@@ -156,7 +157,8 @@ class DashboardViewModel(
                 val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
                     "Protein: ${proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
                     "Carbs: ${carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
-                    "Fat: ${fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g."
+                    "Fat: ${fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
+                    "Fibre (estimated): ${fiberEaten.toInt()} / ${macroTargets.fiberG.toInt()}g."
 
                 val workoutsText = if (currentState.workoutList.isEmpty()) {
                     "No manual workouts logged today."
@@ -178,7 +180,7 @@ class DashboardViewModel(
                     Use the user's live daily metrics below for context:
                     - User Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
                     - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
-                    - Macro Targets: Protein: ${macroTargets.proteinG.toInt()}g, Carbs: ${macroTargets.carbsG.toInt()}g, Fat: ${macroTargets.fatG.toInt()}g, Calories: ${macroTargets.calories.toInt()} kcal
+                    - Macro Targets: Protein: ${macroTargets.proteinG.toInt()}g, Carbs: ${macroTargets.carbsG.toInt()}g, Fat: ${macroTargets.fatG.toInt()}g, Fibre: ${macroTargets.fiberG.toInt()}g, Calories: ${macroTargets.calories.toInt()} kcal
                     - Daily Nutrition: $nutritionText
                     - Daily Activity: $activityText
                     - Daily Workouts: $workoutsText
@@ -312,6 +314,7 @@ class DashboardViewModel(
             val proteinEaten = nutrition.sumOf { it.proteinG }
             val carbsEaten = nutrition.sumOf { it.carbsG }
             val fatEaten = nutrition.sumOf { it.fatG }
+            val fiberEaten = nutrition.sumOf { com.superfit.app.domain.MealTags.of(it).fiberG }
 
             val weightMetrics = com.superfit.app.domain.WeightTrendEngine.calculateMetrics(profile, weightEntries)
 
@@ -366,6 +369,7 @@ class DashboardViewModel(
                 proteinEaten = proteinEaten,
                 carbsEaten = carbsEaten,
                 fatEaten = fatEaten,
+                fiberEaten = fiberEaten,
                 manualWorkoutCalories = manualCal
             )
         }
@@ -600,6 +604,7 @@ sealed interface DashboardUiState {
         val proteinEaten: Double,
         val carbsEaten: Double,
         val fatEaten: Double,
+        val fiberEaten: Double = 0.0,
         val manualWorkoutCalories: Double
     ) : DashboardUiState
 }

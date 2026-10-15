@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
+import com.superfit.app.domain.MealTags
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -293,6 +294,17 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.fatG }
+        )
+
+        // Fibre (estimated per meal by the AI when it's logged)
+        MacroProgressBar(
+            label = "Fibre",
+            eaten = state.fiberEaten,
+            target = state.macroTargets.fiberG,
+            color = HyperVioletAccent,
+            unit = "g",
+            entries = state.nutritionList,
+            macroSelector = { MealTags.of(it).fiberG }
         )
     }
 }

@@ -122,6 +122,7 @@ object CoachPatternEngine {
         checkWeight(today, weights, goal, targetWeightKg, zone, findings, checked)
         checkTreats(today, byDate, zone, goal, days.take(7).any { it.status == DayLogStatus.BLANK }, findings, checked)
         checkVegAndFruit(completeLastWeek, findings, checked)
+        checkFiber(completeLastWeek, targets, goal, findings, checked)
         checkSteps(today, activity, weightKg, findings, checked)
         checkSleep(today, sleep, findings, checked)
         checkWorkouts(today, workouts, zone, findings, checked)
@@ -732,6 +733,55 @@ object CoachPatternEngine {
 
     // ---------------------------------------------------------------------------------------
     // Meaning of the numbers
+    /**
+     * Fibre is an AI estimate per meal, so only days where every meal has the AI's tags are
+     * judged (the app's own name-based guess is too rough to call someone short on fibre).
+     */
+    private fun checkFiber(
+        completeDays: List<DayLog>,
+        targets: MacroTargets,
+        goal: String,
+        out: MutableList<CoachFinding>,
+        checked: MutableSet<String>
+    ) {
+        val judged = completeDays.mapNotNull { day ->
+            val tags = day.entries.map { MealTags.decode(it.qualityTags) ?: return@mapNotNull null }
+            tags.sumOf { it.fiberG } to tags.sumOf { it.vegFruitServings }
+        }
+        if (judged.size < MIN_COMPLETE_DAYS) return
+        checked += "fibre"
+        val target = targets.fiberG
+        val recent = judged.take(5)
+        val short = recent.filter { it.first < target * 0.7 }
+        if (short.size >= 3) {
+            val avg = short.map { it.first }.average().roundToInt()
+            val avgVegFruit = recent.map { it.second }.average()
+            val why = if (goal == "LOSE_WEIGHT") {
+                "Fibre keeps you full for longer on fewer calories, which makes a calorie deficit much easier to stick to. It also helps digestion and keeps blood sugar steadier."
+            } else {
+                "Fibre helps digestion, keeps you full and keeps blood sugar and energy steadier through the day."
+            }
+            val vegTip = if (avgVegFruit < 2.0) "Add a bowl of sabzi or salad to lunch and dinner, and " else ""
+            out += CoachFinding(
+                id = "fibre_low", area = "fibre", kind = FindingKind.CONCERN, priority = 64,
+                fact = "Fibre came in well under target on ${if (short.size == recent.size) "all" else short.size} of your last ${recent.size} fully logged days (about ${avg}g on those days vs your ${target.roundToInt()}g target).",
+                meaning = "One low day doesn't matter, but this is a pattern. $why",
+                suggestion = "${vegTip}have a guava, apple or pear as a snack. Swap some white rice or maida for whole wheat roti, brown rice, oats or millets, and add rajma, chana or dal. Raise fibre gradually and drink more water as you do."
+                    .replaceFirstChar { it.uppercase() }
+            )
+            return
+        }
+        val hit = judged.count { it.first >= target * 0.9 }
+        if (hit == judged.size && hit >= 4) {
+            out += CoachFinding(
+                id = "fibre_good", area = "fibre", kind = FindingKind.WIN, priority = 34,
+                fact = "You reached your fibre target on all of your last $hit fully logged days.",
+                meaning = "That's great for staying full, digestion and steady energy.",
+                suggestion = "Keep the same whole grains, dal and vegetables going today."
+            )
+        }
+    }
+
     // ---------------------------------------------------------------------------------------
 
     fun proteinMeaning(target: Double, weightKg: Double, goal: String): String {
@@ -760,6 +810,7 @@ object CoachPatternEngine {
         } else {
             lines += "Calorie target ${num(target)} kcal (set by you)."
         }
+        lines += "Fibre target ${targets.fiberG.roundToInt()}g a day. Fibre guide: 1 bowl dal ≈ 5–8g, 1 cup rajma or chana ≈ 11g, 1 guava ≈ 5g, 1 apple or pear ≈ 4–5g, 2 whole wheat rotis ≈ 4g, 1 bowl oats ≈ 4g, 1 bowl sabzi ≈ 3–4g."
         lines += "Treat meals: up to $WEEKLY_TREAT_ALLOWANCE a week fit easily into the plan."
         return lines
     }

@@ -224,4 +224,30 @@ class CoachPatternEngineTest {
         assertTrue(analyze(emptyList(), weights = weighIns(10 to 81.0, 3 to 79.5)).findings.none { it.area == "weight" })
         assertEquals(listOf("weight_stale"), analyze(emptyList(), weights = weighIns(20 to 80.0)).ids())
     }
+
+    // ---- Fibre ------------------------------------------------------------------------------
+
+    /** A full day where every meal carries the AI's tags, adding up to [fiber] grams of fibre. */
+    private fun taggedDay(daysAgo: Int, fiber: Double, vegFruit: Double = 0.5) = fullDay(daysAgo, 130.0).map { m ->
+        m.copy(qualityTags = MealTags(1, false, false, vegFruit, fiber / 3, false, "dal").encode())
+    }
+
+    @Test
+    fun `fibre well under target on most fully logged days is flagged with ways to fix it`() {
+        val report = analyze((1..5).flatMap { taggedDay(it, fiber = 12.0) })
+        val finding = report.findings.single { it.area == "fibre" }
+        assertEquals("fibre_low", finding.id)
+        assertTrue(finding.fact.contains("28g target"))
+        assertTrue(finding.suggestion.startsWith("Add a bowl of sabzi"))
+        assertTrue("fibre" in report.checkedAreas)
+    }
+
+    @Test
+    fun `fibre on target every day is a win, and untagged meals are never judged`() {
+        assertEquals("fibre_good", analyze((1..5).flatMap { taggedDay(it, fiber = 30.0) }).findings.single { it.area == "fibre" }.id)
+
+        val untagged = analyze((1..5).flatMap { fullDay(it, 130.0) })
+        assertTrue(untagged.findings.none { it.area == "fibre" })
+        assertFalse("fibre" in untagged.checkedAreas)
+    }
 }
