@@ -972,6 +972,34 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
 
 /** Gemini marks key phrases as **bold**; show them bold instead of with raw asterisks. */
 internal fun boldMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+    appendBold(text)
+}
+
+/**
+ * Coach chat replies can also use markdown bullets ("* ", "- ") and headings ("## ");
+ * show those as plain bullets and bold lines rather than raw symbols.
+ */
+internal fun chatMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+    text.lines().forEachIndexed { i, rawLine ->
+        if (i > 0) append("\n")
+        val indent = rawLine.takeWhile { it == ' ' }
+        val line = rawLine.trimStart()
+        when {
+            line.startsWith("#") -> {
+                val heading = line.trimStart('#').trim().removeSurrounding("**")
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(heading) }
+            }
+            line.startsWith("* ") || line.startsWith("- ") -> {
+                append(indent)
+                append("• ")
+                appendBold(line.substring(2))
+            }
+            else -> appendBold(rawLine)
+        }
+    }
+}
+
+private fun AnnotatedString.Builder.appendBold(text: String) {
     val parts = text.split("**")
     parts.forEachIndexed { index, part ->
         // Odd-numbered parts sit between a pair of ** markers. A lone unmatched ** is dropped.
