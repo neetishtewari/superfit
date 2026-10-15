@@ -18,6 +18,7 @@ class SuperfitApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installAppCheck()
+        com.superfit.app.data.ReminderNotifications.ensureChannel(this)
         scheduleTelemetrySync()
         scheduleDailyReminder()
     }
