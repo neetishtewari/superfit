@@ -30,7 +30,11 @@ data class DayLog(
     val calories: Double,
     val proteinG: Double,
     val mainMealsLogged: Set<MealSlot>,
-    val status: DayLogStatus
+    val status: DayLogStatus,
+    /** Estimated grams of fibre, from the AI's meal tags (or a guess from the name when untagged). */
+    val fibreG: Double = 0.0,
+    /** True when most of the day's food has AI tags, so [fibreG] is good enough to judge. */
+    val fibreKnown: Boolean = false
 )
 
 enum class FindingKind { CONCERN, WIN, LOGGING }
@@ -122,6 +126,7 @@ object CoachPatternEngine {
         checkWeight(today, weights, goal, targetWeightKg, zone, findings, checked)
         checkTreats(today, byDate, zone, goal, days.take(7).any { it.status == DayLogStatus.BLANK }, findings, checked)
         checkVegAndFruit(completeLastWeek, findings, checked)
+        checkFibre(completeLastWeek, targets, findings, checked)
         checkSteps(today, activity, weightKg, findings, checked)
         checkSleep(today, sleep, findings, checked)
         checkWorkouts(today, workouts, zone, findings, checked)
@@ -193,7 +198,12 @@ object CoachPatternEngine {
             calories >= typicalCalories * 0.8 && calories >= targetCalories * 0.7 -> DayLogStatus.COMPLETE
             else -> DayLogStatus.PARTIAL
         }
-        return DayLog(date, entries, calories, entries.sumOf { it.proteinG }, mainMeals, status)
+        val aiTaggedCalories = entries.filter { MealTags.decode(it.qualityTags) != null }.sumOf { it.calories }
+        return DayLog(
+            date, entries, calories, entries.sumOf { it.proteinG }, mainMeals, status,
+            fibreG = entries.sumOf { MealTags.of(it).fiberG },
+            fibreKnown = calories > 0 && aiTaggedCalories >= calories * 0.7
+        )
     }
 
     // ---------------------------------------------------------------------------------------
@@ -732,7 +742,49 @@ object CoachPatternEngine {
 
     // ---------------------------------------------------------------------------------------
     // Meaning of the numbers
+    private fun checkFibre(
+        completeDays: List<DayLog>,
+        targets: MacroTargets,
+        out: MutableList<CoachFinding>,
+        checked: MutableSet<String>
+    ) {
+        // Fibre comes from the AI's estimate per meal, so only judge days where most food has one.
+        val days = completeDays.filter { it.fibreKnown }
+        if (days.size < MIN_COMPLETE_DAYS) return
+        checked += "fibre"
+        val target = fibreTargetG(targets.calories)
+        val meaning = fibreMeaning(target)
+        val recent = days.take(5)
+        val short = recent.filter { it.fibreG < target * 0.7 }
+        if (short.size >= 3) {
+            val avg = short.map { it.fibreG }.average().roundToInt()
+            out += CoachFinding(
+                id = "fibre_low", area = "fibre", kind = FindingKind.CONCERN, priority = 62,
+                fact = "Fibre came in low on ${if (short.size == recent.size) "all" else short.size} of your last ${recent.size} fully logged days (about ${avg}g on those days vs a ${target.roundToInt()}g target).",
+                meaning = "One low day doesn't matter, but this is a pattern. $meaning",
+                suggestion = "Add one high-fibre food to a meal today: a bowl of dal, chana or rajma, a whole fruit, a salad, or whole wheat roti instead of white rice."
+            )
+            return
+        }
+        val hit = days.count { it.fibreG >= target * 0.9 }
+        if (hit >= 4 && hit == days.size) {
+            out += CoachFinding(
+                id = "fibre_good", area = "fibre", kind = FindingKind.WIN, priority = 30,
+                fact = "You reached your fibre target on all of your last $hit fully logged days.",
+                meaning = meaning,
+                suggestion = "Keep the dal, whole grains, vegetables and fruit coming today."
+            )
+        }
+    }
+
     // ---------------------------------------------------------------------------------------
+
+    /** About 14g of fibre per 1,000 kcal eaten, kept between 25g and 38g a day. */
+    fun fibreTargetG(calories: Double): Double = (calories / 1000.0 * 14.0).coerceIn(25.0, 38.0).roundToInt().toDouble()
+
+    fun fibreMeaning(target: Double): String =
+        "Your ${target.roundToInt()}g fibre target (about 14g per 1,000 kcal you eat) keeps you full for longer, " +
+            "steadies your energy after meals and keeps digestion regular."
 
     fun proteinMeaning(target: Double, weightKg: Double, goal: String): String {
         val perKg = if (weightKg > 0) target / weightKg else 0.0
@@ -761,6 +813,10 @@ object CoachPatternEngine {
             lines += "Calorie target ${num(target)} kcal (set by you)."
         }
         lines += "Treat meals: up to $WEEKLY_TREAT_ALLOWANCE a week fit easily into the plan."
+        lines += fibreMeaning(fibreTargetG(targets.calories))
+        lines += "Fibre guide: 1 cup cooked dal, chana or rajma ≈ 8 to 12g, 1 apple or pear with skin ≈ 4 to 5g, 1 whole wheat roti ≈ 3g, " +
+            "1 cup cooked oats ≈ 4g, 1 tbsp chia or flax seeds ≈ 3 to 4g, a bowl of sabzi or salad ≈ 3 to 4g. " +
+            "White rice, maida and juice have very little. Add fibre gradually and drink more water as you do."
         return lines
     }
 

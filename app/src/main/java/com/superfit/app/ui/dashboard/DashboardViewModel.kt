@@ -12,6 +12,7 @@ import com.superfit.app.domain.MacroTargets
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.GeminiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -156,7 +157,8 @@ class DashboardViewModel(
                 val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
                     "Protein: ${proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
                     "Carbs: ${carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
-                    "Fat: ${fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g."
+                    "Fat: ${fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
+                    "Fibre (estimated): ${nutrition.sumOf { MealTags.of(it).fiberG }.toInt()} / ${CoachPatternEngine.fibreTargetG(macroTargets.calories).toInt()}g."
 
                 val workoutsText = if (currentState.workoutList.isEmpty()) {
                     "No manual workouts logged today."
