@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -335,7 +336,7 @@ internal fun CoachChatSheet(
                                     .padding(12.dp)
                             ) {
                                 Text(
-                                    text = message.text,
+                                    text = if (isUser) AnnotatedString(message.text) else boldMarkdown(message.text),
                                     color = ThemeTextPrimary,
                                     fontSize = 13.sp,
                                     lineHeight = 18.sp
