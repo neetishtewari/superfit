@@ -170,4 +170,27 @@ class RepeatMealCacheTest {
         // Uses the plain roti staple (2 x 100), not 2 x the whole past meal
         assertEquals(200.0, result!!.calories, 0.5)
     }
+
+    @Test
+    fun `hindi script is kept, so different hindi meals never match each other`() {
+        assertEquals("2 अंडे", RepeatMealCache.normalize("२ अंडे!"))
+        val history = listOf(
+            NutritionEntryEntity(foodText = "2 अंडे", calories = 156.0, proteinG = 12.6, carbsG = 1.2, fatG = 10.6, timestamp = 0L)
+        )
+        assertNull(RepeatMealCache.findRepeatMeal("2 रोटी", history))
+        assertEquals(156.0, RepeatMealCache.findRepeatMeal("2 अंडे", history)!!.calories, 0.1)
+    }
+
+    @Test
+    fun `a repeat of a past meal keeps its quality tags, scaled to the portion`() {
+        val tags = MealTags(2, true, false, 0.0, 2.0, true, "samosa", why = "Deep fried.", swap = MealSwap("baked samosa", 80, "Less oil"))
+        val history = listOf(
+            NutritionEntryEntity(foodText = "1 samosa", calories = 260.0, proteinG = 4.0, carbsG = 30.0, fatG = 14.0, timestamp = 0L, qualityTags = tags.encode())
+        )
+        val result = RepeatMealCache.findRepeatMeal("2 samosas", history)!!
+        assertEquals(520.0, result.calories, 0.1)
+        assertEquals(4.0, result.tags!!.fiberG, 0.0)
+        assertEquals(160, result.tags!!.swap!!.kcalSaved)
+        assertEquals("Deep fried.", result.tags!!.why)
+    }
 }

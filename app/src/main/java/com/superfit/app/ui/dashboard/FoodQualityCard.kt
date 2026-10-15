@@ -527,7 +527,7 @@ fun FoodSwapCard(
                     )
                 }
 
-                Surface(
+                if (swap.calorieSavings > 0) Surface(
                     shape = CircleShape,
                     color = NeonMint.copy(alpha = 0.15f)
                 ) {

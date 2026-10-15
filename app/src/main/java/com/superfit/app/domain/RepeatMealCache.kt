@@ -24,13 +24,16 @@ object RepeatMealCache {
     )
 
     /**
-     * Normalizes a food text string for consistent comparison.
-     * Example: "2 Boiled Eggs!" -> "2 boiled eggs"
+     * Normalizes a food text string for consistent comparison. Letters of every script are kept
+     * (with their vowel signs), so "2 अंडे" doesn't shrink to just "2" and match some other meal.
+     * Example: "2 Boiled Eggs!" -> "2 boiled eggs", "२ अंडे" -> "2 अंडे"
      */
     fun normalize(text: String): String {
         return text.trim()
             .lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z0-9\\s]"), " ")
+            .map { c -> if (c in '०'..'९') '0' + (c - '०') else c }
+            .joinToString("")
+            .replace(Regex("[^\\p{L}\\p{M}\\p{Nd}\\s]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
     }
@@ -169,7 +172,8 @@ object RepeatMealCache {
                         calories = roundOneDecimal(pastEntry.calories * scaleFactor),
                         proteinG = roundOneDecimal(pastEntry.proteinG * scaleFactor),
                         carbsG = roundOneDecimal(pastEntry.carbsG * scaleFactor),
-                        fatG = roundOneDecimal(pastEntry.fatG * scaleFactor)
+                        fatG = roundOneDecimal(pastEntry.fatG * scaleFactor),
+                        tags = MealTags.decode(pastEntry.qualityTags)?.scaled(scaleFactor)
                     )
                 }
             }

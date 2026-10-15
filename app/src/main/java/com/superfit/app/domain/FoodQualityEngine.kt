@@ -95,6 +95,10 @@ object FoodQualityEngine {
 
         // Group entries by sanitized food name
         val grouped = entriesToAnalyze.groupBy { sanitizeFoodName(it.foodText) }
+        // The AI's tags for each food, newest first, so its latest reason and swap are used
+        val tagsByFood = grouped.mapValues { (_, entries) ->
+            entries.sortedByDescending { it.timestamp }.mapNotNull { MealTags.decode(it.qualityTags) }
+        }
 
         val ratedItems = grouped.map { (foodName, entries) ->
             val totalCount = entries.size
@@ -104,7 +108,7 @@ object FoodQualityEngine {
             val isHighProtein = avgProtein >= 14.0 || proteinCalsRatio >= 0.25
 
             // Coach perspective: evaluate base score considering whole food status and protein utility
-            val tags = entries.firstNotNullOfOrNull { MealTags.decode(it.qualityTags) }
+            val tags = tagsByFood[foodName]?.firstOrNull()
             val baseScore = tags?.let { scoreFromTags(it, isHighProtein) }
                 ?: evaluateCoachScore(foodName, isHighProtein, avgCals, userGoal)
             val tier = evaluateTier(baseScore)
@@ -136,7 +140,8 @@ object FoodQualityEngine {
             )
 
             // Objective rationale explaining why the food is good, ok, or bad
-            val rationale = generateScoreRationale(foodName, baseScore, isHighProtein, avgCals)
+            val rationale = tagsByFood[foodName]?.firstNotNullOfOrNull { it.why }
+                ?: generateScoreRationale(foodName, baseScore, isHighProtein, avgCals)
 
             FoodItemRating(
                 foodText = foodName.capitalizeWords(),
@@ -199,7 +204,10 @@ object FoodQualityEngine {
         val swapSuggestions = mutableListOf<FoodSwapSuggestion>()
 
         for (item in candidateItemsForSwap) {
-            val swap = generateSwapForItem(item.foodText, item.avgCalories, usedAlternatives, userGoal)
+            val aiSwap = tagsByFood[sanitizeFoodName(item.foodText)]?.firstNotNullOfOrNull { it.swap }
+                ?.takeIf { it.alternative.capitalizeWords() !in usedAlternatives }
+            val swap = aiSwap?.let { FoodSwapSuggestion(item.foodText, it.alternative.capitalizeWords(), it.kcalSaved, it.benefit) }
+                ?: generateSwapForItem(item.foodText, item.avgCalories, usedAlternatives, userGoal)
             if (swap != null) {
                 usedAlternatives.add(swap.suggestedAlternative)
                 swapSuggestions.add(swap)
@@ -288,6 +296,7 @@ object FoodQualityEngine {
         if (isHighProtein && tags.processing <= 2) score += 1
         if (tags.fried) score -= 1
         if (tags.addedSugar) score -= 1
+        if (tags.hiddenOil) score -= 1
         if (tags.treat) score = minOf(score, 4)
         return score.coerceIn(1, 10)
     }

@@ -271,5 +271,33 @@ class FoodQualityEngineTest {
         assertEquals(10, eggItem.cleanlinessScore)
         assertTrue(eggItem.scoreRationale.contains("protein", ignoreCase = true) || eggItem.scoreRationale.contains("amino", ignoreCase = true) || eggItem.scoreRationale.contains("micronutrient", ignoreCase = true))
     }
-}
 
+    @Test
+    fun `the AI's swap and reason are used for any language, keyword ones only as a fallback`() {
+        val aiTags = MealTags(
+            processing = 3, fried = true, addedSugar = false, vegFruitServings = 0.0, fiberG = 3.0, treat = true,
+            foodType = "chole kulche", why = "Fried kulcha and oily chole make this heavy.",
+            swap = MealSwap("chole with 2 phulkas", 220, "Same chole, no fried bread")
+        )
+        val entries = listOf(
+            NutritionEntryEntity(foodText = "छोले कुलचे", calories = 600.0, proteinG = 15.0, carbsG = 80.0, fatG = 25.0, timestamp = now, qualityTags = aiTags.encode()),
+            NutritionEntryEntity(foodText = "samosa", calories = 260.0, proteinG = 4.0, carbsG = 30.0, fatG = 14.0, timestamp = now - oneDayMs)
+        )
+        val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
+
+        val chole = result.allRatedItems.first { it.foodText == "छोले कुलचे" }
+        assertEquals("Fried kulcha and oily chole make this heavy.", chole.scoreRationale)
+        val aiSwap = result.swapSuggestions.first { it.originalFood == "छोले कुलचे" }
+        assertEquals("Chole With 2 Phulkas", aiSwap.suggestedAlternative)
+        assertEquals(220, aiSwap.calorieSavings)
+
+        // No AI tags: the old word list still finds a swap
+        assertTrue(result.swapSuggestions.any { it.originalFood == "Samosa" })
+    }
+
+    @Test
+    fun `hidden oil costs a point like frying does`() {
+        val gravy = MealTags(2, false, false, 0.5, 4.0, false, "dal makhani")
+        assertEquals(FoodQualityEngine.scoreFromTags(gravy, false) - 1, FoodQualityEngine.scoreFromTags(gravy.copy(hiddenOil = true), false))
+    }
+}

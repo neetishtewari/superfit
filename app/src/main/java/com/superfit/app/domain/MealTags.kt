@@ -21,8 +21,24 @@ data class MealTags(
     /** Short generic dish name, e.g. "burger", "biryani", "dal". */
     val foodType: String,
     /** True when worked out from the meal's name in the app, not by the AI. */
-    val estimated: Boolean = false
+    val estimated: Boolean = false,
+    /** Lots of oil, ghee or butter you can't see, such as restaurant gravies or ghee-laden parathas. */
+    val hiddenOil: Boolean = false,
+    /** The AI's one-line reason this meal is good or not, shown as the food's "Why". */
+    val why: String? = null,
+    /** The AI's suggested healthier swap in the same cuisine, or null when the meal is fine as it is. */
+    val swap: MealSwap? = null
 ) {
+    /** True when the AI also gave its reason and swap, which meals tagged before those existed lack. */
+    val hasAdvice: Boolean get() = why != null
+
+    /** The same meal at a different portion size. */
+    fun scaled(factor: Double): MealTags = copy(
+        vegFruitServings = (vegFruitServings * factor).coerceIn(0.0, 10.0),
+        fiberG = (fiberG * factor).coerceIn(0.0, 100.0),
+        swap = swap?.let { it.copy(kcalSaved = (it.kcalSaved * factor).toInt()) }
+    )
+
     fun encode(): String = listOf(
         "v1",
         "p=$processing",
@@ -31,10 +47,20 @@ data class MealTags(
         "vf=${String.format(Locale.US, "%.1f", vegFruitServings)}",
         "fb=${String.format(Locale.US, "%.1f", fiberG)}",
         "tr=${if (treat) 1 else 0}",
-        "ty=${foodType.replace(Regex("[|=\\n]"), " ").trim().take(30)}"
+        "ty=${clean(foodType, 30)}"
+    ).plus(
+        listOfNotNull(
+            if (hiddenOil) "oil=1" else null,
+            why?.let { "why=${clean(it, 160)}" },
+            swap?.let { "sw=${clean(it.alternative, 80)}" },
+            swap?.let { "sv=${it.kcalSaved}" },
+            swap?.let { "sb=${clean(it.benefit, 80)}" }
+        )
     ).joinToString("|")
 
     companion object {
+        private fun clean(text: String, max: Int) = text.replace(Regex("[|=\\n]"), " ").trim().take(max)
+
         fun decode(raw: String?): MealTags? {
             if (raw.isNullOrBlank() || !raw.startsWith("v1|")) return null
             val fields = raw.split('|').drop(1).mapNotNull { part ->
@@ -48,7 +74,12 @@ data class MealTags(
                 vegFruitServings = fields["vf"]?.toDoubleOrNull() ?: 0.0,
                 fiberG = fields["fb"]?.toDoubleOrNull() ?: 0.0,
                 treat = fields["tr"] == "1",
-                foodType = fields["ty"].orEmpty()
+                foodType = fields["ty"].orEmpty(),
+                hiddenOil = fields["oil"] == "1",
+                why = fields["why"]?.takeIf { it.isNotBlank() },
+                swap = fields["sw"]?.takeIf { it.isNotBlank() }?.let { alt ->
+                    MealSwap(alt, fields["sv"]?.toIntOrNull() ?: 0, fields["sb"].orEmpty())
+                }
             )
         }
 
@@ -62,7 +93,14 @@ data class MealTags(
                 vegFruitServings = json.optDouble("vegFruitServings", 0.0).takeIf { !it.isNaN() }?.coerceIn(0.0, 10.0) ?: 0.0,
                 fiberG = json.optDouble("fiber", 0.0).takeIf { !it.isNaN() }?.coerceIn(0.0, 100.0) ?: 0.0,
                 treat = json.optBoolean("treat", false),
-                foodType = json.optString("foodType", "").lowercase().trim()
+                foodType = json.optString("foodType", "").lowercase().trim(),
+                hiddenOil = json.optBoolean("hiddenOil", false),
+                why = json.optString("why", "").trim().takeIf { it.isNotEmpty() && it != "null" },
+                swap = json.optJSONObject("swap")?.let { sw ->
+                    val alternative = sw.optString("alternative", "").trim()
+                    if (alternative.isEmpty()) null
+                    else MealSwap(alternative, sw.optInt("kcalSaved", 0).coerceIn(0, 2000), sw.optString("benefit", "").trim())
+                }
             )
         }
 
@@ -76,7 +114,14 @@ data class MealTags(
                 "- \"vegFruitServings\": Double (servings of vegetables or fruit; about a cup of cooked vegetables, a bowl of salad or one piece of fruit is 1)\n" +
                 "- \"fiber\": Double (estimated grams of fibre)\n" +
                 "- \"treat\": Boolean (true for fast food, desserts, sweets, fried snacks, sugary drinks or alcohol)\n" +
-                "- \"foodType\": String (the main dish as a short generic name in lowercase, one or two words, e.g. \"burger\", \"pizza\", \"biryani\", \"dal\", \"salad\")\n"
+                "- \"foodType\": String (the main dish as a short generic name in lowercase, one or two words, e.g. \"burger\", \"pizza\", \"biryani\", \"dal\", \"salad\")\n" +
+                "- \"hiddenOil\": Boolean (true if it carries a lot of oil, ghee or butter that is easy to miss, not counting deep-frying, such as restaurant gravies, butter chicken, dal makhani, ghee-laden parathas or oily sabzi)\n" +
+                "- \"why\": String (one plain sentence, at most 15 words, on what makes this meal good or not for health)\n" +
+                "- \"swap\": Object or null. If the meal is fried, sugary, oily, processed or a treat, suggest one realistic healthier swap this person would enjoy: " +
+                "the same cuisine and region, the same kind of meal (a breakfast for a breakfast, a snack for a snack, a sweet for a sweet) and at least as much protein. " +
+                "{\"alternative\": String (short, e.g. \"moong dal chilla with curd\"), \"kcalSaved\": Int (calories saved, 0 if about the same), \"benefit\": String (at most 10 words)}. " +
+                "Use null when the meal is already a healthy choice.\n" +
+                "Write all text in English, even when the meal is described in Hindi or another language or script.\n"
 
         private val friedWords = Regex(
             "\\b(fried|fries|pakoras?|pakodas?|samosas?|bhature|bhaturas?|puris?|pooris?|vadas?|kachoris?|bondas?|nuggets?|tempura|chips|crisps)\\b",
@@ -119,3 +164,6 @@ data class MealTags(
         fun of(entry: NutritionEntryEntity): MealTags = decode(entry.qualityTags) ?: estimate(entry)
     }
 }
+
+/** A healthier swap for a meal, suggested by the AI. */
+data class MealSwap(val alternative: String, val kcalSaved: Int, val benefit: String)
