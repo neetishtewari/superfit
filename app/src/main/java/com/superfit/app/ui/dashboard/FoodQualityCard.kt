@@ -113,7 +113,9 @@ fun FoodQualityCard(
 
             if (!metrics.hasEnoughData) {
                 Text(
-                    text = "Log your meals on at least 3 days this week to see your score. It looks at the pattern of your week, so one meal or one day can't make or break it.",
+                    text = if (metrics.distinctDaysLogged >= com.superfit.app.domain.DietScoreEngine.MIN_DAYS)
+                        "Your meals are still being analysed. Your score appears once the AI has rated them."
+                    else "Log your meals on at least 3 days this week to see your score. It looks at the pattern of your week, so one meal or one day can't make or break it.",
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                     color = SuperfitTheme.colors.textSecondary
@@ -444,7 +446,7 @@ fun FoodRatingItemRow(item: FoodItemRating) {
                     color = actionColor.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "${item.cleanlinessScore}/10 Clean",
+                        text = if (item.rated) "${item.cleanlinessScore}/10 Clean" else "Not rated yet",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = actionColor,

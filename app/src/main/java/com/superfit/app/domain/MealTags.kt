@@ -20,7 +20,7 @@ data class MealTags(
     val treat: Boolean,
     /** Short generic dish name, e.g. "burger", "biryani", "dal". */
     val foodType: String,
-    /** True when worked out from the meal's name in the app, not by the AI. */
+    /** True for a meal the AI hasn't tagged yet; see [untagged]. */
     val estimated: Boolean = false,
     /** Lots of oil, ghee or butter you can't see, such as restaurant gravies or ghee-laden parathas. */
     val hiddenOil: Boolean = false,
@@ -123,45 +123,18 @@ data class MealTags(
                 "Use null when the meal is already a healthy choice.\n" +
                 "Write all text in English, even when the meal is described in Hindi or another language or script.\n"
 
-        private val friedWords = Regex(
-            "\\b(fried|fries|pakoras?|pakodas?|samosas?|bhature|bhaturas?|puris?|pooris?|vadas?|kachoris?|bondas?|nuggets?|tempura|chips|crisps)\\b",
-            RegexOption.IGNORE_CASE
-        )
-        private val fibreWords = Regex(
-            "\\b(dal|daal|rajma|chana|chole|chickpeas?|lentils?|beans|oats|oatmeal|sprouts|quinoa|millet|bajra|jowar|ragi|brown rice|whole ?wheat|salad)\\b",
-            RegexOption.IGNORE_CASE
-        )
-
         /**
-         * A best guess from the meal's name, for meals logged before tags existed or when the AI
-         * couldn't be reached. Rougher than the AI's tags, and marked [estimated].
+         * Stand-in for a meal the AI hasn't tagged yet (logged offline, or before tags existed).
+         * It claims nothing: no veg, no fibre, not a treat. Scores and the coach leave such meals
+         * out where it matters, and the daily backfill tags them.
          */
-        fun estimate(entry: NutritionEntryEntity): MealTags {
-            val text = entry.foodText
-            val treatCategory = CoachPatternEngine.treatCategory(text)
-            val keywordScore = FoodQualityEngine.keywordScore(text, entry.proteinG >= 14.0)
-            val processing = when {
-                treatCategory != null -> 3
-                keywordScore >= 9 -> 1
-                keywordScore >= 6 -> 2
-                else -> 3
-            }
-            val vegFruit = if (CoachPatternEngine.isVegOrFruit(text)) 1.0 else 0.0
-            val fibre = vegFruit * 3.0 + (if (fibreWords.containsMatchIn(text)) 5.0 else 1.0)
-            return MealTags(
-                processing = processing,
-                fried = friedWords.containsMatchIn(text),
-                addedSugar = treatCategory == "dessert" || treatCategory == "sugary drink",
-                vegFruitServings = vegFruit,
-                fiberG = fibre,
-                treat = treatCategory != null,
-                foodType = treatCategory ?: text.lowercase().split(Regex("\\s+")).filter { it.any(Char::isLetter) }.take(2).joinToString(" "),
-                estimated = true
-            )
-        }
+        fun untagged(): MealTags = MealTags(
+            processing = 2, fried = false, addedSugar = false, vegFruitServings = 0.0, fiberG = 0.0,
+            treat = false, foodType = "", estimated = true
+        )
 
-        /** The AI's tags when the meal has them, otherwise a guess from its name. */
-        fun of(entry: NutritionEntryEntity): MealTags = decode(entry.qualityTags) ?: estimate(entry)
+        /** The AI's tags when the meal has them, otherwise [untagged]. */
+        fun of(entry: NutritionEntryEntity): MealTags = decode(entry.qualityTags) ?: untagged()
     }
 }
 

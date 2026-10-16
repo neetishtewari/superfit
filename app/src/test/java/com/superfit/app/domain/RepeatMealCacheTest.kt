@@ -120,11 +120,10 @@ class RepeatMealCacheTest {
     }
 
     @Test
-    fun testCommonStaplesFallbackWhenHistoryEmpty() {
-        val result = RepeatMealCache.findRepeatMeal("2 boiled eggs", emptyList())
-        assertNotNull(result)
-        assertEquals(156.0, result!!.calories, 0.5)
-        assertEquals(12.6, result.proteinG, 0.2)
+    fun testCommonFoodsGoToTheAiWithoutHistory() {
+        // The app keeps no built-in list of foods: only the user's own past meals skip the AI.
+        assertNull(RepeatMealCache.findRepeatMeal("2 boiled eggs", emptyList()))
+        assertNull(RepeatMealCache.findRepeatMeal("2 rotis", emptyList()))
     }
 
     @Test
@@ -134,15 +133,9 @@ class RepeatMealCacheTest {
     }
 
     @Test
-    fun testTwoRotisUsesStaple() {
-        val result = RepeatMealCache.findRepeatMeal("2 rotis", emptyList())
-        assertNotNull(result)
-        assertEquals(200.0, result!!.calories, 0.5)
-    }
-
-    @Test
     fun testTuIsReadAsTwo() {
-        val result = RepeatMealCache.findRepeatMeal("tu rotis", emptyList())
+        val history = listOf(NutritionEntryEntity(foodText = "1 roti", calories = 100.0, proteinG = 3.0, carbsG = 20.0, fatG = 1.5, timestamp = 0L))
+        val result = RepeatMealCache.findRepeatMeal("tu rotis", history)
         assertNotNull(result)
         assertEquals(200.0, result!!.calories, 0.5)
     }
@@ -165,10 +158,8 @@ class RepeatMealCacheTest {
                 timestamp = System.currentTimeMillis()
             )
         )
-        val result = RepeatMealCache.findRepeatMeal("2 rotis", history)
-        assertNotNull(result)
-        // Uses the plain roti staple (2 x 100), not 2 x the whole past meal
-        assertEquals(200.0, result!!.calories, 0.5)
+        // Not 2 x the whole past meal: plain rotis are a different meal, so the AI estimates them
+        assertNull(RepeatMealCache.findRepeatMeal("2 rotis", history))
     }
 
     @Test

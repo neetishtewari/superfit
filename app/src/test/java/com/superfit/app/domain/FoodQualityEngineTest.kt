@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
 import java.time.ZoneId
 
 class FoodQualityEngineTest {
@@ -13,6 +12,19 @@ class FoodQualityEngineTest {
     private val zoneId = ZoneId.of("UTC")
     private val now = System.currentTimeMillis()
     private val oneDayMs = 24 * 3600 * 1000L
+
+    // What the AI returns for each kind of meal. The engine knows foods only through these tags.
+    private val cleanTags = MealTags(1, fried = false, addedSugar = false, vegFruitServings = 1.0, fiberG = 5.0, treat = false, foodType = "salad")
+
+    private fun junkTags(type: String, swap: String?, sugar: Boolean = false) = MealTags(
+        3, fried = !sugar, addedSugar = sugar, vegFruitServings = 0.0, fiberG = 1.0, treat = true, foodType = type,
+        why = "Fast food that is heavy on refined carbs and fat.",
+        swap = swap?.let { MealSwap(it, 200, "Lighter and more protein") }
+    )
+
+    private fun food(text: String, kcal: Double, protein: Double, tags: MealTags?, timestamp: Long = now) = NutritionEntryEntity(
+        foodText = text, calories = kcal, proteinG = protein, carbsG = 0.0, fatG = 0.0, timestamp = timestamp, qualityTags = tags?.encode()
+    )
 
     @Test
     fun testEmptyHistoryReturnsDefaultMetrics() {
@@ -25,274 +37,107 @@ class FoodQualityEngineTest {
     }
 
     @Test
-    fun testDayOneSingleCleanFoodItemizedImmediateScore() {
-        val entries = listOf(
-            NutritionEntryEntity(
-                foodText = "Grilled Chicken Salad",
-                calories = 350.0,
-                proteinG = 40.0,
-                carbsG = 10.0,
-                fatG = 12.0,
-                timestamp = now
-            )
-        )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        assertEquals(1, result.distinctDaysLogged)
-        assertEquals(1, result.allRatedItems.size)
-
-        val item = result.allRatedItems.first()
+    fun `a whole-food meal tagged by the AI scores top marks`() {
+        val result = FoodQualityEngine.analyzeDietQuality(listOf(food("Grilled Chicken Salad", 350.0, 40.0, cleanTags)), zoneId = zoneId)
+        val item = result.allRatedItems.single()
         assertEquals(10, item.cleanlinessScore)
         assertEquals(FoodCleanlinessTier.CLEANEST, item.tier)
-        assertEquals(1, item.weeklyFrequency)
-        assertEquals(1, item.daysLoggedCount)
-        assertTrue(item.actionRecommendation.contains("satiety") || item.actionRecommendation.contains("protein") || item.actionRecommendation.contains("Clean"))
+        assertTrue(item.rated)
+        assertTrue(result.swapSuggestions.isEmpty())
     }
 
     @Test
-    fun testDayOneProcessedFoodGeneratesImmediateSwap() {
-        val entries = listOf(
-            NutritionEntryEntity(
-                foodText = "Cheeseburger",
-                calories = 650.0,
-                proteinG = 25.0,
-                carbsG = 45.0,
-                fatG = 38.0,
-                timestamp = now
-            )
+    fun `a fast-food meal gets the AI's swap on day one but is not a habit yet`() {
+        val result = FoodQualityEngine.analyzeDietQuality(
+            listOf(food("Cheeseburger", 650.0, 25.0, junkTags("burger", "grilled chicken wrap"))), zoneId = zoneId
         )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        assertEquals(1, result.distinctDaysLogged)
-        assertEquals(1, result.allRatedItems.size)
-
-        val item = result.allRatedItems.first()
-        assertEquals(3, item.cleanlinessScore)
+        val item = result.allRatedItems.single()
+        assertEquals(2, item.cleanlinessScore)
         assertEquals(FoodCleanlinessTier.HIGH_RISK, item.tier)
-        // On Day 1, single entry is NOT treated as a multi-day habit
         assertFalse(item.isHabitualRisk)
         assertTrue(item.actionRecommendation.contains("Single-day indulgence"))
-
-        // Must generate swap even on Day 1 for low quality food!
-        assertEquals(1, result.swapSuggestions.size)
-        val swap = result.swapSuggestions.first()
-        assertTrue(swap.suggestedAlternative.contains("Chicken") || swap.suggestedAlternative.contains("Wrap"))
-        assertTrue(swap.calorieSavings > 0)
+        assertEquals("Grilled Chicken Wrap", result.swapSuggestions.single().suggestedAlternative)
     }
 
     @Test
-    fun testOutlierDayDoesNotDistortSevenDayCleanEatingScore() {
-        // 6 days of clean eating (Chicken, Oats, Salad, Salmon)
-        val cleanEntries = mutableListOf<NutritionEntryEntity>()
-        for (dayOffset in 1..6) {
-            val dayTime = now - (dayOffset * oneDayMs)
-            cleanEntries.add(NutritionEntryEntity(foodText = "Oatmeal", calories = 300.0, proteinG = 15.0, carbsG = 50.0, fatG = 5.0, timestamp = dayTime))
-            cleanEntries.add(NutritionEntryEntity(foodText = "Chicken Breast", calories = 350.0, proteinG = 50.0, carbsG = 0.0, fatG = 5.0, timestamp = dayTime))
-            cleanEntries.add(NutritionEntryEntity(foodText = "Green Salad", calories = 150.0, proteinG = 4.0, carbsG = 15.0, fatG = 7.0, timestamp = dayTime))
+    fun `one cheat day does not drag down a clean week`() {
+        val clean = (1..6).flatMap { d ->
+            val t = now - d * oneDayMs
+            listOf(food("Oatmeal", 300.0, 15.0, cleanTags, t), food("Chicken Breast", 350.0, 50.0, cleanTags, t), food("Green Salad", 150.0, 4.0, cleanTags, t))
         }
-
-        // 1 outlier cheat day: Pizza and Soda logged on day 0
-        val outlierEntries = listOf(
-            NutritionEntryEntity(foodText = "Pepperoni Pizza", calories = 700.0, proteinG = 20.0, carbsG = 70.0, fatG = 30.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Coke Soda", calories = 180.0, proteinG = 0.0, carbsG = 45.0, fatG = 0.0, timestamp = now)
+        val cheat = listOf(
+            food("Pepperoni Pizza", 700.0, 20.0, junkTags("pizza", "paneer tikka on whole wheat roti")),
+            food("Coke", 180.0, 0.0, junkTags("soft drink", "nimbu pani without sugar", sugar = true))
         )
+        val result = FoodQualityEngine.analyzeDietQuality(clean + cheat, zoneId = zoneId)
 
-        val allEntries = cleanEntries + outlierEntries
-        val result = FoodQualityEngine.analyzeDietQuality(allEntries, zoneId = zoneId)
-
-        // 7 distinct days
         assertEquals(7, result.distinctDaysLogged)
-
-        // Outlier items logged on only 1 distinct day must NOT be flagged as habitual risks
-        val pizzaRating = result.allRatedItems.first { it.foodText.contains("Pizza", ignoreCase = true) }
-        val sodaRating = result.allRatedItems.first { it.foodText.contains("Soda", ignoreCase = true) }
-        assertEquals(1, pizzaRating.daysLoggedCount)
-        assertEquals(1, sodaRating.daysLoggedCount)
-        assertFalse("Pizza on 1 day must not be habitual risk", pizzaRating.isHabitualRisk)
-        assertFalse("Soda on 1 day must not be habitual risk", sodaRating.isHabitualRisk)
-
-        // Proportional weighting: 18 clean meals (score 10) vs 2 outlier meals (scores 5 and 3)
-        // Score should remain high (> 85) reflecting the overall 7-day pattern
-        assertTrue("Overall score (${result.overallScore}) should reflect predominantly clean eating", result.overallScore >= 85)
-
-        // But swaps must still be offered for the outlier foods!
-        assertTrue(result.swapSuggestions.any { it.originalFood.contains("Pizza", ignoreCase = true) || it.originalFood.contains("Soda", ignoreCase = true) })
+        assertFalse(result.allRatedItems.first { it.foodText.contains("Pizza") }.isHabitualRisk)
+        assertTrue("Overall score (${result.overallScore}) should reflect mostly clean eating", result.overallScore >= 85)
+        assertEquals(2, result.swapSuggestions.size)
     }
 
     @Test
-    fun testHabitualRiskIdentifiedWhenFoodLoggedAcrossMultipleDays() {
-        val entries = mutableListOf<NutritionEntryEntity>()
-        // User logs Soda across 3 distinct days
-        for (dayOffset in listOf(1, 3, 5)) {
-            val dayTime = now - (dayOffset * oneDayMs)
-            entries.add(NutritionEntryEntity(foodText = "Coke Soda", calories = 180.0, proteinG = 0.0, carbsG = 45.0, fatG = 0.0, timestamp = dayTime))
-        }
-
+    fun `a treat on three different days is a habit`() {
+        val entries = listOf(1, 3, 5).map { d -> food("Coke", 180.0, 0.0, junkTags("soft drink", null, sugar = true), now - d * oneDayMs) }
         val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        val sodaRating = result.allRatedItems.first { it.foodText.contains("Soda", ignoreCase = true) }
-
-        assertEquals(3, sodaRating.daysLoggedCount)
-        assertEquals(3, sodaRating.weeklyFrequency)
-        assertTrue("Logged across 3 days must be flagged as habitual risk", sodaRating.isHabitualRisk)
-        assertTrue("Action must recommend reducing frequency", sodaRating.actionRecommendation.contains("reduce frequency", ignoreCase = true))
-        assertTrue(result.flaggedHabitualFoods.contains(sodaRating))
+        val coke = result.allRatedItems.single()
+        assertEquals(3, coke.daysLoggedCount)
+        assertTrue(coke.isHabitualRisk)
+        assertTrue(coke.actionRecommendation.contains("reduce frequency", ignoreCase = true))
+        assertTrue(result.flaggedHabitualFoods.contains(coke))
     }
 
     @Test
-    fun testMultipleSwapsAreUniqueAndDiverse() {
+    fun `the same swap is never suggested twice`() {
         val entries = listOf(
-            NutritionEntryEntity(foodText = "Cheeseburger", calories = 650.0, proteinG = 25.0, carbsG = 45.0, fatG = 38.0, timestamp = now),
-            NutritionEntryEntity(foodText = "French Fries", calories = 400.0, proteinG = 4.0, carbsG = 50.0, fatG = 20.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Coke Soda", calories = 180.0, proteinG = 0.0, carbsG = 45.0, fatG = 0.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Pepperoni Pizza", calories = 700.0, proteinG = 20.0, carbsG = 70.0, fatG = 30.0, timestamp = now)
+            food("Cheeseburger", 650.0, 25.0, junkTags("burger", "chicken wrap")),
+            food("Chicken Nuggets", 400.0, 20.0, junkTags("nuggets", "chicken wrap")),
+            food("French Fries", 400.0, 4.0, junkTags("fries", "roasted chana"))
         )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        assertEquals(4, result.swapSuggestions.size)
-
-        // All suggested alternatives MUST be completely unique
-        val alternatives = result.swapSuggestions.map { it.suggestedAlternative }
-        assertEquals("Each swap suggestion must be distinct and unique", alternatives.distinct().size, alternatives.size)
-
-        // None of them should be a repeated catch-all
-        for (swap in result.swapSuggestions) {
-            assertTrue(swap.calorieSavings > 0)
-            assertTrue(swap.benefitHighlight.isNotBlank())
-        }
+        val alternatives = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId).swapSuggestions.map { it.suggestedAlternative }
+        assertEquals(listOf("Chicken Wrap", "Roasted Chana").sorted(), alternatives.sorted())
     }
 
     @Test
-    fun testHealthyStaplesNotOfferedSwaps() {
-        val entries = listOf(
-            NutritionEntryEntity(foodText = "Grilled Salmon", calories = 400.0, proteinG = 42.0, carbsG = 0.0, fatG = 22.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Brown Rice", calories = 220.0, proteinG = 5.0, carbsG = 46.0, fatG = 2.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Paneer Tikka", calories = 280.0, proteinG = 18.0, carbsG = 8.0, fatG = 20.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Steamed Broccoli", calories = 55.0, proteinG = 4.0, carbsG = 11.0, fatG = 0.6, timestamp = now)
-        )
-
+    fun `meals the AI hasn't tagged yet are not rated, flagged or swapped`() {
+        val entries = listOf(1, 2, 3).flatMap { d ->
+            listOf(food("samosa", 260.0, 4.0, null, now - d * oneDayMs), food("apple", 95.0, 0.5, null, now - d * oneDayMs))
+        }
         val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        // Clean whole foods should have high scores (9 or 10) and NO swap suggestions
         for (item in result.allRatedItems) {
-            assertTrue("${item.foodText} should be clean", item.cleanlinessScore >= 9)
+            assertFalse(item.rated)
+            assertEquals(FoodQualityEngine.UNRATED_SCORE, item.cleanlinessScore)
+            assertFalse(item.isHabitualRisk)
         }
-        assertTrue("Healthy staples do not need swaps", result.swapSuggestions.isEmpty())
+        assertTrue(result.swapSuggestions.isEmpty())
+        assertTrue(result.topCleanFoods.isEmpty())
+        assertFalse(result.hasEnoughData)
     }
 
     @Test
-    fun testFriedEggsRatedTopTierAndNeverSwappedWithPotatoWedges() {
-        val entries = listOf(
-            NutritionEntryEntity(
-                foodText = "Fried Eggs",
-                calories = 220.0,
-                proteinG = 18.0,
-                carbsG = 1.0,
-                fatG = 16.0,
-                timestamp = now
-            )
-        )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, userGoal = "LOSE_WEIGHT", zoneId = zoneId)
-        val eggItem = result.allRatedItems.first()
-
-        assertEquals(10, eggItem.cleanlinessScore)
-        assertEquals(FoodCleanlinessTier.CLEANEST, eggItem.tier)
-        assertFalse(eggItem.isHabitualRisk)
-        assertTrue("Egg action should recognize high satiety and lean mass preservation", eggItem.actionRecommendation.contains("satiety", ignoreCase = true) || eggItem.actionRecommendation.contains("protein", ignoreCase = true))
-
-        // Eggs must NEVER be recommended to swap with potato wedges!
-        assertTrue("Eggs should not have any swap suggestions", result.swapSuggestions.isEmpty())
-        assertFalse("Never swap eggs for potato wedges", result.swapSuggestions.any { it.suggestedAlternative.contains("Potato", ignoreCase = true) })
+    fun `older tags without the AI's reason are explained from the tags`() {
+        val oldTags = MealTags(3, fried = true, addedSugar = false, vegFruitServings = 0.0, fiberG = 1.0, treat = true, foodType = "pakora")
+        val item = FoodQualityEngine.analyzeDietQuality(listOf(food("Pakora", 300.0, 5.0, oldTags)), zoneId = zoneId).allRatedItems.single()
+        assertEquals("Ultra-processed or fast food • fried", item.scoreRationale)
     }
 
     @Test
-    fun testCategoryIntegrityInFitnessSwaps() {
-        val entries = listOf(
-            // Crunchy fried carbs
-            NutritionEntryEntity(foodText = "French Fries", calories = 380.0, proteinG = 4.0, carbsG = 48.0, fatG = 18.0, timestamp = now),
-            // Processed meat
-            NutritionEntryEntity(foodText = "Crispy Bacon", calories = 260.0, proteinG = 15.0, carbsG = 1.0, fatG = 22.0, timestamp = now)
-        )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, userGoal = "BUILD_MUSCLE", zoneId = zoneId)
-        val friesSwap = result.swapSuggestions.first { it.originalFood.contains("Fries", ignoreCase = true) }
-        val baconSwap = result.swapSuggestions.first { it.originalFood.contains("Bacon", ignoreCase = true) }
-
-        // Fries swaps with healthier carb (Sweet Potato or Zucchini)
-        assertTrue(friesSwap.suggestedAlternative.contains("Sweet Potato", ignoreCase = true) || friesSwap.suggestedAlternative.contains("Zucchini", ignoreCase = true))
-
-        // Bacon swaps with leaner poultry protein (Turkey Bacon or Chicken Sausage)
-        assertTrue(baconSwap.suggestedAlternative.contains("Turkey", ignoreCase = true) || baconSwap.suggestedAlternative.contains("Chicken", ignoreCase = true))
-    }
-
-    @Test
-    fun testAppleAndPearBothRatedTenWithClearRationale() {
-        val entries = listOf(
-            NutritionEntryEntity(foodText = "Fresh Apple", calories = 95.0, proteinG = 0.5, carbsG = 25.0, fatG = 0.3, timestamp = now),
-            NutritionEntryEntity(foodText = "Ripe Pear", calories = 100.0, proteinG = 0.6, carbsG = 27.0, fatG = 0.2, timestamp = now)
-        )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        val appleItem = result.allRatedItems.first { it.foodText.contains("Apple", ignoreCase = true) }
-        val pearItem = result.allRatedItems.first { it.foodText.contains("Pear", ignoreCase = true) }
-
-        // Both apple and pear MUST be rated 10/10 CLEANEST whole foods
-        assertEquals(10, appleItem.cleanlinessScore)
-        assertEquals(10, pearItem.cleanlinessScore)
-        assertEquals(FoodCleanlinessTier.CLEANEST, appleItem.tier)
-        assertEquals(FoodCleanlinessTier.CLEANEST, pearItem.tier)
-
-        // Rationales must explain WHY
-        assertTrue("Apple rationale should mention fiber/pectin/polyphenols", appleItem.scoreRationale.isNotBlank())
-        assertTrue("Pear rationale should mention fiber/pectin/antioxidants", pearItem.scoreRationale.isNotBlank())
-        assertTrue("Apple rationale details nutrition", appleItem.scoreRationale.contains("fiber", ignoreCase = true) || appleItem.scoreRationale.contains("pectin", ignoreCase = true))
-        assertTrue("Pear rationale details nutrition", pearItem.scoreRationale.contains("fiber", ignoreCase = true) || pearItem.scoreRationale.contains("pectin", ignoreCase = true))
-    }
-
-    @Test
-    fun testScoreRationalesProvideEducationalReasonsAcrossTiers() {
-        val entries = listOf(
-            NutritionEntryEntity(foodText = "French Fries", calories = 380.0, proteinG = 4.0, carbsG = 48.0, fatG = 18.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Coke Soda", calories = 180.0, proteinG = 0.0, carbsG = 45.0, fatG = 0.0, timestamp = now),
-            NutritionEntryEntity(foodText = "Fried Eggs", calories = 220.0, proteinG = 18.0, carbsG = 1.0, fatG = 16.0, timestamp = now)
-        )
-
-        val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
-        val friesItem = result.allRatedItems.first { it.foodText.contains("Fries", ignoreCase = true) }
-        val sodaItem = result.allRatedItems.first { it.foodText.contains("Soda", ignoreCase = true) }
-        val eggItem = result.allRatedItems.first { it.foodText.contains("Eggs", ignoreCase = true) }
-
-        // Low tier foods have rationale explaining industrial fats/spikes/processing
-        assertTrue(friesItem.cleanlinessScore <= 5)
-        assertTrue(friesItem.scoreRationale.isNotBlank())
-        assertTrue(sodaItem.cleanlinessScore <= 3)
-        assertTrue(sodaItem.scoreRationale.contains("insulin", ignoreCase = true) || sodaItem.scoreRationale.contains("liquid", ignoreCase = true) || sodaItem.scoreRationale.contains("sugar", ignoreCase = true))
-
-        // High tier food explains why it is good
-        assertEquals(10, eggItem.cleanlinessScore)
-        assertTrue(eggItem.scoreRationale.contains("protein", ignoreCase = true) || eggItem.scoreRationale.contains("amino", ignoreCase = true) || eggItem.scoreRationale.contains("micronutrient", ignoreCase = true))
-    }
-
-    @Test
-    fun `the AI's swap and reason are used for any language, keyword ones only as a fallback`() {
+    fun `the AI's swap and reason are used for any language`() {
         val aiTags = MealTags(
             processing = 3, fried = true, addedSugar = false, vegFruitServings = 0.0, fiberG = 3.0, treat = true,
             foodType = "chole kulche", why = "Fried kulcha and oily chole make this heavy.",
             swap = MealSwap("chole with 2 phulkas", 220, "Same chole, no fried bread")
         )
-        val entries = listOf(
-            NutritionEntryEntity(foodText = "छोले कुलचे", calories = 600.0, proteinG = 15.0, carbsG = 80.0, fatG = 25.0, timestamp = now, qualityTags = aiTags.encode()),
-            NutritionEntryEntity(foodText = "samosa", calories = 260.0, proteinG = 4.0, carbsG = 30.0, fatG = 14.0, timestamp = now - oneDayMs)
-        )
+        val entries = listOf(food("छोले कुलचे", 600.0, 15.0, aiTags))
         val result = FoodQualityEngine.analyzeDietQuality(entries, zoneId = zoneId)
 
-        val chole = result.allRatedItems.first { it.foodText == "छोले कुलचे" }
+        val chole = result.allRatedItems.single()
         assertEquals("Fried kulcha and oily chole make this heavy.", chole.scoreRationale)
-        val aiSwap = result.swapSuggestions.first { it.originalFood == "छोले कुलचे" }
-        assertEquals("Chole With 2 Phulkas", aiSwap.suggestedAlternative)
-        assertEquals(220, aiSwap.calorieSavings)
-
-        // No AI tags: the old word list still finds a swap
-        assertTrue(result.swapSuggestions.any { it.originalFood == "Samosa" })
+        val swap = result.swapSuggestions.single()
+        assertEquals("छोले कुलचे", swap.originalFood)
+        assertEquals("Chole With 2 Phulkas", swap.suggestedAlternative)
+        assertEquals(220, swap.calorieSavings)
     }
 
     @Test

@@ -31,10 +31,10 @@ data class DayLog(
     val proteinG: Double,
     val mainMealsLogged: Set<MealSlot>,
     val status: DayLogStatus,
-    /** Estimated grams of fibre, from the AI's meal tags (or a guess from the name when untagged). */
+    /** Estimated grams of fibre, from the AI's meal tags (untagged meals count as none). */
     val fibreG: Double = 0.0,
-    /** True when most of the day's food has AI tags, so [fibreG] is good enough to judge. */
-    val fibreKnown: Boolean = false
+    /** True when most of the day's food has AI tags, so fibre, veg and treats can be judged. */
+    val tagsKnown: Boolean = false
 )
 
 enum class FindingKind { CONCERN, WIN, LOGGING }
@@ -202,7 +202,7 @@ object CoachPatternEngine {
         return DayLog(
             date, entries, calories, entries.sumOf { it.proteinG }, mainMeals, status,
             fibreG = entries.sumOf { MealTags.of(it).fiberG },
-            fibreKnown = calories > 0 && aiTaggedCalories >= calories * 0.7
+            tagsKnown = calories > 0 && aiTaggedCalories >= calories * 0.7
         )
     }
 
@@ -553,9 +553,9 @@ object CoachPatternEngine {
             val span = java.time.temporal.ChronoUnit.DAYS.between(dates.last(), today).toInt() + 1
             out += CoachFinding(
                 id = "treats_habit", area = "treats", kind = FindingKind.CONCERN, priority = 82,
-                fact = "${plural(category).replaceFirstChar { it.uppercase() }} showed up on ${dates.size} days in the last $span days (${dates.take(4).sorted().joinToString(", ") { fmt(it) }}).$minimumNote",
+                fact = "${category.replaceFirstChar { it.uppercase() }} showed up on ${dates.size} days in the last $span days (${dates.take(4).sorted().joinToString(", ") { fmt(it) }}).$minimumNote",
                 meaning = "Once in a while is a treat. This often, it's becoming a habit, and habits are what move your results${goalPhrase(goal)}.",
-                suggestion = "Keep ${plural(category)} to once a week and pick a lighter swap for the other times."
+                suggestion = "Keep $category to once a week and pick a lighter swap for the other times."
             )
         } else {
             // A category that turns up every single week for the last three weeks.
@@ -565,7 +565,7 @@ object CoachPatternEngine {
             if (everyWeek != null) {
                 out += CoachFinding(
                     id = "treats_every_week", area = "treats", kind = FindingKind.CONCERN, priority = 55,
-                    fact = "${plural(everyWeek).replaceFirstChar { it.uppercase() }} came up every week for the last 3 weeks.",
+                    fact = "${everyWeek.replaceFirstChar { it.uppercase() }} came up every week for the last 3 weeks.",
                     meaning = "Once a week is fine on its own, but it's worth noticing that it has become a fixed part of your week.",
                     suggestion = "If it's a planned weekly treat, enjoy it. If it's a default, try a swap one week."
                 )
@@ -595,6 +595,8 @@ object CoachPatternEngine {
     }
 
     private fun checkVegAndFruit(completeDays: List<DayLog>, out: MutableList<CoachFinding>, checked: MutableSet<String>) {
+        // Veg comes from the AI's tags, so only judge days where most food has them.
+        val completeDays = completeDays.filter { it.tagsKnown }
         if (completeDays.size < MIN_COMPLETE_DAYS) return
         checked += "veg"
         val withVeg = completeDays.count { day -> day.entries.any { hasVegOrFruit(it) } }
@@ -749,7 +751,7 @@ object CoachPatternEngine {
         checked: MutableSet<String>
     ) {
         // Fibre comes from the AI's estimate per meal, so only judge days where most food has one.
-        val days = completeDays.filter { it.fibreKnown }
+        val days = completeDays.filter { it.tagsKnown }
         if (days.size < MIN_COMPLETE_DAYS) return
         checked += "fibre"
         val target = fibreTargetG(targets.calories)
@@ -824,48 +826,15 @@ object CoachPatternEngine {
     // Food matching
     // ---------------------------------------------------------------------------------------
 
-    private fun words(pattern: String) = Regex("\\b($pattern)\\b", RegexOption.IGNORE_CASE)
-
-    /** Treat foods by category. Matching is on whole words so "eggplant" never reads as "egg". */
-    private val treatCategories: List<Pair<String, Regex>> = listOf(
-        "burger" to words("burgers?"),
-        "pizza" to words("pizzas?"),
-        "fries" to words("(french )?fries|wedges|hash ?browns?|tater tots?"),
-        "fried snack" to words("samosas?|pakoras?|pakodas?|kachoris?|vadas?|bhature|bhaturas?|puris?|pooris?|bondas?"),
-        "fried chicken" to words("fried chicken|nuggets?|kfc|popcorn chicken|chicken tenders?"),
-        "dessert" to words("cakes?|pastry|pastries|donuts?|doughnuts?|brownies?|ice ?creams?|sundaes?|cookies?|gulab jamuns?|jalebis?|rasgullas?|rasmalai|halwa|ladoos?|laddoos?|barfi|burfi|kheer|mithai|sweets|candy|chocolates?|desserts?|muffins?"),
-        "sugary drink" to words("soda|coke|pepsi|sprite|fanta|thums up|cold ?drinks?|soft drinks?|milkshakes?|frappuccinos?|energy drinks?"),
-        "alcohol" to words("beers?|wines?|whiske?y|vodka|rum|gin|cocktails?|tequila|alcohol|pints?"),
-        "instant noodles" to words("maggi|ramen|instant noodles|cup noodles"),
-        "packaged snack" to words("chips|crisps|nachos|doritos|kurkure|lays|namkeen|bhujia")
-    )
-
-    private val notATreat = Regex("\\b(protein|sugar[- ]free|diet|zero|dark chocolate|sweet potato)\\b", RegexOption.IGNORE_CASE)
-
-    fun treatCategory(foodText: String): String? {
-        if (notATreat.containsMatchIn(foodText)) return null
-        return treatCategories.firstOrNull { it.second.containsMatchIn(foodText) }?.first
-    }
-
-    private val vegOrFruit = words(
-        "salads?|sabzi|sabji|subzi|vegetables?|veggies?|spinach|palak|methi|bhindi|okra|gobi|cauliflower|broccoli|cabbage|" +
-            "carrots?|beans|peas|matar|tomato(es)?|cucumbers?|kakdi|lauki|tinda|karela|baingan|eggplant|brinjal|capsicum|peppers?|" +
-            "mushrooms?|zucchini|kale|lettuce|beetroot|pumpkin|sambar|avial|poriyal|thoran|kootu|stir ?fry|soup|" +
-            "fruits?|apples?|bananas?|oranges?|mangoe?s?|papaya|guavas?|grapes?|berries|strawberr(y|ies)|blueberr(y|ies)|" +
-            "watermelon|melon|pineapple|pomegranate|kiwis?|pears?|peach(es)?|plums?|cherr(y|ies)|chikoo|chiku|litchis?|lychees?|mosambi"
-    )
-
-    fun isVegOrFruit(foodText: String): Boolean = vegOrFruit.containsMatchIn(foodText)
-
-    /** Treat category of a logged meal, using the AI's tags when the meal has them. */
+    /** Treat category of a logged meal from the AI's tags; null when it isn't a treat or isn't tagged yet. */
     fun treatCategoryOf(entry: NutritionEntryEntity): String? {
-        val tags = MealTags.decode(entry.qualityTags) ?: return treatCategory(entry.foodText)
+        val tags = MealTags.decode(entry.qualityTags) ?: return null
         if (!tags.treat) return null
-        return treatCategory(entry.foodText) ?: tags.foodType.ifBlank { "treat" }
+        return tags.foodType.ifBlank { "treat" }
     }
 
     fun hasVegOrFruit(entry: NutritionEntryEntity): Boolean =
-        MealTags.decode(entry.qualityTags)?.let { it.vegFruitServings >= 0.5 } ?: isVegOrFruit(entry.foodText)
+        MealTags.decode(entry.qualityTags)?.let { it.vegFruitServings >= 0.5 } ?: false
 
     // ---------------------------------------------------------------------------------------
     // Helpers
@@ -882,12 +851,6 @@ object CoachPatternEngine {
     private fun fmtKg(value: Double): String = String.format(Locale.US, "%.1f", value)
 
     private fun num(value: Int): String = String.format(Locale.US, "%,d", value)
-
-    private fun plural(category: String): String = when (category) {
-        "fries", "dessert", "alcohol", "instant noodles" -> category
-        "fried chicken" -> category
-        else -> "${category}s"
-    }
 
     private fun goalPhrase(goal: String): String = when (goal) {
         "LOSE_WEIGHT" -> " on the scale"

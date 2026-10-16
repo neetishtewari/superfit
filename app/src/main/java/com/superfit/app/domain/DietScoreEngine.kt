@@ -59,22 +59,30 @@ object DietScoreEngine {
         if (daysLogged < MIN_DAYS) return null
 
         val tagged = inWindow.map { it to MealTags.of(it) }
+        // Food quality is judged only from meals the AI has tagged; untagged ones are tagged within a day.
+        val aiTagged = tagged.filter { !it.second.estimated }
+        if (aiTagged.isEmpty()) return null
+
         // A meal is one sitting: a day plus a meal time.
-        val meals = tagged.groupBy { (e, _) -> dateOf(e.timestamp, zone) to CoachPatternEngine.slotOf(e.timestamp, zone) }
-        val mainMeals = meals.filterKeys { it.second != MealSlot.SNACK }.values.toList().ifEmpty { meals.values.toList() }
+        fun sittings(list: List<Pair<NutritionEntryEntity, MealTags>>) =
+            list.groupBy { (e, _) -> dateOf(e.timestamp, zone) to CoachPatternEngine.slotOf(e.timestamp, zone) }
+        fun mainOnly(meals: Map<Pair<LocalDate, MealSlot>, List<Pair<NutritionEntryEntity, MealTags>>>) =
+            meals.filterKeys { it.second != MealSlot.SNACK }.values.toList().ifEmpty { meals.values.toList() }
+        val meals = sittings(tagged)
+        val aiMeals = sittings(aiTagged)
 
         val parts = listOf(
-            proteinPart(byDate, dates - today, mainMeals, proteinTargetG, calorieTarget, today, zone),
-            vegPart(mainMeals),
-            wholeFoodPart(tagged),
-            treatPart(meals.values.toList()),
-            fibrePart(tagged)
+            proteinPart(byDate, dates - today, mainOnly(meals), proteinTargetG, calorieTarget, today, zone),
+            vegPart(mainOnly(aiMeals)),
+            wholeFoodPart(aiTagged),
+            treatPart(aiMeals.values.toList()),
+            fibrePart(aiTagged)
         )
         return DietScore(
             score = parts.sumOf { it.points }.coerceIn(0, 100),
             parts = parts,
             daysLogged = daysLogged,
-            treatMeals = meals.values.count { meal -> meal.any { it.second.treat } },
+            treatMeals = aiMeals.values.count { meal -> meal.any { it.second.treat } },
             estimatedShare = tagged.count { it.second.estimated }.toDouble() / tagged.size
         )
     }

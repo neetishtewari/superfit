@@ -39,18 +39,21 @@ class MealTagsTest {
     }
 
     @Test
-    fun `the AI's tags win over the name, and names are a fallback`() {
+    fun `meals without AI tags claim nothing about their food`() {
         val proteinIceCream = entry("protein ice cream", tags = MealTags(2, false, false, 0.0, 1.0, treat = false, foodType = "ice cream").encode())
         assertNull(CoachPatternEngine.treatCategoryOf(proteinIceCream))
         val kulfi = entry("kulfi", tags = MealTags(2, false, true, 0.0, 0.0, treat = true, foodType = "kulfi").encode())
         assertEquals("kulfi", CoachPatternEngine.treatCategoryOf(kulfi))
 
-        val estimated = MealTags.of(entry("dal rice and bhindi sabzi"))
-        assertTrue(estimated.estimated)
-        assertEquals(1, estimated.processing)
-        assertEquals(1.0, estimated.vegFruitServings, 0.0)
-        assertFalse(estimated.treat)
-        assertTrue(MealTags.of(entry("samosa")).treat)
+        // No word lists: an untagged samosa or salad is just "not tagged yet".
+        for (text in listOf("samosa", "dal rice and bhindi sabzi")) {
+            val tags = MealTags.of(entry(text))
+            assertTrue(tags.estimated)
+            assertFalse(tags.treat)
+            assertEquals(0.0, tags.fiberG, 0.0)
+            assertEquals(0.0, tags.vegFruitServings, 0.0)
+        }
+        assertNull(CoachPatternEngine.treatCategoryOf(entry("samosa")))
     }
 
     @Test
