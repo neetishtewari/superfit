@@ -13,6 +13,7 @@ import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.MealTags
+import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -85,7 +86,8 @@ class DashboardViewModel(
 
     /**
      * Meals logged before quality tags existed are judged from their names, which is rough.
-     * Once a day, ask the AI to tag the last 4 weeks of them in a few batches.
+     * Once a day, ask the AI to tag the last 4 weeks of them in a few batches. Low-scoring meals
+     * tagged before the AI gave reasons and swaps are asked again so they get a swap too.
      */
     private fun tagOlderMeals() {
         val todayStr = LocalDate.now().toString()
@@ -94,7 +96,7 @@ class DashboardViewModel(
             try {
                 val cutoff = System.currentTimeMillis() - 28L * 24 * 3600 * 1000
                 val untagged = repository.getAllNutritionEntries()
-                    .filter { it.qualityTags == null && it.timestamp >= cutoff && it.id != 0L }
+                    .filter { it.timestamp >= cutoff && it.id != 0L && needsTags(it) }
                     .sortedByDescending { it.timestamp }
                     .take(60)
                 val tagger = com.superfit.app.domain.MealTagger(_apiKey.value)
@@ -107,6 +109,11 @@ class DashboardViewModel(
                 android.util.Log.w("DashboardViewModel", "Tagging older meals failed; will retry next launch", e)
             }
         }
+    }
+
+    private fun needsTags(entry: NutritionEntryEntity): Boolean {
+        val tags = MealTags.decode(entry.qualityTags) ?: return true
+        return !tags.hasAdvice && FoodQualityEngine.scoreFromTags(tags, isHighProtein = false) <= 5
     }
 
     fun loadFrequentMeals() {

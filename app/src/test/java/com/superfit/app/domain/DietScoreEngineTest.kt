@@ -73,14 +73,17 @@ class DietScoreEngineTest {
     }
 
     @Test
-    fun `older meals without tags are judged from their names`() {
-        val entries = (1..4).flatMap { d ->
+    fun `meals the AI hasn't tagged yet are left out of food quality`() {
+        val untagged = (1..4).flatMap { d ->
             listOf(meal(d, 13, 900.0, 40.0, null, "chicken burger and fries"), meal(d, 20, 900.0, 40.0, null, "pizza"))
         }
-        val s = score(entries)!!
-        assertEquals(1.0, s.estimatedShare, 0.0)
-        assertEquals(8, s.treatMeals)
-        assertEquals(0, s.parts.first { it.key == "whole" }.points)
+        // Nothing tagged yet: no score rather than a guess from the names.
+        assertNull(score(untagged))
+
+        val s = score(untagged + (1..4).flatMap { goodDay(it) })!!
+        assertEquals(0.4, s.estimatedShare, 0.001)
+        assertEquals(0, s.treatMeals)
+        assertEquals(20, s.parts.first { it.key == "whole" }.points)
     }
 
     @Test

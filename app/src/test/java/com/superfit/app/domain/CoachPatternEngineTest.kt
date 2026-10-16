@@ -20,21 +20,25 @@ class CoachPatternEngineTest {
     private val zone = ZoneOffset.UTC
     private val targets = MacroTargets(calories = 2000.0, proteinG = 130.0, carbsG = 200.0, fatG = 60.0)
 
-    private fun meal(daysAgo: Int, hour: Int, text: String, kcal: Double, protein: Double = 10.0) =
+    private fun meal(daysAgo: Int, hour: Int, text: String, kcal: Double, protein: Double = 10.0, tags: MealTags? = null) =
         NutritionEntryEntity(
             foodText = text,
             calories = kcal,
             proteinG = protein,
             carbsG = 0.0,
             fatG = 0.0,
-            timestamp = today.minusDays(daysAgo.toLong()).atTime(hour, 0).toInstant(zone).toEpochMilli()
+            timestamp = today.minusDays(daysAgo.toLong()).atTime(hour, 0).toInstant(zone).toEpochMilli(),
+            qualityTags = tags?.encode()
         )
 
+    /** What the AI tags a treat as; the coach knows treats only from these tags. */
+    private fun treat(type: String) = MealTags(3, false, false, 0.0, 1.0, treat = true, foodType = type)
+
     /** Breakfast, lunch and dinner adding up to [kcal] and [protein]. */
-    private fun fullDay(daysAgo: Int, protein: Double, kcal: Double = 2000.0, dinner: String = "dal rice and sabzi") = listOf(
+    private fun fullDay(daysAgo: Int, protein: Double, kcal: Double = 2000.0, dinner: String = "dal rice and sabzi", dinnerTags: MealTags? = null) = listOf(
         meal(daysAgo, 8, "oats with milk", kcal * 0.25, protein * 0.25),
         meal(daysAgo, 13, "roti and paneer", kcal * 0.35, protein * 0.35),
-        meal(daysAgo, 20, dinner, kcal * 0.40, protein * 0.40)
+        meal(daysAgo, 20, dinner, kcal * 0.40, protein * 0.40, dinnerTags)
     )
 
     private fun analyze(
@@ -167,38 +171,42 @@ class CoachPatternEngineTest {
 
     @Test
     fun `one burger in a week is fine`() {
-        val logs = (1..6).flatMap { d -> fullDay(d, 130.0, dinner = if (d == 3) "chicken burger" else "dal rice and sabzi") }
+        val logs = (1..6).flatMap { d -> if (d == 3) fullDay(d, 130.0, dinner = "chicken burger", dinnerTags = treat("burger")) else fullDay(d, 130.0) }
         val report = analyze(logs)
         assertTrue(report.findings.none { it.area == "treats" })
     }
 
     @Test
     fun `burgers on three days become a habit`() {
-        val logs = (1..8).flatMap { d -> fullDay(d, 130.0, dinner = if (d in setOf(1, 4, 7)) "veg burger" else "dal rice and sabzi") }
+        val logs = (1..8).flatMap { d -> if (d in setOf(1, 4, 7)) fullDay(d, 130.0, dinner = "veg burger", dinnerTags = treat("burger")) else fullDay(d, 130.0) }
         val finding = analyze(logs).findings.first { it.id == "treats_habit" }
-        assertTrue(finding.fact, finding.fact.startsWith("Burgers showed up on 3 days"))
+        assertTrue(finding.fact, finding.fact.startsWith("Burger showed up on 3 days"))
     }
 
     @Test
     fun `more than two treat meals in a week is flagged, and a pizza with a beer is one meal`() {
         val logs = (1..6).flatMap { fullDay(it, 130.0) } + listOf(
-            meal(1, 21, "pizza", 600.0), meal(1, 21, "beer", 200.0),
-            meal(3, 16, "chocolate cake", 400.0),
-            meal(5, 17, "samosa", 300.0)
+            meal(1, 21, "pizza", 600.0, tags = treat("pizza")), meal(1, 21, "beer", 200.0, tags = treat("beer")),
+            meal(3, 16, "chocolate cake", 400.0, tags = treat("cake")),
+            meal(5, 17, "samosa", 300.0, tags = treat("samosa"))
         )
         val finding = analyze(logs).findings.first { it.id == "treats_high" }
         assertTrue(finding.fact, finding.fact.startsWith("3 treat meals"))
     }
 
     @Test
-    fun `treat matching uses whole words and skips healthier versions`() {
-        assertEquals("burger", CoachPatternEngine.treatCategory("Chicken Burger"))
-        assertEquals("dessert", CoachPatternEngine.treatCategory("2 gulab jamun"))
-        assertNull(CoachPatternEngine.treatCategory("eggplant curry"))
-        assertNull(CoachPatternEngine.treatCategory("ginger tea"))
-        assertNull(CoachPatternEngine.treatCategory("protein ice cream"))
-        assertNull(CoachPatternEngine.treatCategory("diet coke"))
-        assertNull(CoachPatternEngine.treatCategory("sweet potato chaat"))
+    fun `treats come only from the AI's tags, never from the meal's name`() {
+        assertNull(CoachPatternEngine.treatCategoryOf(meal(1, 20, "chicken burger", 600.0)))
+        assertEquals("kulfi", CoachPatternEngine.treatCategoryOf(meal(1, 20, "कुल्फी", 200.0, tags = treat("kulfi"))))
+        assertEquals("treat", CoachPatternEngine.treatCategoryOf(meal(1, 20, "something sweet", 200.0, tags = treat(""))))
+        val proteinIceCream = MealTags(2, false, false, 0.0, 1.0, treat = false, foodType = "ice cream")
+        assertNull(CoachPatternEngine.treatCategoryOf(meal(1, 20, "protein ice cream", 200.0, tags = proteinIceCream)))
+    }
+
+    @Test
+    fun `untagged meals are never judged on vegetables`() {
+        val logs = (1..6).flatMap { d -> fullDay(d, protein = 130.0, dinner = "white rice and curry") }
+        assertTrue(analyze(logs).findings.none { it.area == "veg" })
     }
 
     // ---- Calories, logging, steps -----------------------------------------------------------

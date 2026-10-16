@@ -39,18 +39,21 @@ class MealTagsTest {
     }
 
     @Test
-    fun `the AI's tags win over the name, and names are a fallback`() {
+    fun `meals without AI tags claim nothing about their food`() {
         val proteinIceCream = entry("protein ice cream", tags = MealTags(2, false, false, 0.0, 1.0, treat = false, foodType = "ice cream").encode())
         assertNull(CoachPatternEngine.treatCategoryOf(proteinIceCream))
         val kulfi = entry("kulfi", tags = MealTags(2, false, true, 0.0, 0.0, treat = true, foodType = "kulfi").encode())
         assertEquals("kulfi", CoachPatternEngine.treatCategoryOf(kulfi))
 
-        val estimated = MealTags.of(entry("dal rice and bhindi sabzi"))
-        assertTrue(estimated.estimated)
-        assertEquals(1, estimated.processing)
-        assertEquals(1.0, estimated.vegFruitServings, 0.0)
-        assertFalse(estimated.treat)
-        assertTrue(MealTags.of(entry("samosa")).treat)
+        // No word lists: an untagged samosa or salad is just "not tagged yet".
+        for (text in listOf("samosa", "dal rice and bhindi sabzi")) {
+            val tags = MealTags.of(entry(text))
+            assertTrue(tags.estimated)
+            assertFalse(tags.treat)
+            assertEquals(0.0, tags.fiberG, 0.0)
+            assertEquals(0.0, tags.vegFruitServings, 0.0)
+        }
+        assertNull(CoachPatternEngine.treatCategoryOf(entry("samosa")))
     }
 
     @Test
@@ -62,5 +65,41 @@ class MealTagsTest {
         assertEquals("pizza", tags[12L]!!.foodType)
         assertEquals(1, tags[11L]!!.processing)
         assertTrue(MealTagger.parse("not json", meals).isEmpty())
+    }
+
+    @Test
+    fun `the AI's reason, swap and hidden oil are read and saved`() {
+        val json = JSONObject("""{"foodText":"misal pav","calories":550,"processing":2,"fried":false,"addedSugar":false,"vegFruitServings":0.5,"fiber":9,"treat":false,"foodType":"misal pav",
+            "hiddenOil":true,"why":"Sprouts give protein and fibre, but the tarri is oily.","swap":{"alternative":"usal with 1 pav and onion","kcalSaved":150,"benefit":"Same taste, far less oil"}}""")
+        val tags = MealTags.fromJson(json)!!
+        assertTrue(tags.hiddenOil)
+        assertTrue(tags.hasAdvice)
+        assertEquals(MealSwap("usal with 1 pav and onion", 150, "Same taste, far less oil"), tags.swap)
+        assertEquals(tags, MealTags.decode(tags.encode()))
+
+        val healthy = MealTags.fromJson(JSONObject("""{"processing":1,"why":"Whole food.","swap":null}"""))!!
+        assertNull(healthy.swap)
+        assertFalse(healthy.hiddenOil)
+    }
+
+    @Test
+    fun `tags saved before reasons and swaps existed still load`() {
+        val old = "v1|p=3|fr=1|sg=0|vf=0.0|fb=2.0|tr=1|ty=samosa"
+        val tags = MealTags.decode(old)!!
+        assertEquals(3, tags.processing)
+        assertFalse(tags.hasAdvice)
+        assertNull(tags.swap)
+        assertFalse(tags.hiddenOil)
+        // Without the new fields, the saved text stays exactly what older app versions write
+        assertEquals(old, tags.encode())
+    }
+
+    @Test
+    fun `a bigger portion scales fibre, veg and the calories a swap saves`() {
+        val tags = MealTags(2, false, false, 1.0, 4.0, false, "poha", swap = MealSwap("vegetable upma", 50, "More fibre"))
+        val doubled = tags.scaled(2.0)
+        assertEquals(8.0, doubled.fiberG, 0.0)
+        assertEquals(2.0, doubled.vegFruitServings, 0.0)
+        assertEquals(100, doubled.swap!!.kcalSaved)
     }
 }

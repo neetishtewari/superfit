@@ -24,13 +24,16 @@ object RepeatMealCache {
     )
 
     /**
-     * Normalizes a food text string for consistent comparison.
-     * Example: "2 Boiled Eggs!" -> "2 boiled eggs"
+     * Normalizes a food text string for consistent comparison. Letters of every script are kept
+     * (with their vowel signs), so "2 अंडे" doesn't shrink to just "2" and match some other meal.
+     * Example: "2 Boiled Eggs!" -> "2 boiled eggs", "२ अंडे" -> "2 अंडे"
      */
     fun normalize(text: String): String {
         return text.trim()
             .lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z0-9\\s]"), " ")
+            .map { c -> if (c in '०'..'९') '0' + (c - '०') else c }
+            .joinToString("")
+            .replace(Regex("[^\\p{L}\\p{M}\\p{Nd}\\s]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
     }
@@ -68,41 +71,6 @@ object RepeatMealCache {
         "handful", "scoop", "scoops", "cooked", "raw", "freshly"
     )
 
-    private data class BaselineMacro(val cal: Double, val p: Double, val c: Double, val f: Double)
-
-    private val commonStaples = mapOf(
-        "boiled egg" to BaselineMacro(78.0, 6.3, 0.6, 5.3),
-        "egg" to BaselineMacro(78.0, 6.3, 0.6, 5.3),
-        "fried egg" to BaselineMacro(90.0, 6.3, 0.6, 7.0),
-        "scrambled egg" to BaselineMacro(95.0, 6.5, 1.0, 7.0),
-        "apple" to BaselineMacro(95.0, 0.5, 25.0, 0.3),
-        "pear" to BaselineMacro(100.0, 0.6, 27.0, 0.2),
-        "banana" to BaselineMacro(105.0, 1.3, 27.0, 0.3),
-        "milk tea with stevia" to BaselineMacro(45.0, 2.0, 4.0, 2.2),
-        "milk tea" to BaselineMacro(50.0, 2.0, 6.0, 2.0),
-        "chai" to BaselineMacro(50.0, 2.0, 6.0, 2.0),
-        "tea with stevia" to BaselineMacro(30.0, 1.0, 2.0, 1.0),
-        "black coffee" to BaselineMacro(5.0, 0.3, 0.0, 0.0),
-        "coffee" to BaselineMacro(5.0, 0.3, 0.0, 0.0),
-        "coffee with milk" to BaselineMacro(45.0, 2.5, 4.0, 2.0),
-        "chicken breast" to BaselineMacro(165.0, 31.0, 0.0, 3.6),
-        "grilled chicken" to BaselineMacro(180.0, 32.0, 0.0, 4.5),
-        "rice" to BaselineMacro(200.0, 4.0, 45.0, 0.5),
-        "white rice" to BaselineMacro(200.0, 4.0, 45.0, 0.5),
-        "brown rice" to BaselineMacro(215.0, 5.0, 45.0, 1.8),
-        "oats" to BaselineMacro(150.0, 5.0, 27.0, 2.5),
-        "oatmeal" to BaselineMacro(150.0, 5.0, 27.0, 2.5),
-        "roti" to BaselineMacro(100.0, 3.0, 20.0, 1.5),
-        "chapati" to BaselineMacro(100.0, 3.0, 20.0, 1.5),
-        "protein shake" to BaselineMacro(130.0, 25.0, 3.0, 1.5),
-        "whey protein" to BaselineMacro(130.0, 25.0, 3.0, 1.5),
-        "greek yogurt" to BaselineMacro(120.0, 15.0, 6.0, 2.0),
-        "paneer" to BaselineMacro(265.0, 18.0, 3.0, 20.0),
-        "peanut butter toast" to BaselineMacro(210.0, 8.0, 24.0, 10.0),
-        "toast" to BaselineMacro(80.0, 3.0, 15.0, 1.0),
-        "bread" to BaselineMacro(80.0, 3.0, 15.0, 1.0)
-    )
-
     /**
      * Extracts canonical stemmed keywords by filtering out numbers and descriptor qualifiers.
      * Example: "1 large boiled egg" -> ["boiled", "egg"]
@@ -125,8 +93,8 @@ object RepeatMealCache {
     }
 
     /**
-     * Attempts to find a matching previously logged meal from history or common staples.
-     * Guaranteed 0ms response for repeat meals and staple foods.
+     * Finds the same meal in the user's own history, so a repeat skips the AI. Everything else,
+     * however common, goes to the AI; the app keeps no built-in list of foods.
      */
     fun findRepeatMeal(
         input: String,
@@ -169,23 +137,8 @@ object RepeatMealCache {
                         calories = roundOneDecimal(pastEntry.calories * scaleFactor),
                         proteinG = roundOneDecimal(pastEntry.proteinG * scaleFactor),
                         carbsG = roundOneDecimal(pastEntry.carbsG * scaleFactor),
-                        fatG = roundOneDecimal(pastEntry.fatG * scaleFactor)
-                    )
-                }
-            }
-        }
-
-        // 3. Instant common fitness staples lookup (0ms offline fallback)
-        if (inputKeywords.isNotEmpty()) {
-            for ((stapleName, macro) in commonStaples) {
-                val stapleKeywords = extractKeywords(stapleName)
-                if (areKeywordListsEquivalent(inputKeywords, stapleKeywords)) {
-                    return ParsedNutritionResult(
-                        foodText = input.trim(),
-                        calories = roundOneDecimal(macro.cal * inputQty),
-                        proteinG = roundOneDecimal(macro.p * inputQty),
-                        carbsG = roundOneDecimal(macro.c * inputQty),
-                        fatG = roundOneDecimal(macro.f * inputQty)
+                        fatG = roundOneDecimal(pastEntry.fatG * scaleFactor),
+                        tags = MealTags.decode(pastEntry.qualityTags)?.scaled(scaleFactor)
                     )
                 }
             }
