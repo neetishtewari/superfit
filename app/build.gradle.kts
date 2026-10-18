@@ -145,6 +145,13 @@ dependencies {
   // WorkManager
   implementation(libs.androidx.work.runtime)
 
+  // Camera and barcode scanning for photo logging
+  implementation(libs.androidx.camera.core)
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
+  implementation(libs.mlkit.barcode.scanning)
+
   // Google Health Connect
   implementation(libs.androidx.health.connect)
 

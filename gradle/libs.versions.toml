@@ -22,6 +22,8 @@ firebaseBom = "34.19.0"
 googleServices = "4.4.2"
 playServicesAuth = "21.2.0"
 material = "1.12.0"
+camerax = "1.4.2"
+mlkitBarcode = "17.3.0"
 
 
 [libraries]
@@ -75,6 +77,12 @@ firebase-appcheck-playintegrity = { module = "com.google.firebase:firebase-appch
 firebase-appcheck-debug = { module = "com.google.firebase:firebase-appcheck-debug" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 
+# Camera and barcode scanning for photo logging
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

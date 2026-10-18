@@ -23,6 +23,10 @@
     <!-- Microphone Permission for Voice Logging -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Photo, barcode and label logging. Phones without a camera can still install. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- Notification Permission for Daily Reminders and AI Coaching Alerts -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
