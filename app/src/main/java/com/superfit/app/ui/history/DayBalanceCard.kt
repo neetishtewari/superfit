@@ -220,7 +220,7 @@ fun DayBalanceCard(
                                     color = Color.Gray
                                 )
                                 Text(
-                                    text = "Tap to adjust",
+                                    text = "Tap to edit",
                                     fontSize = 10.sp,
                                     color = ThemeTextTertiary
                                 )

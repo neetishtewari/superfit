@@ -63,7 +63,7 @@ fun MealEditSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Adjust meal",
+                text = "Edit meal",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = ThemeTextPrimary

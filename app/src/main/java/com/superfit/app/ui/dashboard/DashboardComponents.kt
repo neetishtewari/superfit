@@ -428,7 +428,7 @@ fun MealItemRow(
             }
             if (onClick != null) {
                 Text(
-                    text = "Tap to adjust",
+                    text = "Tap to edit",
                     color = ThemeTextTertiary,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 2.dp)
