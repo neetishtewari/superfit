@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Check
@@ -184,7 +185,9 @@ fun VoiceQuickLogCard(
     isProcessing: Boolean,
     onMicClick: () -> Unit,
     onStopClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Opens the food camera. Null on phones without a camera, which hides the button. */
+    onCameraClick: (() -> Unit)? = null
 ) {
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -333,12 +336,31 @@ fun VoiceQuickLogCard(
                         text = when {
                             isListening -> if (logType == "MEAL") "Speak what you ate now..." else "Speak what workout you did..."
                             isProcessing -> if (logType == "MEAL") "Estimating calories & macros with Gemini..." else "Estimating calories & sets/reps with Gemini..."
+                            logType == "MEAL" && onCameraClick != null -> "Tap the mic and speak what you ate, or snap a photo."
                             logType == "MEAL" -> "Tap the mic and speak what you ate."
                             else -> "Tap the mic and speak what exercise you did."
                         },
                         fontSize = 11.sp,
                         color = ThemeTextSecondary
                     )
+                }
+
+                if (logType == "MEAL" && onCameraClick != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(ThemeTextPrimary.copy(alpha = 0.05f))
+                            .clickable(enabled = !isListening && !isProcessing, onClick = onCameraClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Log a meal with the camera",
+                            tint = ThemeTextPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }

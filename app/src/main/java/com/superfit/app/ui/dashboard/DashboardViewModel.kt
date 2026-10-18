@@ -461,6 +461,37 @@ class DashboardViewModel(
         }
     }
 
+    /**
+     * Saves a meal the user confirmed in the camera's Check your meal sheet. Photo meals already
+     * carry quality tags from the same AI call; packaged foods are tagged straight after saving.
+     */
+    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean) {
+        viewModelScope.launch {
+            try {
+                val id = repository.addNutritionEntry(entry)
+                loadFrequentMeals()
+                _parsingState.value = ParsingState.Success(entry.foodText)
+                if (isPackaged) {
+                    val saved = entry.copy(id = id)
+                    try {
+                        com.superfit.app.domain.MealTagger(_apiKey.value).tag(listOf(saved))[id]
+                            ?.let { repository.saveMealTags(saved, it.encode()) }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // The daily backfill tags it later.
+                        android.util.Log.w("DashboardViewModel", "Tagging packaged food failed", e)
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardViewModel", "Saving photo meal failed", e)
+                _parsingState.value = ParsingState.Error("Couldn't save this meal. Please try again.")
+            }
+        }
+    }
+
     /** Saves a meal the user adjusted in the edit sheet. */
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {

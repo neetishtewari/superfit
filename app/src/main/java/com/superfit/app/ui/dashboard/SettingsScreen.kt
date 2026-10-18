@@ -202,7 +202,8 @@ fun SettingsScreen(
                         text = "Superfit's AI works without a key. If you add your own Google AI Studio key, " +
                                "AI requests go straight to Google using your key instead.\n" +
                                "• Your key is stored only on this phone and is never sent to Superfit.\n" +
-                               "• Leave this empty to use Superfit's built-in AI.",
+                               "• Leave this empty to use Superfit's built-in AI.\n" +
+                               "• Meal photos are sent to Google's Gemini AI to estimate nutrition and are not stored.",
                         fontSize = 11.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )

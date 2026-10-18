@@ -62,6 +62,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.superfit.app.ui.camera.FoodCameraScreen
 import androidx.core.content.ContextCompat
 import android.provider.Settings
 import android.net.Uri
@@ -96,6 +99,7 @@ fun DashboardScreen(
     var foodInputText by remember { mutableStateOf("") }
 
     var showFavoritesDialog by remember { mutableStateOf(false) }
+    var showFoodCamera by remember { mutableStateOf(false) }
 
     LaunchedEffect(triggerFavoritesLog) {
         if (triggerFavoritesLog) {
@@ -104,6 +108,7 @@ fun DashboardScreen(
     }
 
     val context = LocalContext.current
+    val hasCamera = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
 
     // Voice Quick-Log State variables
     var isListening by remember { mutableStateOf(false) }
@@ -245,6 +250,22 @@ fun DashboardScreen(
                 )
             )
     ) {
+        if (showFoodCamera) {
+            Dialog(
+                onDismissRequest = { showFoodCamera = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                FoodCameraScreen(
+                    apiKey = apiKey,
+                    onLogged = { entry, isPackaged ->
+                        viewModel.addPhotoMeal(entry, isPackaged)
+                        showFoodCamera = false
+                    },
+                    onClose = { showFoodCamera = false }
+                )
+            }
+        }
+
         if (showFavoritesDialog) {
             val predictedFoods by viewModel.predictedFoods.collectAsState()
             FoodHistoryDialog(
@@ -376,7 +397,10 @@ fun DashboardScreen(
                         },
                         onStopClick = {
                             speechHelper.stopListening()
-                        }
+                        },
+                        onCameraClick = if (hasCamera) {
+                            { showFoodCamera = true }
+                        } else null
                     )
 
                     if (logType == "MEAL") {

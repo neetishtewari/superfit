@@ -90,7 +90,8 @@
         </ul>
 
         <h2>4. Generative AI & API Queries</h2>
-        <p>To enable natural language meal and workout logging, Superfit requires a Google Gemini API Key. When you speak or write food/workout logs, the query is sent directly to Google's Gemini API endpoints to perform structured parsing. The API key is stored securely in encrypted local SharedPreferences and is only transmitted directly to Google's APIs. No intermediary servers collect or inspect your queries.</p>
+        <p>To turn spoken or typed meal and workout logs into calories and nutrients, Superfit sends what you said or typed to Google's Gemini AI, through Google Firebase AI Logic. If you add your own Gemini API key in Settings, requests go directly to Google using that key instead; the key is stored only on your device.</p>
+        <p><strong>Photos and barcodes.</strong> If you log food with the camera, the photo of your meal or of a nutrition label is sent to Google's Gemini AI to estimate nutrition. Photos are held in memory only while they are read and are never saved on your device or by Superfit. When you scan a barcode, only the barcode number is sent to Open Food Facts (openfoodfacts.org), a free public food database, to look up the product's nutrition.</p>
 
         <h2>5. Your Rights & Data Portability</h2>
         <p>Because all data resides in the local database of your device, you have complete ownership of it. If you choose to clear the app storage or uninstall the application, all stored logs are permanently deleted from your device.</p>
