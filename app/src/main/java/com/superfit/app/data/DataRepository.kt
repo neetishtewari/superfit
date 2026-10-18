@@ -60,6 +60,12 @@ class DataRepository(
         firebaseSyncManager.uploadNutrition(entry.copy(qualityTags = tags))
     }
 
+    /** Saves an edited meal (amounts, oil or sugar changed) and updates its cloud backup. */
+    suspend fun updateNutritionEntry(entry: NutritionEntryEntity) {
+        database.nutritionDao().updateEntry(entry)
+        firebaseSyncManager.uploadNutrition(entry)
+    }
+
     suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) {
         database.nutritionDao().deleteEntry(entry)
         firebaseSyncManager.deleteNutrition(entry)

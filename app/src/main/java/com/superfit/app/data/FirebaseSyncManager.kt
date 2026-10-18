@@ -455,6 +455,7 @@ class FirebaseSyncManager(private val context: Context) {
         put("fatG", fatG)
         put("timestamp", timestamp)
         qualityTags?.let { put("qualityTags", it) }
+        items?.let { put("items", it) }
     }
 
     private fun Map<String, Any>.toNutritionEntry(): NutritionEntryEntity = NutritionEntryEntity(
@@ -465,7 +466,8 @@ class FirebaseSyncManager(private val context: Context) {
         carbsG = (this["carbsG"] as? Number)?.toDouble() ?: 0.0,
         fatG = (this["fatG"] as? Number)?.toDouble() ?: 0.0,
         timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L,
-        qualityTags = this["qualityTags"] as? String
+        qualityTags = this["qualityTags"] as? String,
+        items = this["items"] as? String
     )
 
     private fun WorkoutEntryEntity.toMap(): Map<String, Any> = mapOf(

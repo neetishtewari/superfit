@@ -338,6 +338,14 @@ class HistoryViewModel(
         _parsingState.value = HistoryParsingState.Idle
     }
 
+    /** Saves a meal the user adjusted in the edit sheet. */
+    fun updateMeal(entry: NutritionEntryEntity) {
+        viewModelScope.launch {
+            repository.updateNutritionEntry(entry)
+            loadData()
+        }
+    }
+
     fun deleteMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.deleteNutritionEntry(entry)
