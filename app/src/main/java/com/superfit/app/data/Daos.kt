@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -63,6 +64,9 @@ interface NutritionDao {
 
     @Delete
     suspend fun deleteEntry(entry: NutritionEntryEntity)
+
+    @Update
+    suspend fun updateEntry(entry: NutritionEntryEntity)
 
     @Query("UPDATE nutrition_entries SET qualityTags = :tags WHERE id = :id")
     suspend fun setQualityTags(id: Long, tags: String)

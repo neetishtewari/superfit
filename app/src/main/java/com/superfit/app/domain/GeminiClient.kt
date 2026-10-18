@@ -340,7 +340,7 @@ object GeminiClient {
         }
     }
 
-    private const val INVALID_KEY_MESSAGE = "Invalid API Key. Please update your API key in Settings."
+    private const val INVALID_KEY_MESSAGE = "Your own Gemini key in Settings isn't working. Remove it there to use Superfit's built-in AI."
     private const val AI_UNAVAILABLE_MESSAGE = "The AI assistant is unavailable right now. Please try again later."
 
     private val FRIENDLY_MESSAGES = setOf(

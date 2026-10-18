@@ -59,4 +59,14 @@ class EntryDaoTest {
         val all = db.nutritionDao().getAllEntries().sortedBy { it.timestamp }
         assertEquals(listOf("eggs", "whey"), all.map { it.foodText })
     }
+
+    @Test
+    fun editingAMealReplacesItsTotalsAndItems() = runBlocking {
+        val id = db.nutritionDao().insertEntry(meal(0, "2 roti", 1))
+        val edited = meal(id, "3 roti", 1).copy(calories = 360.0, items = "{\"v\":1}")
+        db.nutritionDao().updateEntry(edited)
+        val all = db.nutritionDao().getAllEntries()
+        assertEquals(1, all.size)
+        assertEquals(edited, all.single())
+    }
 }

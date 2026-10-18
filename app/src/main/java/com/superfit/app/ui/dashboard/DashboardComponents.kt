@@ -379,7 +379,8 @@ fun SleepMetricPill(
 @Composable
 fun MealItemRow(
     entry: NutritionEntryEntity,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -387,6 +388,7 @@ fun MealItemRow(
             .clip(RoundedCornerShape(12.dp))
             .background(ThemeTextPrimary.copy(alpha = 0.03f))
             .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -422,6 +424,14 @@ fun MealItemRow(
                     text = "F: ${entry.fatG.toInt()}g",
                     color = Color.Gray,
                     fontSize = 11.sp
+                )
+            }
+            if (onClick != null) {
+                Text(
+                    text = "Tap to edit",
+                    color = ThemeTextTertiary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }

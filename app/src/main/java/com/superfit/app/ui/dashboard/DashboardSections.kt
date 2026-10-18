@@ -145,7 +145,7 @@ internal fun DashboardHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "API Settings"
+                        contentDescription = "Settings"
                     )
                 }
 
@@ -315,8 +315,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
 internal fun CoachInsightsCard(
     coachingState: CoachingInsightState,
     onRefresh: () -> Unit,
-    onOpenChat: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenChat: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -526,22 +525,20 @@ internal fun CoachInsightsCard(
                             modifier = Modifier.weight(1f)
                         )
                     }
-                    if (cState.message.contains("Settings", ignoreCase = true) || cState.message.contains("API Key", ignoreCase = true)) {
-                        Button(
-                            onClick = onOpenSettings,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = EnergeticCoral.copy(alpha = 0.15f),
-                                contentColor = EnergeticCoral
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = "Open API Settings",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    Button(
+                        onClick = onRefresh,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = EnergeticCoral.copy(alpha = 0.15f),
+                            contentColor = EnergeticCoral
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text(
+                            text = "Try again",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -556,8 +553,7 @@ internal fun TrackMealsCard(
     parsingState: ParsingState,
     foodInputText: String,
     onFoodInputChange: (String) -> Unit,
-    onViewAllFoods: () -> Unit,
-    onOpenSettings: () -> Unit
+    onViewAllFoods: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -712,9 +708,10 @@ internal fun TrackMealsCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (errMsg.contains("Settings", ignoreCase = true)) {
+                // Re-sends what the user last said or typed, so they don't have to say it again.
+                if (viewModel.canRetryLastMeal) {
                     Button(
-                        onClick = onOpenSettings,
+                        onClick = { viewModel.retryLastMeal() },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EnergeticCoral.copy(alpha = 0.15f),
                             contentColor = EnergeticCoral
@@ -723,7 +720,7 @@ internal fun TrackMealsCard(
                         modifier = Modifier.height(32.dp)
                     ) {
                         Text(
-                            text = "Open API Settings",
+                            text = "Try again",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -747,13 +744,25 @@ internal fun TrackMealsCard(
                 color = ThemeTextSecondary
             )
         } else {
+            var editingMeal by remember { mutableStateOf<NutritionEntryEntity?>(null) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.nutritionList.forEach { entry ->
                     MealItemRow(
                         entry = entry,
-                        onDelete = { viewModel.deleteMeal(entry) }
+                        onDelete = { viewModel.deleteMeal(entry) },
+                        onClick = { editingMeal = entry }
                     )
                 }
+            }
+            editingMeal?.let { meal ->
+                MealEditSheet(
+                    entry = meal,
+                    onSave = {
+                        viewModel.updateMeal(it)
+                        editingMeal = null
+                    },
+                    onDismiss = { editingMeal = null }
+                )
             }
         }
     }
