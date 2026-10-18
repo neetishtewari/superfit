@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,9 +76,10 @@ class ReminderSchedulerTest {
 
         ReminderScheduler.scheduleReminder(context, 20, 30)
 
-        val states = reminders().associate { it.id to it.state }
-        assertEquals(WorkInfo.State.CANCELLED, states[old])
-        assertEquals(1, states.values.count { it == WorkInfo.State.ENQUEUED })
+        // REPLACE cancels the old request and WorkManager may drop it from the list entirely.
+        val pending = reminders().filter { it.state == WorkInfo.State.ENQUEUED }
+        assertEquals(1, pending.size)
+        assertNotEquals(old, pending.single().id)
     }
 
     private fun at(hour: Int, minute: Int, second: Int = 0) = Calendar.getInstance().apply {
