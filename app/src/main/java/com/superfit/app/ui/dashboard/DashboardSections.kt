@@ -747,13 +747,25 @@ internal fun TrackMealsCard(
                 color = ThemeTextSecondary
             )
         } else {
+            var editingMeal by remember { mutableStateOf<NutritionEntryEntity?>(null) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.nutritionList.forEach { entry ->
                     MealItemRow(
                         entry = entry,
-                        onDelete = { viewModel.deleteMeal(entry) }
+                        onDelete = { viewModel.deleteMeal(entry) },
+                        onClick = { editingMeal = entry }
                     )
                 }
+            }
+            editingMeal?.let { meal ->
+                MealEditSheet(
+                    entry = meal,
+                    onSave = {
+                        viewModel.updateMeal(it)
+                        editingMeal = null
+                    },
+                    onDismiss = { editingMeal = null }
+                )
             }
         }
     }

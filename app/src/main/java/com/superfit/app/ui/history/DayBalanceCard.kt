@@ -47,6 +47,8 @@ import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.GoalProgressCard
 import com.superfit.app.ui.dashboard.FoodQualityCard
 import com.superfit.app.ui.dashboard.FoodSwapCard
+import com.superfit.app.ui.dashboard.MealEditSheet
+import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -180,6 +182,17 @@ fun DayBalanceCard(
                         .padding(vertical = 8.dp)
                 )
             } else {
+                var editingMeal by remember { mutableStateOf<NutritionEntryEntity?>(null) }
+                editingMeal?.let { meal ->
+                    MealEditSheet(
+                        entry = meal,
+                        onSave = {
+                            viewModel.updateMeal(it)
+                            editingMeal = null
+                        },
+                        onDismiss = { editingMeal = null }
+                    )
+                }
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -189,6 +202,7 @@ fun DayBalanceCard(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(ThemeTextPrimary.copy(alpha = 0.03f))
+                                .clickable { editingMeal = entry }
                                 .padding(8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -204,6 +218,11 @@ fun DayBalanceCard(
                                     text = "P: ${entry.proteinG.toInt()}g | C: ${entry.carbsG.toInt()}g | F: ${entry.fatG.toInt()}g",
                                     fontSize = 10.sp,
                                     color = Color.Gray
+                                )
+                                Text(
+                                    text = "Tap to adjust",
+                                    fontSize = 10.sp,
+                                    color = ThemeTextTertiary
                                 )
                             }
                             Row(
