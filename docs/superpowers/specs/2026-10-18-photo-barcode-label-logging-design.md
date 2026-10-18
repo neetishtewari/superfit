@@ -69,7 +69,7 @@ Neetish asked for an elegant design, and for Superfit to ask the user to confirm
   - `ui/camera/CheckMealSheet.kt`: shows a `MealItems`, reusing the item rows and LevelPicker from `MealEditSheet` (made internal), or the packaged amount chooser.
 - **Saving.** `DashboardViewModel.addPhotoMeal(entry)` saves through the same repository call as voice, refreshes, and tags packaged meals.
 - **No database change.** Everything fits the existing columns (items, qualityTags).
-- **Manifest.** Adds `android.permission.CAMERA` and `<uses-feature android:name="android.hardware.camera" android:required="false"/>`, so phones without a camera can still install.
+- **Manifest.** Adds `android.permission.CAMERA` and `<uses-feature android:name="android.hardware.camera" android:required="false"/>`, so phones without a camera can still install; the camera button is hidden on them.
 
 ## Testing
 
