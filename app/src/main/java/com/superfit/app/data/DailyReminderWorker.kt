@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerParameters
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.CoachingEngine
@@ -14,6 +15,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 
 class DailyReminderWorker(
     appContext: Context,
@@ -22,19 +24,32 @@ class DailyReminderWorker(
 
     override suspend fun doWork(): Result {
         val sharedPrefs = getUserSharedPrefs(applicationContext)
-
-        // 1. Reschedule for tomorrow at the configured time
-        val reminderEnabled = sharedPrefs.getBoolean("reminder_enabled", true)
-        if (reminderEnabled) {
-            val hour = sharedPrefs.getInt("reminder_hour", 21)
-            val minute = sharedPrefs.getInt("reminder_minute", 0)
-            ReminderScheduler.scheduleReminder(applicationContext, hour, minute)
+        try {
+            remind(sharedPrefs)
+        } catch (e: CancellationException) {
+            throw e // Android stopped this run; WorkManager runs it again later.
+        } catch (e: Exception) {
+            android.util.Log.e("DailyReminderWorker", "Reminder failed", e)
         }
 
+        // 1. Tomorrow's reminder, queued behind this one. REPLACE here would cancel this very
+        // run, which is why the reminder never used to appear.
+        if (sharedPrefs.getBoolean("reminder_enabled", true)) {
+            ReminderScheduler.scheduleReminder(
+                applicationContext,
+                sharedPrefs.getInt("reminder_hour", 21),
+                sharedPrefs.getInt("reminder_minute", 0),
+                ExistingWorkPolicy.APPEND_OR_REPLACE
+            )
+        }
+        return Result.success()
+    }
+
+    private suspend fun remind(sharedPrefs: android.content.SharedPreferences) {
         // Nothing can be shown, so don't spend an AI call on it.
         if (!ReminderNotifications.canPost(applicationContext)) {
             android.util.Log.w("DailyReminderWorker", "Notifications are turned off for Superfit; skipping reminder")
-            return Result.success()
+            return
         }
 
         // 2. Fetch today's logging data
@@ -114,8 +129,6 @@ class DailyReminderWorker(
                 )
             }
         }
-
-        return Result.success()
     }
 
     private fun sendNotification(title: String, text: String) {

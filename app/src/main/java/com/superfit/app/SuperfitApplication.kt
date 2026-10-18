@@ -3,6 +3,7 @@ package com.superfit.app
 import android.app.Application
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -57,7 +58,9 @@ class SuperfitApplication : Application() {
         if (enabled) {
             val hour = sharedPrefs.getInt("reminder_hour", 21) // default 9 PM
             val minute = sharedPrefs.getInt("reminder_minute", 0)
-            com.superfit.app.data.ReminderScheduler.scheduleReminder(this, hour, minute)
+            // KEEP: this runs whenever Android starts the app, including to deliver the reminder
+            // itself, and replacing the pending reminder then would cancel it.
+            com.superfit.app.data.ReminderScheduler.scheduleReminder(this, hour, minute, ExistingWorkPolicy.KEEP)
         } else {
             com.superfit.app.data.ReminderScheduler.cancelReminder(this)
         }

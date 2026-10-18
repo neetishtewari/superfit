@@ -58,6 +58,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 
 # WorkManager background tasks
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
 
 # Google Health Connect
 androidx-health-connect = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
