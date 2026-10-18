@@ -14,6 +14,13 @@ class NutritionParser(private val apiKey: String) {
         "- \"protein\": Double\n" +
         "- \"carbs\": Double\n" +
         "- \"fat\": Double\n" +
+        "- \"items\": Array of the separate foods in the meal, each an object with: " +
+        "\"name\": String (short English name, e.g. \"roti\", \"dal\", \"chai\"), " +
+        "\"quantity\": Double, " +
+        "\"unit\": String (one of piece, katori, bowl, cup, glass, slice, tbsp, tsp, g, ml, serving), " +
+        "\"calories\", \"protein\", \"carbs\", \"fat\", \"fiber\": Double (for that whole quantity), " +
+        "\"oilG\": Double (grams of oil, ghee or butter added in cooking or serving it, 0 if none), " +
+        "\"sugarG\": Double (grams of added sugar, 0 if none). The items' numbers must add up to the meal's totals.\n" +
         MealTags.PROMPT_FIELDS +
         "Provide reasonable estimations if quantities or specific types are not detailed by the user.\n" +
         "CRITICAL: If the user's input is gibberish, background noise, or completely unrelated to food, meals, or beverages, set the \"foodText\" field to exactly \"invalid\" and set \"calories\", \"protein\", \"carbs\", and \"fat\" all to 0.0."
@@ -48,30 +55,6 @@ class NutritionParser(private val apiKey: String) {
             .removeSuffix("```")
             .trim()
 
-        val jsonObject = JSONObject(cleanJsonText)
-        val foodText = jsonObject.optString("foodText", input)
-        val calories = jsonObject.optDouble("calories", 0.0)
-        val protein = jsonObject.optDouble("protein", 0.0)
-        val carbs = jsonObject.optDouble("carbs", 0.0)
-        val fat = jsonObject.optDouble("fat", 0.0)
-        val tags = runCatching { MealTags.fromJson(jsonObject) }.getOrNull()
-
-        return ParsedNutritionResult(
-            foodText = foodText,
-            calories = calories,
-            proteinG = protein,
-            carbsG = carbs,
-            fatG = fat,
-            tags = tags
-        )
+        return ParsedNutritionResult.fromJson(JSONObject(cleanJsonText), input)
     }
 }
-
-data class ParsedNutritionResult(
-    val foodText: String,
-    val calories: Double,
-    val proteinG: Double,
-    val carbsG: Double,
-    val fatG: Double,
-    val tags: MealTags? = null
-)

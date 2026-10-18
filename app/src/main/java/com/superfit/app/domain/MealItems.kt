@@ -77,6 +77,9 @@ data class MealItems(
 
     fun foodText(): String = items.joinToString(", ") { it.label() }
 
+    /** The same meal at a different portion size. */
+    fun scaled(factor: Double): MealItems = copy(items = items.map { it.copy(qty = it.qty * factor) })
+
     fun encode(): String = JSONObject()
         .put("v", 1)
         .put("oil", oil.name)

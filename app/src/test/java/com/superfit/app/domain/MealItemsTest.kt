@@ -161,4 +161,24 @@ class MealItemsTest {
         assertEquals(1.6, newTags.vegFruitServings, 0.05)
         assertEquals(7L, edited.id)
     }
+
+    @Test
+    fun `a repeat of an edited meal scales its items`() {
+        val history = listOf(
+            NutritionEntryEntity(foodText = "2 roti", calories = 240.0, proteinG = 7.0, carbsG = 40.0, fatG = 6.0, timestamp = 0L, items = MealItems(listOf(roti), oil = Level.HIGH).encode())
+        )
+        val result = RepeatMealCache.findRepeatMeal("4 roti", history)!!
+        assertEquals(480.0, result.calories, 0.1)
+        assertEquals(4.0, result.items!!.items.single().qty, 0.0)
+        assertEquals(Level.HIGH, result.items!!.oil)
+    }
+
+    @Test
+    fun `an exact repeat copies the items`() {
+        val items = MealItems(listOf(roti, dal))
+        val history = listOf(
+            NutritionEntryEntity(foodText = "2 roti, 1 katori dal", calories = 420.0, proteinG = 16.0, carbsG = 64.0, fatG = 11.0, timestamp = 0L, items = items.encode())
+        )
+        assertEquals(items, RepeatMealCache.findRepeatMeal("2 roti, 1 katori dal", history)!!.items)
+    }
 }

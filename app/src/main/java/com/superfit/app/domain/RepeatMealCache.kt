@@ -117,7 +117,8 @@ object RepeatMealCache {
                 proteinG = exactMatch.proteinG,
                 carbsG = exactMatch.carbsG,
                 fatG = exactMatch.fatG,
-                tags = MealTags.decode(exactMatch.qualityTags)
+                tags = MealTags.decode(exactMatch.qualityTags),
+                items = MealItems.decode(exactMatch.items)
             )
         }
 
@@ -138,7 +139,8 @@ object RepeatMealCache {
                         proteinG = roundOneDecimal(pastEntry.proteinG * scaleFactor),
                         carbsG = roundOneDecimal(pastEntry.carbsG * scaleFactor),
                         fatG = roundOneDecimal(pastEntry.fatG * scaleFactor),
-                        tags = MealTags.decode(pastEntry.qualityTags)?.scaled(scaleFactor)
+                        tags = MealTags.decode(pastEntry.qualityTags)?.scaled(scaleFactor),
+                        items = MealItems.decode(pastEntry.items)?.scaled(scaleFactor)
                     )
                 }
             }

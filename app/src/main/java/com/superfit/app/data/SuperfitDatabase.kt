@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StreakStateEntity::class,
         HabitEntryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class SuperfitDatabase : RoomDatabase() {
@@ -131,6 +131,14 @@ abstract class SuperfitDatabase : RoomDatabase() {
             }
         }
 
+        // Each meal's separate foods, so amounts and oil/sugar can be fixed after logging.
+        // Older meals keep NULL and open as a single serving.
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `nutrition_entries` ADD COLUMN `items` TEXT")
+            }
+        }
+
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -138,7 +146,8 @@ abstract class SuperfitDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_1_5,
             MIGRATION_2_5,
-            MIGRATION_5_6
+            MIGRATION_5_6,
+            MIGRATION_6_7
         )
 
         fun getDatabase(context: Context): SuperfitDatabase {

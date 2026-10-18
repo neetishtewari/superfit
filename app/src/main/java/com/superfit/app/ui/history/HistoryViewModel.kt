@@ -380,7 +380,8 @@ class HistoryViewModel(
                     carbsG = result.carbsG,
                     fatG = result.fatG,
                     timestamp = targetTimestamp,
-                    qualityTags = result.tags?.encode()
+                    qualityTags = result.tags?.encode(),
+                    items = result.items?.encode()
                 )
                 repository.addNutritionEntry(entry)
                 loadData()

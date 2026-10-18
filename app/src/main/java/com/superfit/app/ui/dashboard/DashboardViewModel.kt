@@ -453,7 +453,8 @@ class DashboardViewModel(
                     carbsG = result.carbsG,
                     fatG = result.fatG,
                     timestamp = System.currentTimeMillis(),
-                    qualityTags = result.tags?.encode()
+                    qualityTags = result.tags?.encode(),
+                    items = result.items?.encode()
                 )
                 repository.addNutritionEntry(entry)
                 loadFrequentMeals()
