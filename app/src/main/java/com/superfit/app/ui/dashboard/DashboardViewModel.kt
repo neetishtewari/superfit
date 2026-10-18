@@ -339,14 +339,6 @@ class DashboardViewModel(
                 workoutMins = workoutMins
             )
 
-            val workoutRecommendation = com.superfit.app.domain.WorkoutRecommenderEngine.generateRecommendation(
-                profile = profile,
-                workoutsLoggedToday = workouts,
-                historyWorkouts = workouts // Live day's workouts & past history
-            )
-
-            val showWorkoutRecs = sharedPrefs.getBoolean("show_ai_workout_recommendations", true)
-
             val dietQualityMetrics = com.superfit.app.domain.FoodQualityEngine.analyzeDietQuality(
                 nutritionHistory = allNutritionHistory,
                 userGoal = profile.goal,
@@ -364,8 +356,6 @@ class DashboardViewModel(
                 weightMetrics = weightMetrics,
                 streakState = streakState,
                 habitEntry = habitEntry,
-                workoutRecommendation = workoutRecommendation,
-                showAiWorkoutRecommendations = showWorkoutRecs,
                 dietQualityMetrics = dietQualityMetrics,
                 bmr = bmr,
                 tdee = tdee,
@@ -383,11 +373,6 @@ class DashboardViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState.Loading
     )
-
-    fun setWorkoutRecommendationsEnabled(enabled: Boolean) {
-        sharedPrefs.edit().putBoolean("show_ai_workout_recommendations", enabled).apply()
-        _customMacroTrigger.value = System.currentTimeMillis()
-    }
 
     fun addWater(addMl: Int) {
         viewModelScope.launch {
@@ -431,8 +416,17 @@ class DashboardViewModel(
         }
     }
 
+    // What the user last asked to log, so a failed attempt can be retried without saying it again.
+    private var lastMealInput: String? = null
+    val canRetryLastMeal: Boolean get() = !lastMealInput.isNullOrBlank()
+
+    fun retryLastMeal() {
+        lastMealInput?.let { parseAndAddMeal(it) }
+    }
+
     fun parseAndAddMeal(input: String) {
         val key = _apiKey.value
+        lastMealInput = input
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
@@ -606,8 +600,6 @@ sealed interface DashboardUiState {
         val weightMetrics: com.superfit.app.domain.WeightGoalMetrics,
         val streakState: StreakStateEntity = StreakStateEntity(),
         val habitEntry: HabitEntryEntity = HabitEntryEntity(date = ""),
-        val workoutRecommendation: com.superfit.app.domain.TrainerWorkoutRecommendation,
-        val showAiWorkoutRecommendations: Boolean = true,
         val dietQualityMetrics: com.superfit.app.domain.DietQualityMetrics = com.superfit.app.domain.DietQualityMetrics(85, "BALANCED", emptyList(), emptyList(), emptyList()),
         val bmr: Double,
         val tdee: Double,

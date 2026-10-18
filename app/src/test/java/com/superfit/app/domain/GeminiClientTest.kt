@@ -57,7 +57,7 @@ class GeminiClientTest {
             }
             fail("expected an exception")
         } catch (e: Exception) {
-            assertEquals("Invalid API Key. Please update your API key in Settings.", e.message)
+            assertEquals("Your own Gemini key in Settings isn't working. Remove it there to use Superfit's built-in AI.", e.message)
         }
         assertEquals(1, callCount)
     }

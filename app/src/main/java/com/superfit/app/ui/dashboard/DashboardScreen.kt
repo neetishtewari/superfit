@@ -392,15 +392,18 @@ fun DashboardScreen(
                         // 3. Daily Nutrient Ledger
                         NutrientLedgerCard(state = state)
 
+                        // Quick weigh-in, so weight logging doesn't need the History tab
+                        WeightQuickRow(
+                            currentWeightKg = state.weightMetrics.currentWeightKg,
+                            weightEntries = state.weightEntries,
+                            onLogWeight = { weight, note -> viewModel.logWeight(weight, note) }
+                        )
+
                         // 4. AI Daily Coach Insights Card
                         CoachInsightsCard(
                             coachingState = coachingState,
                             onRefresh = { viewModel.refreshCoachingInsight() },
-                            onOpenChat = { showChatBottomSheet = true },
-                            onOpenSettings = {
-                                showChatBottomSheet = false
-                                onNavigateToSettings()
-                            }
+                            onOpenChat = { showChatBottomSheet = true }
                         )
 
                         // 5. Diet Quality Index Card (7-Day Rolling)
@@ -418,34 +421,17 @@ fun DashboardScreen(
                             parsingState = parsingState,
                             foodInputText = foodInputText,
                             onFoodInputChange = { foodInputText = it },
-                            onViewAllFoods = { showFavoritesDialog = true },
-                            onOpenSettings = {
-                                showChatBottomSheet = false
-                                onNavigateToSettings()
-                            }
+                            onViewAllFoods = { showFavoritesDialog = true }
                         )
                     } else {
-                        // WORKOUT VIEW: AI Trainer Workout, Activity & Performance, Sleep & Recovery
-                        // 1. AI Recommended Workout Card
-                        if (state.showAiWorkoutRecommendations) {
-                            WorkoutRecommendationCard(
-                                recommendation = state.workoutRecommendation,
-                                onLogWorkout = { workoutInput, difficulty ->
-                                    viewModel.parseAndAddWorkout(workoutInput, difficulty)
-                                },
-                                onDisableClick = {
-                                    viewModel.setWorkoutRecommendationsEnabled(false)
-                                }
-                            )
-                        }
-
-                        // 2. Activity & Performance Card
+                        // WORKOUT VIEW: Activity & Performance, Sleep & Recovery
+                        // 1. Activity & Performance Card
                         ActivityPerformanceCard(
                             state = state,
                             onDeleteWorkout = { viewModel.deleteWorkout(it) }
                         )
 
-                        // 3. Sleep & Readiness Recovery Dashboard
+                        // 2. Sleep & Readiness Recovery Dashboard
                         SleepRecoveryCard(state = state)
                     }
 
