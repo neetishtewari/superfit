@@ -10,7 +10,8 @@ import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.PackagedFood
 import com.superfit.app.domain.ParsedNutritionResult
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -26,9 +27,13 @@ sealed interface CameraState {
 
 /**
  * What the food camera is doing: which mode it is in, and what happened to the last photo or
- * barcode. Lives only while the camera is open, so every opening starts fresh.
+ * barcode. A ViewModel so turning the phone keeps the photo and its result; [reset] is called
+ * each time the camera opens, so every opening starts fresh.
  */
-class FoodCameraController(private val apiKey: String, private val scope: CoroutineScope) {
+class FoodCameraController : ViewModel() {
+
+    /** Blank means Superfit's built-in AI. Set by the screen each time it opens. */
+    var apiKey: String = ""
 
     var mode by mutableStateOf(CameraMode.MEAL)
         private set
@@ -43,7 +48,21 @@ class FoodCameraController(private val apiKey: String, private val scope: Corout
 
     // The scanner reports the same barcode many times a second; only the first one counts.
     private var scanLocked = false
+    // After Retake the same packet is usually still in view. Ignore its code until the camera has
+    // seen a few frames without it, or a few seconds have passed, so it isn't looked up again at once.
+    private var ignoredCode: String? = null
+    private var ignoreUntil = 0L
+    private var lastCode: String? = null
+    private var emptyFrames = 0
     private var job: Job? = null
+
+    fun reset() {
+        retake()
+        mode = CameraMode.MEAL
+        banner = null
+        ignoredCode = null
+        lastCode = null
+    }
 
     fun changeMode(newMode: CameraMode) {
         if (state != CameraState.Viewfinder) return
@@ -57,7 +76,7 @@ class FoodCameraController(private val apiKey: String, private val scope: Corout
         photo = bitmap
         banner = null
         state = CameraState.Working(if (photoMode == CameraMode.LABEL) "Reading the label…" else "Reading your meal…")
-        job = scope.launch {
+        job = viewModelScope.launch {
             state = try {
                 val parser = FoodPhotoParser(apiKey)
                 if (photoMode == CameraMode.LABEL) {
@@ -77,13 +96,22 @@ class FoodCameraController(private val apiKey: String, private val scope: Corout
         }
     }
 
+    /** A scanned frame with no barcode in it. A few in a row mean the old packet is out of view. */
+    fun onNoBarcode() {
+        emptyFrames++
+        if (emptyFrames >= 5) ignoredCode = null
+    }
+
     /** Returns true when this barcode is the one being looked up, so the screen can vibrate once. */
-    fun onBarcode(code: String): Boolean {
+    fun onBarcode(code: String, now: Long = System.currentTimeMillis()): Boolean {
         if (scanLocked || mode != CameraMode.BARCODE || state != CameraState.Viewfinder) return false
+        emptyFrames = 0
+        if (code == ignoredCode && now < ignoreUntil) return false
         scanLocked = true
+        lastCode = code
         banner = null
         state = CameraState.Working("Looking up product…")
-        job = scope.launch {
+        job = viewModelScope.launch {
             try {
                 val food = OpenFoodFactsClient.lookup(code)
                 if (food != null) {
@@ -98,18 +126,20 @@ class FoodCameraController(private val apiKey: String, private val scope: Corout
                 throw e
             } catch (e: Exception) {
                 android.util.Log.w("FoodCamera", "Barcode lookup failed", e)
-                state = CameraState.Failed(GeminiClient.sanitizeError(e))
+                state = CameraState.Failed("Couldn't reach the product database. Check your connection and try again.")
             }
         }
         return true
     }
 
     /** Back to the viewfinder in the same mode. */
-    fun retake() {
+    fun retake(now: Long = System.currentTimeMillis()) {
         job?.cancel()
         job = null
         photo = null
         scanLocked = false
+        ignoredCode = lastCode
+        ignoreUntil = now + 3_000L
         state = CameraState.Viewfinder
     }
 }

@@ -8,7 +8,9 @@ import com.google.ai.client.generativeai.type.generationConfig
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 import java.util.concurrent.ConcurrentHashMap
@@ -156,8 +158,10 @@ object GeminiClient {
         systemInstructionText: String?,
         isJson: Boolean = true
     ): String {
-        val (w, h) = scaledSize(image.width, image.height)
-        val scaled = if (w == image.width && h == image.height) image else Bitmap.createScaledBitmap(image, w, h, true)
+        val scaled = withContext(Dispatchers.Default) {
+            val (w, h) = scaledSize(image.width, image.height)
+            if (w == image.width && h == image.height) image else Bitmap.createScaledBitmap(image, w, h, true)
+        }
         return withFirebaseWording(apiKey) {
             runWithFailover { modelName ->
                 if (apiKey.isBlank()) {

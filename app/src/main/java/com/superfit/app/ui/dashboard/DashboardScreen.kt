@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,6 +66,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.superfit.app.ui.camera.FoodCameraController
 import com.superfit.app.ui.camera.FoodCameraScreen
 import androidx.core.content.ContextCompat
 import android.provider.Settings
@@ -99,7 +102,9 @@ fun DashboardScreen(
     var foodInputText by remember { mutableStateOf("") }
 
     var showFavoritesDialog by remember { mutableStateOf(false) }
-    var showFoodCamera by remember { mutableStateOf(false) }
+    // Saveable so turning the phone while taking a photo keeps the camera open.
+    var showFoodCamera by rememberSaveable { mutableStateOf(false) }
+    val foodCameraController: FoodCameraController = viewModel()
 
     LaunchedEffect(triggerFavoritesLog) {
         if (triggerFavoritesLog) {
@@ -256,6 +261,7 @@ fun DashboardScreen(
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 FoodCameraScreen(
+                    controller = foodCameraController,
                     apiKey = apiKey,
                     onLogged = { entry, isPackaged ->
                         viewModel.addPhotoMeal(entry, isPackaged)
@@ -399,7 +405,10 @@ fun DashboardScreen(
                             speechHelper.stopListening()
                         },
                         onCameraClick = if (hasCamera) {
-                            { showFoodCamera = true }
+                            {
+                                foodCameraController.reset()
+                                showFoodCamera = true
+                            }
                         } else null
                     )
 

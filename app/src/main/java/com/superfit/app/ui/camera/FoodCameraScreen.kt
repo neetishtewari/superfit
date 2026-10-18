@@ -61,6 +61,8 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.ui.dashboard.NeonGreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import java.util.concurrent.Executors
 
 /**
@@ -70,6 +72,7 @@ import java.util.concurrent.Executors
  */
 @Composable
 fun FoodCameraScreen(
+    controller: FoodCameraController,
     apiKey: String,
     onLogged: (NutritionEntryEntity, Boolean) -> Unit,
     onClose: () -> Unit
@@ -77,8 +80,7 @@ fun FoodCameraScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptics = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-    val controller = remember { FoodCameraController(apiKey, scope) }
+    controller.apiKey = apiKey
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
@@ -126,7 +128,8 @@ fun FoodCameraScreen(
                 mode = controller.mode,
                 imageCapture = imageCapture,
                 onBarcode = { code ->
-                    if (controller.onBarcode(code)) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (code == null) controller.onNoBarcode()
+                    else if (controller.onBarcode(code)) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
                 onUnavailable = cameraUnavailable
             )
@@ -226,7 +229,7 @@ fun FoodCameraScreen(
 private fun CameraPreview(
     mode: CameraMode,
     imageCapture: ImageCapture,
-    onBarcode: (String) -> Unit,
+    onBarcode: (String?) -> Unit,
     onUnavailable: () -> Unit
 ) {
     val context = LocalContext.current
@@ -255,7 +258,8 @@ private fun CameraPreview(
     }
 
     // Barcode mode only needs the live analysis; Meal and Label only need photos.
-    DisposableEffect(mode, lifecycleOwner) {
+    val scanning = mode == CameraMode.BARCODE
+    DisposableEffect(scanning, lifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
         var disposed = false
@@ -265,7 +269,7 @@ private fun CameraPreview(
                 val cameraProvider = future.get().also { provider = it }
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
                 cameraProvider.unbindAll()
-                if (mode == CameraMode.BARCODE) {
+                if (scanning) {
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
@@ -288,10 +292,10 @@ private fun CameraPreview(
     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 }
 
-/** Hands each new barcode number to [onCode]. ML Kit calls back on the main thread. */
+/** Hands each frame's barcode number, or null for none, to [onCode]. ML Kit calls back on the main thread. */
 private class BarcodeAnalyzer(
     private val scanner: BarcodeScanner,
-    private val onCode: (String) -> Unit
+    private val onCode: (String?) -> Unit
 ) : ImageAnalysis.Analyzer {
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
@@ -302,15 +306,16 @@ private class BarcodeAnalyzer(
         }
         scanner.process(InputImage.fromMediaImage(media, image.imageInfo.rotationDegrees))
             .addOnSuccessListener { codes ->
-                codes.firstNotNullOfOrNull { code -> code.rawValue?.takeIf { it.isNotEmpty() && it.all(Char::isDigit) } }
-                    ?.let(onCode)
+                onCode(codes.firstNotNullOfOrNull { code -> code.rawValue?.takeIf { it.isNotEmpty() && it.all(Char::isDigit) } })
             }
             .addOnCompleteListener { image.close() }
     }
 }
 
+/** Decodes and turns the photo upright off the main thread, then hands it over on the main thread. */
 private fun takePhoto(context: Context, imageCapture: ImageCapture, onPhoto: (Bitmap) -> Unit, onError: () -> Unit) {
-    imageCapture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
+    val main = ContextCompat.getMainExecutor(context)
+    imageCapture.takePicture(Dispatchers.Default.asExecutor(), object : ImageCapture.OnImageCapturedCallback() {
         override fun onCaptureSuccess(image: ImageProxy) {
             val bitmap = try {
                 image.toBitmap().rotated(image.imageInfo.rotationDegrees)
@@ -319,12 +324,12 @@ private fun takePhoto(context: Context, imageCapture: ImageCapture, onPhoto: (Bi
             } finally {
                 image.close()
             }
-            if (bitmap != null) onPhoto(bitmap) else onError()
+            main.execute { if (bitmap != null) onPhoto(bitmap) else onError() }
         }
 
         override fun onError(exception: ImageCaptureException) {
             android.util.Log.w("FoodCamera", "Photo capture failed", exception)
-            onError()
+            main.execute { onError() }
         }
     })
 }

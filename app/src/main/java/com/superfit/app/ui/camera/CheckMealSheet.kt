@@ -81,7 +81,7 @@ fun CheckPackSheet(
         onLog = {
             onLog(
                 NutritionEntryEntity(
-                    foodText = meal.foodText(),
+                    foodText = food.name ?: "Packaged food",
                     calories = totals.kcal,
                     proteinG = totals.protein,
                     carbsG = totals.carbs,
