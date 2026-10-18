@@ -115,4 +115,11 @@ class GeminiClientTest {
         }
         assertEquals(1, callCount)
     }
+
+    @Test
+    fun `photos are shrunk to 1024 px on the long edge`() {
+        assertEquals(1024 to 768, GeminiClient.scaledSize(4000, 3000))
+        assertEquals(768 to 1024, GeminiClient.scaledSize(3000, 4000))
+        assertEquals(800 to 600, GeminiClient.scaledSize(800, 600))
+    }
 }

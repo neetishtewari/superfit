@@ -1,5 +1,6 @@
 package com.superfit.app.domain
 
+import android.graphics.Bitmap
 import android.util.Log
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
@@ -142,6 +143,40 @@ object GeminiClient {
                 getOrCreateModel(modelName, apiKey, systemInstructionText, isJson).generateContent(prompt).text
             }
         }
+    }
+
+    /**
+     * Like [generateContent], with a photo sent alongside [prompt]. The photo is shrunk to
+     * 1024 px on its long edge first; the SDK sends it as JPEG. It is never saved.
+     */
+    suspend fun generateContentWithImage(
+        apiKey: String,
+        image: Bitmap,
+        prompt: String,
+        systemInstructionText: String?,
+        isJson: Boolean = true
+    ): String {
+        val (w, h) = scaledSize(image.width, image.height)
+        val scaled = if (w == image.width && h == image.height) image else Bitmap.createScaledBitmap(image, w, h, true)
+        return withFirebaseWording(apiKey) {
+            runWithFailover { modelName ->
+                if (apiKey.isBlank()) {
+                    val input = com.google.firebase.ai.type.content { image(scaled); text(prompt) }
+                    getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(input).text
+                } else {
+                    val input = content { image(scaled); text(prompt) }
+                    getOrCreateModel(modelName, apiKey, systemInstructionText, isJson).generateContent(input).text
+                }
+            }
+        }
+    }
+
+    /** Width and height that fit within [maxEdge] on the long side, keeping the shape. Never enlarges. */
+    fun scaledSize(width: Int, height: Int, maxEdge: Int = 1024): Pair<Int, Int> {
+        val longEdge = maxOf(width, height)
+        if (longEdge <= maxEdge) return width to height
+        val factor = maxEdge.toDouble() / longEdge
+        return maxOf(1, Math.round(width * factor).toInt()) to maxOf(1, Math.round(height * factor).toInt())
     }
 
     /**

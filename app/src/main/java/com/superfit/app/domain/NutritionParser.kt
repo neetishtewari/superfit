@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 class NutritionParser(private val apiKey: String) {
 
-    private val systemInstructionText =
+    internal val systemInstructionText =
         "You are an expert clinical nutrition AI. Parse the user's natural language meal description and estimate " +
         "the total calories (kcal), protein (grams), carbohydrates (grams), and fats (grams).\n" +
         "You must return a raw JSON object with the following fields and types:\n" +
