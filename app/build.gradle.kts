@@ -124,6 +124,7 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
+  testImplementation(libs.androidx.work.testing)
 
   // Instrumented tests: jUnit rules and runners
   androidTestImplementation(libs.androidx.test.core)
