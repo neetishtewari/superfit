@@ -46,7 +46,6 @@ fun MealEditSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var meal by remember(entry.id) { mutableStateOf(MealItems.decode(entry.items) ?: MealItems.legacy(entry)) }
-    val totals = meal.totals()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -69,32 +68,7 @@ fun MealEditSheet(
                 color = ThemeTextPrimary
             )
 
-            meal.items.forEachIndexed { index, item ->
-                MealItemEditRow(
-                    item = item,
-                    canRemove = meal.items.size > 1,
-                    onQtyChange = { qty ->
-                        meal = meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) })
-                    },
-                    onRemove = {
-                        meal = meal.copy(items = meal.items.toMutableList().also { it.removeAt(index) })
-                    }
-                )
-            }
-
-            if (meal.hasOil) {
-                LevelPicker(label = "Oil / ghee", selected = meal.oil, onSelect = { meal = meal.copy(oil = it) })
-            }
-            if (meal.hasSugar) {
-                LevelPicker(label = "Sugar", selected = meal.sugar, onSelect = { meal = meal.copy(sugar = it) })
-            }
-
-            Text(
-                text = "${totals.kcal.toInt()} kcal  ·  P ${totals.protein.toInt()}g  ·  C ${totals.carbs.toInt()}g  ·  F ${totals.fat.toInt()}g",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = NeonGreen
-            )
+            MealItemsEditor(meal = meal, onChange = { meal = it })
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -113,6 +87,40 @@ fun MealEditSheet(
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+/** The item rows, oil and sugar pickers and live totals, shared by Edit meal and Check your meal. */
+@Composable
+internal fun MealItemsEditor(meal: MealItems, onChange: (MealItems) -> Unit) {
+    val totals = meal.totals()
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        meal.items.forEachIndexed { index, item ->
+            MealItemEditRow(
+                item = item,
+                canRemove = meal.items.size > 1,
+                onQtyChange = { qty ->
+                    onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
+                },
+                onRemove = {
+                    onChange(meal.copy(items = meal.items.toMutableList().also { it.removeAt(index) }))
+                }
+            )
+        }
+
+        if (meal.hasOil) {
+            LevelPicker(label = "Oil / ghee", selected = meal.oil, onSelect = { onChange(meal.copy(oil = it)) })
+        }
+        if (meal.hasSugar) {
+            LevelPicker(label = "Sugar", selected = meal.sugar, onSelect = { onChange(meal.copy(sugar = it)) })
+        }
+
+        Text(
+            text = "${totals.kcal.toInt()} kcal  ·  P ${totals.protein.toInt()}g  ·  C ${totals.carbs.toInt()}g  ·  F ${totals.fat.toInt()}g",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = NeonGreen
+        )
     }
 }
 
@@ -178,7 +186,7 @@ private fun MealItemEditRow(
 }
 
 @Composable
-private fun StepButton(icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
+internal fun StepButton(icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
     FilledTonalIconButton(
         onClick = onClick,
         enabled = enabled,
