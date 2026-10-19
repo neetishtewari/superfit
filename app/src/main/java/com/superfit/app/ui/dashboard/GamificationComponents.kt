@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
@@ -35,7 +36,8 @@ import com.superfit.app.theme.*
 @Composable
 fun StreakHeaderCard(
     streakState: StreakStateEntity,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShare: (() -> Unit)? = null
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -72,6 +74,7 @@ fun StreakHeaderCard(
                 )
             }
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
             if (streakState.graceDaysRemaining == 0 && streakState.currentStreak > 0) {
                 // Yesterday was missed: the grace day is holding the streak until a meal is logged today
                 Surface(
@@ -148,6 +151,20 @@ fun StreakHeaderCard(
                         )
                     }
                 }
+            }
+            if (onShare != null) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Share my day",
+                    tint = SuperfitTheme.colors.textSecondary,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onShare)
+                        .padding(7.dp)
+                )
+            }
             }
         }
     }

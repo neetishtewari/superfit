@@ -338,6 +338,26 @@ fun SettingsScreen(
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
 
                     WorkoutImportSettings(viewModel)
+
+                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
+
+                    Text(
+                        text = "Personal bests",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = SuperfitTheme.colors.textPrimary
+                    )
+                    val personalBests by viewModel.personalBests.collectAsState()
+                    var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
+                    PersonalBestsList(
+                        bests = personalBests.all,
+                        onShare = { best ->
+                            shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = false, today = java.time.LocalDate.now())
+                        }
+                    )
+                    shareCard?.let { card ->
+                        com.superfit.app.ui.share.ShareCardSheet(card = card, onDismiss = { shareCard = null })
+                    }
                 }
             }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.DateRange
@@ -777,7 +778,8 @@ internal fun ActivityPerformanceCard(
     onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
     onHideImportedWorkout: (com.superfit.app.domain.WorkoutView) -> Unit = {},
     workoutImportEnabled: Boolean = false,
-    workoutImportRunning: Boolean = false
+    workoutImportRunning: Boolean = false,
+    onShareWorkout: (com.superfit.app.domain.ShareCard) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -851,7 +853,11 @@ internal fun ActivityPerformanceCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.importedWorkouts.forEach { workout ->
-                    ImportedWorkoutRow(workout = workout, onHide = { onHideImportedWorkout(workout) })
+                    ImportedWorkoutRow(
+                        workout = workout,
+                        onHide = { onHideImportedWorkout(workout) },
+                        onShare = { onShareWorkout(com.superfit.app.domain.ShareCards.activity(workout)) }
+                    )
                 }
                 state.workoutList.forEach { entry ->
                     Row(
@@ -891,6 +897,17 @@ internal fun ActivityPerformanceCard(
                                 fontWeight = FontWeight.Bold,
                                 color = EnergeticCoral
                             )
+                            IconButton(
+                                onClick = { onShareWorkout(com.superfit.app.domain.ShareCards.activity(entry)) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Share workout",
+                                    tint = ThemeTextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             IconButton(
                                 onClick = { onDeleteWorkout(entry) },
                                 modifier = Modifier.size(24.dp)

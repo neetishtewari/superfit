@@ -17,6 +17,10 @@ import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.LogRouter
 import com.superfit.app.domain.RepeatMealCache
+import com.superfit.app.domain.BestKind
+import com.superfit.app.domain.PersonalBest
+import com.superfit.app.domain.PersonalBests
+import com.superfit.app.domain.StreakEngine
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutView
@@ -538,6 +542,47 @@ class DashboardViewModel(
         initialValue = DashboardUiState.Loading
     )
 
+    /**
+     * Personal bests from every imported workout and the meal streak, plus the one new best to
+     * offer on Home. Workout bests wait for the first import to finish, so it sets the starting
+     * points quietly.
+     */
+    val personalBests: StateFlow<BestsUiState> = combine(
+        repository.profileFlow,
+        repository.allImportedWorkoutsFlow,
+        repository.allNutritionEntriesFlow,
+        _customMacroTrigger
+    ) { profile, rows, meals, _ ->
+        if (profile == null) return@combine BestsUiState()
+        val prefs = repository.workoutImportPrefs
+        val views = if (prefs.enabled && prefs.lastImportMillis > 0) {
+            ImportedWorkouts.views(appContext, rows, prefs, PhysiologyEngine.calculateBmr(profile))
+        } else emptyList()
+        val streak = StreakEngine.fromMealTimestamps(meals.map { it.timestamp })
+        val bests = PersonalBests.compute(views, streak.longestStreak)
+        val baseline = prefs.bestBaseline
+        val riding = prefs.bestStreakRiding
+        val check = PersonalBests.check(bests, baseline, riding, streak.currentStreak, System.currentTimeMillis())
+        if (check.baseline != baseline || check.streakRiding != riding) {
+            prefs.bestBaseline = check.baseline
+            prefs.bestStreakRiding = check.streakRiding
+            viewModelScope.launch { runCatching { repository.backUpWorkoutImportSettings() } }
+        }
+        BestsUiState(all = bests, toOffer = check.announce.firstOrNull())
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = BestsUiState()
+    )
+
+    /** A best was shared or dismissed: remember it so it's offered only once. */
+    fun acknowledgeBest(best: PersonalBest) {
+        val prefs = repository.workoutImportPrefs
+        prefs.bestBaseline = PersonalBests.acknowledge(best, prefs.bestBaseline)
+        if (best.kind == BestKind.LONGEST_STREAK) prefs.bestStreakRiding = true
+        viewModelScope.launch { runCatching { repository.backUpWorkoutImportSettings() } }
+    }
+
     /** Keeps the home-screen widget's "kcal left" in step with the dashboard. */
     private fun updateWidget(state: DashboardUiState.Success) {
         // Same rounding as the Home ring's "left", so the two never differ by 1 kcal.
@@ -925,6 +970,12 @@ sealed interface DashboardUiState {
         val workoutTargetSource: String = ""
     ) : DashboardUiState
 }
+
+/** Every personal best, and the new one (if any) to offer for sharing on Home. */
+data class BestsUiState(
+    val all: List<PersonalBest> = emptyList(),
+    val toOffer: PersonalBest? = null
+)
 
 /** "Same workout as your Samsung Health run? Keep just one?" after a voice-logged workout. */
 data class DuplicateWorkoutPrompt(val voiceEntryId: Long, val voiceDescription: String, val imported: WorkoutView)

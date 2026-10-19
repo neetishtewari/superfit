@@ -237,6 +237,10 @@ fun DashboardScreen(
     val workoutPermissionMissing by viewModel.workoutPermissionMissing.collectAsState()
     val workoutImportRunning by viewModel.workoutImportRunning.collectAsState()
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
+    val personalBests by viewModel.personalBests.collectAsState()
+    // The card in the share preview, and the new best it shows (remembered once it's shared).
+    var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
+    var shareBest by remember { mutableStateOf<com.superfit.app.domain.PersonalBest?>(null) }
 
     // Auto sync on entry
     LaunchedEffect(Unit) {
@@ -435,6 +439,17 @@ fun DashboardScreen(
                         } else null
                     )
 
+                    personalBests.toOffer?.let { best ->
+                        NewBestCard(
+                            best = best,
+                            onShare = {
+                                shareBest = best
+                                shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now())
+                            },
+                            onDismiss = { viewModel.acknowledgeBest(best) }
+                        )
+                    }
+
                     if (logType == "MEAL") {
                         // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
                         // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
@@ -459,7 +474,8 @@ fun DashboardScreen(
 
                         // 2. Daily Streak Header Card (Narrow Band)
                         StreakHeaderCard(
-                            streakState = state.streakState
+                            streakState = state.streakState,
+                            onShare = { shareCard = dailyShareCard(state, coachingState) }
                         )
 
                         // 3. Daily Nutrient Ledger
@@ -515,7 +531,8 @@ fun DashboardScreen(
                             onDeleteWorkout = { viewModel.deleteWorkout(it) },
                             onHideImportedWorkout = { viewModel.hideWorkout(it) },
                             workoutImportEnabled = workoutImportEnabled,
-                            workoutImportRunning = workoutImportRunning
+                            workoutImportRunning = workoutImportRunning,
+                            onShareWorkout = { shareCard = it }
                         )
 
                         // 2. Sleep & Readiness Recovery Dashboard
@@ -525,6 +542,17 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(48.dp))
                 }
             }
+        }
+
+        shareCard?.let { card ->
+            com.superfit.app.ui.share.ShareCardSheet(
+                card = card,
+                onDismiss = {
+                    shareCard = null
+                    shareBest = null
+                },
+                onShared = { shareBest?.let { viewModel.acknowledgeBest(it) } }
+            )
         }
 
         duplicateWorkoutPrompt?.let { prompt ->

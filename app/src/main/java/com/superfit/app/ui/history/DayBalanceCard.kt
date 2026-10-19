@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -49,6 +50,9 @@ import com.superfit.app.ui.dashboard.FoodQualityCard
 import com.superfit.app.ui.dashboard.FoodSwapCard
 import com.superfit.app.ui.dashboard.MealEditSheet
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.domain.ShareCard
+import com.superfit.app.domain.ShareCards
+import com.superfit.app.ui.share.ShareCardSheet
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -60,6 +64,9 @@ fun DayBalanceCard(
     viewModel: HistoryViewModel,
     modifier: Modifier = Modifier
 ) {
+    var shareCard by remember { mutableStateOf<ShareCard?>(null) }
+    shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
+
     val netColor = if (summary.netBalance < 0) NeonMint else CoralRed
     val balanceLabel = if (summary.netBalance < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
 
@@ -268,7 +275,8 @@ fun DayBalanceCard(
                     summary.importedWorkouts.forEach { workout ->
                         com.superfit.app.ui.dashboard.ImportedWorkoutRow(
                             workout = workout,
-                            onHide = { viewModel.hideImportedWorkout(workout) }
+                            onHide = { viewModel.hideImportedWorkout(workout) },
+                            onShare = { shareCard = ShareCards.activity(workout) }
                         )
                     }
                 }
@@ -326,6 +334,17 @@ fun DayBalanceCard(
                                     fontWeight = FontWeight.Bold,
                                     color = CoralRed
                                 )
+                                IconButton(
+                                    onClick = { shareCard = ShareCards.activity(entry) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share workout",
+                                        tint = ThemeTextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                                 IconButton(
                                     onClick = { viewModel.deleteWorkout(entry) },
                                     modifier = Modifier.size(24.dp)

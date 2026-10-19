@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -18,6 +21,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -92,7 +97,7 @@ fun WorkoutConnectCard(onConnect: () -> Unit, onNotNow: () -> Unit, modifier: Mo
 /** A workout from another app. Long-press to hide it in Superfit (it stays in the other app). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit, showDay: Boolean = false) {
+fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit, showDay: Boolean = false, onShare: (() -> Unit)? = null) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
         Row(
@@ -115,13 +120,25 @@ fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit, showDay: Boolea
                 Text(text = workout.detailLine, fontSize = 11.sp, color = SuperfitTheme.colors.textSecondary)
                 Text(text = "from ${workout.sourceName}", fontSize = 10.sp, color = Color.Gray)
             }
-            workout.exerciseKcal?.let {
-                Text(
-                    text = "${it.toInt()} kcal",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = EnergeticCoral
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                workout.exerciseKcal?.let {
+                    Text(
+                        text = "${it.toInt()} kcal",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EnergeticCoral
+                    )
+                }
+                if (onShare != null) {
+                    IconButton(onClick = onShare, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share workout",
+                            tint = SuperfitTheme.colors.textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
