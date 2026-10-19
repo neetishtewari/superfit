@@ -907,25 +907,6 @@ internal fun ActivityPerformanceCard(
                 }
             }
         }
-
-        if (state.earlierImportedWorkouts.isNotEmpty()) {
-            HorizontalDivider(
-                color = ThemeTextPrimary.copy(alpha = 0.05f),
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-            Text(
-                text = "EARLIER THIS WEEK",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 0.5.sp
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.earlierImportedWorkouts.forEach { workout ->
-                    ImportedWorkoutRow(workout = workout, onHide = { onHideImportedWorkout(workout) }, showDay = true)
-                }
-            }
-        }
     }
 }
 

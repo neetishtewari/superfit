@@ -200,14 +200,6 @@ class DataRepository(
         return database.importedWorkoutDao().getBetweenFlow(startOfDay, endOfDay)
     }
 
-    /** Workouts from other apps that started in the 6 days before [date]. */
-    fun getImportedWorkoutsForWeekBefore(date: LocalDate): Flow<List<ImportedWorkoutEntity>> {
-        val zoneId = ZoneId.systemDefault()
-        val from = date.minusDays(6).atStartOfDay(zoneId).toInstant().toEpochMilli()
-        val to = date.atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-        return database.importedWorkoutDao().getBetweenFlow(from, to)
-    }
-
     val importedWorkoutCountFlow: Flow<Int> get() = database.importedWorkoutDao().countFlow()
 
     suspend fun getAllImportedWorkouts(): List<ImportedWorkoutEntity> = database.importedWorkoutDao().getAll()
