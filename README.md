@@ -31,9 +31,16 @@ Requirements: JDK 17 and the Android SDK (compileSdk 36).
 ./gradlew assembleDebug       # debug APK (installs as "Superfit (Dev)")
 ```
 
-The debug build is shrunk with R8 and the same `proguard-rules.pro` as the Play build, so the dev app on the phone behaves like the store version. If something works when you run from source but breaks on the phone, look for a missing keep rule first. See `docs/release-checklist.md` before each Play upload.
-
 CI (`.github/workflows/ci.yml`) runs both on every pull request and every push to `main`. It also fails if the build changes a Room schema file under `app/schemas`, so commit those files with any entity change.
+
+### Testing what the Play build will do
+
+The debug build is shrunk with R8 using the same rules as release, so the dev app runs the same processed code as the Play Store app. Bugs that only appear after shrinking (in 1.0.25, R8 removed a WorkManager constructor and the home-screen widget never finished loading) show up while testing the dev app, not after an upload.
+
+- `scripts/check-r8-keeps.sh` fails if R8 removed a worker or a WorkManager input merger. CI runs it after `assembleDebug`.
+- `scripts/device-smoke-test.sh` builds and installs the dev app on a USB-connected phone, launches it, forces every scheduled background job to run (including the daily reminder, so a reminder notification appears), and fails on crashes or WorkManager errors. Run it before building a release. It never touches the Play Store app.
+
+When a feature is created by reflection (a new worker, a library that instantiates classes by name), add a `-keep` rule to `app/proguard-rules.pro`, and add the class to `scripts/check-r8-keeps.sh` if it isn't a worker. `docs/release-checklist.md` lists the checks to run before each Play upload.
 
 ### Release signing
 
