@@ -100,6 +100,8 @@ fun DashboardScreen(
     val scrollState = rememberScrollState()
 
     var logType by remember { mutableStateOf("MEAL") }
+    // Hidden for the rest of the visit once Add or Not now is tapped, even across tab switches.
+    var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
 
     var showChatBottomSheet by remember { mutableStateOf(false) }
     var foodInputText by remember { mutableStateOf("") }
@@ -427,7 +429,6 @@ fun DashboardScreen(
                         CalorieRingsCard(state = state)
 
                         // One-time tip offering the home-screen widget
-                        var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
                         val widgetTipEligible = remember(state.totalMealsLogged) {
                             WidgetPin.shouldShowTip(context, state.totalMealsLogged)
                         }

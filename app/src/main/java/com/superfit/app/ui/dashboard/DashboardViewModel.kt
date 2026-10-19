@@ -31,7 +31,6 @@ import com.superfit.app.widget.SuperfitWidget
 import com.superfit.app.widget.WidgetSnapshot
 import com.superfit.app.widget.WidgetSnapshotStore
 import java.time.LocalDate
-import kotlin.math.roundToInt
 
 class DashboardViewModel(
     private val repository: DataRepository,
@@ -41,6 +40,8 @@ class DashboardViewModel(
     val healthConnectManager = repository.healthConnectManager
 
     private val appContext = context.applicationContext
+    // The day the dashboard's flows were built for; a ViewModel kept past midnight still shows that day.
+    private val dashboardDate = LocalDate.now().toString()
     private val sharedPrefs = getUserSharedPrefs(context)
     private val geminiKeyStore = GeminiKeyStore(context)
 
@@ -389,11 +390,10 @@ class DashboardViewModel(
 
     /** Keeps the home-screen widget's "kcal left" in step with the dashboard. */
     private fun updateWidget(state: DashboardUiState.Success) {
-        val snapshot = WidgetSnapshot(
-            date = LocalDate.now().toString(),
-            targetKcal = state.macroTargets.calories.roundToInt(),
-            eatenKcal = state.caloriesEaten.roundToInt()
-        )
+        // Same rounding as the Home ring's "left", so the two never differ by 1 kcal.
+        val target = state.macroTargets.calories.toInt()
+        val left = (state.macroTargets.calories - state.caloriesEaten).toInt()
+        val snapshot = WidgetSnapshot(date = dashboardDate, targetKcal = target, eatenKcal = target - left)
         if (WidgetSnapshotStore.save(appContext, snapshot)) {
             viewModelScope.launch { SuperfitWidget.refresh(appContext) }
         }
@@ -495,18 +495,28 @@ class DashboardViewModel(
 
                 val mealResult = meal?.getOrNull()?.takeIf { it.foodText != "invalid" }
                 val workoutResult = workout?.getOrNull()?.takeIf { it.workoutText != "invalid" }
-                mealResult?.let { saveMeal(it) }
+                mealResult?.let {
+                    saveMeal(it)
+                    // A retry after this point must not log the meal twice.
+                    lastMealInput = routed.exercise.ifBlank { null }
+                }
                 workoutResult?.let { saveWorkout(it, "JUST_RIGHT") }
+                val foodMissed = routed.food.isNotBlank() && mealResult == null
+                val exerciseMissed = routed.exercise.isNotBlank() && workoutResult == null
 
                 _parsingState.value = when {
                     mealResult != null && workoutResult != null -> ParsingState.Success(
                         mealResult.foodText,
                         message = "Logged: ${mealResult.foodText} · Workout: ${workoutResult.workoutText}"
                     )
-                    mealResult != null -> ParsingState.Success(mealResult.foodText)
+                    mealResult != null -> ParsingState.Success(
+                        mealResult.foodText,
+                        message = if (exerciseMissed) "Logged: ${mealResult.foodText} · Couldn't log the exercise. Try saying it again." else null
+                    )
                     workoutResult != null -> ParsingState.Success(
                         workoutResult.workoutText,
-                        message = "Logged workout: ${workoutResult.workoutText}"
+                        message = if (foodMissed) "Logged workout: ${workoutResult.workoutText} · Couldn't log the food. Try saying it again."
+                            else "Logged workout: ${workoutResult.workoutText}"
                     )
                     else -> {
                         val failure = meal?.exceptionOrNull() ?: workout?.exceptionOrNull()

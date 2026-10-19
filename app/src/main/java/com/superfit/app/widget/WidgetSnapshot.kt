@@ -24,6 +24,12 @@ object WidgetSnapshotStore {
         return true
     }
 
+    /** Updates today's eaten total, keeping the saved target. Does nothing before the dashboard has saved one. */
+    fun updateEaten(context: Context, date: String, eatenKcal: Int): Boolean {
+        val current = load(context) ?: return false
+        return save(context, current.copy(date = date, eatenKcal = eatenKcal))
+    }
+
     fun load(context: Context): WidgetSnapshot? {
         val prefs = getUserSharedPrefs(context)
         val date = prefs.getString(KEY_DATE, null) ?: return null
