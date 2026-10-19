@@ -49,6 +49,12 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // Shrink the dev app exactly like the Play build, so testing on the phone runs the same
+            // R8-processed code. Code that only breaks after R8 (like the WorkManager input merger
+            // that left the widget loading forever in 1.0.25) then shows up before release.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         release {
             isMinifyEnabled = true
