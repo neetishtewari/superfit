@@ -49,6 +49,7 @@ import androidx.compose.ui.zIndex
 import androidx.health.connect.client.PermissionController
 import androidx.compose.animation.core.*
 import com.superfit.app.theme.*
+import com.superfit.app.widget.WidgetPin
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
@@ -424,6 +425,24 @@ fun DashboardScreen(
                         // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
                         // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
                         CalorieRingsCard(state = state)
+
+                        // One-time tip offering the home-screen widget
+                        var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
+                        val widgetTipEligible = remember(state.totalMealsLogged) {
+                            WidgetPin.shouldShowTip(context, state.totalMealsLogged)
+                        }
+                        if (widgetTipEligible && !widgetTipHidden) {
+                            WidgetTipCard(
+                                onAdd = {
+                                    WidgetPin.requestPin(context)
+                                    widgetTipHidden = true
+                                },
+                                onNotNow = {
+                                    WidgetPin.dismissTip(context)
+                                    widgetTipHidden = true
+                                }
+                            )
+                        }
 
                         // 2. Daily Streak Header Card (Narrow Band)
                         StreakHeaderCard(
