@@ -25,7 +25,7 @@ Date: 2026-10-19. Draft for Neetish's OK. Based on the workout check on Neetish'
 
 ## Calories
 - Apps share **total** calories, which include what the body burns anyway during that time. Superfit shows **exercise calories**: total minus the resting part (worked out from the user's BMR and the workout's length). For the 18 Oct run: 601 total, about 550 from the run itself.
-- **Workouts raise that day's calorie target** (Neetish chose "Add back half", 2026-10-19, then "All" after seeing his own numbers the same day), only for people who connect their workouts:
+- **Workouts raise that day's calorie target** (Neetish chose "Add back half", 2026-10-19, then "All" after seeing their own numbers the same day), only for people who connect their workouts:
   - The base target covers everyday life without workouts: resting burn (BMR) x 1.2, plus the goal adjustment as today.
   - Each day, that day's exercise calories are added (all of them by default). Example: the 18 Oct run (about 550 exercise kcal) adds about 550 kcal; a rest day gets the base only.
   - Settings, "Add workout calories to my target": Off / Half / All (default).
