@@ -334,6 +334,10 @@ fun SettingsScreen(
                         color = SuperfitTheme.colors.textTertiary,
                         modifier = Modifier.align(Alignment.End)
                     )
+
+                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
+
+                    WorkoutImportSettings(viewModel)
                 }
             }
 

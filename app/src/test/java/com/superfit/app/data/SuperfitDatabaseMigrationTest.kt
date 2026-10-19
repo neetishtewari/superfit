@@ -86,7 +86,7 @@ class SuperfitDatabaseMigrationTest {
         try {
             // Opening the database runs the migrations and Room's schema validation.
             val db = database.openHelper.writableDatabase
-            assertEquals(7, db.version)
+            assertEquals(8, db.version)
 
             db.query("SELECT weightKg, startingWeightKg, fitnessLevel FROM user_profile WHERE id = 0").use { cursor ->
                 assertEquals(1, cursor.count)
@@ -108,6 +108,11 @@ class SuperfitDatabaseMigrationTest {
             db.query("SELECT items FROM nutrition_entries").use { cursor ->
                 cursor.moveToFirst()
                 assertTrue(cursor.isNull(0))
+            }
+            // Workouts from other apps start empty; the first Health Connect import fills them in.
+            db.query("SELECT COUNT(*) FROM imported_workouts").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
             }
             db.query("SELECT difficultyRating FROM workout_entries").use { cursor ->
                 assertEquals(if (expectWorkoutRow) 1 else 0, cursor.count)

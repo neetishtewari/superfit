@@ -39,7 +39,9 @@ data class DaySummaryState(
     val steps: Int,
     val netBalance: Double,
     val meals: List<NutritionEntryEntity>,
-    val workouts: List<WorkoutEntryEntity>
+    val workouts: List<WorkoutEntryEntity>,
+    // Workouts from other apps, without doubles or hidden ones.
+    val importedWorkouts: List<com.superfit.app.domain.WorkoutView> = emptyList()
 )
 
 data class WeeklyTrendsState(
@@ -105,17 +107,22 @@ class HistoryViewModel(
     private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
     private var workoutsByDate: Map<LocalDate, List<WorkoutEntryEntity>> = emptyMap()
     private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
-    private var bmr: Double = 0.0
-    private var activityMultiplier: Double = 1.2
-    private var calorieOffset: Double = 0.0
+    private var importedByDate: Map<LocalDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
+    private var profile: UserProfileEntity? = null
 
-    private fun calculateTargetCalories(activeCal: Double): Double {
+    /** The day's calorie target, including that day's workouts for people who connected them. */
+    private fun calculateTargetCalories(date: LocalDate): Double {
         val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-        return if (customMacroEnabled) {
+        val profile = profile
+        return if (customMacroEnabled || profile == null) {
             sharedPrefs.getInt("custom_calories", 2000).toDouble()
         } else {
-            val rawTdee = PhysiologyEngine.calculateTdee(bmr, activityMultiplier, activeCal)
-            (rawTdee + calorieOffset).coerceAtLeast(1200.0)
+            ImportedWorkouts.target(
+                profile,
+                repository.workoutImportPrefs,
+                importedByDate[date].orEmpty(),
+                workoutsByDate[date].orEmpty()
+            ).targets.calories
         }
     }
 
@@ -144,7 +151,7 @@ class HistoryViewModel(
         val activity = activityByDate[selectedDate]
         val manualCal = workouts.sumOf { it.caloriesBurned }
         val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-        val tdee = calculateTargetCalories(activeCal)
+        val tdee = calculateTargetCalories(selectedDate)
         val eaten = meals.sumOf { it.calories }
 
         selectedSummary = DaySummaryState(
@@ -155,16 +162,16 @@ class HistoryViewModel(
             steps = activity?.steps ?: 0,
             netBalance = eaten - tdee,
             meals = meals,
-            workouts = workouts
+            workouts = workouts,
+            importedWorkouts = importedByDate[selectedDate].orEmpty()
         )
     }
 
     fun loadData() {
         viewModelScope.launch {
             val profile = repository.getProfile() ?: return@launch
-            bmr = PhysiologyEngine.calculateBmr(profile)
-            activityMultiplier = profile.activityMultiplier
-            calorieOffset = profile.calorieOffset.toDouble()
+            this@HistoryViewModel.profile = profile
+            importedByDate = ImportedWorkouts.byDate(repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)))
 
             // Get all local entries to compute month grid and consistency
             val allNutrition = repository.getAllNutritionEntries()
@@ -204,11 +211,7 @@ class HistoryViewModel(
                 val mealsCount = meals.size
                 val caloriesEaten = meals.sumOf { it.calories }
 
-                val workouts = workoutsByDate[tempDate] ?: emptyList()
-                val manualCal = workouts.sumOf { it.caloriesBurned }
-                val activity = activityByDate[tempDate]
-                val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-                val tdee = calculateTargetCalories(activeCal)
+                val tdee = calculateTargetCalories(tempDate)
 
                 val status = when {
                     mealsCount < 2 -> DayStatus.Insufficient
@@ -241,11 +244,7 @@ class HistoryViewModel(
                 if (mealsCount >= 2) {
                     rollingLoggedCount++
                     val caloriesEaten = meals.sumOf { it.calories }
-                    val workouts = workoutsByDate[checkDate] ?: emptyList()
-                    val manualCal = workouts.sumOf { it.caloriesBurned }
-                    val activity = activityByDate[checkDate]
-                    val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-                    val tdee = calculateTargetCalories(activeCal)
+                    val tdee = calculateTargetCalories(checkDate)
                     if (caloriesEaten < tdee) {
                         rollingDeficitCount++
                     }
@@ -265,7 +264,7 @@ class HistoryViewModel(
             for (i in 0 until 30) {
                 val checkDate = today.minusDays(i.toLong())
                 val workouts = workoutsByDate[checkDate] ?: emptyList()
-                if (workouts.isNotEmpty()) {
+                if (workouts.isNotEmpty() || !importedByDate[checkDate].isNullOrEmpty()) {
                     rollingWorkoutDaysCount++
                 }
             }
@@ -289,15 +288,12 @@ class HistoryViewModel(
                 val mealsCount = meals.size
 
                 val workouts = workoutsByDate[checkDate] ?: emptyList()
-                val manualCal = workouts.sumOf { it.caloriesBurned }
-                totalWorkouts += workouts.size
+                totalWorkouts += workouts.size + importedByDate[checkDate].orEmpty().size
                 totalStrengthSets += workouts.filter { it.workoutType == "Strength" }.sumOf { it.setsCount }
 
                 if (mealsCount >= 2) {
                     val eatenCalories = meals.sumOf { it.calories }
-                    val activity = activityByDate[checkDate]
-                    val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-                    val tdee = calculateTargetCalories(activeCal)
+                    val tdee = calculateTargetCalories(checkDate)
                     totalNetCalories += (eatenCalories - tdee)
                     totalProteinG += meals.sumOf { it.proteinG }
                     trackedDaysCount++
@@ -349,6 +345,14 @@ class HistoryViewModel(
     fun deleteMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.deleteNutritionEntry(entry)
+            loadData()
+        }
+    }
+
+    /** Hides a workout from another app in Superfit; it stays in that app. */
+    fun hideImportedWorkout(workout: com.superfit.app.domain.WorkoutView) {
+        viewModelScope.launch {
+            repository.hideImportedWorkout(workout.merged.memberIds)
             loadData()
         }
     }

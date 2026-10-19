@@ -263,7 +263,18 @@ fun DayBalanceCard(
                 letterSpacing = 0.5.sp
             )
 
-            if (summary.workouts.isEmpty()) {
+            if (summary.importedWorkouts.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    summary.importedWorkouts.forEach { workout ->
+                        com.superfit.app.ui.dashboard.ImportedWorkoutRow(
+                            workout = workout,
+                            onHide = { viewModel.hideImportedWorkout(workout) }
+                        )
+                    }
+                }
+            }
+
+            if (summary.workouts.isEmpty() && summary.importedWorkouts.isEmpty()) {
                 Text(
                     text = "No workouts logged on this day.",
                     fontSize = 13.sp,
@@ -273,7 +284,7 @@ fun DayBalanceCard(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
                 )
-            } else {
+            } else if (summary.workouts.isNotEmpty()) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {

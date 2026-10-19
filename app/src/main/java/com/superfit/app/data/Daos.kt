@@ -115,6 +115,9 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: WorkoutEntryEntity): Long
 
+    @Query("SELECT * FROM workout_entries WHERE id = :id")
+    suspend fun getEntry(id: Long): WorkoutEntryEntity?
+
     @Delete
     suspend fun deleteEntry(entry: WorkoutEntryEntity)
 
@@ -136,6 +139,30 @@ interface WorkoutDao {
 
     @Query("DELETE FROM workout_entries")
     suspend fun deleteAllEntries()
+}
+
+@Dao
+interface ImportedWorkoutDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(workouts: List<ImportedWorkoutEntity>)
+
+    @Query("SELECT * FROM imported_workouts WHERE startTime >= :from AND startTime <= :to")
+    fun getBetweenFlow(from: Long, to: Long): Flow<List<ImportedWorkoutEntity>>
+
+    @Query("SELECT * FROM imported_workouts WHERE startTime >= :from AND startTime <= :to")
+    suspend fun getBetween(from: Long, to: Long): List<ImportedWorkoutEntity>
+
+    @Query("SELECT * FROM imported_workouts")
+    suspend fun getAll(): List<ImportedWorkoutEntity>
+
+    @Query("SELECT * FROM imported_workouts")
+    fun getAllFlow(): Flow<List<ImportedWorkoutEntity>>
+
+    @Query("DELETE FROM imported_workouts WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<String>)
+
+    @Query("DELETE FROM imported_workouts")
+    suspend fun deleteAll()
 }
 
 @Dao

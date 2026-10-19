@@ -226,6 +226,16 @@ fun DashboardScreen(
         viewModel.syncTelemetry()
     }
 
+    // Health Connect's screen for workouts from other apps (Connect on the Activity card)
+    val workoutPermissionsLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        viewModel.onWorkoutPermissionsResult(granted)
+    }
+    val workoutImportEnabled by viewModel.workoutImportEnabled.collectAsState()
+    val workoutCardDismissed by viewModel.workoutCardDismissed.collectAsState()
+    val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
+
     // Auto sync on entry
     LaunchedEffect(Unit) {
         viewModel.syncTelemetry()
@@ -486,10 +496,21 @@ fun DashboardScreen(
                         )
                     } else {
                         // WORKOUT VIEW: Activity & Performance, Sleep & Recovery
+                        // One-time offer to bring in workouts from other apps
+                        if (!workoutImportEnabled && !workoutCardDismissed && viewModel.healthConnectManager.isAvailable()) {
+                            WorkoutConnectCard(
+                                onConnect = {
+                                    workoutPermissionsLauncher.launch(com.superfit.app.data.WorkoutImporter.permissions)
+                                },
+                                onNotNow = { viewModel.dismissWorkoutCard() }
+                            )
+                        }
+
                         // 1. Activity & Performance Card
                         ActivityPerformanceCard(
                             state = state,
-                            onDeleteWorkout = { viewModel.deleteWorkout(it) }
+                            onDeleteWorkout = { viewModel.deleteWorkout(it) },
+                            onHideImportedWorkout = { viewModel.hideWorkout(it) }
                         )
 
                         // 2. Sleep & Readiness Recovery Dashboard
@@ -499,6 +520,14 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(48.dp))
                 }
             }
+        }
+
+        duplicateWorkoutPrompt?.let { prompt ->
+            DuplicateWorkoutDialog(
+                prompt = prompt,
+                onKeepImported = { viewModel.keepImportedWorkout() },
+                onKeepBoth = { viewModel.keepBothWorkouts() }
+            )
         }
 
         if (showChatBottomSheet && dashboardState is DashboardUiState.Success) {

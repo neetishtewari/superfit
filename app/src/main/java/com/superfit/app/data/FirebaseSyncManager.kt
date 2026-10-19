@@ -159,6 +159,11 @@ class FirebaseSyncManager(private val context: Context) {
                 database.habitDao().insertHabitEntries(habits)
             }
 
+            // 9. Choices for workouts from other apps (the workouts themselves come from Health Connect)
+            val workoutSettingsDoc = firestore.collection("users").document(userId)
+                .collection("settings").document(WORKOUT_IMPORT_DOC).get().await()
+            workoutSettingsDoc.data?.let { WorkoutImportPrefs(getUserSharedPrefs(context)).restore(it) }
+
             Log.d(tag, "Full bi-directional sync down complete.")
         } catch (e: Exception) {
             Log.e(tag, "Error syncing data down: ${e.message}", e)
@@ -314,6 +319,16 @@ class FirebaseSyncManager(private val context: Context) {
         }
     }
 
+    suspend fun uploadWorkoutImportSettings(settings: Map<String, Any>) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId)
+                .collection("settings").document(WORKOUT_IMPORT_DOC).set(settings).await()
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading workout import settings: ${e.message}")
+        }
+    }
+
     suspend fun uploadHabitEntry(entry: HabitEntryEntity) {
         val userId = auth.currentUser?.uid ?: return
         try {
@@ -370,6 +385,12 @@ class FirebaseSyncManager(private val context: Context) {
             // 8. Delete habit documents
             val habitSnap = firestore.collection("users").document(userId).collection("habits").get().await()
             for (doc in habitSnap.documents) {
+                doc.reference.delete().await()
+            }
+
+            // 9. Delete settings documents
+            val settingsSnap = firestore.collection("users").document(userId).collection("settings").get().await()
+            for (doc in settingsSnap.documents) {
                 doc.reference.delete().await()
             }
 
@@ -546,5 +567,6 @@ class FirebaseSyncManager(private val context: Context) {
 
     companion object {
         private const val PREF_ENTRY_BACKUP_REPAIRED = "entry_backup_repaired_v1"
+        private const val WORKOUT_IMPORT_DOC = "workoutImport"
     }
 }

@@ -232,6 +232,9 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                     value = "${state.activity.steps} / 10K",
                     color = ElectricCyan
                 )
+                workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)?.let {
+                    Text(text = it, fontSize = 11.sp, color = ThemeTextSecondary)
+                }
             }
         }
     }
@@ -771,7 +774,8 @@ internal fun TrackMealsCard(
 @Composable
 internal fun ActivityPerformanceCard(
     state: DashboardUiState.Success,
-    onDeleteWorkout: (WorkoutEntryEntity) -> Unit
+    onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
+    onHideImportedWorkout: (com.superfit.app.domain.WorkoutView) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -817,7 +821,7 @@ internal fun ActivityPerformanceCard(
             unit = "steps"
         )
 
-        if (state.workoutList.isNotEmpty()) {
+        if (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()) {
             HorizontalDivider(
                 color = ThemeTextPrimary.copy(alpha = 0.05f),
                 modifier = Modifier.padding(vertical = 4.dp)
@@ -832,6 +836,9 @@ internal fun ActivityPerformanceCard(
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.importedWorkouts.forEach { workout ->
+                    ImportedWorkoutRow(workout = workout, onHide = { onHideImportedWorkout(workout) })
+                }
                 state.workoutList.forEach { entry ->
                     Row(
                         modifier = Modifier

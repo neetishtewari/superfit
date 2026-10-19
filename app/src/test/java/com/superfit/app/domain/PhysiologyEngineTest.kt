@@ -2,6 +2,7 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.UserProfileEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhysiologyEngineTest {
@@ -124,5 +125,54 @@ class PhysiologyEngineTest {
         
         // Carbs target: (2136.0 - (128.0 * 4) - (59.33 * 9)) / 4 = (2136.0 - 512 - 534.0) / 4 = 272.5g
         assertEquals(272.50, targets.carbsG, 0.01)
+    }
+
+    // 80 kg, 180 cm, 30-year-old man: BMR 1,780. Chose "moderately active" (1.55) at sign-up.
+    private val runner = UserProfileEntity(
+        age = 30, heightCm = 180.0, weightKg = 80.0, isMale = true,
+        activityMultiplier = 1.55, goal = "LOSE_WEIGHT", calorieOffset = -500
+    )
+
+    @Test
+    fun withoutConnectedWorkoutsTheTargetUsesTheChosenActivityLevel() {
+        val day = PhysiologyEngine.dailyTarget(runner, workoutsConnected = false, addBack = WorkoutAddBack.HALF, exerciseKcal = 550.0)
+        // 1780 x 1.55 - 500 = 2259
+        assertEquals(2259.0, day.targets.calories, 0.01)
+        assertEquals(0.0, day.workoutKcal, 0.0)
+    }
+
+    @Test
+    fun connectedWorkoutsAddHalfOfTheDaysExerciseCaloriesToAnEverydayBase() {
+        val runDay = PhysiologyEngine.dailyTarget(runner, workoutsConnected = true, addBack = WorkoutAddBack.HALF, exerciseKcal = 550.0)
+        val restDay = PhysiologyEngine.dailyTarget(runner, workoutsConnected = true, addBack = WorkoutAddBack.HALF, exerciseKcal = 0.0)
+        // Base: 1780 x 1.2 - 500 = 1636. Run day: 1636 + 275 = 1911.
+        assertEquals(1636.0, restDay.targets.calories, 0.01)
+        assertEquals(1911.0, runDay.targets.calories, 0.01)
+        assertEquals(275.0, runDay.workoutKcal, 0.01)
+        assertEquals(1636.0, runDay.baseCalories, 0.01)
+        assertEquals(1780.0 * 1.2 + 275.0, runDay.tdee, 0.01)
+        // Protein stays steady; the extra goes to carbs and fat.
+        assertEquals(restDay.targets.proteinG, runDay.targets.proteinG, 0.0)
+        assertTrue(runDay.targets.carbsG > restDay.targets.carbsG)
+        assertTrue(runDay.targets.fatG > restDay.targets.fatG)
+    }
+
+    @Test
+    fun addBackAllAddsTheWholeWorkoutAndOffKeepsTheChosenActivityLevel() {
+        val all = PhysiologyEngine.dailyTarget(runner, workoutsConnected = true, addBack = WorkoutAddBack.ALL, exerciseKcal = 550.0)
+        val off = PhysiologyEngine.dailyTarget(runner, workoutsConnected = true, addBack = WorkoutAddBack.OFF, exerciseKcal = 550.0)
+        assertEquals(2186.0, all.targets.calories, 0.01)
+        assertEquals(2259.0, off.targets.calories, 0.01)
+        assertEquals(0.0, off.workoutKcal, 0.0)
+    }
+
+    @Test
+    fun workoutPartIsWhatActuallyRaisedTheTargetWhenTheMinimumApplies() {
+        // Small profile whose base sits on the 1,200 kcal minimum: BMR 1,158, base 1389 - 500 = 889 -> 1200.
+        val small = UserProfileEntity(age = 40, heightCm = 155.0, weightKg = 55.0, isMale = false, calorieOffset = -500)
+        val day = PhysiologyEngine.dailyTarget(small, workoutsConnected = true, addBack = WorkoutAddBack.HALF, exerciseKcal = 400.0)
+        // 1389 + 200 - 500 = 1089, still below the minimum, so the workout changed nothing visible.
+        assertEquals(1200.0, day.targets.calories, 0.01)
+        assertEquals(0.0, day.workoutKcal, 0.01)
     }
 }

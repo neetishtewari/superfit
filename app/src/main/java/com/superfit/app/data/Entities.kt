@@ -91,6 +91,25 @@ data class WorkoutEntryEntity(
     val difficultyRating: String = "JUST_RIGHT" // "EASY", "JUST_RIGHT", "HARD"
 )
 
+/**
+ * A workout another app (Samsung Health, Strava, a watch) shared through Health Connect. One row
+ * per app's copy; WorkoutMerge shows each workout once. Not backed up to the cloud, because it
+ * can always be read again from Health Connect.
+ */
+@Entity(tableName = "imported_workouts")
+data class ImportedWorkoutEntity(
+    @PrimaryKey val id: String, // Health Connect's record id
+    val sourcePackage: String,
+    val exerciseType: Int, // Health Connect's ExerciseSessionRecord type
+    val startTime: Long, // epoch millis
+    val endTime: Long,
+    val distanceMeters: Double? = null,
+    val totalKcal: Double? = null,
+    val avgHeartRate: Long? = null,
+    // False until distance, calories and heart rate have been read, so a cut-short import fills them in later.
+    val detailsRead: Boolean = false
+)
+
 data class PredictedFood(
     val foodText: String,
     val calories: Double,
