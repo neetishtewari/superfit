@@ -418,7 +418,6 @@ class DashboardViewModel(
         _customMacroTrigger,
         repository.allNutritionEntriesFlow,
         repository.getImportedWorkoutsForDay(LocalDate.now()),
-        repository.getImportedWorkoutsForWeekBefore(LocalDate.now()),
         repository.importedWorkoutCountFlow
     ) { array ->
         val profile = array[0] as? UserProfileEntity
@@ -435,9 +434,7 @@ class DashboardViewModel(
         val allNutritionHistory = array[9] as? List<NutritionEntryEntity> ?: emptyList()
         @Suppress("UNCHECKED_CAST")
         val importedRows = array[10] as? List<ImportedWorkoutEntity> ?: emptyList()
-        @Suppress("UNCHECKED_CAST")
-        val earlierImportedRows = array[11] as? List<ImportedWorkoutEntity> ?: emptyList()
-        val importedCount = array[12] as? Int ?: 0
+        val importedCount = array[11] as? Int ?: 0
 
         if (profile == null) {
             DashboardUiState.NotInitialized
@@ -452,9 +449,6 @@ class DashboardViewModel(
             val workoutPrefs = repository.workoutImportPrefs
             val importedWorkouts = if (workoutPrefs.enabled) {
                 ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
-            } else emptyList()
-            val earlierImportedWorkouts = if (workoutPrefs.enabled) {
-                ImportedWorkouts.views(appContext, earlierImportedRows, workoutPrefs, bmr)
             } else emptyList()
             val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
             // What the body burns today with all of today's workouts, for the coach's deficit sums.
@@ -531,7 +525,6 @@ class DashboardViewModel(
                 manualWorkoutCalories = manualCal,
                 totalMealsLogged = allNutritionHistory.size,
                 importedWorkouts = importedWorkouts,
-                earlierImportedWorkouts = earlierImportedWorkouts,
                 importedWorkoutCount = if (workoutPrefs.enabled) importedCount else 0,
                 workoutTargetKcal = workoutTargetKcal,
                 workoutTargetSource = WorkoutDisplay.boostSource(importedWorkouts, workouts.size)
@@ -925,8 +918,6 @@ sealed interface DashboardUiState {
         val totalMealsLogged: Int = 0,
         // Today's workouts from other apps, without doubles or hidden ones.
         val importedWorkouts: List<WorkoutView> = emptyList(),
-        // The 6 days before today, so a fresh import shows something even on a rest day.
-        val earlierImportedWorkouts: List<WorkoutView> = emptyList(),
         // Every app's copy counted, before doubles are merged; 0 while the import is off.
         val importedWorkoutCount: Int = 0,
         // How much of today's calorie target comes from today's workouts, and from which.
