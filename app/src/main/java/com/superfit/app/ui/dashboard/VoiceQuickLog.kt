@@ -206,7 +206,7 @@ fun VoiceQuickLogCard(
             )
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // Segment Selector Switch (MEAL / WORKOUT)
+            // FOOD / ACTIVITY tab: picks which cards show below. The mic handles both either way.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -226,7 +226,7 @@ fun VoiceQuickLogCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "MEAL",
+                        text = "FOOD",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (logType == "MEAL") ThemeSecondaryAccent else ThemeTextTertiary,
@@ -243,7 +243,7 @@ fun VoiceQuickLogCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "WORKOUT",
+                        text = "ACTIVITY",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (logType == "WORKOUT") ThemeSecondaryAccent else ThemeTextTertiary,
@@ -320,9 +320,8 @@ fun VoiceQuickLogCard(
                     Text(
                         text = when {
                             isListening -> "Listening..."
-                            isProcessing -> "Analyzing Speech..."
-                            logType == "MEAL" -> "Quick-Log Meal"
-                            else -> "Quick-Log Workout"
+                            isProcessing -> "Working it out…"
+                            else -> "Quick log"
                         },
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
@@ -334,11 +333,10 @@ fun VoiceQuickLogCard(
                     )
                     Text(
                         text = when {
-                            isListening -> if (logType == "MEAL") "Speak what you ate now..." else "Speak what workout you did..."
-                            isProcessing -> if (logType == "MEAL") "Estimating calories & macros with Gemini..." else "Estimating calories & sets/reps with Gemini..."
-                            logType == "MEAL" && onCameraClick != null -> "Tap the mic and speak what you ate, or snap a photo."
-                            logType == "MEAL" -> "Tap the mic and speak what you ate."
-                            else -> "Tap the mic and speak what exercise you did."
+                            isListening -> "Say what you ate or did..."
+                            isProcessing -> "Logging food, exercise or both"
+                            logType == "MEAL" && onCameraClick != null -> "Tap the mic and say what you ate or did, or snap a photo"
+                            else -> "Tap the mic and say what you ate or did"
                         },
                         fontSize = 11.sp,
                         color = ThemeTextSecondary

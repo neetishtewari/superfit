@@ -122,15 +122,12 @@ fun DashboardScreen(
     var showVoiceBanner by remember { mutableStateOf(false) }
 
     // Speech recognizer helper instantiation
-    val speechHelper = remember(logType) {
+    val speechHelper = remember {
         SpeechRecognizerHelper(
             context = context,
             onResult = { text ->
-                if (logType == "MEAL") {
-                    viewModel.parseAndAddMeal(text)
-                } else {
-                    viewModel.parseAndAddWorkout(text)
-                }
+                // One mic for everything: food, exercise or both, whichever tab is showing.
+                viewModel.smartLog(text)
             },
             onError = { error ->
                 voiceMessage = error
@@ -175,7 +172,7 @@ fun DashboardScreen(
         val state = parsingState
         when (state) {
             is ParsingState.Success -> {
-                voiceMessage = "Logged: ${state.foodText}"
+                voiceMessage = state.message ?: "Logged: ${state.foodText}"
                 voiceBannerColor = NeonGreen
                 showVoiceBanner = true
                 viewModel.resetParsingState()
@@ -194,7 +191,7 @@ fun DashboardScreen(
         val state = workoutParsingState
         when (state) {
             is ParsingState.Success -> {
-                voiceMessage = "Logged: ${state.foodText}"
+                voiceMessage = state.message ?: "Logged: ${state.foodText}"
                 voiceBannerColor = NeonGreen
                 showVoiceBanner = true
                 viewModel.resetWorkoutParsingState()
