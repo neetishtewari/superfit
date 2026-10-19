@@ -17,6 +17,9 @@ import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.LogRouter
 import com.superfit.app.domain.RepeatMealCache
+import com.superfit.app.domain.WorkoutAddBack
+import com.superfit.app.domain.WorkoutDisplay
+import com.superfit.app.domain.WorkoutView
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,10 +85,31 @@ class DashboardViewModel(
     private val _customMacroTrigger = MutableStateFlow(System.currentTimeMillis())
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key != null && key.startsWith("custom_")) {
+        if (key != null && (key.startsWith("custom_") || key.startsWith(WorkoutImportPrefs.KEY_PREFIX))) {
             _customMacroTrigger.value = System.currentTimeMillis()
+            // Also catches the switch being restored from the cloud backup.
+            if (key.startsWith(WorkoutImportPrefs.KEY_PREFIX)) {
+                _workoutImportEnabled.value = repository.workoutImportPrefs.enabled
+            }
         }
     }
+
+    private val _workoutImportEnabled = MutableStateFlow(repository.workoutImportPrefs.enabled)
+    val workoutImportEnabled: StateFlow<Boolean> = _workoutImportEnabled.asStateFlow()
+
+    // The import is on but Health Connect no longer lets Superfit read workouts (taken away in its
+    // settings, or a new phone restored from backup): the Connect card asks again.
+    private val _workoutPermissionMissing = MutableStateFlow(false)
+    val workoutPermissionMissing: StateFlow<Boolean> = _workoutPermissionMissing.asStateFlow()
+
+    private val _workoutCardDismissed = MutableStateFlow(repository.workoutImportPrefs.cardDismissed)
+    val workoutCardDismissed: StateFlow<Boolean> = _workoutCardDismissed.asStateFlow()
+
+    private val _workoutImportRunning = MutableStateFlow(false)
+    val workoutImportRunning: StateFlow<Boolean> = _workoutImportRunning.asStateFlow()
+
+    private val _duplicateWorkoutPrompt = MutableStateFlow<DuplicateWorkoutPrompt?>(null)
+    val duplicateWorkoutPrompt: StateFlow<DuplicateWorkoutPrompt?> = _duplicateWorkoutPrompt.asStateFlow()
 
     init {
         checkPermissions()
@@ -178,19 +202,32 @@ class DashboardViewModel(
                     "Fat: ${fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
                     "Fibre (estimated): ${nutrition.sumOf { MealTags.of(it).fiberG }.toInt()} / ${CoachPatternEngine.fibreTargetG(macroTargets.calories).toInt()}g."
 
-                val workoutsText = if (currentState.workoutList.isEmpty()) {
-                    "No manual workouts logged today."
+                val workoutsText = if (currentState.workoutList.isEmpty() && currentState.importedWorkouts.isEmpty()) {
+                    "No workouts logged today."
                 } else {
-                    currentState.workoutList.joinToString { 
+                    (currentState.workoutList.map {
                         if (it.workoutType == "Strength") {
                             "${it.description} (Strength, ${it.setsCount} sets x ${it.repsCount} reps, ~${it.caloriesBurned.toInt()} kcal)"
                         } else {
                             "${it.description} (Cardio, ~${it.caloriesBurned.toInt()} kcal)"
                         }
-                    }
+                    } + currentState.importedWorkouts.map {
+                        ImportedWorkouts.coachEntry(it).let { e -> "${e.description}, ~${e.caloriesBurned.toInt()} exercise kcal" }
+                    }).joinToString()
                 }
 
                 val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
+
+                val weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000
+                val weekWorkoutsText = repository.getImportedWorkoutViews(currentState.bmr)
+                    .filter { it.startTime >= weekAgo }
+                    .groupBy { it.title }
+                    .map { (title, list) ->
+                        val km = list.sumOf { it.distanceKm ?: 0.0 }
+                        "${list.size} x $title" + if (km > 0) String.format(java.util.Locale.US, " (%.1f km)", km) else ""
+                    }
+                    .joinToString()
+                    .ifEmpty { "none recorded" }
 
                 val systemInstructionText = """
                     You are Superfit AI Coach, a premium, friendly, highly analytical personal trainer and health scientist.
@@ -202,6 +239,7 @@ class DashboardViewModel(
                     - Daily Nutrition: $nutritionText
                     - Daily Activity: $activityText
                     - Daily Workouts: $workoutsText
+                    - Workouts from other apps, last 7 days: $weekWorkoutsText
                     - Daily Sleep: $sleepText
                     
                     Rules:
@@ -220,7 +258,7 @@ class DashboardViewModel(
                         targets = macroTargets,
                         maintenanceCalories = if (sharedPrefs.getBoolean("custom_macro_enabled", false)) null else currentState.tdee,
                         nutrition = repository.getAllNutritionEntries(),
-                        workouts = repository.getAllWorkoutEntries(),
+                        workouts = repository.getAllWorkoutsForCoach(currentState.bmr),
                         activity = repository.getAllActivityTelemetry(),
                         sleep = repository.getAllSleepTelemetry(),
                         weights = repository.getAllWeightEntries(),
@@ -262,7 +300,103 @@ class DashboardViewModel(
             val hasAll = repository.healthConnectManager.hasAllPermissions()
             _hasHealthConnectPermissions.value = hasAll
             _grantedPermissions.value = granted
+            _workoutPermissionMissing.value = client != null && repository.healthConnectManager.isAvailable() &&
+                repository.workoutImportPrefs.enabled && WorkoutImporter.EXERCISE_PERMISSION !in granted
         }
+    }
+
+    // --- Workouts from other apps ---
+
+    val workoutImportPrefs: WorkoutImportPrefs get() = repository.workoutImportPrefs
+
+    /** Called with what the user allowed on Health Connect's screen after tapping Connect. */
+    fun onWorkoutPermissionsResult(granted: Set<String>) {
+        if (WorkoutImporter.EXERCISE_PERMISSION !in granted) return
+        viewModelScope.launch {
+            repository.setWorkoutImportEnabled(true)
+            _workoutImportEnabled.value = true
+            checkPermissions()
+            _workoutImportRunning.value = true
+            try {
+                repository.importWorkouts()
+            } finally {
+                _workoutImportRunning.value = false
+            }
+        }
+    }
+
+    fun setWorkoutImportEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setWorkoutImportEnabled(enabled)
+            _workoutImportEnabled.value = enabled
+        }
+    }
+
+    fun dismissWorkoutCard() {
+        repository.workoutImportPrefs.cardDismissed = true
+        _workoutCardDismissed.value = true
+        _workoutPermissionMissing.value = false
+    }
+
+    fun hideWorkout(workout: WorkoutView) {
+        viewModelScope.launch { repository.hideImportedWorkout(workout.merged.memberIds) }
+    }
+
+    fun unhideAllWorkouts() {
+        viewModelScope.launch {
+            repository.workoutImportPrefs.unhideAll()
+            repository.backUpWorkoutImportSettings()
+        }
+    }
+
+    fun setMainWorkoutApp(packageName: String?) {
+        viewModelScope.launch {
+            repository.workoutImportPrefs.mainApp = packageName
+            repository.backUpWorkoutImportSettings()
+        }
+    }
+
+    fun setWorkoutAddBack(addBack: WorkoutAddBack) {
+        viewModelScope.launch {
+            repository.workoutImportPrefs.addBack = addBack
+            repository.backUpWorkoutImportSettings()
+        }
+    }
+
+    /** Apps that have shared workouts, as (package, name), for the "Main workout app" choice. */
+    suspend fun workoutSourceApps(): List<Pair<String, String>> =
+        repository.getAllImportedWorkouts().map { it.sourcePackage }.distinct()
+            .map { it to SourceAppNames.label(appContext, it) }
+            .sortedBy { it.second }
+
+    /**
+     * After a cardio workout is logged by voice, offers to drop it if another app recorded a
+     * workout in the last few hours, so it isn't counted twice. The prompt shows both, so the
+     * user can tell whether they're the same, and each imported workout is asked about once.
+     */
+    private fun offerDuplicateCheck(voiceEntryId: Long, voiceDescription: String, workoutType: String) {
+        if (workoutType != "Cardio") return
+        val state = dashboardState.value as? DashboardUiState.Success ?: return
+        val now = System.currentTimeMillis()
+        val prefs = repository.workoutImportPrefs
+        val imported = state.importedWorkouts
+            .filter { now - (it.startTime + it.merged.durationMillis) in 0..DUPLICATE_WINDOW_MILLIS }
+            .filterNot { prefs.wasAskedAboutDuplicate(it.merged.primary.id) }
+            .maxByOrNull { it.startTime } ?: return
+        prefs.markAskedAboutDuplicate(imported.merged.primary.id)
+        _duplicateWorkoutPrompt.value = DuplicateWorkoutPrompt(voiceEntryId, voiceDescription, imported)
+    }
+
+    fun keepImportedWorkout() {
+        val prompt = _duplicateWorkoutPrompt.value ?: return
+        _duplicateWorkoutPrompt.value = null
+        viewModelScope.launch {
+            repository.getWorkoutEntry(prompt.voiceEntryId)?.let { repository.deleteWorkoutEntry(it) }
+        }
+    }
+
+    fun keepBothWorkouts() {
+        _duplicateWorkoutPrompt.value = null
     }
 
     fun updateApiKey(key: String) {
@@ -282,7 +416,10 @@ class DashboardViewModel(
         repository.streakStateFlow,
         repository.getHabitEntryFlow(LocalDate.now().toString()),
         _customMacroTrigger,
-        repository.allNutritionEntriesFlow
+        repository.allNutritionEntriesFlow,
+        repository.getImportedWorkoutsForDay(LocalDate.now()),
+        repository.getImportedWorkoutsForWeekBefore(LocalDate.now()),
+        repository.importedWorkoutCountFlow
     ) { array ->
         val profile = array[0] as? UserProfileEntity
         val activity = array[1] as? ActivityTelemetryEntity
@@ -296,6 +433,11 @@ class DashboardViewModel(
         val rawHabit = array[7] as? HabitEntryEntity
         @Suppress("UNCHECKED_CAST")
         val allNutritionHistory = array[9] as? List<NutritionEntryEntity> ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val importedRows = array[10] as? List<ImportedWorkoutEntity> ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val earlierImportedRows = array[11] as? List<ImportedWorkoutEntity> ?: emptyList()
+        val importedCount = array[12] as? Int ?: 0
 
         if (profile == null) {
             DashboardUiState.NotInitialized
@@ -304,10 +446,19 @@ class DashboardViewModel(
             // Live physiological calculations
             val bmr = PhysiologyEngine.calculateBmr(profile)
             val manualCal = workouts.sumOf { it.caloriesBurned }
-            val healthConnectCal = activity?.activeCalories ?: 0.0
-            val totalActiveCal = healthConnectCal + manualCal
 
-            val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier, totalActiveCal)
+            // Workouts from other apps. Their calories are already inside Health Connect's
+            // "burned today", so they only move the target, never the burned number.
+            val workoutPrefs = repository.workoutImportPrefs
+            val importedWorkouts = if (workoutPrefs.enabled) {
+                ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
+            } else emptyList()
+            val earlierImportedWorkouts = if (workoutPrefs.enabled) {
+                ImportedWorkouts.views(appContext, earlierImportedRows, workoutPrefs, bmr)
+            } else emptyList()
+            val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
+            // What the body burns today with all of today's workouts, for the coach's deficit sums.
+            val tdee = dailyTarget.maintenance
             val readiness = sleep?.readinessScore ?: 50 // Default 50% if no sleep session found
 
             // Macro targets from live TDEE and goal (or the user's own numbers)
@@ -324,8 +475,9 @@ class DashboardViewModel(
                     fatG = customFat
                 )
             } else {
-                PhysiologyEngine.calculateMacroTargets(profile, tdee, totalActiveCal)
+                dailyTarget.targets
             }
+            val workoutTargetKcal = if (customMacroEnabled) 0.0 else dailyTarget.workoutKcal
 
             // Aggregate nutrition eaten today
             val caloriesEaten = nutrition.sumOf { it.calories }
@@ -377,7 +529,12 @@ class DashboardViewModel(
                 carbsEaten = carbsEaten,
                 fatEaten = fatEaten,
                 manualWorkoutCalories = manualCal,
-                totalMealsLogged = allNutritionHistory.size
+                totalMealsLogged = allNutritionHistory.size,
+                importedWorkouts = importedWorkouts,
+                earlierImportedWorkouts = earlierImportedWorkouts,
+                importedWorkoutCount = if (workoutPrefs.enabled) importedCount else 0,
+                workoutTargetKcal = workoutTargetKcal,
+                workoutTargetSource = WorkoutDisplay.boostSource(importedWorkouts, workouts.size)
             )
         }
     }.onEach { state ->
@@ -550,7 +707,7 @@ class DashboardViewModel(
     }
 
     private suspend fun saveWorkout(result: com.superfit.app.domain.ParsedWorkoutResult, difficultyRating: String) {
-        repository.addWorkoutEntry(
+        val id = repository.addWorkoutEntry(
             WorkoutEntryEntity(
                 description = result.workoutText,
                 caloriesBurned = result.caloriesBurned,
@@ -561,6 +718,7 @@ class DashboardViewModel(
                 difficultyRating = difficultyRating
             )
         )
+        offerDuplicateCheck(id, result.workoutText, result.workoutType)
     }
 
     fun parseAndAddMeal(input: String) {
@@ -707,7 +865,7 @@ class DashboardViewModel(
                     macroTargets = currentState.macroTargets,
                     maintenanceCalories = if (customMacroEnabled) null else currentState.tdee,
                     historyNutrition = repository.getAllNutritionEntries(),
-                    historyWorkouts = repository.getAllWorkoutEntries(),
+                    historyWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr),
                     historyActivity = repository.getAllActivityTelemetry(),
                     historySleep = repository.getAllSleepTelemetry(),
                     historyWeights = repository.getAllWeightEntries(),
@@ -764,9 +922,23 @@ sealed interface DashboardUiState {
         val carbsEaten: Double,
         val fatEaten: Double,
         val manualWorkoutCalories: Double,
-        val totalMealsLogged: Int = 0
+        val totalMealsLogged: Int = 0,
+        // Today's workouts from other apps, without doubles or hidden ones.
+        val importedWorkouts: List<WorkoutView> = emptyList(),
+        // The 6 days before today, so a fresh import shows something even on a rest day.
+        val earlierImportedWorkouts: List<WorkoutView> = emptyList(),
+        // Every app's copy counted, before doubles are merged; 0 while the import is off.
+        val importedWorkoutCount: Int = 0,
+        // How much of today's calorie target comes from today's workouts, and from which.
+        val workoutTargetKcal: Double = 0.0,
+        val workoutTargetSource: String = ""
     ) : DashboardUiState
 }
+
+/** "Same workout as your Samsung Health run? Keep just one?" after a voice-logged workout. */
+data class DuplicateWorkoutPrompt(val voiceEntryId: Long, val voiceDescription: String, val imported: WorkoutView)
+
+private const val DUPLICATE_WINDOW_MILLIS = 6L * 3600 * 1000
 
 sealed interface CoachingInsightState {
     object Idle : CoachingInsightState

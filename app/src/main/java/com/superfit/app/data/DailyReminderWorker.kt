@@ -62,19 +62,25 @@ class DailyReminderWorker(
         val entries = nutritionDao.getEntriesForDay(startOfDay, endOfDay)
         val totalCalories = entries.sumOf { it.calories }
 
-        // Determine target calories
+        // Determine target calories, with today's workouts added for people who connected them
         val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
         val profile = database.profileDao().getProfile()
+        val workoutPrefs = WorkoutImportPrefs(sharedPrefs)
+        suspend fun todayTarget(p: UserProfileEntity): com.superfit.app.domain.DailyTarget {
+            val imported = if (workoutPrefs.enabled) {
+                ImportedWorkouts.views(
+                    applicationContext,
+                    database.importedWorkoutDao().getBetween(startOfDay, endOfDay),
+                    workoutPrefs,
+                    PhysiologyEngine.calculateBmr(p)
+                )
+            } else emptyList()
+            return ImportedWorkouts.target(p, workoutPrefs, imported, database.workoutDao().getEntriesForDay(startOfDay, endOfDay))
+        }
         val targetCalories = if (customMacroEnabled) {
             sharedPrefs.getInt("custom_calories", 2000).toDouble()
         } else {
-            if (profile != null) {
-                val bmr = PhysiologyEngine.calculateBmr(profile)
-                val tdee = PhysiologyEngine.calculateTdee(bmr, profile.activityMultiplier)
-                PhysiologyEngine.calculateMacroTargets(profile, tdee).calories
-            } else {
-                2000.0
-            }
+            profile?.let { todayTarget(it).targets.calories } ?: 2000.0
         }
 
         // 3. Decide notification style:
@@ -89,8 +95,9 @@ class DailyReminderWorker(
             val apiKey = GeminiKeyStore(applicationContext).get()
             try {
                 val coachProfile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2)
+                val dailyTarget = todayTarget(coachProfile)
                 val bmr = PhysiologyEngine.calculateBmr(coachProfile)
-                val tdee = PhysiologyEngine.calculateTdee(bmr, coachProfile.activityMultiplier)
+                val tdee = dailyTarget.maintenance
                 val targets = if (customMacroEnabled) {
                     MacroTargets(
                         calories = sharedPrefs.getInt("custom_calories", 2000).toDouble(),
@@ -99,7 +106,7 @@ class DailyReminderWorker(
                         fatG = sharedPrefs.getInt("custom_fat_g", 70).toDouble()
                     )
                 } else {
-                    PhysiologyEngine.calculateMacroTargets(coachProfile, tdee)
+                    dailyTarget.targets
                 }
 
                 val insight = CoachingEngine(apiKey).generateDailyInsight(
@@ -107,7 +114,10 @@ class DailyReminderWorker(
                     macroTargets = targets,
                     maintenanceCalories = if (customMacroEnabled) null else tdee,
                     historyNutrition = database.nutritionDao().getAllEntries(),
-                    historyWorkouts = database.workoutDao().getAllEntries(),
+                    historyWorkouts = database.workoutDao().getAllEntries() + if (workoutPrefs.enabled) {
+                        ImportedWorkouts.views(applicationContext, database.importedWorkoutDao().getAll(), workoutPrefs, bmr)
+                            .map(ImportedWorkouts::coachEntry)
+                    } else emptyList(),
                     historyActivity = database.telemetryDao().getAllActivity(),
                     historySleep = database.telemetryDao().getAllSleep(),
                     historyWeights = database.weightDao().getAllWeightEntries(),

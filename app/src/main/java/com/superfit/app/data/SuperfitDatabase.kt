@@ -17,9 +17,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WorkoutEntryEntity::class,
         WeightEntryEntity::class,
         StreakStateEntity::class,
-        HabitEntryEntity::class
+        HabitEntryEntity::class,
+        ImportedWorkoutEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class SuperfitDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class SuperfitDatabase : RoomDatabase() {
     abstract fun weightDao(): WeightDao
     abstract fun streakDao(): StreakDao
     abstract fun habitDao(): HabitDao
+    abstract fun importedWorkoutDao(): ImportedWorkoutDao
 
     companion object {
         @Volatile
@@ -139,6 +141,18 @@ abstract class SuperfitDatabase : RoomDatabase() {
             }
         }
 
+        // Workouts from other apps through Health Connect. Starts empty; the first import fills it.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `imported_workouts` (`id` TEXT NOT NULL, `sourcePackage` TEXT NOT NULL, " +
+                        "`exerciseType` INTEGER NOT NULL, `startTime` INTEGER NOT NULL, `endTime` INTEGER NOT NULL, " +
+                        "`distanceMeters` REAL, `totalKcal` REAL, `avgHeartRate` INTEGER, `detailsRead` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -147,7 +161,8 @@ abstract class SuperfitDatabase : RoomDatabase() {
             MIGRATION_1_5,
             MIGRATION_2_5,
             MIGRATION_5_6,
-            MIGRATION_6_7
+            MIGRATION_6_7,
+            MIGRATION_7_8
         )
 
         fun getDatabase(context: Context): SuperfitDatabase {

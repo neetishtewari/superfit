@@ -112,6 +112,8 @@ class DataRepository(
                     e.printStackTrace()
                 }
 
+                importWorkouts()
+
                 try {
                     val sleep = healthConnectManager.readSleepTelemetry(date)
                     if (sleep != null) {
@@ -169,10 +171,14 @@ class DataRepository(
         return database.workoutDao().getEntriesForDayFlow(startOfDay, endOfDay)
     }
 
-    suspend fun addWorkoutEntry(entry: WorkoutEntryEntity) {
+    /** Returns the new workout's id. */
+    suspend fun addWorkoutEntry(entry: WorkoutEntryEntity): Long {
         val id = database.workoutDao().insertEntry(entry)
         firebaseSyncManager.uploadWorkout(entry.copy(id = id))
+        return id
     }
+
+    suspend fun getWorkoutEntry(id: Long): WorkoutEntryEntity? = database.workoutDao().getEntry(id)
 
     suspend fun deleteWorkoutEntry(entry: WorkoutEntryEntity) {
         database.workoutDao().deleteEntry(entry)
@@ -181,6 +187,68 @@ class DataRepository(
 
     suspend fun getAllWorkoutEntries(): List<WorkoutEntryEntity> {
         return database.workoutDao().getAllEntries()
+    }
+
+    // --- Workouts from other apps (Health Connect) ---
+
+    val workoutImportPrefs: WorkoutImportPrefs get() = WorkoutImportPrefs(getUserSharedPrefs(context))
+
+    fun getImportedWorkoutsForDay(date: LocalDate): Flow<List<ImportedWorkoutEntity>> {
+        val zoneId = ZoneId.systemDefault()
+        val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val endOfDay = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
+        return database.importedWorkoutDao().getBetweenFlow(startOfDay, endOfDay)
+    }
+
+    /** Workouts from other apps that started in the 6 days before [date]. */
+    fun getImportedWorkoutsForWeekBefore(date: LocalDate): Flow<List<ImportedWorkoutEntity>> {
+        val zoneId = ZoneId.systemDefault()
+        val from = date.minusDays(6).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val to = date.atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
+        return database.importedWorkoutDao().getBetweenFlow(from, to)
+    }
+
+    val importedWorkoutCountFlow: Flow<Int> get() = database.importedWorkoutDao().countFlow()
+
+    suspend fun getAllImportedWorkouts(): List<ImportedWorkoutEntity> = database.importedWorkoutDao().getAll()
+
+    /** Workouts from other apps without doubles or hidden ones, empty while the import is off. */
+    suspend fun getImportedWorkoutViews(bmr: Double): List<com.superfit.app.domain.WorkoutView> {
+        val prefs = workoutImportPrefs
+        if (!prefs.enabled) return emptyList()
+        return ImportedWorkouts.views(context, getAllImportedWorkouts(), prefs, bmr)
+    }
+
+    /** Voice-logged workouts plus imported ones, for the coach. */
+    suspend fun getAllWorkoutsForCoach(bmr: Double): List<WorkoutEntryEntity> =
+        getAllWorkoutEntries() + getImportedWorkoutViews(bmr).map(ImportedWorkouts::coachEntry)
+
+    /** Reads new workouts from Health Connect when the user has turned the import on. */
+    suspend fun importWorkouts(): Int? {
+        val prefs = workoutImportPrefs
+        if (!prefs.enabled || !healthConnectManager.isAvailable()) return null
+        val client = healthConnectManager.healthConnectClient ?: return null
+        return WorkoutImporter.import(client, database.importedWorkoutDao(), prefs)
+    }
+
+    /** Turns the import on or off. Turning it off forgets the imported workouts; they can be read again. */
+    suspend fun setWorkoutImportEnabled(enabled: Boolean) {
+        val prefs = workoutImportPrefs
+        prefs.enabled = enabled
+        if (!enabled) {
+            database.importedWorkoutDao().deleteAll()
+            prefs.lastImportMillis = 0L
+        }
+        backUpWorkoutImportSettings()
+    }
+
+    suspend fun hideImportedWorkout(ids: List<String>) {
+        workoutImportPrefs.hide(ids)
+        backUpWorkoutImportSettings()
+    }
+
+    suspend fun backUpWorkoutImportSettings() {
+        firebaseSyncManager.uploadWorkoutImportSettings(workoutImportPrefs.toBackup())
     }
 
     val weightEntriesFlow: Flow<List<WeightEntryEntity>> get() = database.weightDao().getAllWeightEntriesFlow()

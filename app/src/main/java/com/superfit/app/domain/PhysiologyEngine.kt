@@ -92,6 +92,35 @@ object PhysiologyEngine {
         )
     }
 
+    /** Activity level for everyday life without workouts, used when workouts are added separately. */
+    const val EVERYDAY_ACTIVITY_MULTIPLIER = 1.2
+
+    /**
+     * The day's calorie target. People who connect workouts from other apps get a base for
+     * everyday life (BMR x 1.2 plus the goal adjustment) and [addBack] of that day's exercise
+     * calories on top, so a big run day gets more food and a rest day gets the base. Everyone
+     * else, or with add-back Off, keeps BMR x the activity level they chose. Protein stays
+     * steady; only carbs and fat grow with the extra calories.
+     */
+    fun dailyTarget(
+        profile: UserProfileEntity,
+        workoutsConnected: Boolean,
+        addBack: WorkoutAddBack,
+        exerciseKcal: Double
+    ): DailyTarget {
+        val bmr = calculateBmr(profile)
+        if (!workoutsConnected || addBack == WorkoutAddBack.OFF) {
+            val tdee = calculateTdee(bmr, profile.activityMultiplier)
+            return DailyTarget(calculateMacroTargets(profile, tdee), tdee, workoutKcal = 0.0, maintenance = tdee)
+        }
+        val baseTdee = bmr * EVERYDAY_ACTIVITY_MULTIPLIER
+        val exercise = exerciseKcal.coerceAtLeast(0.0)
+        val tdee = baseTdee + exercise * addBack.fraction
+        val targets = calculateMacroTargets(profile, tdee)
+        val baseCalories = calculateMacroTargets(profile, baseTdee).calories
+        return DailyTarget(targets, tdee, workoutKcal = targets.calories - baseCalories, maintenance = baseTdee + exercise)
+    }
+
     fun proteinPerKg(goal: String): Double = if (goal == "GAIN_MUSCLE") 2.0 else 1.6
 
     fun proteinReferenceWeightKg(profile: UserProfileEntity): Double {
@@ -99,6 +128,20 @@ object PhysiologyEngine {
         if (heightM <= 0.0) return profile.weightKg
         return minOf(profile.weightKg, 27.0 * heightM * heightM)
     }
+}
+
+/** How much of a day's exercise calories is added to that day's target. */
+enum class WorkoutAddBack(val fraction: Double) { OFF(0.0), HALF(0.5), ALL(1.0) }
+
+/**
+ * A day's targets. [tdee] is the energy the target is built from, before the goal adjustment.
+ * [maintenance] is what the body burns that day as Superfit estimates it, with all of the day's
+ * workouts counted, for the coach's deficit sums. [workoutKcal] is how much of the calorie
+ * target comes from that day's workouts (0 when workouts aren't added), so screens can show
+ * "2,100 + 275 from your run".
+ */
+data class DailyTarget(val targets: MacroTargets, val tdee: Double, val workoutKcal: Double, val maintenance: Double) {
+    val baseCalories: Double get() = targets.calories - workoutKcal
 }
 
 data class MacroTargets(
