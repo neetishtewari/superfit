@@ -25,7 +25,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 31
-        versionName = "1.0.26"
+        versionName = "1.0.27"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
