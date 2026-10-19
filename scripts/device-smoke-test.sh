@@ -38,8 +38,12 @@ fi
 
 # Force every job the app has with Android's job scheduler (WorkManager runs through it). This
 # includes the daily reminder, so the phone shows a reminder notification during the test.
-jobs=$(adb shell dumpsys jobscheduler | grep -oE "JOB #u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG/" \
-       | sed -E 's#^JOB \#u0a[0-9]+/([0-9]+):.*#\1#' | sort -u)
+# Skip jobs set 100+ days out: Glance books a ten-year placeholder job only to keep WorkManager's
+# job service enabled. It is never meant to run and fails ("must be started with a key") if forced.
+jobs=$(adb shell dumpsys jobscheduler | awk -v pkg="$PKG/" '
+    /^  JOB #u0a[0-9]+\/[0-9]+: / { id = ""; if (index($0, pkg)) { split($2, a, "/"); id = a[2]; sub(":", "", id); ids[id] = 1 } }
+    id != "" && /Minimum latency: \+[0-9][0-9][0-9]+d/ { delete ids[id] }
+    END { for (i in ids) print i }' | sort -u)
 if [ -z "$jobs" ]; then
     echo "FAIL: the app scheduled no background jobs (expected the reminder and the sync)" >&2
     exit 1
