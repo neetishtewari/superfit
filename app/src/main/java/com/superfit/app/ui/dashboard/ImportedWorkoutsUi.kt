@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.ElectricCyan
-import com.superfit.app.theme.EnergeticCoral
 import com.superfit.app.theme.SuperfitTheme
 import java.text.NumberFormat
 import java.time.Instant
