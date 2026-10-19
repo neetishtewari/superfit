@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +64,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.superfit.app.ui.camera.FoodCameraController
+import com.superfit.app.ui.camera.FoodCameraScreen
 import androidx.core.content.ContextCompat
 import android.provider.Settings
 import android.net.Uri
@@ -96,6 +102,9 @@ fun DashboardScreen(
     var foodInputText by remember { mutableStateOf("") }
 
     var showFavoritesDialog by remember { mutableStateOf(false) }
+    // Saveable so turning the phone while taking a photo keeps the camera open.
+    var showFoodCamera by rememberSaveable { mutableStateOf(false) }
+    val foodCameraController: FoodCameraController = viewModel()
 
     LaunchedEffect(triggerFavoritesLog) {
         if (triggerFavoritesLog) {
@@ -104,6 +113,7 @@ fun DashboardScreen(
     }
 
     val context = LocalContext.current
+    val hasCamera = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
 
     // Voice Quick-Log State variables
     var isListening by remember { mutableStateOf(false) }
@@ -245,6 +255,23 @@ fun DashboardScreen(
                 )
             )
     ) {
+        if (showFoodCamera) {
+            Dialog(
+                onDismissRequest = { showFoodCamera = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                FoodCameraScreen(
+                    controller = foodCameraController,
+                    apiKey = apiKey,
+                    onLogged = { entry, isPackaged ->
+                        viewModel.addPhotoMeal(entry, isPackaged)
+                        showFoodCamera = false
+                    },
+                    onClose = { showFoodCamera = false }
+                )
+            }
+        }
+
         if (showFavoritesDialog) {
             val predictedFoods by viewModel.predictedFoods.collectAsState()
             FoodHistoryDialog(
@@ -376,7 +403,13 @@ fun DashboardScreen(
                         },
                         onStopClick = {
                             speechHelper.stopListening()
-                        }
+                        },
+                        onCameraClick = if (hasCamera) {
+                            {
+                                foodCameraController.reset()
+                                showFoodCamera = true
+                            }
+                        } else null
                     )
 
                     if (logType == "MEAL") {

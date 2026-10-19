@@ -47,11 +47,13 @@ class DataRepository(
         return database.nutritionDao().getEntriesForDayFlow(startOfDay, endOfDay)
     }
 
-    suspend fun addNutritionEntry(entry: NutritionEntryEntity) {
+    /** Returns the new meal's id. */
+    suspend fun addNutritionEntry(entry: NutritionEntryEntity): Long {
         // Back up under the id Room just assigned. A new entry still has id 0 here, and uploading
         // it as-is wrote every meal to the same cloud document, so only the latest one was kept.
         val id = database.nutritionDao().insertEntry(entry)
         firebaseSyncManager.uploadNutrition(entry.copy(id = id))
+        return id
     }
 
     /** Saves the AI's quality tags on an existing meal and updates its cloud backup. */
