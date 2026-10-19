@@ -92,7 +92,7 @@ fun WorkoutConnectCard(onConnect: () -> Unit, onNotNow: () -> Unit, modifier: Mo
 /** A workout from another app. Long-press to hide it in Superfit (it stays in the other app). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit) {
+fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit, showDay: Boolean = false) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
         Row(
@@ -107,7 +107,7 @@ fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "${workout.title} · ${timeOf(workout.startTime)}",
+                    text = "${workout.title} · ${if (showDay) dayAndTimeOf(workout.startTime) else timeOf(workout.startTime)}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = SuperfitTheme.colors.textPrimary
@@ -166,6 +166,11 @@ fun workoutTargetLine(targetCalories: Double, workoutKcal: Double, source: Strin
     val total = targetCalories.toInt()
     val fmt = NumberFormat.getIntegerInstance()
     return "${fmt.format(total - added)} + ${fmt.format(added)} $source = ${fmt.format(total)} today"
+}
+
+private fun dayAndTimeOf(millis: Long): String {
+    val time = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+    return "${time.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} ${timeOf(millis)}"
 }
 
 private fun timeOf(millis: Long): String =

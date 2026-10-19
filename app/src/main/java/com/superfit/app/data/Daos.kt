@@ -155,6 +155,9 @@ interface ImportedWorkoutDao {
     @Query("SELECT * FROM imported_workouts")
     suspend fun getAll(): List<ImportedWorkoutEntity>
 
+    @Query("SELECT COUNT(*) FROM imported_workouts")
+    fun countFlow(): Flow<Int>
+
     @Query("SELECT * FROM imported_workouts")
     fun getAllFlow(): Flow<List<ImportedWorkoutEntity>>
 

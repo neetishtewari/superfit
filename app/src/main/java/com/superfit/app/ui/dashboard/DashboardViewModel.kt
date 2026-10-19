@@ -105,6 +105,9 @@ class DashboardViewModel(
     private val _workoutCardDismissed = MutableStateFlow(repository.workoutImportPrefs.cardDismissed)
     val workoutCardDismissed: StateFlow<Boolean> = _workoutCardDismissed.asStateFlow()
 
+    private val _workoutImportRunning = MutableStateFlow(false)
+    val workoutImportRunning: StateFlow<Boolean> = _workoutImportRunning.asStateFlow()
+
     private val _duplicateWorkoutPrompt = MutableStateFlow<DuplicateWorkoutPrompt?>(null)
     val duplicateWorkoutPrompt: StateFlow<DuplicateWorkoutPrompt?> = _duplicateWorkoutPrompt.asStateFlow()
 
@@ -313,7 +316,12 @@ class DashboardViewModel(
             repository.setWorkoutImportEnabled(true)
             _workoutImportEnabled.value = true
             checkPermissions()
-            repository.importWorkouts()
+            _workoutImportRunning.value = true
+            try {
+                repository.importWorkouts()
+            } finally {
+                _workoutImportRunning.value = false
+            }
         }
     }
 
@@ -409,7 +417,9 @@ class DashboardViewModel(
         repository.getHabitEntryFlow(LocalDate.now().toString()),
         _customMacroTrigger,
         repository.allNutritionEntriesFlow,
-        repository.getImportedWorkoutsForDay(LocalDate.now())
+        repository.getImportedWorkoutsForDay(LocalDate.now()),
+        repository.getImportedWorkoutsForWeekBefore(LocalDate.now()),
+        repository.importedWorkoutCountFlow
     ) { array ->
         val profile = array[0] as? UserProfileEntity
         val activity = array[1] as? ActivityTelemetryEntity
@@ -425,6 +435,9 @@ class DashboardViewModel(
         val allNutritionHistory = array[9] as? List<NutritionEntryEntity> ?: emptyList()
         @Suppress("UNCHECKED_CAST")
         val importedRows = array[10] as? List<ImportedWorkoutEntity> ?: emptyList()
+        @Suppress("UNCHECKED_CAST")
+        val earlierImportedRows = array[11] as? List<ImportedWorkoutEntity> ?: emptyList()
+        val importedCount = array[12] as? Int ?: 0
 
         if (profile == null) {
             DashboardUiState.NotInitialized
@@ -439,6 +452,9 @@ class DashboardViewModel(
             val workoutPrefs = repository.workoutImportPrefs
             val importedWorkouts = if (workoutPrefs.enabled) {
                 ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
+            } else emptyList()
+            val earlierImportedWorkouts = if (workoutPrefs.enabled) {
+                ImportedWorkouts.views(appContext, earlierImportedRows, workoutPrefs, bmr)
             } else emptyList()
             val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
             // What the body burns today with all of today's workouts, for the coach's deficit sums.
@@ -515,6 +531,8 @@ class DashboardViewModel(
                 manualWorkoutCalories = manualCal,
                 totalMealsLogged = allNutritionHistory.size,
                 importedWorkouts = importedWorkouts,
+                earlierImportedWorkouts = earlierImportedWorkouts,
+                importedWorkoutCount = if (workoutPrefs.enabled) importedCount else 0,
                 workoutTargetKcal = workoutTargetKcal,
                 workoutTargetSource = WorkoutDisplay.boostSource(importedWorkouts, workouts.size)
             )
@@ -907,6 +925,10 @@ sealed interface DashboardUiState {
         val totalMealsLogged: Int = 0,
         // Today's workouts from other apps, without doubles or hidden ones.
         val importedWorkouts: List<WorkoutView> = emptyList(),
+        // The 6 days before today, so a fresh import shows something even on a rest day.
+        val earlierImportedWorkouts: List<WorkoutView> = emptyList(),
+        // Every app's copy counted, before doubles are merged; 0 while the import is off.
+        val importedWorkoutCount: Int = 0,
         // How much of today's calorie target comes from today's workouts, and from which.
         val workoutTargetKcal: Double = 0.0,
         val workoutTargetSource: String = ""

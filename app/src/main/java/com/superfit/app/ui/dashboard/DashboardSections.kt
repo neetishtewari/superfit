@@ -775,7 +775,9 @@ internal fun TrackMealsCard(
 internal fun ActivityPerformanceCard(
     state: DashboardUiState.Success,
     onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
-    onHideImportedWorkout: (com.superfit.app.domain.WorkoutView) -> Unit = {}
+    onHideImportedWorkout: (com.superfit.app.domain.WorkoutView) -> Unit = {},
+    workoutImportEnabled: Boolean = false,
+    workoutImportRunning: Boolean = false
 ) {
     Column(
         modifier = Modifier
@@ -820,6 +822,18 @@ internal fun ActivityPerformanceCard(
             color = ElectricCyan,
             unit = "steps"
         )
+
+        if (workoutImportEnabled) {
+            Text(
+                text = when {
+                    workoutImportRunning -> "Bringing in your workouts from other apps…"
+                    state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once Samsung Health, Strava or your watch shares them with Health Connect."
+                    else -> "Workouts from other apps appear here on their own. Older ones are in History."
+                },
+                fontSize = 11.sp,
+                color = ThemeTextSecondary
+            )
+        }
 
         if (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()) {
             HorizontalDivider(
@@ -890,6 +904,25 @@ internal fun ActivityPerformanceCard(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if (state.earlierImportedWorkouts.isNotEmpty()) {
+            HorizontalDivider(
+                color = ThemeTextPrimary.copy(alpha = 0.05f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            Text(
+                text = "EARLIER THIS WEEK",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                letterSpacing = 0.5.sp
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.earlierImportedWorkouts.forEach { workout ->
+                    ImportedWorkoutRow(workout = workout, onHide = { onHideImportedWorkout(workout) }, showDay = true)
                 }
             }
         }
