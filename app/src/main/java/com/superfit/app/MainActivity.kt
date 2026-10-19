@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: DataRepository
     private val triggerVoiceLog = MutableStateFlow(false)
     private val triggerFavoritesLog = MutableStateFlow(false)
+    private val triggerPhotoLog = MutableStateFlow(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,13 +46,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val triggerVoice by triggerVoiceLog.collectAsState()
                     val triggerFavs by triggerFavoritesLog.collectAsState()
+                    val triggerPhoto by triggerPhotoLog.collectAsState()
                     MainNavigation(
                         healthConnectManager = healthConnectManager,
                         repository = repository,
                         triggerVoiceLog = triggerVoice,
                         triggerFavoritesLog = triggerFavs,
+                        triggerPhotoLog = triggerPhoto,
                         onVoiceLogTriggeredHandled = { triggerVoiceLog.value = false },
-                        onFavoritesLogTriggeredHandled = { triggerFavoritesLog.value = false }
+                        onFavoritesLogTriggeredHandled = { triggerFavoritesLog.value = false },
+                        onPhotoLogTriggeredHandled = { triggerPhotoLog.value = false }
                     )
                 }
             }
@@ -68,6 +72,8 @@ class MainActivity : ComponentActivity() {
             triggerVoiceLog.value = true
         } else if (intent?.action == "com.superfit.app.ACTION_FAVORITES_LOG") {
             triggerFavoritesLog.value = true
+        } else if (intent?.action == "com.superfit.app.ACTION_PHOTO_LOG") {
+            triggerPhotoLog.value = true
         }
     }
 }

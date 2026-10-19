@@ -152,6 +152,9 @@ dependencies {
   implementation(libs.androidx.camera.view)
   implementation(libs.mlkit.barcode.scanning)
 
+  // Home-screen widget
+  implementation(libs.androidx.glance.appwidget)
+
   // Google Health Connect
   implementation(libs.androidx.health.connect)
 

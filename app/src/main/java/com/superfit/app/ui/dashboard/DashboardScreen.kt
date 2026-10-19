@@ -84,7 +84,9 @@ fun DashboardScreen(
     triggerVoiceLog: Boolean = false,
     triggerFavoritesLog: Boolean = false,
     onVoiceLogTriggeredHandled: () -> Unit = {},
-    onFavoritesLogTriggeredHandled: () -> Unit = {}
+    onFavoritesLogTriggeredHandled: () -> Unit = {},
+    triggerPhotoLog: Boolean = false,
+    onPhotoLogTriggeredHandled: () -> Unit = {}
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
@@ -226,7 +228,16 @@ fun DashboardScreen(
         viewModel.syncTelemetry()
     }
 
-    // Trigger voice log from notifications
+    // Camera button on the home-screen widget
+    LaunchedEffect(triggerPhotoLog) {
+        if (triggerPhotoLog) {
+            foodCameraController.reset()
+            showFoodCamera = true
+            onPhotoLogTriggeredHandled()
+        }
+    }
+
+    // Trigger voice log from notifications and the widget mic
     LaunchedEffect(triggerVoiceLog) {
         if (triggerVoiceLog) {
             val hasPermission = ContextCompat.checkSelfPermission(

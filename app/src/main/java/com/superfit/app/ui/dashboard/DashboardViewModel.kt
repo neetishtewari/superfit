@@ -24,9 +24,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.superfit.app.widget.SuperfitWidget
+import com.superfit.app.widget.WidgetSnapshot
+import com.superfit.app.widget.WidgetSnapshotStore
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 class DashboardViewModel(
     private val repository: DataRepository,
@@ -35,6 +40,7 @@ class DashboardViewModel(
 
     val healthConnectManager = repository.healthConnectManager
 
+    private val appContext = context.applicationContext
     private val sharedPrefs = getUserSharedPrefs(context)
     private val geminiKeyStore = GeminiKeyStore(context)
 
@@ -369,14 +375,29 @@ class DashboardViewModel(
                 proteinEaten = proteinEaten,
                 carbsEaten = carbsEaten,
                 fatEaten = fatEaten,
-                manualWorkoutCalories = manualCal
+                manualWorkoutCalories = manualCal,
+                totalMealsLogged = allNutritionHistory.size
             )
         }
+    }.onEach { state ->
+        if (state is DashboardUiState.Success) updateWidget(state)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState.Loading
     )
+
+    /** Keeps the home-screen widget's "kcal left" in step with the dashboard. */
+    private fun updateWidget(state: DashboardUiState.Success) {
+        val snapshot = WidgetSnapshot(
+            date = LocalDate.now().toString(),
+            targetKcal = state.macroTargets.calories.roundToInt(),
+            eatenKcal = state.caloriesEaten.roundToInt()
+        )
+        if (WidgetSnapshotStore.save(appContext, snapshot)) {
+            viewModelScope.launch { SuperfitWidget.refresh(appContext) }
+        }
+    }
 
     fun addWater(addMl: Int) {
         viewModelScope.launch {
@@ -732,7 +753,8 @@ sealed interface DashboardUiState {
         val proteinEaten: Double,
         val carbsEaten: Double,
         val fatEaten: Double,
-        val manualWorkoutCalories: Double
+        val manualWorkoutCalories: Double,
+        val totalMealsLogged: Int = 0
     ) : DashboardUiState
 }
 
