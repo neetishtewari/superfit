@@ -39,6 +39,13 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_CARD_DISMISSED, false)
         set(value) = prefs.edit().putBoolean(KEY_CARD_DISMISSED, value).apply()
 
+    /** Imported workouts already asked about after a voice-logged one, so each is asked about once. */
+    fun wasAskedAboutDuplicate(id: String): Boolean = id in prefs.getStringSet(KEY_DUPLICATE_ASKED, emptySet()).orEmpty()
+
+    fun markAskedAboutDuplicate(id: String) {
+        prefs.edit().putStringSet(KEY_DUPLICATE_ASKED, prefs.getStringSet(KEY_DUPLICATE_ASKED, emptySet()).orEmpty() + id).apply()
+    }
+
     /** When the last import finished; 0 before the first one, which reads 90 days back. */
     var lastImportMillis: Long
         get() = prefs.getLong(KEY_LAST_IMPORT, 0L)
@@ -71,5 +78,6 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
         private const val KEY_HIDDEN = "workout_import_hidden_ids"
         private const val KEY_CARD_DISMISSED = "workout_import_card_dismissed"
         private const val KEY_LAST_IMPORT = "workout_import_last_millis"
+        private const val KEY_DUPLICATE_ASKED = "workout_import_duplicate_asked"
     }
 }

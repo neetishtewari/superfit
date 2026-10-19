@@ -97,7 +97,7 @@ class DailyReminderWorker(
                 val coachProfile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2)
                 val dailyTarget = todayTarget(coachProfile)
                 val bmr = PhysiologyEngine.calculateBmr(coachProfile)
-                val tdee = dailyTarget.tdee
+                val tdee = dailyTarget.maintenance
                 val targets = if (customMacroEnabled) {
                     MacroTargets(
                         calories = sharedPrefs.getInt("custom_calories", 2000).toDouble(),

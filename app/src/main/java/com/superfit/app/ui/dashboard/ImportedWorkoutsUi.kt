@@ -136,15 +136,22 @@ fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit) {
     }
 }
 
-/** Asked after a voice-logged workout when another app already recorded one today. */
+/** Asked after a voice-logged workout when another app recorded one in the last few hours. */
 @Composable
 fun DuplicateWorkoutDialog(prompt: DuplicateWorkoutPrompt, onKeepImported: () -> Unit, onKeepBoth: () -> Unit) {
+    val imported = prompt.imported
     AlertDialog(
         onDismissRequest = onKeepBoth,
-        title = { Text("Looks like your ${prompt.sourceName} ${prompt.workoutNoun}") },
-        text = { Text("Keep just one, so it isn't counted twice?") },
+        title = { Text("Same workout as your ${imported.sourceName} ${imported.noun}?") },
+        text = {
+            Text(
+                "You just logged \"${prompt.voiceDescription}\". ${imported.sourceName} recorded a " +
+                    "${imported.noun} at ${timeOf(imported.startTime)} (${imported.detailLine}). " +
+                    "If they're the same, keep just one so it isn't counted twice."
+            )
+        },
         confirmButton = {
-            TextButton(onClick = onKeepImported) { Text("Keep imported") }
+            TextButton(onClick = onKeepImported) { Text("Keep ${imported.sourceName}'s") }
         },
         dismissButton = {
             TextButton(onClick = onKeepBoth) { Text("Keep both") }

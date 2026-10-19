@@ -151,6 +151,8 @@ class PhysiologyEngineTest {
         assertEquals(275.0, runDay.workoutKcal, 0.01)
         assertEquals(1636.0, runDay.baseCalories, 0.01)
         assertEquals(1780.0 * 1.2 + 275.0, runDay.tdee, 0.01)
+        // The coach's "what you burn" counts the whole run, not just the half added to the target.
+        assertEquals(1780.0 * 1.2 + 550.0, runDay.maintenance, 0.01)
         // Protein stays steady; the extra goes to carbs and fat.
         assertEquals(restDay.targets.proteinG, runDay.targets.proteinG, 0.0)
         assertTrue(runDay.targets.carbsG > restDay.targets.carbsG)

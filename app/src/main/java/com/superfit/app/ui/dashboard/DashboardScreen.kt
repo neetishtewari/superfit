@@ -234,6 +234,7 @@ fun DashboardScreen(
     }
     val workoutImportEnabled by viewModel.workoutImportEnabled.collectAsState()
     val workoutCardDismissed by viewModel.workoutCardDismissed.collectAsState()
+    val workoutPermissionMissing by viewModel.workoutPermissionMissing.collectAsState()
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
 
     // Auto sync on entry
@@ -497,7 +498,8 @@ fun DashboardScreen(
                     } else {
                         // WORKOUT VIEW: Activity & Performance, Sleep & Recovery
                         // One-time offer to bring in workouts from other apps
-                        if (!workoutImportEnabled && !workoutCardDismissed && viewModel.healthConnectManager.isAvailable()) {
+                        val offerWorkoutConnect = workoutPermissionMissing || (!workoutImportEnabled && !workoutCardDismissed)
+                        if (offerWorkoutConnect && viewModel.healthConnectManager.isAvailable()) {
                             WorkoutConnectCard(
                                 onConnect = {
                                     workoutPermissionsLauncher.launch(com.superfit.app.data.WorkoutImporter.permissions)

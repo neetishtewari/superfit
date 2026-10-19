@@ -111,13 +111,14 @@ object PhysiologyEngine {
         val bmr = calculateBmr(profile)
         if (!workoutsConnected || addBack == WorkoutAddBack.OFF) {
             val tdee = calculateTdee(bmr, profile.activityMultiplier)
-            return DailyTarget(calculateMacroTargets(profile, tdee), tdee, workoutKcal = 0.0)
+            return DailyTarget(calculateMacroTargets(profile, tdee), tdee, workoutKcal = 0.0, maintenance = tdee)
         }
         val baseTdee = bmr * EVERYDAY_ACTIVITY_MULTIPLIER
-        val tdee = baseTdee + exerciseKcal.coerceAtLeast(0.0) * addBack.fraction
+        val exercise = exerciseKcal.coerceAtLeast(0.0)
+        val tdee = baseTdee + exercise * addBack.fraction
         val targets = calculateMacroTargets(profile, tdee)
         val baseCalories = calculateMacroTargets(profile, baseTdee).calories
-        return DailyTarget(targets, tdee, workoutKcal = targets.calories - baseCalories)
+        return DailyTarget(targets, tdee, workoutKcal = targets.calories - baseCalories, maintenance = baseTdee + exercise)
     }
 
     fun proteinPerKg(goal: String): Double = if (goal == "GAIN_MUSCLE") 2.0 else 1.6
@@ -133,11 +134,13 @@ object PhysiologyEngine {
 enum class WorkoutAddBack(val fraction: Double) { OFF(0.0), HALF(0.5), ALL(1.0) }
 
 /**
- * A day's targets. [tdee] is what the body burns that day as Superfit estimates it, before the
- * goal adjustment. [workoutKcal] is how much of the calorie target comes from that day's
- * workouts (0 when workouts aren't added), so screens can show "2,100 + 275 from your run".
+ * A day's targets. [tdee] is the energy the target is built from, before the goal adjustment.
+ * [maintenance] is what the body burns that day as Superfit estimates it, with all of the day's
+ * workouts counted, for the coach's deficit sums. [workoutKcal] is how much of the calorie
+ * target comes from that day's workouts (0 when workouts aren't added), so screens can show
+ * "2,100 + 275 from your run".
  */
-data class DailyTarget(val targets: MacroTargets, val tdee: Double, val workoutKcal: Double) {
+data class DailyTarget(val targets: MacroTargets, val tdee: Double, val workoutKcal: Double, val maintenance: Double) {
     val baseCalories: Double get() = targets.calories - workoutKcal
 }
 

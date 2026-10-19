@@ -78,6 +78,8 @@ object WorkoutImporter {
                     reader.read(session, row)
                 }
             }
+            // The user may have turned the import off while this one was running.
+            if (!prefs.enabled) return@withLock null
             dao.upsertAll(rows)
             // Workouts deleted in the other app disappear here too (only when every session was read).
             val gone = known.keys - sessions.map { it.metadata.id }.toSet()
@@ -122,12 +124,13 @@ object WorkoutImporter {
     /**
      * Reads distance, calories and heart rate recorded by the same app during each session, one
      * metric per call so a missing permission or one broken record only blanks that value. After
-     * repeated failures (usually Health Connect's rate limit) it stops asking, and sessions read
-     * after that are saved without details to be filled in next time.
+     * many failures in a row (usually Health Connect's rate limit) it stops asking, and sessions
+     * read after that are saved without details to be filled in next time.
      */
     private class DetailReader(private val client: HealthConnectClient, private val granted: Set<String>) {
-        private var failures = 0
-        val stopped: Boolean get() = failures >= MAX_FAILURES
+        private var failuresInARow = 0
+        private var logged = false
+        val stopped: Boolean get() = failuresInARow >= MAX_FAILURES_IN_A_ROW
 
         suspend fun read(session: ExerciseSessionRecord, row: ImportedWorkoutEntity): ImportedWorkoutEntity {
             if (stopped) return row
@@ -137,10 +140,13 @@ object WorkoutImporter {
                 if (permission !in granted || stopped) return null
                 return try {
                     client.aggregate(AggregateRequest(setOf(metric), range, origin))[metric]
+                        .also { failuresInARow = 0 }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (failures++ == 0) Log.w(TAG, "Reading workout details failed", e)
+                    failuresInARow++
+                    if (!logged) Log.w(TAG, "Reading workout details failed", e)
+                    logged = true
                     null
                 }
             }
@@ -156,7 +162,7 @@ object WorkoutImporter {
         }
 
         private companion object {
-            const val MAX_FAILURES = 10
+            const val MAX_FAILURES_IN_A_ROW = 10
         }
     }
 }

@@ -87,11 +87,20 @@ class DashboardViewModel(
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key.startsWith("custom_") || key.startsWith(WorkoutImportPrefs.KEY_PREFIX))) {
             _customMacroTrigger.value = System.currentTimeMillis()
+            // Also catches the switch being restored from the cloud backup.
+            if (key.startsWith(WorkoutImportPrefs.KEY_PREFIX)) {
+                _workoutImportEnabled.value = repository.workoutImportPrefs.enabled
+            }
         }
     }
 
     private val _workoutImportEnabled = MutableStateFlow(repository.workoutImportPrefs.enabled)
     val workoutImportEnabled: StateFlow<Boolean> = _workoutImportEnabled.asStateFlow()
+
+    // The import is on but Health Connect no longer lets Superfit read workouts (taken away in its
+    // settings, or a new phone restored from backup): the Connect card asks again.
+    private val _workoutPermissionMissing = MutableStateFlow(false)
+    val workoutPermissionMissing: StateFlow<Boolean> = _workoutPermissionMissing.asStateFlow()
 
     private val _workoutCardDismissed = MutableStateFlow(repository.workoutImportPrefs.cardDismissed)
     val workoutCardDismissed: StateFlow<Boolean> = _workoutCardDismissed.asStateFlow()
@@ -288,12 +297,8 @@ class DashboardViewModel(
             val hasAll = repository.healthConnectManager.hasAllPermissions()
             _hasHealthConnectPermissions.value = hasAll
             _grantedPermissions.value = granted
-            // Workout access was taken away in Health Connect's settings: stop importing.
-            if (client != null && repository.healthConnectManager.isAvailable() &&
+            _workoutPermissionMissing.value = client != null && repository.healthConnectManager.isAvailable() &&
                 repository.workoutImportPrefs.enabled && WorkoutImporter.EXERCISE_PERMISSION !in granted
-            ) {
-                setWorkoutImportEnabled(false)
-            }
         }
     }
 
@@ -322,6 +327,7 @@ class DashboardViewModel(
     fun dismissWorkoutCard() {
         repository.workoutImportPrefs.cardDismissed = true
         _workoutCardDismissed.value = true
+        _workoutPermissionMissing.value = false
     }
 
     fun hideWorkout(workout: WorkoutView) {
@@ -356,15 +362,21 @@ class DashboardViewModel(
             .sortedBy { it.second }
 
     /**
-     * After a cardio workout is logged by voice, offers to drop it if another app already
-     * recorded a workout today, so it isn't counted twice.
+     * After a cardio workout is logged by voice, offers to drop it if another app recorded a
+     * workout in the last few hours, so it isn't counted twice. The prompt shows both, so the
+     * user can tell whether they're the same, and each imported workout is asked about once.
      */
-    private fun offerDuplicateCheck(voiceEntryId: Long, workoutType: String) {
+    private fun offerDuplicateCheck(voiceEntryId: Long, voiceDescription: String, workoutType: String) {
         if (workoutType != "Cardio") return
         val state = dashboardState.value as? DashboardUiState.Success ?: return
         val now = System.currentTimeMillis()
-        val imported = state.importedWorkouts.filter { it.startTime <= now }.maxByOrNull { it.startTime } ?: return
-        _duplicateWorkoutPrompt.value = DuplicateWorkoutPrompt(voiceEntryId, imported.noun, imported.sourceName)
+        val prefs = repository.workoutImportPrefs
+        val imported = state.importedWorkouts
+            .filter { now - (it.startTime + it.merged.durationMillis) in 0..DUPLICATE_WINDOW_MILLIS }
+            .filterNot { prefs.wasAskedAboutDuplicate(it.merged.primary.id) }
+            .maxByOrNull { it.startTime } ?: return
+        prefs.markAskedAboutDuplicate(imported.merged.primary.id)
+        _duplicateWorkoutPrompt.value = DuplicateWorkoutPrompt(voiceEntryId, voiceDescription, imported)
     }
 
     fun keepImportedWorkout() {
@@ -429,7 +441,8 @@ class DashboardViewModel(
                 ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
             } else emptyList()
             val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
-            val tdee = dailyTarget.tdee
+            // What the body burns today with all of today's workouts, for the coach's deficit sums.
+            val tdee = dailyTarget.maintenance
             val readiness = sleep?.readinessScore ?: 50 // Default 50% if no sleep session found
 
             // Macro targets from live TDEE and goal (or the user's own numbers)
@@ -687,7 +700,7 @@ class DashboardViewModel(
                 difficultyRating = difficultyRating
             )
         )
-        offerDuplicateCheck(id, result.workoutType)
+        offerDuplicateCheck(id, result.workoutText, result.workoutType)
     }
 
     fun parseAndAddMeal(input: String) {
@@ -900,8 +913,10 @@ sealed interface DashboardUiState {
     ) : DashboardUiState
 }
 
-/** "Looks like your Samsung Health run. Keep just one?" after a voice-logged workout. */
-data class DuplicateWorkoutPrompt(val voiceEntryId: Long, val workoutNoun: String, val sourceName: String)
+/** "Same workout as your Samsung Health run? Keep just one?" after a voice-logged workout. */
+data class DuplicateWorkoutPrompt(val voiceEntryId: Long, val voiceDescription: String, val imported: WorkoutView)
+
+private const val DUPLICATE_WINDOW_MILLIS = 6L * 3600 * 1000
 
 sealed interface CoachingInsightState {
     object Idle : CoachingInsightState
