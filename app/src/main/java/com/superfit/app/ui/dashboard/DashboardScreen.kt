@@ -49,6 +49,7 @@ import androidx.compose.ui.zIndex
 import androidx.health.connect.client.PermissionController
 import androidx.compose.animation.core.*
 import com.superfit.app.theme.*
+import com.superfit.app.widget.WidgetPin
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
@@ -84,7 +85,9 @@ fun DashboardScreen(
     triggerVoiceLog: Boolean = false,
     triggerFavoritesLog: Boolean = false,
     onVoiceLogTriggeredHandled: () -> Unit = {},
-    onFavoritesLogTriggeredHandled: () -> Unit = {}
+    onFavoritesLogTriggeredHandled: () -> Unit = {},
+    triggerPhotoLog: Boolean = false,
+    onPhotoLogTriggeredHandled: () -> Unit = {}
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
@@ -97,6 +100,8 @@ fun DashboardScreen(
     val scrollState = rememberScrollState()
 
     var logType by remember { mutableStateOf("MEAL") }
+    // Hidden for the rest of the visit once Add or Not now is tapped, even across tab switches.
+    var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
 
     var showChatBottomSheet by remember { mutableStateOf(false) }
     var foodInputText by remember { mutableStateOf("") }
@@ -122,15 +127,12 @@ fun DashboardScreen(
     var showVoiceBanner by remember { mutableStateOf(false) }
 
     // Speech recognizer helper instantiation
-    val speechHelper = remember(logType) {
+    val speechHelper = remember {
         SpeechRecognizerHelper(
             context = context,
             onResult = { text ->
-                if (logType == "MEAL") {
-                    viewModel.parseAndAddMeal(text)
-                } else {
-                    viewModel.parseAndAddWorkout(text)
-                }
+                // One mic for everything: food, exercise or both, whichever tab is showing.
+                viewModel.smartLog(text)
             },
             onError = { error ->
                 voiceMessage = error
@@ -175,7 +177,7 @@ fun DashboardScreen(
         val state = parsingState
         when (state) {
             is ParsingState.Success -> {
-                voiceMessage = "Logged: ${state.foodText}"
+                voiceMessage = state.message ?: "Logged: ${state.foodText}"
                 voiceBannerColor = NeonGreen
                 showVoiceBanner = true
                 viewModel.resetParsingState()
@@ -194,7 +196,7 @@ fun DashboardScreen(
         val state = workoutParsingState
         when (state) {
             is ParsingState.Success -> {
-                voiceMessage = "Logged: ${state.foodText}"
+                voiceMessage = state.message ?: "Logged: ${state.foodText}"
                 voiceBannerColor = NeonGreen
                 showVoiceBanner = true
                 viewModel.resetWorkoutParsingState()
@@ -229,7 +231,16 @@ fun DashboardScreen(
         viewModel.syncTelemetry()
     }
 
-    // Trigger voice log from notifications
+    // Camera button on the home-screen widget
+    LaunchedEffect(triggerPhotoLog) {
+        if (triggerPhotoLog) {
+            foodCameraController.reset()
+            showFoodCamera = true
+            onPhotoLogTriggeredHandled()
+        }
+    }
+
+    // Trigger voice log from notifications and the widget mic
     LaunchedEffect(triggerVoiceLog) {
         if (triggerVoiceLog) {
             val hasPermission = ContextCompat.checkSelfPermission(
@@ -416,6 +427,23 @@ fun DashboardScreen(
                         // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
                         // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
                         CalorieRingsCard(state = state)
+
+                        // One-time tip offering the home-screen widget
+                        val widgetTipEligible = remember(state.totalMealsLogged) {
+                            WidgetPin.shouldShowTip(context, state.totalMealsLogged)
+                        }
+                        if (widgetTipEligible && !widgetTipHidden) {
+                            WidgetTipCard(
+                                onAdd = {
+                                    WidgetPin.requestPin(context)
+                                    widgetTipHidden = true
+                                },
+                                onNotNow = {
+                                    WidgetPin.dismissTip(context)
+                                    widgetTipHidden = true
+                                }
+                            )
+                        }
 
                         // 2. Daily Streak Header Card (Narrow Band)
                         StreakHeaderCard(

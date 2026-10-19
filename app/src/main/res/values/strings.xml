@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Superfit</string>
+    <string name="widget_description">Calories left today, and quick logging by voice or camera</string>
 </resources>

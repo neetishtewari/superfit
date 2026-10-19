@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.theme.*
+import com.superfit.app.widget.WidgetPin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +72,11 @@ fun SettingsScreen(
     // Whether the phone lets Superfit show notifications at all. Re-checked when coming back
     // from the phone's settings.
     var notificationsAllowed by remember { mutableStateOf(ReminderNotifications.canPost(context)) }
+    val canPinWidget = remember { WidgetPin.canPin(context) }
+    var widgetPlaced by remember { mutableStateOf(WidgetPin.isPlaced(context)) }
     LifecycleResumeEffect(Unit) {
         notificationsAllowed = ReminderNotifications.canPost(context)
+        widgetPlaced = WidgetPin.isPlaced(context)
         onPauseOrDispose { }
     }
 
@@ -766,6 +770,46 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
+                    }
+                }
+            }
+
+            // Home-screen widget (hidden where the launcher can't add one from an app)
+            if (canPinWidget) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            1.dp,
+                            Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .clickable { WidgetPin.requestPin(context) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Add home-screen widget",
+                                fontWeight = FontWeight.Bold,
+                                color = SuperfitTheme.colors.textPrimary,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = if (widgetPlaced) "Already on your home screen. Tap to add another."
+                                    else "Calories left, plus mic and camera buttons to log in seconds.",
+                                fontSize = 11.sp,
+                                color = SuperfitTheme.colors.textSecondary
+                            )
+                        }
+                        Text(text = "Add", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
                     }
                 }
             }

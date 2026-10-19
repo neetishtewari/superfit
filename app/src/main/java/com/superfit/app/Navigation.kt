@@ -38,8 +38,10 @@ fun MainNavigation(
     repository: DataRepository,
     triggerVoiceLog: Boolean = false,
     triggerFavoritesLog: Boolean = false,
+    triggerPhotoLog: Boolean = false,
     onVoiceLogTriggeredHandled: () -> Unit = {},
-    onFavoritesLogTriggeredHandled: () -> Unit = {}
+    onFavoritesLogTriggeredHandled: () -> Unit = {},
+    onPhotoLogTriggeredHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var startDestination by remember { mutableStateOf<NavKey?>(null) }
@@ -133,6 +135,8 @@ fun MainNavigation(
                     triggerFavoritesLog = triggerFavoritesLog,
                     onVoiceLogTriggeredHandled = onVoiceLogTriggeredHandled,
                     onFavoritesLogTriggeredHandled = onFavoritesLogTriggeredHandled,
+                    triggerPhotoLog = triggerPhotoLog,
+                    onPhotoLogTriggeredHandled = onPhotoLogTriggeredHandled,
                     onNavigateToOnboarding = {
                         backStack.removeLastOrNull()
                         backStack.add(Onboarding)

@@ -3,7 +3,10 @@ package com.superfit.app.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.firebase.auth.FirebaseAuth
+import com.superfit.app.widget.SuperfitWidget
+import com.superfit.app.widget.WidgetSnapshotStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -53,6 +56,7 @@ class DataRepository(
         // it as-is wrote every meal to the same cloud document, so only the latest one was kept.
         val id = database.nutritionDao().insertEntry(entry)
         firebaseSyncManager.uploadNutrition(entry.copy(id = id))
+        refreshWidget()
         return id
     }
 
@@ -66,11 +70,28 @@ class DataRepository(
     suspend fun updateNutritionEntry(entry: NutritionEntryEntity) {
         database.nutritionDao().updateEntry(entry)
         firebaseSyncManager.uploadNutrition(entry)
+        refreshWidget()
     }
 
     suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) {
         database.nutritionDao().deleteEntry(entry)
         firebaseSyncManager.deleteNutrition(entry)
+        refreshWidget()
+    }
+
+    /** Keeps the home-screen widget right after a meal is added, edited or deleted from any screen. */
+    private suspend fun refreshWidget() {
+        try {
+            val today = LocalDate.now()
+            val eaten = getNutritionEntriesForDay(today).first().sumOf { it.calories }
+            if (WidgetSnapshotStore.updateEaten(context, today.toString(), eaten.toInt())) {
+                SuperfitWidget.refresh(context)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("DataRepository", "Widget update failed", e)
+        }
     }
 
     suspend fun syncHealthConnectTelemetry(date: LocalDate) {

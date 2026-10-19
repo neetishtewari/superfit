@@ -15,13 +15,21 @@ import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
+import com.superfit.app.domain.LogRouter
+import com.superfit.app.domain.RepeatMealCache
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.superfit.app.widget.SuperfitWidget
+import com.superfit.app.widget.WidgetSnapshot
+import com.superfit.app.widget.WidgetSnapshotStore
 import java.time.LocalDate
 
 class DashboardViewModel(
@@ -31,6 +39,9 @@ class DashboardViewModel(
 
     val healthConnectManager = repository.healthConnectManager
 
+    private val appContext = context.applicationContext
+    // The day the dashboard's flows were built for; a ViewModel kept past midnight still shows that day.
+    private val dashboardDate = LocalDate.now().toString()
     private val sharedPrefs = getUserSharedPrefs(context)
     private val geminiKeyStore = GeminiKeyStore(context)
 
@@ -365,14 +376,28 @@ class DashboardViewModel(
                 proteinEaten = proteinEaten,
                 carbsEaten = carbsEaten,
                 fatEaten = fatEaten,
-                manualWorkoutCalories = manualCal
+                manualWorkoutCalories = manualCal,
+                totalMealsLogged = allNutritionHistory.size
             )
         }
+    }.onEach { state ->
+        if (state is DashboardUiState.Success) updateWidget(state)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = DashboardUiState.Loading
     )
+
+    /** Keeps the home-screen widget's "kcal left" in step with the dashboard. */
+    private fun updateWidget(state: DashboardUiState.Success) {
+        // Same rounding as the Home ring's "left", so the two never differ by 1 kcal.
+        val target = state.macroTargets.calories.toInt()
+        val left = (state.macroTargets.calories - state.caloriesEaten).toInt()
+        val snapshot = WidgetSnapshot(date = dashboardDate, targetKcal = target, eatenKcal = target - left)
+        if (WidgetSnapshotStore.save(appContext, snapshot)) {
+            viewModelScope.launch { SuperfitWidget.refresh(appContext) }
+        }
+    }
 
     fun addWater(addMl: Int) {
         viewModelScope.launch {
@@ -420,13 +445,128 @@ class DashboardViewModel(
     private var lastMealInput: String? = null
     val canRetryLastMeal: Boolean get() = !lastMealInput.isNullOrBlank()
 
+    // Whether the last input came from the mic (food, exercise or both) or the typed meal box.
+    private var lastInputWasSpoken = false
+
     fun retryLastMeal() {
-        lastMealInput?.let { parseAndAddMeal(it) }
+        lastMealInput?.let { if (lastInputWasSpoken) smartLog(it) else parseAndAddMeal(it) }
+    }
+
+    /**
+     * Logs whatever was said: food, exercise or both. An exact repeat of one of the user's own
+     * meals is logged straight away; anything else is split by [LogRouter] and each part goes to
+     * its usual parser. If one part can't be understood, the other is still logged.
+     */
+    fun smartLog(input: String) {
+        val key = _apiKey.value
+        lastMealInput = input
+        lastInputWasSpoken = true
+
+        viewModelScope.launch {
+            _parsingState.value = ParsingState.Loading
+            try {
+                val history = repository.getAllNutritionEntries()
+                RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
+                    saveMeal(repeat)
+                    _parsingState.value = ParsingState.Success(repeat.foodText)
+                    return@launch
+                }
+
+                val routed = LogRouter(key).route(input)
+                if (routed.isEmpty) {
+                    _parsingState.value = ParsingState.Error(NOTHING_RECOGNISED)
+                    return@launch
+                }
+
+                val (meal, workout) = coroutineScope {
+                    val mealJob = async {
+                        if (routed.food.isBlank()) null
+                        else runCatching { NutritionParser(key).parseFoodInput(routed.food, history) }
+                    }
+                    val workoutJob = async {
+                        if (routed.exercise.isBlank()) null
+                        else runCatching { WorkoutParser(key).parseWorkoutInput(routed.exercise) }
+                    }
+                    mealJob.await() to workoutJob.await()
+                }
+                listOfNotNull(meal?.exceptionOrNull(), workout?.exceptionOrNull())
+                    .firstOrNull { it is kotlinx.coroutines.CancellationException }
+                    ?.let { throw it }
+
+                val mealResult = meal?.getOrNull()?.takeIf { it.foodText != "invalid" }
+                val workoutResult = workout?.getOrNull()?.takeIf { it.workoutText != "invalid" }
+                mealResult?.let {
+                    saveMeal(it)
+                    // A retry after this point must not log the meal twice.
+                    lastMealInput = routed.exercise.ifBlank { null }
+                }
+                workoutResult?.let { saveWorkout(it, "JUST_RIGHT") }
+                val foodMissed = routed.food.isNotBlank() && mealResult == null
+                val exerciseMissed = routed.exercise.isNotBlank() && workoutResult == null
+
+                _parsingState.value = when {
+                    mealResult != null && workoutResult != null -> ParsingState.Success(
+                        mealResult.foodText,
+                        message = "Logged: ${mealResult.foodText} · Workout: ${workoutResult.workoutText}"
+                    )
+                    mealResult != null -> ParsingState.Success(
+                        mealResult.foodText,
+                        message = if (exerciseMissed) "Logged: ${mealResult.foodText} · Couldn't log the exercise. Try saying it again." else null
+                    )
+                    workoutResult != null -> ParsingState.Success(
+                        workoutResult.workoutText,
+                        message = if (foodMissed) "Logged workout: ${workoutResult.workoutText} · Couldn't log the food. Try saying it again."
+                            else "Logged workout: ${workoutResult.workoutText}"
+                    )
+                    else -> {
+                        val failure = meal?.exceptionOrNull() ?: workout?.exceptionOrNull()
+                        if (failure != null) android.util.Log.e("DashboardViewModel", "Smart log failed", failure)
+                        ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: NOTHING_RECOGNISED)
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardViewModel", "Smart log failed", e)
+                _parsingState.value = ParsingState.Error(GeminiClient.sanitizeError(e))
+            }
+        }
+    }
+
+    private suspend fun saveMeal(result: com.superfit.app.domain.ParsedNutritionResult) {
+        repository.addNutritionEntry(
+            NutritionEntryEntity(
+                foodText = result.foodText,
+                calories = result.calories,
+                proteinG = result.proteinG,
+                carbsG = result.carbsG,
+                fatG = result.fatG,
+                timestamp = System.currentTimeMillis(),
+                qualityTags = result.tags?.encode(),
+                items = result.items?.encode()
+            )
+        )
+        loadFrequentMeals()
+    }
+
+    private suspend fun saveWorkout(result: com.superfit.app.domain.ParsedWorkoutResult, difficultyRating: String) {
+        repository.addWorkoutEntry(
+            WorkoutEntryEntity(
+                description = result.workoutText,
+                caloriesBurned = result.caloriesBurned,
+                workoutType = result.workoutType,
+                setsCount = result.setsCount,
+                repsCount = result.repsCount,
+                timestamp = System.currentTimeMillis(),
+                difficultyRating = difficultyRating
+            )
+        )
     }
 
     fun parseAndAddMeal(input: String) {
         val key = _apiKey.value
         lastMealInput = input
+        lastInputWasSpoken = false
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
@@ -440,18 +580,7 @@ class DashboardViewModel(
                     return@launch
                 }
 
-                val entry = NutritionEntryEntity(
-                    foodText = result.foodText,
-                    calories = result.calories,
-                    proteinG = result.proteinG,
-                    carbsG = result.carbsG,
-                    fatG = result.fatG,
-                    timestamp = System.currentTimeMillis(),
-                    qualityTags = result.tags?.encode(),
-                    items = result.items?.encode()
-                )
-                repository.addNutritionEntry(entry)
-                loadFrequentMeals()
+                saveMeal(result)
                 _parsingState.value = ParsingState.Success(result.foodText)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Meal parsing failed", e)
@@ -524,16 +653,7 @@ class DashboardViewModel(
                     return@launch
                 }
 
-                val entry = WorkoutEntryEntity(
-                    description = result.workoutText,
-                    caloriesBurned = result.caloriesBurned,
-                    workoutType = result.workoutType,
-                    setsCount = result.setsCount,
-                    repsCount = result.repsCount,
-                    timestamp = System.currentTimeMillis(),
-                    difficultyRating = difficultyRating
-                )
-                repository.addWorkoutEntry(entry)
+                saveWorkout(result, difficultyRating)
                 _workoutParsingState.value = ParsingState.Success(result.workoutText)
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Workout parsing failed", e)
@@ -611,10 +731,13 @@ class DashboardViewModel(
     }
 }
 
+private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
+
 sealed interface ParsingState {
     object Idle : ParsingState
     object Loading : ParsingState
-    data class Success(val foodText: String) : ParsingState
+    /** [message] replaces the usual "Logged: …" banner, e.g. when a workout was logged too. */
+    data class Success(val foodText: String, val message: String? = null) : ParsingState
     data class Error(val message: String) : ParsingState
 }
 
@@ -640,7 +763,8 @@ sealed interface DashboardUiState {
         val proteinEaten: Double,
         val carbsEaten: Double,
         val fatEaten: Double,
-        val manualWorkoutCalories: Double
+        val manualWorkoutCalories: Double,
+        val totalMealsLogged: Int = 0
     ) : DashboardUiState
 }
 
