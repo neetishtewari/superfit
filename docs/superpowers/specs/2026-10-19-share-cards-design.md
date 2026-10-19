@@ -47,7 +47,7 @@ Three kinds of picture to share, all Story size (tall, 9:16, made at 1080 x 1920
 
 ## How it works
 - Each card is a normal app screen element, drawn off-screen at 1080 x 1920 and saved as a PNG. Android's standard file-sharing route (a FileProvider) hands it to the share sheet.
-- **Font:** the cards use Sora, the font in the mock-ups, bundled in the app (free licence, adds about 200 KB). The rest of the app keeps its current font.
+- **Font:** the cards use the phone's own font in bold weights. (The mock-ups use Sora; bundling it can come later, it couldn't be downloaded from the build environment.)
 - **Personal-best list:** a small engine on the phone recomputes bests from imported workouts and the streak. Bests already announced are remembered (backed up with the other settings), so the prompt never repeats, even after reinstalling.
 - No database change.
 

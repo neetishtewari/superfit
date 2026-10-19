@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Share card pictures, kept in the app's cache only until the next share. -->
+<paths>
+    <cache-path name="shares" path="shares/" />
+</paths>

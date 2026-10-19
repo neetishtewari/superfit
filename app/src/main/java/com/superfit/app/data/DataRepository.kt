@@ -202,6 +202,8 @@ class DataRepository(
 
     val importedWorkoutCountFlow: Flow<Int> get() = database.importedWorkoutDao().countFlow()
 
+    val allImportedWorkoutsFlow: Flow<List<ImportedWorkoutEntity>> get() = database.importedWorkoutDao().getAllFlow()
+
     suspend fun getAllImportedWorkouts(): List<ImportedWorkoutEntity> = database.importedWorkoutDao().getAll()
 
     /** Workouts from other apps without doubles or hidden ones, empty while the import is off. */
