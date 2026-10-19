@@ -49,6 +49,11 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // Shrink the dev app exactly like the Play build, so code R8 removes by mistake breaks
+            // on the test phone and in CI instead of in production (1.0.25's widget never loaded).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         release {
             isMinifyEnabled = true

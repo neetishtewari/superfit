@@ -31,6 +31,8 @@ Requirements: JDK 17 and the Android SDK (compileSdk 36).
 ./gradlew assembleDebug       # debug APK (installs as "Superfit (Dev)")
 ```
 
+The debug build is shrunk with R8 and the same `proguard-rules.pro` as the Play build, so the dev app on the phone behaves like the store version. If something works when you run from source but breaks on the phone, look for a missing keep rule first. See `docs/release-checklist.md` before each Play upload.
+
 CI (`.github/workflows/ci.yml`) runs both on every pull request and every push to `main`. It also fails if the build changes a Room schema file under `app/schemas`, so commit those files with any entity change.
 
 ### Release signing
