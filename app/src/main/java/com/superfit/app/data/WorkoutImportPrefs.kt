@@ -21,7 +21,7 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
 
     var addBack: WorkoutAddBack
         get() = runCatching { WorkoutAddBack.valueOf(prefs.getString(KEY_ADD_BACK, null) ?: "") }
-            .getOrDefault(WorkoutAddBack.HALF)
+            .getOrDefault(WorkoutAddBack.ALL)
         set(value) = prefs.edit().putString(KEY_ADD_BACK, value.name).apply()
 
     val hiddenIds: Set<String>

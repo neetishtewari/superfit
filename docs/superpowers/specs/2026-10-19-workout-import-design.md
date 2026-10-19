@@ -25,10 +25,10 @@ Date: 2026-10-19. Draft for Neetish's OK. Based on the workout check on Neetish'
 
 ## Calories
 - Apps share **total** calories, which include what the body burns anyway during that time. Superfit shows **exercise calories**: total minus the resting part (worked out from the user's BMR and the workout's length). For the 18 Oct run: 601 total, about 550 from the run itself.
-- **Workouts raise that day's calorie target** (Neetish chose "Add back half", 2026-10-19), only for people who connect their workouts:
+- **Workouts raise that day's calorie target** (Neetish chose "Add back half", 2026-10-19, then "All" after seeing his own numbers the same day), only for people who connect their workouts:
   - The base target covers everyday life without workouts: resting burn (BMR) x 1.2, plus the goal adjustment as today.
-  - Each day, half of that day's exercise calories are added. Example: the 18 Oct run (about 550 exercise kcal) adds about 275 kcal; a rest day gets the base only.
-  - Settings, "Add workout calories to my target": Off / Half (default) / All.
+  - Each day, that day's exercise calories are added (all of them by default). Example: the 18 Oct run (about 550 exercise kcal) adds about 550 kcal; a rest day gets the base only.
+  - Settings, "Add workout calories to my target": Off / Half / All (default).
   - The Home ring shows where the number comes from, e.g. "2,100 + 275 from your run = 2,375 today", so it never changes without explanation.
   - Why it matters (Neetish's data, 4-19 Oct): workout calories ranged from 51 to 953 a day (about 220 exercise kcal on average), so a fixed target was ~700 kcal short on the big run day.
   - Voice-logged workouts count too, using their estimated calories.
