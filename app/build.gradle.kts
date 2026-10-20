@@ -74,6 +74,16 @@ android {
       shaders = false
     }
 
+    lint {
+        // Errors fail CI; warnings only show in the report. Print the findings in the CI log.
+        abortOnError = true
+        warningsAsErrors = false
+        textReport = true
+        textOutput = file("stdout")
+        // These warn whenever a library has a newer version, which says nothing about this code.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
