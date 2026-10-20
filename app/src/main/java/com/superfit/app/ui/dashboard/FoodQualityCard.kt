@@ -113,9 +113,11 @@ fun FoodQualityCard(
 
             if (!metrics.hasEnoughData) {
                 Text(
-                    text = if (metrics.distinctDaysLogged >= com.superfit.app.domain.DietScoreEngine.MIN_DAYS)
+                    text = if (metrics.distinctDaysLogged >= com.superfit.app.domain.DietScoreEngine.MIN_DAYS) {
                         "Your meals are still being analysed. Your score appears once the AI has rated them."
-                    else "Log your meals on at least 3 days this week to see your score. It looks at the pattern of your week, so one meal or one day can't make or break it.",
+                    } else {
+                        "Log your meals on at least 3 days this week to see your score. It looks at the pattern of your week, so one meal or one day can't make or break it."
+                    },
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                     color = SuperfitTheme.colors.textSecondary
@@ -529,17 +531,19 @@ fun FoodSwapCard(
                     )
                 }
 
-                if (swap.calorieSavings > 0) Surface(
-                    shape = CircleShape,
-                    color = NeonMint.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = "Save ~${swap.calorieSavings} kcal",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NeonMint,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                if (swap.calorieSavings > 0) {
+                    Surface(
+                        shape = CircleShape,
+                        color = NeonMint.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = "Save ~${swap.calorieSavings} kcal",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonMint,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
 

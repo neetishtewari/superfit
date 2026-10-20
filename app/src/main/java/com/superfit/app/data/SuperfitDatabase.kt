@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
@@ -36,7 +35,7 @@ abstract class SuperfitDatabase : RoomDatabase() {
 
     companion object {
         @Volatile
-        private var INSTANCE: SuperfitDatabase? = null
+        private var instance: SuperfitDatabase? = null
         private var activeUserId: String? = null
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -51,13 +50,13 @@ abstract class SuperfitDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `workout_entries` (" +
-                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                    "`description` TEXT NOT NULL, " +
-                    "`caloriesBurned` REAL NOT NULL, " +
-                    "`workoutType` TEXT NOT NULL, " +
-                    "`setsCount` INTEGER NOT NULL, " +
-                    "`repsCount` INTEGER NOT NULL, " +
-                    "`timestamp` INTEGER NOT NULL)"
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`description` TEXT NOT NULL, " +
+                        "`caloriesBurned` REAL NOT NULL, " +
+                        "`workoutType` TEXT NOT NULL, " +
+                        "`setsCount` INTEGER NOT NULL, " +
+                        "`repsCount` INTEGER NOT NULL, " +
+                        "`timestamp` INTEGER NOT NULL)"
                 )
             }
         }
@@ -77,31 +76,31 @@ abstract class SuperfitDatabase : RoomDatabase() {
                 // 3. Create newly introduced tables
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `weight_entries` (" +
-                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                    "`weightKg` REAL NOT NULL, " +
-                    "`timestamp` INTEGER NOT NULL, " +
-                    "`note` TEXT NOT NULL)"
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`weightKg` REAL NOT NULL, " +
+                        "`timestamp` INTEGER NOT NULL, " +
+                        "`note` TEXT NOT NULL)"
                 )
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `streak_state` (" +
-                    "`id` INTEGER NOT NULL, " +
-                    "`currentStreak` INTEGER NOT NULL, " +
-                    "`longestStreak` INTEGER NOT NULL, " +
-                    "`masteryStreak` INTEGER NOT NULL, " +
-                    "`graceDaysRemaining` INTEGER NOT NULL, " +
-                    "`lastLoggedDate` TEXT NOT NULL, " +
-                    "`lastGraceUsedDate` TEXT NOT NULL, " +
-                    "PRIMARY KEY(`id`))"
+                        "`id` INTEGER NOT NULL, " +
+                        "`currentStreak` INTEGER NOT NULL, " +
+                        "`longestStreak` INTEGER NOT NULL, " +
+                        "`masteryStreak` INTEGER NOT NULL, " +
+                        "`graceDaysRemaining` INTEGER NOT NULL, " +
+                        "`lastLoggedDate` TEXT NOT NULL, " +
+                        "`lastGraceUsedDate` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
                 )
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `habit_entries` (" +
-                    "`date` TEXT NOT NULL, " +
-                    "`waterMl` INTEGER NOT NULL, " +
-                    "`workoutMins` INTEGER NOT NULL, " +
-                    "`cleanEatsCompleted` INTEGER NOT NULL, " +
-                    "`stepsCompleted` INTEGER NOT NULL, " +
-                    "`sleepCompleted` INTEGER NOT NULL, " +
-                    "PRIMARY KEY(`date`))"
+                        "`date` TEXT NOT NULL, " +
+                        "`waterMl` INTEGER NOT NULL, " +
+                        "`workoutMins` INTEGER NOT NULL, " +
+                        "`cleanEatsCompleted` INTEGER NOT NULL, " +
+                        "`stepsCompleted` INTEGER NOT NULL, " +
+                        "`sleepCompleted` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`date`))"
                 )
             }
         }
@@ -167,23 +166,23 @@ abstract class SuperfitDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): SuperfitDatabase {
             val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
-            return INSTANCE?.takeIf { activeUserId == currentUserId } ?: synchronized(this) {
-                INSTANCE?.let {
+            return instance?.takeIf { activeUserId == currentUserId } ?: synchronized(this) {
+                instance?.let {
                     if (it.isOpen) {
                         it.close()
                     }
                 }
-                val instance = Room.databaseBuilder(
+                val db = Room.databaseBuilder(
                     context.applicationContext,
                     SuperfitDatabase::class.java,
                     "superfit_database_$currentUserId"
                 )
-                .addMigrations(*ALL_MIGRATIONS)
-                .fallbackToDestructiveMigrationOnDowngrade(true)
-                .build()
-                INSTANCE = instance
+                    .addMigrations(*ALL_MIGRATIONS)
+                    .fallbackToDestructiveMigrationOnDowngrade(true)
+                    .build()
+                instance = db
                 activeUserId = currentUserId
-                instance
+                db
             }
         }
     }

@@ -23,6 +23,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Check formatting (ktlint)
+        run: scripts/ktlint.sh
+
       - name: Unit tests
         run: ./gradlew --stacktrace testDebugUnitTest
 
@@ -33,6 +36,13 @@ jobs:
       # WorkManager creates by reflection (the cause of the 1.0.25 widget stuck loading).
       - name: Check R8 kept reflection-created classes
         run: scripts/check-r8-keeps.sh
+
+      - name: Android Lint
+        run: ./gradlew --stacktrace lintDebug
+
+      - name: Print lint findings
+        if: failure()
+        run: cat app/build/reports/lint-results-debug.txt || true
 
       # Release builds use their own App Check provider (src/release), so compile that code too.
       - name: Compile release code
@@ -55,4 +65,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html

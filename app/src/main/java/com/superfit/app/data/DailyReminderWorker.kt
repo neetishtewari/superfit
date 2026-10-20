@@ -8,13 +8,13 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerParameters
-import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.MacroTargets
+import com.superfit.app.domain.PhysiologyEngine
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.Instant
 import kotlinx.coroutines.CancellationException
 
 class DailyReminderWorker(
@@ -74,7 +74,9 @@ class DailyReminderWorker(
                     workoutPrefs,
                     PhysiologyEngine.calculateBmr(p)
                 )
-            } else emptyList()
+            } else {
+                emptyList()
+            }
             return ImportedWorkouts.target(p, workoutPrefs, imported, database.workoutDao().getEntriesForDay(startOfDay, endOfDay))
         }
         val targetCalories = if (customMacroEnabled) {
@@ -117,7 +119,9 @@ class DailyReminderWorker(
                     historyWorkouts = database.workoutDao().getAllEntries() + if (workoutPrefs.enabled) {
                         ImportedWorkouts.views(applicationContext, database.importedWorkoutDao().getAll(), workoutPrefs, bmr)
                             .map(ImportedWorkouts::coachEntry)
-                    } else emptyList(),
+                    } else {
+                        emptyList()
+                    },
                     historyActivity = database.telemetryDao().getAllActivity(),
                     historySleep = database.telemetryDao().getAllSleep(),
                     historyWeights = database.weightDao().getAllWeightEntries(),
@@ -210,4 +214,3 @@ class DailyReminderWorker(
         notificationManager.notify(notificationId, notification)
     }
 }
-

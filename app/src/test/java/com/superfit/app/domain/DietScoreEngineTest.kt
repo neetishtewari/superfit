@@ -1,13 +1,13 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import java.time.LocalDate
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
-import java.time.ZoneOffset
 
 class DietScoreEngineTest {
 

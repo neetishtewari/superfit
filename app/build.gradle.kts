@@ -74,6 +74,16 @@ android {
       shaders = false
     }
 
+    lint {
+        // Errors fail CI; warnings only show in the report (CI prints it when lint fails).
+        abortOnError = true
+        warningsAsErrors = false
+        textReport = true
+        textOutput = file("build/reports/lint-results-debug.txt")
+        // These warn whenever a library has a newer version, which says nothing about this code.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

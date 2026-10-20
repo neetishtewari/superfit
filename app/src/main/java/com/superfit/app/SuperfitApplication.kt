@@ -10,8 +10,8 @@ import androidx.work.WorkManager
 import com.google.firebase.Firebase
 import com.google.firebase.appcheck.appCheck
 import com.google.firebase.initialize
-import com.superfit.app.data.TelemetrySyncWorker
 import com.superfit.app.data.DailyReminderWorker
+import com.superfit.app.data.TelemetrySyncWorker
 import java.util.concurrent.TimeUnit
 
 class SuperfitApplication : Application() {
@@ -65,5 +65,4 @@ class SuperfitApplication : Application() {
             com.superfit.app.data.ReminderScheduler.cancelReminder(this)
         }
     }
-
 }

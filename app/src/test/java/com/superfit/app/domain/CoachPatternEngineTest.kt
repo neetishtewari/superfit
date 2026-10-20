@@ -3,15 +3,15 @@ package com.superfit.app.domain
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WeightEntryEntity
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneOffset
 
 class CoachPatternEngineTest {
 
@@ -186,7 +186,8 @@ class CoachPatternEngineTest {
     @Test
     fun `more than two treat meals in a week is flagged, and a pizza with a beer is one meal`() {
         val logs = (1..6).flatMap { fullDay(it, 130.0) } + listOf(
-            meal(1, 21, "pizza", 600.0, tags = treat("pizza")), meal(1, 21, "beer", 200.0, tags = treat("beer")),
+            meal(1, 21, "pizza", 600.0, tags = treat("pizza")),
+            meal(1, 21, "beer", 200.0, tags = treat("beer")),
             meal(3, 16, "chocolate cake", 400.0, tags = treat("cake")),
             meal(5, 17, "samosa", 300.0, tags = treat("samosa"))
         )

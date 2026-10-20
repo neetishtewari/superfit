@@ -1,5 +1,6 @@
 package com.superfit.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -7,17 +8,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.data.SuperfitDatabase
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.theme.ThemeConfig
-
 import kotlinx.coroutines.flow.MutableStateFlow
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import android.content.Intent
 
 class MainActivity : ComponentActivity() {
     private lateinit var healthConnectManager: HealthConnectManager

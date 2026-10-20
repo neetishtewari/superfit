@@ -35,13 +35,15 @@ class NutritionParserTest {
     @Test
     fun `without usable items the meal is saved as before`() {
         val noItems = ParsedNutritionResult.fromJson(
-            JSONObject("""{"foodText":"poha","calories":250,"protein":5,"carbs":45,"fat":6}"""), "poha"
+            JSONObject("""{"foodText":"poha","calories":250,"protein":5,"carbs":45,"fat":6}"""),
+            "poha"
         )
         assertEquals(250.0, noItems.calories, 0.01)
         assertNull(noItems.items)
 
         val badItems = ParsedNutritionResult.fromJson(
-            JSONObject("""{"foodText":"poha","calories":250,"protein":5,"carbs":45,"fat":6,"items":[{"name":"poha","quantity":0,"calories":250}]}"""), "poha"
+            JSONObject("""{"foodText":"poha","calories":250,"protein":5,"carbs":45,"fat":6,"items":[{"name":"poha","quantity":0,"calories":250}]}"""),
+            "poha"
         )
         assertEquals(250.0, badItems.calories, 0.01)
         assertNull(badItems.items)
@@ -50,7 +52,8 @@ class NutritionParserTest {
     @Test
     fun `gibberish keeps no items`() {
         val result = ParsedNutritionResult.fromJson(
-            JSONObject("""{"foodText":"invalid","calories":0,"protein":0,"carbs":0,"fat":0,"items":[]}"""), "hmm"
+            JSONObject("""{"foodText":"invalid","calories":0,"protein":0,"carbs":0,"fat":0,"items":[]}"""),
+            "hmm"
         )
         assertEquals("invalid", result.foodText)
         assertNull(result.items)

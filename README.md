@@ -29,9 +29,11 @@ Requirements: JDK 17 and the Android SDK (compileSdk 36).
 ```
 ./gradlew testDebugUnitTest   # unit tests
 ./gradlew assembleDebug       # debug APK (installs as "Superfit (Dev)")
+./gradlew lintDebug           # Android Lint
+scripts/ktlint.sh --format    # format the Kotlin code (rules in .editorconfig)
 ```
 
-CI (`.github/workflows/ci.yml`) runs both on every pull request and every push to `main`. It also fails if the build changes a Room schema file under `app/schemas`, so commit those files with any entity change.
+CI (`.github/workflows/ci.yml`) runs all of these on every pull request and every push to `main`, and fails on a formatting problem or an Android Lint error (lint warnings are only reported). It also fails if the build changes a Room schema file under `app/schemas`, so commit those files with any entity change.
 
 ### Testing what the Play build will do
 

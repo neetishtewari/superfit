@@ -1,11 +1,11 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToLong
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** How much oil or sugar went in compared with the AI's estimate. */
 enum class Level(val factor: Double) { LOW(0.5), NORMAL(1.0), HIGH(1.5) }
@@ -85,16 +85,19 @@ data class MealItems(
         .put("oil", oil.name)
         .put("sugar", sugar.name)
         .put("est", hasEstimates)
-        .put("items", JSONArray().apply {
-            items.forEach {
-                put(
-                    JSONObject()
-                        .put("name", it.name).put("qty", it.qty).put("unit", it.unit)
-                        .put("kcal", it.kcal).put("p", it.protein).put("c", it.carbs).put("f", it.fat)
-                        .put("fib", it.fiber).put("oil", it.oilG).put("sug", it.sugarG)
-                )
+        .put(
+            "items",
+            JSONArray().apply {
+                items.forEach {
+                    put(
+                        JSONObject()
+                            .put("name", it.name).put("qty", it.qty).put("unit", it.unit)
+                            .put("kcal", it.kcal).put("p", it.protein).put("c", it.carbs).put("f", it.fat)
+                            .put("fib", it.fiber).put("oil", it.oilG).put("sug", it.sugarG)
+                    )
+                }
             }
-        })
+        )
         .toString()
 
     companion object {

@@ -475,4 +475,12 @@ private fun JourneyChart(j: JourneyForecast, forecastColor: Color) {
 
 private fun hours(minutes: Long): String = if (minutes >= 60) String.format(Locale.US, "%.1f h", minutes / 60.0) else "$minutes min"
 private fun km(v: Double): String = String.format(Locale.US, if (v >= 10) "%.0f" else "%.1f", v)
-private fun signedKcal(v: Double): String = (if (v > 0) "+" else if (v < 0) "-" else "") + InsightsEngine.kcal(v)
+private fun signedKcal(v: Double): String = (
+    if (v > 0) {
+        "+"
+    } else if (v < 0) {
+        "-"
+    } else {
+        ""
+    }
+    ) + InsightsEngine.kcal(v)

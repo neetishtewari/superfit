@@ -6,15 +6,15 @@ class WorkoutParser(private val apiKey: String) {
 
     private val systemInstructionText =
         "You are an expert exercise physiology AI. Parse the user's natural language workout or exercise description " +
-        "and estimate the total active calories (kcal) burned.\n" +
-        "You must return a raw JSON object with the following fields and types:\n" +
-        "- \"workoutText\": String (a concise, clean summary of the exercises performed, e.g. \"20 burpees, 50 jumping jacks, and 30 pushups\")\n" +
-        "- \"caloriesBurned\": Double (an estimate of total calories burned based on standard MET values)\n" +
-        "- \"workoutType\": String (must be either \"Cardio\" or \"Strength\" based on the dominant exercise type)\n" +
-        "- \"setsCount\": Int (total number of sets performed. Default to 1 if not specified or for general cardio)\n" +
-        "- \"repsCount\": Int (total number of repetitions completed across all exercises. Default to 0 for general cardio)\n\n" +
-        "Provide reasonable estimations if duration, intensity, sets, reps or specific dumbbells/weights are not detailed by the user.\n" +
-        "CRITICAL: If the user's input is gibberish, background noise, or completely unrelated to exercises, workouts, gym training, sports, or physical activity, set the \"workoutText\" field to exactly \"invalid\", \"caloriesBurned\" to 0.0, \"workoutType\" to \"Cardio\", \"setsCount\" to 0, and \"repsCount\" to 0."
+            "and estimate the total active calories (kcal) burned.\n" +
+            "You must return a raw JSON object with the following fields and types:\n" +
+            "- \"workoutText\": String (a concise, clean summary of the exercises performed, e.g. \"20 burpees, 50 jumping jacks, and 30 pushups\")\n" +
+            "- \"caloriesBurned\": Double (an estimate of total calories burned based on standard MET values)\n" +
+            "- \"workoutType\": String (must be either \"Cardio\" or \"Strength\" based on the dominant exercise type)\n" +
+            "- \"setsCount\": Int (total number of sets performed. Default to 1 if not specified or for general cardio)\n" +
+            "- \"repsCount\": Int (total number of repetitions completed across all exercises. Default to 0 for general cardio)\n\n" +
+            "Provide reasonable estimations if duration, intensity, sets, reps or specific dumbbells/weights are not detailed by the user.\n" +
+            "CRITICAL: If the user's input is gibberish, background noise, or completely unrelated to exercises, workouts, gym training, sports, or physical activity, set the \"workoutText\" field to exactly \"invalid\", \"caloriesBurned\" to 0.0, \"workoutType\" to \"Cardio\", \"setsCount\" to 0, and \"repsCount\" to 0."
 
     suspend fun parseWorkoutInput(input: String): ParsedWorkoutResult {
         if (input.isBlank()) {
@@ -27,7 +27,7 @@ class WorkoutParser(private val apiKey: String) {
             systemInstructionText = systemInstructionText,
             isJson = true
         )
-        
+
         val cleanJsonText = jsonText.trim()
             .removePrefix("```json")
             .removePrefix("```")

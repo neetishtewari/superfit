@@ -1,10 +1,10 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.Calendar
 
 class FoodPredictionTest {
 
@@ -25,12 +25,12 @@ class FoodPredictionTest {
 
         val result = FoodPredictor.predict(entries, currentHour = 12, nowMs = now)
         assertEquals(1, result.size)
-        
+
         val item = result[0]
         // Most common casing should be "banana" or "Banana" or "banana " depending on frequency.
         // In this case, each has frequency 1, so it takes the first or most common, which is "banana".
         assertTrue(item.foodText.trim().equals("banana", ignoreCase = true))
-        
+
         // Average macros:
         // calories: (100 + 120 + 110)/3 = 110
         // protein: (1 + 2 + 1.5)/3 = 1.5
@@ -69,7 +69,7 @@ class FoodPredictionTest {
         // Apple logged 10 days ago, Toast logged 1 day ago
         val appleCal = Calendar.getInstance().apply { timeInMillis = tenDaysAgo }
         val toastCal = Calendar.getInstance().apply { timeInMillis = oneDayAgo }
-        
+
         val currentHour = appleCal.get(Calendar.HOUR_OF_DAY) // Align current hour to their logged hour
 
         val entries = listOf(

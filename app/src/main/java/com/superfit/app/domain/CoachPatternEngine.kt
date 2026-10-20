@@ -200,7 +200,12 @@ object CoachPatternEngine {
         }
         val aiTaggedCalories = entries.filter { MealTags.decode(it.qualityTags) != null }.sumOf { it.calories }
         return DayLog(
-            date, entries, calories, entries.sumOf { it.proteinG }, mainMeals, status,
+            date,
+            entries,
+            calories,
+            entries.sumOf { it.proteinG },
+            mainMeals,
+            status,
             fibreG = entries.sumOf { MealTags.of(it).fiberG },
             tagsKnown = calories > 0 && aiTaggedCalories >= calories * 0.7
         )
@@ -221,7 +226,10 @@ object CoachPatternEngine {
         val logged = lastWeek.size - blanks.size
         if (blanks.size >= 2 && logged >= 1) {
             out += CoachFinding(
-                id = "logging_gaps", area = "logging", kind = FindingKind.LOGGING, priority = 40,
+                id = "logging_gaps",
+                area = "logging",
+                kind = FindingKind.LOGGING,
+                priority = 40,
                 fact = "No meals were logged on ${blanks.size} of the last 7 days (${blanks.take(3).joinToString(", ") { fmt(it.date) }}).",
                 meaning = "Days without logs are left out rather than counted as not eating, so my advice is only as good as the days you log.",
                 suggestion = "Log meals as you eat them today, even a rough one-line entry counts."
@@ -237,7 +245,10 @@ object CoachPatternEngine {
             if (missing >= loggedDays.size * 0.7) {
                 val name = slot.name.lowercase()
                 out += CoachFinding(
-                    id = "logging_missing_$name", area = "logging", kind = FindingKind.LOGGING, priority = 30,
+                    id = "logging_missing_$name",
+                    area = "logging",
+                    kind = FindingKind.LOGGING,
+                    priority = 30,
                     fact = "${name.replaceFirstChar { it.uppercase() }} is missing on $missing of your last ${loggedDays.size} logged days.",
                     meaning = "If you skip $name on purpose, that's fine. If you eat it and forget to log it, your daily totals look lower than they really are.",
                     suggestion = "If you have $name today, add a quick log for it."
@@ -247,7 +258,10 @@ object CoachPatternEngine {
 
         if (completeDays < MIN_COMPLETE_DAYS && logged >= 2) {
             out += CoachFinding(
-                id = "logging_few_complete", area = "logging", kind = FindingKind.LOGGING, priority = 35,
+                id = "logging_few_complete",
+                area = "logging",
+                kind = FindingKind.LOGGING,
+                priority = 35,
                 fact = "Only $completeDays of the last 7 days look fully logged; the rest look like a meal or two was missed.",
                 meaning = "I need about $MIN_COMPLETE_DAYS fully logged days in a week before I judge protein or calorie patterns, so for now I only comment on the meals you did log.",
                 suggestion = "Try logging every meal today so I can give you a proper read on your week."
@@ -275,7 +289,9 @@ object CoachPatternEngine {
             if (short.size >= 3) {
                 val avg = short.map { it.proteinG }.average().roundToInt()
                 out += CoachFinding(
-                    id = "protein_low", area = "protein", kind = FindingKind.CONCERN,
+                    id = "protein_low",
+                    area = "protein",
+                    kind = FindingKind.CONCERN,
                     priority = if (goal == "LOSE_WEIGHT" || goal == "GAIN_MUSCLE") 92 else 85,
                     fact = "Protein came in under target on ${if (short.size == recent.size) "all" else short.size} of your last ${recent.size} fully logged days (about ${avg}g on those days vs your ${target.roundToInt()}g target).",
                     meaning = "One low day doesn't matter, but this is a pattern. $meaning",
@@ -286,7 +302,10 @@ object CoachPatternEngine {
             val hit = completeDays.count { it.proteinG >= target * 0.9 }
             if (hit >= 5 || (hit == completeDays.size && hit >= 4)) {
                 out += CoachFinding(
-                    id = "protein_good", area = "protein", kind = FindingKind.WIN, priority = 50,
+                    id = "protein_good",
+                    area = "protein",
+                    kind = FindingKind.WIN,
+                    priority = 50,
                     fact = "You hit your protein target on $hit of your last ${completeDays.size} fully logged days.",
                     meaning = meaning,
                     suggestion = "Keep the same protein habits going today."
@@ -309,7 +328,10 @@ object CoachPatternEngine {
             if (light >= meals.size * 0.6) {
                 val perMeal = (target / 3).roundToInt()
                 out += CoachFinding(
-                    id = "protein_meals_light", area = "protein", kind = FindingKind.CONCERN, priority = 70,
+                    id = "protein_meals_light",
+                    area = "protein",
+                    kind = FindingKind.CONCERN,
+                    priority = 70,
                     fact = "$light of the ${meals.size} main meals you logged this week had less than 15g of protein.",
                     meaning = "To reach your ${target.roundToInt()}g a day, each main meal needs roughly ${perMeal}g. $meaning",
                     suggestion = "Build your next meal around a protein: eggs, paneer, chicken, fish, tofu, curd or a big bowl of dal."
@@ -343,20 +365,29 @@ object CoachPatternEngine {
                         "Over a week that adds up to about ${num(extra * 7)} kcal, close to a full day's food."
                     }
                     out += CoachFinding(
-                        id = "calories_high", area = "calories", kind = FindingKind.CONCERN, priority = 80,
+                        id = "calories_high",
+                        area = "calories",
+                        kind = FindingKind.CONCERN,
+                        priority = 80,
                         fact = "On fully logged days you averaged ${num(avg.roundToInt())} kcal, about $extra kcal a day over your ${num(target.roundToInt())} target.",
                         meaning = impact,
                         suggestion = "Keep today's portions a little smaller, especially rice, roti and oil, rather than skipping a meal."
                     )
                 }
                 goal == "GAIN_MUSCLE" && avg < target * 0.9 -> out += CoachFinding(
-                    id = "calories_low_for_gain", area = "calories", kind = FindingKind.CONCERN, priority = 75,
+                    id = "calories_low_for_gain",
+                    area = "calories",
+                    kind = FindingKind.CONCERN,
+                    priority = 75,
                     fact = "On fully logged days you averaged ${num(avg.roundToInt())} kcal, under your ${num(target.roundToInt())} target.",
                     meaning = "Building muscle needs a small surplus. Below target, your training has less to build with.",
                     suggestion = "Add one extra snack today, like a banana with peanut butter, or curd with nuts."
                 )
                 avg < target * 0.75 -> out += CoachFinding(
-                    id = "calories_very_low", area = "calories", kind = FindingKind.CONCERN, priority = 78,
+                    id = "calories_very_low",
+                    area = "calories",
+                    kind = FindingKind.CONCERN,
+                    priority = 78,
                     fact = "Even on days that look fully logged, you averaged ${num(avg.roundToInt())} kcal against a ${num(target.roundToInt())} target.",
                     meaning = "A gap this big makes it hard to hold on to muscle and usually leads to strong hunger later. If you're simply forgetting to log some food, that's worth fixing first.",
                     suggestion = "Make sure today has three proper meals, each with a protein."
@@ -364,9 +395,14 @@ object CoachPatternEngine {
                 abs(avg - target) <= target * 0.1 -> {
                     val note = if (biggest.calories > target * 1.25) {
                         " That includes a ${num(biggest.calories.roundToInt())} kcal day on ${fmt(biggest.date)}, and the rest of the week balanced it out."
-                    } else ""
+                    } else {
+                        ""
+                    }
                     out += CoachFinding(
-                        id = "calories_on_track", area = "calories", kind = FindingKind.WIN, priority = 45,
+                        id = "calories_on_track",
+                        area = "calories",
+                        kind = FindingKind.WIN,
+                        priority = 45,
                         fact = "Your fully logged days averaged ${num(avg.roundToInt())} kcal, right around your ${num(target.roundToInt())} target.$note",
                         meaning = "What matters is the weekly average, not any single day. You're on course for your goal.",
                         suggestion = "Keep the same rhythm today."
@@ -385,7 +421,9 @@ object CoachPatternEngine {
             if (weekendAvg > weekdayAvg * 1.25 && weekendAvg > target) {
                 val extraPerWeek = ((weekendAvg - weekdayAvg) * 2).roundToInt()
                 out += CoachFinding(
-                    id = "calories_weekend", area = "calories", kind = FindingKind.CONCERN,
+                    id = "calories_weekend",
+                    area = "calories",
+                    kind = FindingKind.CONCERN,
                     priority = if (goal == "LOSE_WEIGHT") 60 else 40,
                     fact = "Weekends average ${num(weekendAvg.roundToInt())} kcal vs ${num(weekdayAvg.roundToInt())} on weekdays.",
                     meaning = "The two weekend days add about ${num(extraPerWeek)} kcal a week on top of your weekdays, which can quietly undo the week's progress.",
@@ -419,7 +457,10 @@ object CoachPatternEngine {
         if (recent.size < 3 || span < 14) {
             if (daysSinceLast >= 14) {
                 out += CoachFinding(
-                    id = "weight_stale", area = "weight", kind = FindingKind.LOGGING, priority = 25,
+                    id = "weight_stale",
+                    area = "weight",
+                    kind = FindingKind.LOGGING,
+                    priority = 25,
                     fact = "Your last weigh-in was $daysSinceLast days ago.",
                     meaning = "Weighing in once or twice a week, at the same time of day, is how I can tell whether the plan is working. $trendMeaning",
                     suggestion = "Weigh yourself tomorrow morning, before eating, and log it."
@@ -453,24 +494,36 @@ object CoachPatternEngine {
         when (goal) {
             "LOSE_WEIGHT" -> when {
                 perWeek > -0.1 -> out += CoachFinding(
-                    id = "weight_stalled", area = "weight", kind = FindingKind.CONCERN, priority = 78,
+                    id = "weight_stalled",
+                    area = "weight",
+                    kind = FindingKind.CONCERN,
+                    priority = 78,
                     fact = "Your weight has held at about ${fmtKg(current)} kg over the last $weeks weeks ($start kg to $end kg).",
                     meaning = when {
                         caloriesHigh -> "That fits with eating above your calorie target. Bringing the weekly average down is what will get the scale moving again."
                         caloriesOnTrack -> "Your logged calories look on target, so the gap is most likely food that isn't getting logged (cooking oil, ghee, drinks, nibbles) or a lower daily burn than estimated. Trimming about 150 to 200 kcal a day usually restarts progress."
                         else -> "To lose weight, the weekly calorie average has to sit below what you burn. $trendMeaning"
                     },
-                    suggestion = if (caloriesOnTrack) "For the next few days, log everything, including oil, ghee, tea, drinks and small bites."
-                    else "Aim for your calorie target today and log every meal, so we can see where the gap is."
+                    suggestion = if (caloriesOnTrack) {
+                        "For the next few days, log everything, including oil, ghee, tea, drinks and small bites."
+                    } else {
+                        "Aim for your calorie target today and log every meal, so we can see where the gap is."
+                    }
                 )
                 perWeek < -onePercent -> out += CoachFinding(
-                    id = "weight_fast", area = "weight", kind = FindingKind.CONCERN, priority = 70,
+                    id = "weight_fast",
+                    area = "weight",
+                    kind = FindingKind.CONCERN,
+                    priority = 70,
                     fact = "You're losing about ${fmtKg(-perWeek)} kg a week ($start kg to $end kg over $weeks weeks).",
                     meaning = "Faster than about 1% of body weight a week (${fmtKg(onePercent)} kg for you) tends to cost muscle and is hard to keep up. A steady 0.5 to 0.75 kg a week lasts.",
                     suggestion = "Eat up to your full calorie target today, with protein in every meal."
                 )
                 perWeek <= -0.2 -> out += CoachFinding(
-                    id = "weight_on_track", area = "weight", kind = FindingKind.WIN, priority = 58,
+                    id = "weight_on_track",
+                    area = "weight",
+                    kind = FindingKind.WIN,
+                    priority = 58,
                     fact = "You're down about ${fmtKg(-change)} kg over the last $weeks weeks, roughly ${fmtKg(-perWeek)} kg a week.$toGo",
                     meaning = "That's a healthy pace you can keep up, and the kind of loss that stays off.",
                     suggestion = "Keep the same routine today."
@@ -478,19 +531,28 @@ object CoachPatternEngine {
             }
             "GAIN_MUSCLE" -> when {
                 perWeek > current * 0.005 -> out += CoachFinding(
-                    id = "weight_gain_fast", area = "weight", kind = FindingKind.CONCERN, priority = 60,
+                    id = "weight_gain_fast",
+                    area = "weight",
+                    kind = FindingKind.CONCERN,
+                    priority = 60,
                     fact = "You're gaining about ${fmtKg(perWeek)} kg a week ($start kg to $end kg over $weeks weeks).",
                     meaning = "Muscle builds slowly, about 0.25 to 0.5% of body weight a week at most. Gaining faster than that is mostly fat.",
                     suggestion = "Trim your surplus a little: keep the protein, cut back on extras like sweets or fried snacks."
                 )
                 perWeek < 0.05 -> out += CoachFinding(
-                    id = "weight_gain_stalled", area = "weight", kind = FindingKind.CONCERN, priority = 60,
+                    id = "weight_gain_stalled",
+                    area = "weight",
+                    kind = FindingKind.CONCERN,
+                    priority = 60,
                     fact = "Your weight has held at about ${fmtKg(current)} kg over the last $weeks weeks.",
                     meaning = "Building muscle needs a small, steady gain. If the scale isn't moving, your training doesn't have the extra fuel it needs.",
                     suggestion = "Add one extra snack today, like curd with nuts or a banana with peanut butter."
                 )
                 else -> out += CoachFinding(
-                    id = "weight_gain_on_track", area = "weight", kind = FindingKind.WIN, priority = 50,
+                    id = "weight_gain_on_track",
+                    area = "weight",
+                    kind = FindingKind.WIN,
+                    priority = 50,
                     fact = "You're gaining about ${fmtKg(perWeek)} kg a week, a lean pace for building muscle.$toGo",
                     meaning = "Slow and steady keeps the gain mostly muscle.",
                     suggestion = "Keep the same routine today."
@@ -499,7 +561,10 @@ object CoachPatternEngine {
             else -> if (abs(change) >= 1.5) {
                 val direction = if (change > 0) "up" else "down"
                 out += CoachFinding(
-                    id = "weight_drift", area = "weight", kind = FindingKind.CONCERN, priority = 50,
+                    id = "weight_drift",
+                    area = "weight",
+                    kind = FindingKind.CONCERN,
+                    priority = 50,
                     fact = "Your weight has drifted $direction about ${fmtKg(abs(change))} kg over the last $weeks weeks ($start kg to $end kg).",
                     meaning = "You're aiming to maintain, so a steady drift like this is worth correcting early while it's small.",
                     suggestion = if (change > 0) "Keep portions close to your calorie target today." else "Make sure today has three full meals."
@@ -552,7 +617,10 @@ object CoachPatternEngine {
             val (category, dates) = habit
             val span = java.time.temporal.ChronoUnit.DAYS.between(dates.last(), today).toInt() + 1
             out += CoachFinding(
-                id = "treats_habit", area = "treats", kind = FindingKind.CONCERN, priority = 82,
+                id = "treats_habit",
+                area = "treats",
+                kind = FindingKind.CONCERN,
+                priority = 82,
                 fact = "${category.replaceFirstChar { it.uppercase() }} showed up on ${dates.size} days in the last $span days (${dates.take(4).sorted().joinToString(", ") { fmt(it) }}).$minimumNote",
                 meaning = "Once in a while is a treat. This often, it's becoming a habit, and habits are what move your results${goalPhrase(goal)}.",
                 suggestion = "Keep $category to once a week and pick a lighter swap for the other times."
@@ -564,7 +632,10 @@ object CoachPatternEngine {
             }
             if (everyWeek != null) {
                 out += CoachFinding(
-                    id = "treats_every_week", area = "treats", kind = FindingKind.CONCERN, priority = 55,
+                    id = "treats_every_week",
+                    area = "treats",
+                    kind = FindingKind.CONCERN,
+                    priority = 55,
                     fact = "${everyWeek.replaceFirstChar { it.uppercase() }} came up every week for the last 3 weeks.",
                     meaning = "Once a week is fine on its own, but it's worth noticing that it has become a fixed part of your week.",
                     suggestion = "If it's a planned weekly treat, enjoy it. If it's a default, try a swap one week."
@@ -578,7 +649,9 @@ object CoachPatternEngine {
                 .joinToString(", ") { (cat, n) -> if (n > 1) "$cat ×$n" else cat }
             val prev = previousWeeks.map { it.size }
             out += CoachFinding(
-                id = "treats_high", area = "treats", kind = FindingKind.CONCERN,
+                id = "treats_high",
+                area = "treats",
+                kind = FindingKind.CONCERN,
                 priority = if (thisWeek.size >= 4) 84 else 72,
                 fact = "${thisWeek.size} treat meals in the last 7 days ($counts). The three weeks before had ${prev.joinToString(", ")}.$minimumNote",
                 meaning = "Up to $WEEKLY_TREAT_ALLOWANCE treat meals a week fit easily into your plan. Beyond that they start to show${goalPhrase(goal)}.",
@@ -586,7 +659,10 @@ object CoachPatternEngine {
             )
         } else if (thisWeek.isEmpty() && previousWeeks[0].size > WEEKLY_TREAT_ALLOWANCE) {
             out += CoachFinding(
-                id = "treats_down", area = "treats", kind = FindingKind.WIN, priority = 55,
+                id = "treats_down",
+                area = "treats",
+                kind = FindingKind.WIN,
+                priority = 55,
                 fact = "No treat meals logged in the last 7 days, down from ${previousWeeks[0].size} the week before.",
                 meaning = "Cutting back like this is one of the changes that shows up fastest on the scale and in energy levels.",
                 suggestion = "Plan your next treat on purpose so it feels like a reward."
@@ -602,14 +678,20 @@ object CoachPatternEngine {
         val withVeg = completeDays.count { day -> day.entries.any { hasVegOrFruit(it) } }
         if (withVeg * 2 < completeDays.size) {
             out += CoachFinding(
-                id = "veg_low", area = "veg", kind = FindingKind.CONCERN, priority = 60,
+                id = "veg_low",
+                area = "veg",
+                kind = FindingKind.CONCERN,
+                priority = 60,
                 fact = "Vegetables or fruit showed up on only $withVeg of your last ${completeDays.size} fully logged days.",
                 meaning = "Vegetables and fruit bring the fibre and vitamins that keep you full, help digestion and support recovery. Most days should have some.",
                 suggestion = "Add a bowl of sabzi, a salad or a piece of fruit to one meal today."
             )
         } else if (withVeg == completeDays.size && withVeg >= 4) {
             out += CoachFinding(
-                id = "veg_good", area = "veg", kind = FindingKind.WIN, priority = 35,
+                id = "veg_good",
+                area = "veg",
+                kind = FindingKind.WIN,
+                priority = 35,
                 fact = "Every one of your last $withVeg fully logged days had vegetables or fruit.",
                 meaning = "That's a strong base for fibre, vitamins and staying full.",
                 suggestion = "Keep it up today."
@@ -639,7 +721,10 @@ object CoachPatternEngine {
             if (baseAvg >= 3000 && recentAvg < baseAvg * 0.75) {
                 val kcal = ((baseAvg - recentAvg) * 0.04 * weightKg / 70).roundToInt()
                 out += CoachFinding(
-                    id = "steps_down", area = "steps", kind = FindingKind.CONCERN, priority = 50,
+                    id = "steps_down",
+                    area = "steps",
+                    kind = FindingKind.CONCERN,
+                    priority = 50,
                     fact = "Steps averaged ${num(recentAvg.roundToInt())} a day this week vs your usual ${num(baseAvg.roundToInt())}.",
                     meaning = "That drop is roughly $kcal kcal a day less burned. $meaning",
                     suggestion = "Fit in a 20-minute walk today, for example after lunch or dinner."
@@ -648,7 +733,10 @@ object CoachPatternEngine {
             }
             if (recentAvg > baseAvg * 1.2 && recentAvg >= 5000) {
                 out += CoachFinding(
-                    id = "steps_up", area = "steps", kind = FindingKind.WIN, priority = 42,
+                    id = "steps_up",
+                    area = "steps",
+                    kind = FindingKind.WIN,
+                    priority = 42,
                     fact = "Steps averaged ${num(recentAvg.roundToInt())} a day this week, up from your usual ${num(baseAvg.roundToInt())}.",
                     meaning = meaning,
                     suggestion = "Keep the walks going today."
@@ -657,7 +745,10 @@ object CoachPatternEngine {
             }
         } else if (recentAvg < 5000 && recent.size >= 5) {
             out += CoachFinding(
-                id = "steps_low", area = "steps", kind = FindingKind.CONCERN, priority = 45,
+                id = "steps_low",
+                area = "steps",
+                kind = FindingKind.CONCERN,
+                priority = 45,
                 fact = "Steps averaged ${num(recentAvg.roundToInt())} a day this week.",
                 meaning = meaning,
                 suggestion = "Add a 15 to 20-minute walk today."
@@ -674,7 +765,10 @@ object CoachPatternEngine {
         val weekday = month.filter { it.first.dayOfWeek != DayOfWeek.SATURDAY && it.first.dayOfWeek != DayOfWeek.SUNDAY }.map { it.second }
         if (weekend.size >= 3 && weekday.size >= 8 && weekend.average() < weekday.average() * 0.6) {
             out += CoachFinding(
-                id = "steps_weekend", area = "steps", kind = FindingKind.CONCERN, priority = 35,
+                id = "steps_weekend",
+                area = "steps",
+                kind = FindingKind.CONCERN,
+                priority = 35,
                 fact = "Weekends average ${num(weekend.average().roundToInt())} steps vs ${num(weekday.average().roundToInt())} on weekdays.",
                 meaning = meaning,
                 suggestion = "Plan one active thing for the weekend, like a long walk or a game."
@@ -692,14 +786,20 @@ object CoachPatternEngine {
         val meaning = "7 to 9 hours is the healthy range for adults. Regularly under about 6.5 hours makes hunger and cravings stronger and slows recovery from training."
         if (avg < 6.5) {
             out += CoachFinding(
-                id = "sleep_low", area = "sleep", kind = FindingKind.CONCERN, priority = 65,
+                id = "sleep_low",
+                area = "sleep",
+                kind = FindingKind.CONCERN,
+                priority = 65,
                 fact = "You've averaged ${"%.1f".format(Locale.US, avg)} hours of sleep over the last ${nights.size} nights.",
                 meaning = meaning,
                 suggestion = "Aim to be in bed 30 minutes earlier tonight, and keep screens away for the last half hour."
             )
         } else if (avg >= 7.0 && nights.size >= 5) {
             out += CoachFinding(
-                id = "sleep_good", area = "sleep", kind = FindingKind.WIN, priority = 30,
+                id = "sleep_good",
+                area = "sleep",
+                kind = FindingKind.WIN,
+                priority = 30,
                 fact = "You've averaged ${"%.1f".format(Locale.US, avg)} hours of sleep over the last ${nights.size} nights.",
                 meaning = meaning,
                 suggestion = "Keep the same bedtime tonight."
@@ -727,14 +827,20 @@ object CoachPatternEngine {
         checked += "workouts"
         if (usual >= 2.0 && thisWeek < usual * 0.5 && lastWeek < usual * 0.5) {
             out += CoachFinding(
-                id = "workouts_down", area = "workouts", kind = FindingKind.CONCERN, priority = 55,
+                id = "workouts_down",
+                area = "workouts",
+                kind = FindingKind.CONCERN,
+                priority = 55,
                 fact = "You've trained on $thisWeek days this week and $lastWeek last week, down from about ${usual.roundToInt()} a week before that.",
                 meaning = "Two quieter weeks in a row is when a break starts turning into a habit. Even short sessions keep the routine alive.",
                 suggestion = "Do a short 20-minute session today, it doesn't need to be a full workout."
             )
         } else if (thisWeek >= usual + 1) {
             out += CoachFinding(
-                id = "workouts_up", area = "workouts", kind = FindingKind.WIN, priority = 40,
+                id = "workouts_up",
+                area = "workouts",
+                kind = FindingKind.WIN,
+                priority = 40,
                 fact = "You've trained on $thisWeek days this week, more than your usual ${usual.roundToInt()}.",
                 meaning = "Consistency like this is what builds results over months.",
                 suggestion = "Balance the extra training with good sleep and protein today."
@@ -761,7 +867,10 @@ object CoachPatternEngine {
         if (short.size >= 3) {
             val avg = short.map { it.fibreG }.average().roundToInt()
             out += CoachFinding(
-                id = "fibre_low", area = "fibre", kind = FindingKind.CONCERN, priority = 62,
+                id = "fibre_low",
+                area = "fibre",
+                kind = FindingKind.CONCERN,
+                priority = 62,
                 fact = "Fibre came in low on ${if (short.size == recent.size) "all" else short.size} of your last ${recent.size} fully logged days (about ${avg}g on those days vs a ${target.roundToInt()}g target).",
                 meaning = "One low day doesn't matter, but this is a pattern. $meaning",
                 suggestion = "Add one high-fibre food to a meal today: a bowl of dal, chana or rajma, a whole fruit, a salad, or whole wheat roti instead of white rice."
@@ -771,7 +880,10 @@ object CoachPatternEngine {
         val hit = days.count { it.fibreG >= target * 0.9 }
         if (hit >= 4 && hit == days.size) {
             out += CoachFinding(
-                id = "fibre_good", area = "fibre", kind = FindingKind.WIN, priority = 30,
+                id = "fibre_good",
+                area = "fibre",
+                kind = FindingKind.WIN,
+                priority = 30,
                 fact = "You reached your fibre target on all of your last $hit fully logged days.",
                 meaning = meaning,
                 suggestion = "Keep the dal, whole grains, vegetables and fruit coming today."

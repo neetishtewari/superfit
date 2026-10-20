@@ -56,8 +56,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -74,11 +74,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
+import java.io.File
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import kotlin.math.roundToInt
 
 /** Share pictures are 1080 x 1920 px: the 360 x 640 dp card drawn at 3x. */
 const val CARD_WIDTH_PX = 1080
@@ -106,8 +106,11 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
         if (uri != null) {
             scope.launch {
                 val loaded = withContext(Dispatchers.IO) { loadPhoto(context, uri) }
-                if (loaded != null) photo = loaded.asImageBitmap()
-                else Toast.makeText(context, "Couldn't open that photo.", Toast.LENGTH_SHORT).show()
+                if (loaded != null) {
+                    photo = loaded.asImageBitmap()
+                } else {
+                    Toast.makeText(context, "Couldn't open that photo.", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

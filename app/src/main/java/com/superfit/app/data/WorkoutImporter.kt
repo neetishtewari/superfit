@@ -13,11 +13,11 @@ import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.superfit.app.domain.WorkoutMerge
+import java.time.Duration
+import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.time.Duration
-import java.time.Instant
 
 /**
  * Reads the workouts other apps share through Health Connect (sessions plus each one's distance,

@@ -4,14 +4,14 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.OpenFoodFactsClient
 import com.superfit.app.domain.FoodPhotoParser
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.PackagedFood
 import com.superfit.app.domain.ParsedNutritionResult
 import kotlinx.coroutines.CancellationException
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -39,15 +39,18 @@ class FoodCameraController : ViewModel() {
         private set
     var state by mutableStateOf<CameraState>(CameraState.Viewfinder)
         private set
+
     /** The photo being read, shown frozen behind the progress and the confirm sheet. Never saved. */
     var photo by mutableStateOf<Bitmap?>(null)
         private set
+
     /** A hint over the viewfinder, such as "snap the label instead". */
     var banner by mutableStateOf<String?>(null)
         private set
 
     // The scanner reports the same barcode many times a second; only the first one counts.
     private var scanLocked = false
+
     // After Retake the same packet is usually still in view. Ignore its code until the camera has
     // seen a few frames without it, or a few seconds have passed, so it isn't looked up again at once.
     private var ignoredCode: String? = null
@@ -84,8 +87,11 @@ class FoodCameraController : ViewModel() {
                         ?: CameraState.Failed("We couldn't read this label. Try a straight, close-up photo.")
                 } else {
                     val result = parser.parseMeal(bitmap)
-                    if (result.foodText == "invalid") CameraState.Failed("We couldn't see any food. Try again with more light.")
-                    else CameraState.MealResult(result)
+                    if (result.foodText == "invalid") {
+                        CameraState.Failed("We couldn't see any food. Try again with more light.")
+                    } else {
+                        CameraState.MealResult(result)
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e

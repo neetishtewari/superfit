@@ -40,10 +40,10 @@ import androidx.glance.unit.ColorProvider
 import com.superfit.app.MainActivity
 import com.superfit.app.R
 import com.superfit.app.data.getUserSharedPrefs
+import java.time.LocalDate
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import java.time.LocalDate
 
 /** Home-screen widget: calories left today, plus mic and camera buttons that open Superfit ready to log. */
 class SuperfitWidget : GlanceAppWidget() {

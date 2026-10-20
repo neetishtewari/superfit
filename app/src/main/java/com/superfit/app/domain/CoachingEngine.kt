@@ -6,12 +6,12 @@ import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
-import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import org.json.JSONObject
 
 /** What the coach card shows: one headline, one thing to do, and the numbers behind it. */
 data class CoachInsight(

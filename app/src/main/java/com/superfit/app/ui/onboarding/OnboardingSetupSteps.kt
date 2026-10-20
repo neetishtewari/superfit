@@ -1,62 +1,60 @@
 package com.superfit.app.ui.onboarding
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import android.view.View
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
-import android.Manifest
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import androidx.activity.result.contract.ActivityResultContracts
-
-import androidx.compose.ui.platform.LocalView
-import android.view.View
-
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
 import com.superfit.app.theme.*
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.platform.LocalClipboardManager
 
 // 4. Google Health Connect Sync Step (Step 3)
 @Composable
@@ -92,7 +90,7 @@ internal fun HealthConnectStep(
     ) {
         Text(text = "💚", fontSize = 42.sp)
         Text(text = "Health Connect Status", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ThemeTextPrimary)
-        
+
         val badgeColor = if (isHcSynced) NeonGreen else Color.Gray
         Box(
             modifier = Modifier
@@ -252,7 +250,7 @@ internal fun OnboardingSummaryStep(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(text = "Macronutrient Target Split", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ThemeTextSecondary)
-            
+
             MacroSplitRow(color = HyperViolet, label = "Protein", value = "${protein}g")
             MacroSplitRow(color = com.superfit.app.theme.ElectricCyan, label = "Carbohydrates", value = "${carbs}g")
             MacroSplitRow(color = NeonGreen, label = "Fat", value = "${fat}g")

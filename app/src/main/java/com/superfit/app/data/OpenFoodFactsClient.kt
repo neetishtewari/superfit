@@ -2,11 +2,11 @@ package com.superfit.app.data
 
 import com.superfit.app.domain.PackagedFood
 import com.superfit.app.domain.PackagedFoodParser
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Looks up a packet by its barcode in Open Food Facts. Only the barcode number is sent. */
 object OpenFoodFactsClient {

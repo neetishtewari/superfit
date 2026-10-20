@@ -134,14 +134,16 @@ object FoodQualityEngine {
             // Determine frequency and quality recommendation with fitness coach insight
             val (recommendation, colorType) = if (tags == null) {
                 Pair("Not rated yet — the AI rates new meals within a day", "YELLOW")
-            } else evaluateRecommendation(
-                score = baseScore,
-                weeklyFreq = weeklyFreq,
-                foodDaysCount = foodDistinctDays,
-                totalDistinctDays = totalDistinctDaysLogged,
-                isHighProtein = isHighProtein,
-                userGoal = userGoal
-            )
+            } else {
+                evaluateRecommendation(
+                    score = baseScore,
+                    weeklyFreq = weeklyFreq,
+                    foodDaysCount = foodDistinctDays,
+                    totalDistinctDays = totalDistinctDaysLogged,
+                    isHighProtein = isHighProtein,
+                    userGoal = userGoal
+                )
+            }
 
             // Objective rationale explaining why the food is good, ok, or bad
             val rationale = tagsByFood[foodName]?.firstNotNullOfOrNull { it.why }
@@ -296,11 +298,13 @@ object FoodQualityEngine {
 
     /** A plain reason from the AI's tags, for meals tagged before the AI wrote its own reason. */
     private fun describe(tags: MealTags): String = buildList {
-        add(when (tags.processing) {
-            1 -> "Whole food or home-style cooking"
-            2 -> "Somewhat processed"
-            else -> "Ultra-processed or fast food"
-        })
+        add(
+            when (tags.processing) {
+                1 -> "Whole food or home-style cooking"
+                2 -> "Somewhat processed"
+                else -> "Ultra-processed or fast food"
+            }
+        )
         if (tags.fried) add("fried")
         if (tags.hiddenOil) add("oily")
         if (tags.addedSugar) add("added sugar")

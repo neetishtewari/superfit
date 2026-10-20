@@ -56,7 +56,7 @@ fun RationaleScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
-    
+
     val colors = SuperfitTheme.colors
     val darkBg = colors.bgStart
     val cardBg = colors.cardBgTranslucent
@@ -64,7 +64,7 @@ fun RationaleScreen(
     val textSecondary = colors.textSecondary
     val textTertiary = colors.textTertiary
     val glassBorder = colors.glassBorder
-    
+
     val neonGreen = Color(0xFF10B981)
     val electricCyan = Color(0xFF06B6D4)
 
@@ -106,7 +106,6 @@ fun RationaleScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            
             // Branding/Header
             Box(
                 modifier = Modifier
@@ -225,7 +224,7 @@ fun RationaleScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
-            
+
             Text(
                 text = "Superfit complies with Google Play Health Connect developer policies. Your data is stored on your phone and backed up to your private Superfit account (Google Firebase). To create your coaching insights, a summary of your recent activity, sleep and meals is sent to Google's Gemini AI.",
                 fontSize = 11.sp,

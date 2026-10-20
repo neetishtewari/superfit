@@ -16,7 +16,8 @@ data class UserProfileEntity(
     val startingWeightKg: Double = 75.0,
     val targetWeightKg: Double = 70.0,
     val startDateTimestamp: Long = System.currentTimeMillis(),
-    val fitnessLevel: String = "INTERMEDIATE" // "BEGINNER", "INTERMEDIATE", "ADVANCED"
+    // "BEGINNER", "INTERMEDIATE", "ADVANCED"
+    val fitnessLevel: String = "INTERMEDIATE"
 )
 
 @Entity(tableName = "weight_entries")
@@ -60,7 +61,8 @@ data class SleepTelemetryEntity(
     @PrimaryKey val date: String, // format YYYY-MM-DD
     val sleepDurationSeconds: Long,
     val deepSleepDurationSeconds: Long,
-    val readinessScore: Int // 0-100% computed daily score
+    // 0-100% computed daily score
+    val readinessScore: Int
 )
 
 @Entity(tableName = "nutrition_entries")
@@ -88,7 +90,8 @@ data class WorkoutEntryEntity(
     val setsCount: Int,
     val repsCount: Int,
     val timestamp: Long, // epoch millis
-    val difficultyRating: String = "JUST_RIGHT" // "EASY", "JUST_RIGHT", "HARD"
+    // "EASY", "JUST_RIGHT", "HARD"
+    val difficultyRating: String = "JUST_RIGHT"
 )
 
 /**
@@ -118,4 +121,3 @@ data class PredictedFood(
     val fatG: Double,
     val score: Double
 )
-
