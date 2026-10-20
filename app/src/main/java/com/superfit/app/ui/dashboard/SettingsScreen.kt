@@ -2,12 +2,8 @@ package com.superfit.app.ui.dashboard
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import com.superfit.app.data.getUserSharedPrefs
-import com.superfit.app.data.ReminderNotifications
-import androidx.lifecycle.compose.LifecycleResumeEffect
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +17,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,10 +31,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.superfit.app.data.ReminderNotifications
+import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
 import com.superfit.app.widget.WidgetPin
 
@@ -52,7 +52,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val sharedPrefs = remember { getUserSharedPrefs(context) }
-    
+
     val dashboardState by viewModel.dashboardState.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
@@ -80,7 +80,6 @@ fun SettingsScreen(
         onPauseOrDispose { }
     }
 
-
     // Health Connect Permission Launcher
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
@@ -104,7 +103,6 @@ fun SettingsScreen(
             Toast.makeText(context, "Notifications are disabled. Grant permission in App Info settings to receive alerts.", Toast.LENGTH_LONG).show()
         }
     }
-
 
     Scaffold(
         topBar = {
@@ -204,10 +202,10 @@ fun SettingsScreen(
                     )
                     Text(
                         text = "Superfit's AI works without a key. If you add your own Google AI Studio key, " +
-                               "AI requests go straight to Google using your key instead.\n" +
-                               "• Your key is stored only on this phone and is never sent to Superfit.\n" +
-                               "• Leave this empty to use Superfit's built-in AI.\n" +
-                               "• Meal photos are sent to Google's Gemini AI to estimate nutrition and are not stored.",
+                            "AI requests go straight to Google using your key instead.\n" +
+                            "• Your key is stored only on this phone and is never sent to Superfit.\n" +
+                            "• Leave this empty to use Superfit's built-in AI.\n" +
+                            "• Meal photos are sent to Google's Gemini AI to estimate nutrition and are not stored.",
                         fontSize = 11.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )
@@ -248,8 +246,11 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
-                                    if (hasHealthConnectPermissions) NeonMint.copy(alpha = 0.15f)
-                                    else CoralRed.copy(alpha = 0.15f)
+                                    if (hasHealthConnectPermissions) {
+                                        NeonMint.copy(alpha = 0.15f)
+                                    } else {
+                                        CoralRed.copy(alpha = 0.15f)
+                                    }
                                 )
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
@@ -807,8 +808,11 @@ fun SettingsScreen(
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = if (widgetPlaced) "Already on your home screen. Tap to add another."
-                                    else "Calories left, plus mic and camera buttons to log in seconds.",
+                                text = if (widgetPlaced) {
+                                    "Already on your home screen. Tap to add another."
+                                } else {
+                                    "Calories left, plus mic and camera buttons to log in seconds."
+                                },
                                 fontSize = 11.sp,
                                 color = SuperfitTheme.colors.textSecondary
                             )

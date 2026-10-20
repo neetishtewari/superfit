@@ -32,7 +32,7 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFF7C3AED), // vibrant violet-600
     secondary = Color(0xFF0891B2), // vibrant cyan-600
-    tertiary = Color(0xFF059669),  // vibrant emerald-600
+    tertiary = Color(0xFF059669), // vibrant emerald-600
     background = LightBgStart,
     surface = LightCardBg,
     error = Color(0xFFDC2626),
@@ -63,7 +63,7 @@ fun SuperfitTheme(
     darkTheme: Boolean = false,
     // Keep dynamic color disabled to enforce our custom premium visual system
     dynamicColor: Boolean = false,
-    content: @Composable () -> Unit,
+    content: @Composable () -> Unit
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -82,4 +82,3 @@ fun SuperfitTheme(
         )
     }
 }
-

@@ -1,62 +1,60 @@
 package com.superfit.app.ui.onboarding
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import android.view.View
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
-import android.Manifest
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import androidx.activity.result.contract.ActivityResultContracts
-
-import androidx.compose.ui.platform.LocalView
-import android.view.View
-
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
 import com.superfit.app.theme.*
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.platform.LocalClipboardManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,16 +67,16 @@ fun OnboardingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isDarkTheme by ThemeConfig.isDarkTheme.collectAsState()
-    
+
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    
+
     // Wizard step state (0 to 4)
     var currentStep by remember { mutableIntStateOf(0) }
     var validationError by remember { mutableStateOf<String?>(null) }
     // Spoken guidance is opt-in: it starts off and the "Voice" chip turns it on.
     var voiceGuideEnabled by remember { mutableStateOf(false) }
-    
+
     // Tooltip / Cheat Sheet dialog states
     var showHeightHelper by remember { mutableStateOf(false) }
     var showTdeeHelper by remember { mutableStateOf(false) }
@@ -120,15 +118,15 @@ fun OnboardingScreen(
             currentTts.stop()
             return@LaunchedEffect
         }
-        
+
         currentTts.stop()
-        
+
         val voicePhrase = guidanceVoices[currentStep] ?: ""
         if (voicePhrase.isNotEmpty()) {
             if (currentStep == 0) {
                 val part1 = "Welcome to Superfit!"
                 val part2 = "It is the easiest way to track your fitness and get personalized, science-backed insights. Choose your appearance preference and tap Get Started to begin our journey!"
-                
+
                 speakUtterance(currentTts, part1)
                 while (currentTts.isSpeaking) {
                     kotlinx.coroutines.delay(100)
@@ -399,7 +397,7 @@ fun OnboardingScreen(
                             color = ThemeTextSecondary
                         )
                         HorizontalDivider(color = ThemeTextPrimary.copy(alpha = 0.05f))
-                        
+
                         val chart = listOf(
                             "5'0\" (5 ft 0 in)" to "152 cm",
                             "5'2\" (5 ft 2 in)" to "157 cm",
@@ -449,8 +447,8 @@ fun OnboardingScreen(
                 text = {
                     Text(
                         text = "Total Daily Energy Expenditure (TDEE) is the total calories your body burns in 24 hours. " +
-                               "It is calculated by multiplying your resting metabolic speed (BMR) with your physical baseline activity multiplier. " +
-                               "Superfit uses your TDEE as the starting energy budget from which we subtract/add calories to meet your targets.",
+                            "It is calculated by multiplying your resting metabolic speed (BMR) with your physical baseline activity multiplier. " +
+                            "Superfit uses your TDEE as the starting energy budget from which we subtract/add calories to meet your targets.",
                         fontSize = 13.sp,
                         color = ThemeTextSecondary,
                         lineHeight = 18.sp

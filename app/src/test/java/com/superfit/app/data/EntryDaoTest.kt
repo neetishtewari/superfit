@@ -38,7 +38,12 @@ class EntryDaoTest {
     }
 
     private fun meal(id: Long, text: String, timestamp: Long) = NutritionEntryEntity(
-        id = id, foodText = text, calories = 100.0, proteinG = 1.0, carbsG = 1.0, fatG = 1.0,
+        id = id,
+        foodText = text,
+        calories = 100.0,
+        proteinG = 1.0,
+        carbsG = 1.0,
+        fatG = 1.0,
         timestamp = timestamp
     )
 

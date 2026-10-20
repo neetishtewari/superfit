@@ -61,9 +61,9 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.ui.dashboard.NeonGreen
+import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
-import java.util.concurrent.Executors
 
 /**
  * Full-screen camera for logging food from a meal photo, a packet's barcode or its nutrition
@@ -128,8 +128,11 @@ fun FoodCameraScreen(
                 mode = controller.mode,
                 imageCapture = imageCapture,
                 onBarcode = { code ->
-                    if (code == null) controller.onNoBarcode()
-                    else if (controller.onBarcode(code)) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (code == null) {
+                        controller.onNoBarcode()
+                    } else if (controller.onBarcode(code)) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                 },
                 onUnavailable = cameraUnavailable
             )
@@ -315,23 +318,26 @@ private class BarcodeAnalyzer(
 /** Decodes and turns the photo upright off the main thread, then hands it over on the main thread. */
 private fun takePhoto(context: Context, imageCapture: ImageCapture, onPhoto: (Bitmap) -> Unit, onError: () -> Unit) {
     val main = ContextCompat.getMainExecutor(context)
-    imageCapture.takePicture(Dispatchers.Default.asExecutor(), object : ImageCapture.OnImageCapturedCallback() {
-        override fun onCaptureSuccess(image: ImageProxy) {
-            val bitmap = try {
-                image.toBitmap().rotated(image.imageInfo.rotationDegrees)
-            } catch (e: Exception) {
-                null
-            } finally {
-                image.close()
+    imageCapture.takePicture(
+        Dispatchers.Default.asExecutor(),
+        object : ImageCapture.OnImageCapturedCallback() {
+            override fun onCaptureSuccess(image: ImageProxy) {
+                val bitmap = try {
+                    image.toBitmap().rotated(image.imageInfo.rotationDegrees)
+                } catch (e: Exception) {
+                    null
+                } finally {
+                    image.close()
+                }
+                main.execute { if (bitmap != null) onPhoto(bitmap) else onError() }
             }
-            main.execute { if (bitmap != null) onPhoto(bitmap) else onError() }
-        }
 
-        override fun onError(exception: ImageCaptureException) {
-            android.util.Log.w("FoodCamera", "Photo capture failed", exception)
-            main.execute { onError() }
+            override fun onError(exception: ImageCaptureException) {
+                android.util.Log.w("FoodCamera", "Photo capture failed", exception)
+                main.execute { onError() }
+            }
         }
-    })
+    )
 }
 
 private fun Bitmap.rotated(degrees: Int): Bitmap {

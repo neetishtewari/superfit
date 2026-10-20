@@ -37,7 +37,7 @@ internal fun speakUtterance(tts: android.speech.tts.TextToSpeech, text: String) 
             val name = v.name.lowercase()
             listOf("iom", "iol", "tpd", "rjs", "gbb", "afh", "male", "guy", "david", "alex", "daniel").any { kw -> name.contains(kw) }
         } ?: nonFemaleVoices.firstOrNull { v -> v.locale.country.equals("US", ignoreCase = true) }
-        ?: nonFemaleVoices.firstOrNull()
+            ?: nonFemaleVoices.firstOrNull()
 
         if (selectedVoice != null) {
             try {

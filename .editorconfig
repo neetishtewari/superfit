@@ -1,0 +1,21 @@
+# Formatting rules for ktlint (scripts/ktlint.sh) and Android Studio.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+ktlint_code_style = android_studio
+# No hard line limit: long lines are wrapped by judgement, not by the formatter.
+max_line_length = off
+# Composable functions are named like classes (HomeScreen), which is the Compose convention.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# Wildcard imports can't be fixed automatically, and an expression body is a style choice.
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_function-expression-body = disabled
+# Leave how a function signature is wrapped to the author.
+ktlint_standard_function-signature = disabled

@@ -79,7 +79,7 @@ class OnboardingViewModel(
             _uiState.value = _uiState.value.copy(isAutofilling = true, error = null)
             val height = repository.healthConnectManager.readLatestHeight()
             val weight = repository.healthConnectManager.readLatestWeight()
-            
+
             if (height == null && weight == null) {
                 _uiState.value = _uiState.value.copy(
                     isAutofilling = false,

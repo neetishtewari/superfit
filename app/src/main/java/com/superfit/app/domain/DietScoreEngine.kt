@@ -106,7 +106,8 @@ object DietScoreEngine {
         if (complete.size >= CoachPatternEngine.MIN_COMPLETE_DAYS) {
             val hit = complete.count { it.proteinG >= target * 0.9 }
             return DietScorePart(
-                key = "protein", label = "Protein",
+                key = "protein",
+                label = "Protein",
                 points = scaled(hit.toDouble() / complete.size, 0.8, PROTEIN_POINTS),
                 maxPoints = PROTEIN_POINTS,
                 detail = "Hit your ${target.roundToInt()}g target on $hit of ${complete.size} fully logged days",
@@ -116,7 +117,8 @@ object DietScoreEngine {
         val perMeal = target / 3
         val good = mainMeals.count { meal -> meal.sumOf { it.first.proteinG } >= perMeal * 0.7 }
         return DietScorePart(
-            key = "protein", label = "Protein",
+            key = "protein",
+            label = "Protein",
             points = if (mainMeals.isEmpty()) 0 else scaled(good.toDouble() / mainMeals.size, 0.8, PROTEIN_POINTS),
             maxPoints = PROTEIN_POINTS,
             detail = "$good of ${mainMeals.size} meals had a good protein serving (about ${(perMeal * 0.7).roundToInt()}g or more)",
@@ -127,7 +129,8 @@ object DietScoreEngine {
     private fun vegPart(mainMeals: List<List<Pair<NutritionEntryEntity, MealTags>>>): DietScorePart {
         val withVeg = mainMeals.count { meal -> meal.sumOf { it.second.vegFruitServings } >= 0.5 }
         return DietScorePart(
-            key = "veg", label = "Vegetables & fruit",
+            key = "veg",
+            label = "Vegetables & fruit",
             points = if (mainMeals.isEmpty()) 0 else scaled(withVeg.toDouble() / mainMeals.size, 0.67, VEG_POINTS),
             maxPoints = VEG_POINTS,
             detail = "In $withVeg of ${mainMeals.size} main meals",
@@ -144,7 +147,8 @@ object DietScoreEngine {
         }
         val points = (WHOLE_POINTS * ((share - 0.35) / 0.40)).coerceIn(0.0, WHOLE_POINTS.toDouble()).roundToInt()
         return DietScorePart(
-            key = "whole", label = "Whole & home-cooked food",
+            key = "whole",
+            label = "Whole & home-cooked food",
             points = points,
             maxPoints = WHOLE_POINTS,
             detail = "${(share * 100).roundToInt()}% of your calories (aim for 75% or more)",
@@ -157,11 +161,15 @@ object DietScoreEngine {
         val allowance = CoachPatternEngine.WEEKLY_TREAT_ALLOWANCE
         val extra = (treatMeals - allowance).coerceAtLeast(0)
         return DietScorePart(
-            key = "treats", label = "Treats",
+            key = "treats",
+            label = "Treats",
             points = (TREAT_POINTS - extra * 5).coerceAtLeast(0),
             maxPoints = TREAT_POINTS,
-            detail = if (extra == 0) "$treatMeals treat meals, within the $allowance a week that fit your plan"
-            else "$treatMeals treat meals; $allowance a week fit your plan, the extra $extra cost ${extra * 5} points",
+            detail = if (extra == 0) {
+                "$treatMeals treat meals, within the $allowance a week that fit your plan"
+            } else {
+                "$treatMeals treat meals; $allowance a week fit your plan, the extra $extra cost ${extra * 5} points"
+            },
             tip = "Keep treats to $allowance a week, and save them for the meals you'll really enjoy."
         )
     }
@@ -170,7 +178,8 @@ object DietScoreEngine {
         val kcal = tagged.sumOf { it.first.calories }
         val perThousand = if (kcal > 0) tagged.sumOf { it.second.fiberG } / kcal * 1000 else 0.0
         return DietScorePart(
-            key = "fibre", label = "Fibre",
+            key = "fibre",
+            label = "Fibre",
             points = scaled(perThousand / 14.0, 1.0, FIBRE_POINTS),
             maxPoints = FIBRE_POINTS,
             detail = "About ${perThousand.roundToInt()}g per 1,000 kcal (aim for 14g)",

@@ -8,12 +8,11 @@ import com.google.ai.client.generativeai.type.generationConfig
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * All Gemini calls go through here.
@@ -67,12 +66,16 @@ object GeminiClient {
     enum class ErrorKind {
         /** Server overloaded / unavailable or timed out: wait and retry the same model. */
         BUSY,
+
         /** Rate limit or quota hit on this model: move on to the next model. */
         RATE_LIMITED,
+
         /** Model name not found or retired: move on to the next model. */
         MODEL_UNAVAILABLE,
+
         /** Bad key, bad request, blocked prompt: other models won't help, stop. */
         FATAL,
+
         /** Anything else: try the next model once. */
         OTHER
     }
@@ -95,7 +98,9 @@ object GeminiClient {
                 },
                 systemInstruction = if (systemInstructionText != null) {
                     content { text(systemInstructionText) }
-                } else null
+                } else {
+                    null
+                }
             )
         }
     }
@@ -125,7 +130,9 @@ object GeminiClient {
             },
             systemInstruction = if (systemInstructionText != null) {
                 com.google.firebase.ai.type.content { text(systemInstructionText) }
-            } else null
+            } else {
+                null
+            }
         )
 
     /**
@@ -165,10 +172,16 @@ object GeminiClient {
         return withFirebaseWording(apiKey) {
             runWithFailover { modelName ->
                 if (apiKey.isBlank()) {
-                    val input = com.google.firebase.ai.type.content { image(scaled); text(prompt) }
+                    val input = com.google.firebase.ai.type.content {
+                        image(scaled)
+                        text(prompt)
+                    }
                     getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(input).text
                 } else {
-                    val input = content { image(scaled); text(prompt) }
+                    val input = content {
+                        image(scaled)
+                        text(prompt)
+                    }
                     getOrCreateModel(modelName, apiKey, systemInstructionText, isJson).generateContent(input).text
                 }
             }
@@ -312,20 +325,28 @@ object GeminiClient {
 
         return when {
             types.contains("InvalidAPIKeyException") ||
-            types.contains("PromptBlockedException") ||
-            types.contains("UnsupportedUserLocationException") ||
-            types.contains("ServiceDisabledException") ||
-            has("App Check", "attestation") ||
-            has("API key not valid", "API_KEY_INVALID", "PERMISSION_DENIED", "INVALID_ARGUMENT") -> ErrorKind.FATAL
+                types.contains("PromptBlockedException") ||
+                types.contains("UnsupportedUserLocationException") ||
+                types.contains("ServiceDisabledException") ||
+                has("App Check", "attestation") ||
+                has("API key not valid", "API_KEY_INVALID", "PERMISSION_DENIED", "INVALID_ARGUMENT") -> ErrorKind.FATAL
 
             types.contains("QuotaExceededException") ||
-            has("429", "RESOURCE_EXHAUSTED", "quota", "rate limit") -> ErrorKind.RATE_LIMITED
+                has("429", "RESOURCE_EXHAUSTED", "quota", "rate limit") -> ErrorKind.RATE_LIMITED
 
             has("404", "NOT_FOUND", "is not found", "no longer available") -> ErrorKind.MODEL_UNAVAILABLE
 
             types.contains("RequestTimeoutException") ||
-            has("503", "UNAVAILABLE", "overloaded", "high demand", "try again later",
-                "INTERNAL", "timed out", "timeout") -> ErrorKind.BUSY
+                has(
+                    "503",
+                    "UNAVAILABLE",
+                    "overloaded",
+                    "high demand",
+                    "try again later",
+                    "INTERNAL",
+                    "timed out",
+                    "timeout"
+                ) -> ErrorKind.BUSY
 
             types.contains("ServerException") -> ErrorKind.BUSY
 
@@ -372,8 +393,8 @@ object GeminiClient {
             }
             else -> when {
                 msg.contains("network", ignoreCase = true) ||
-                msg.contains("connect", ignoreCase = true) ||
-                msg.contains("host", ignoreCase = true) -> "Connection problem. Please check your internet connection."
+                    msg.contains("connect", ignoreCase = true) ||
+                    msg.contains("host", ignoreCase = true) -> "Connection problem. Please check your internet connection."
                 else -> "AI service is temporarily busy. Please try again."
             }
         }

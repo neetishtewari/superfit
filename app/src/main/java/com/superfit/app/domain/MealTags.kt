@@ -1,8 +1,8 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import org.json.JSONObject
 import java.util.Locale
+import org.json.JSONObject
 
 /**
  * What kind of food a logged meal is, judged by the AI when the meal is logged. Diet Quality and
@@ -98,8 +98,11 @@ data class MealTags(
                 why = json.optString("why", "").trim().takeIf { it.isNotEmpty() && it != "null" },
                 swap = json.optJSONObject("swap")?.let { sw ->
                     val alternative = sw.optString("alternative", "").trim()
-                    if (alternative.isEmpty()) null
-                    else MealSwap(alternative, sw.optInt("kcalSaved", 0).coerceIn(0, 2000), sw.optString("benefit", "").trim())
+                    if (alternative.isEmpty()) {
+                        null
+                    } else {
+                        MealSwap(alternative, sw.optInt("kcalSaved", 0).coerceIn(0, 2000), sw.optString("benefit", "").trim())
+                    }
                 }
             )
         }
@@ -129,8 +132,14 @@ data class MealTags(
          * out where it matters, and the daily backfill tags them.
          */
         fun untagged(): MealTags = MealTags(
-            processing = 2, fried = false, addedSugar = false, vegFruitServings = 0.0, fiberG = 0.0,
-            treat = false, foodType = "", estimated = true
+            processing = 2,
+            fried = false,
+            addedSugar = false,
+            vegFruitServings = 0.0,
+            fiberG = 0.0,
+            treat = false,
+            foodType = "",
+            estimated = true
         )
 
         /** The AI's tags when the meal has them, otherwise [untagged]. */

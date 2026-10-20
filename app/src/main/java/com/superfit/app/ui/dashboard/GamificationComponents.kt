@@ -75,96 +75,96 @@ fun StreakHeaderCard(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-            if (streakState.graceDaysRemaining == 0 && streakState.currentStreak > 0) {
-                // Yesterday was missed: the grace day is holding the streak until a meal is logged today
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = CoralRed.copy(alpha = 0.15f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                if (streakState.graceDaysRemaining == 0 && streakState.currentStreak > 0) {
+                    // Yesterday was missed: the grace day is holding the streak until a meal is logged today
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = CoralRed.copy(alpha = 0.15f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = "Grace Active",
-                            tint = CoralRed,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Log today to keep it",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CoralRed,
-                            maxLines = 1
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = "Grace Active",
+                                tint = CoralRed,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Log today to keep it",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CoralRed,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                } else if (streakState.longestStreak > 1) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Best Streak",
+                                tint = ElectricCyan,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Best: ${streakState.longestStreak}d",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SuperfitTheme.colors.textPrimary,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                } else if (streakState.currentStreak > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = NeonMint.copy(alpha = 0.12f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Active",
+                                tint = NeonMint,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Active",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonMint,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
-            } else if (streakState.longestStreak > 1) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Best Streak",
-                            tint = ElectricCyan,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Best: ${streakState.longestStreak}d",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SuperfitTheme.colors.textPrimary,
-                            maxLines = 1
-                        )
-                    }
+                if (onShare != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share my day",
+                        tint = SuperfitTheme.colors.textSecondary,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onShare)
+                            .padding(7.dp)
+                    )
                 }
-            } else if (streakState.currentStreak > 0) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = NeonMint.copy(alpha = 0.12f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Active",
-                            tint = NeonMint,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Active",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NeonMint,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-            if (onShare != null) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = "Share my day",
-                    tint = SuperfitTheme.colors.textSecondary,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onShare)
-                        .padding(7.dp)
-                )
-            }
             }
         }
     }

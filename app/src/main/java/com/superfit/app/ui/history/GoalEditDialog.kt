@@ -56,7 +56,10 @@ fun GoalEditDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = startInput,
-                    onValueChange = { startInput = it; isError = false },
+                    onValueChange = {
+                        startInput = it
+                        isError = false
+                    },
                     label = { Text("Starting weight (kg)") },
                     singleLine = true,
                     isError = isError,
@@ -65,7 +68,10 @@ fun GoalEditDialog(
                 )
                 OutlinedTextField(
                     value = targetInput,
-                    onValueChange = { targetInput = it; isError = false },
+                    onValueChange = {
+                        targetInput = it
+                        isError = false
+                    },
                     label = { Text("Goal weight (kg)") },
                     singleLine = true,
                     isError = isError,

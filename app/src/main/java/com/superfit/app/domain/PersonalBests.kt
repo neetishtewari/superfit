@@ -34,11 +34,13 @@ data class BestCheck(
 object PersonalBests {
 
     const val MIN_PACE_RUN_KM = 5.0
+
     // A new best must beat the old one by this much, so a GPS wobble doesn't count.
     const val DISTANCE_MARGIN_KM = 0.1
     const val PACE_MARGIN_SECONDS = 1.0
     const val STREAK_MARGIN_DAYS = 1.0
     const val MIN_STREAK_DAYS = 7
+
     // Older workouts (late imports, details filled in later) update the starting point quietly.
     const val ANNOUNCE_WITHIN_MILLIS = 7L * 24 * 3600 * 1000
 
@@ -55,7 +57,9 @@ object PersonalBests {
         }
         val streak = if (longestStreak > 0) {
             PersonalBest(BestKind.LONGEST_STREAK, longestStreak.toDouble(), null, null, null)
-        } else null
+        } else {
+            null
+        }
         return bests + listOfNotNull(streak)
     }
 
@@ -106,8 +110,11 @@ object PersonalBests {
                     } else {
                         best.workout != null && best.workout.startTime >= now - ANNOUNCE_WITHIN_MILLIS
                     }
-                    if (fresh) announce += best.copy(previousValue = best.previousValue ?: old)
-                    else updated[best.kind] = best.value
+                    if (fresh) {
+                        announce += best.copy(previousValue = best.previousValue ?: old)
+                    } else {
+                        updated[best.kind] = best.value
+                    }
                 }
                 // A hidden workout no longer counts, so the starting point drops back.
                 isBetter(best.kind, old, best.value) -> updated[best.kind] = best.value

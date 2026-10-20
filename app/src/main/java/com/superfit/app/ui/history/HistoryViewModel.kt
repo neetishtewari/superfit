@@ -1,5 +1,6 @@
 package com.superfit.app.ui.history
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -7,16 +8,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
 import com.superfit.app.domain.PhysiologyEngine
-import kotlinx.coroutines.launch
-import android.content.Context
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class DayStatus {
     Deficit,
@@ -118,7 +118,6 @@ class HistoryViewModel(
     /** False until the user saves a goal weight; Journey asks for one instead of forecasting a made-up goal. */
     var goalSet by mutableStateOf(true)
         private set
-
 
     private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
     private var workoutsByDate: Map<LocalDate, List<WorkoutEntryEntity>> = emptyMap()

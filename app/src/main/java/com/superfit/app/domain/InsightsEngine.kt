@@ -144,9 +144,11 @@ object InsightsEngine {
             add(Insight("active", "Active ${s.activeDays} of 7 days", "$month of the last 28 days.", "you were active ${s.activeDays} of 7 days"))
         }
         paceChange(days, today)?.let { (now, faster) ->
-            if (faster >= 10) add(
-                Insight("pace", "Runs are getting faster", "Average pace ${pace(now)} /km, ${faster} s faster than the 4 weeks before.", "your runs are getting faster")
-            )
+            if (faster >= 10) {
+                add(
+                    Insight("pace", "Runs are getting faster", "Average pace ${pace(now)} /km, $faster s faster than the 4 weeks before.", "your runs are getting faster")
+                )
+            }
         }
         if (s.loggedDays >= 4 && s.proteinDaysHit >= s.loggedDays - 1) {
             add(Insight("protein", "Protein on target", "Hit on ${s.proteinDaysHit} of ${s.loggedDays} logged days.", "you hit protein on most days"))
@@ -173,15 +175,19 @@ object InsightsEngine {
         if (s.loggedDays < 3) {
             add(Insight("logging", "Only ${s.loggedDays} of 7 days fully logged", "Log at least two meals a day so these insights stay accurate.", "only ${s.loggedDays} days were fully logged"))
         }
-        if (loseGoal) weekendSplit(week)?.let { (weekendAvg, share) ->
-            if (weekendAvg >= 300 && share >= 0.3) add(
-                Insight(
-                    "weekend",
-                    "Weekends: ${kcal(weekendAvg)} kcal over target",
-                    "Saturday and Sunday undid ${(share.coerceAtMost(1.0) * 100).roundToInt()}% of the weekday deficit.",
-                    "weekend eating cancelled ${if (share >= 0.75) "most" else "much"} of the deficit"
-                )
-            )
+        if (loseGoal) {
+            weekendSplit(week)?.let { (weekendAvg, share) ->
+                if (weekendAvg >= 300 && share >= 0.3) {
+                    add(
+                        Insight(
+                            "weekend",
+                            "Weekends: ${kcal(weekendAvg)} kcal over target",
+                            "Saturday and Sunday undid ${(share.coerceAtMost(1.0) * 100).roundToInt()}% of the weekday deficit.",
+                            "weekend eating cancelled ${if (share >= 0.75) "most" else "much"} of the deficit"
+                        )
+                    )
+                }
+            }
         }
         underFuelled(week)?.let { add(it) }
         val earlier = (1..3).map { w -> stats(range(days, today.minusDays(7L * w + 7), today.minusDays(7L * w + 1))).workouts }

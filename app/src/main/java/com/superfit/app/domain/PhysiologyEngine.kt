@@ -43,7 +43,7 @@ object PhysiologyEngine {
 
         val targetSleepSeconds = 8.0 * 3600.0 // 8 hours
         val sleepRatio = (sleepDurationSeconds.toDouble() / targetSleepSeconds).coerceAtMost(1.0)
-        
+
         val deepSleepRatio = if (sleepDurationSeconds > 0) {
             deepSleepDurationSeconds.toDouble() / sleepDurationSeconds
         } else {

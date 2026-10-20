@@ -69,8 +69,10 @@ class MealTagsTest {
 
     @Test
     fun `the AI's reason, swap and hidden oil are read and saved`() {
-        val json = JSONObject("""{"foodText":"misal pav","calories":550,"processing":2,"fried":false,"addedSugar":false,"vegFruitServings":0.5,"fiber":9,"treat":false,"foodType":"misal pav",
-            "hiddenOil":true,"why":"Sprouts give protein and fibre, but the tarri is oily.","swap":{"alternative":"usal with 1 pav and onion","kcalSaved":150,"benefit":"Same taste, far less oil"}}""")
+        val json = JSONObject(
+            """{"foodText":"misal pav","calories":550,"processing":2,"fried":false,"addedSugar":false,"vegFruitServings":0.5,"fiber":9,"treat":false,"foodType":"misal pav",
+            "hiddenOil":true,"why":"Sprouts give protein and fibre, but the tarri is oily.","swap":{"alternative":"usal with 1 pav and onion","kcalSaved":150,"benefit":"Same taste, far less oil"}}"""
+        )
         val tags = MealTags.fromJson(json)!!
         assertTrue(tags.hiddenOil)
         assertTrue(tags.hasAdvice)

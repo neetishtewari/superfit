@@ -1,11 +1,11 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.ZoneId
 
 class FoodQualityEngineTest {
 
@@ -23,7 +23,13 @@ class FoodQualityEngineTest {
     )
 
     private fun food(text: String, kcal: Double, protein: Double, tags: MealTags?, timestamp: Long = now) = NutritionEntryEntity(
-        foodText = text, calories = kcal, proteinG = protein, carbsG = 0.0, fatG = 0.0, timestamp = timestamp, qualityTags = tags?.encode()
+        foodText = text,
+        calories = kcal,
+        proteinG = protein,
+        carbsG = 0.0,
+        fatG = 0.0,
+        timestamp = timestamp,
+        qualityTags = tags?.encode()
     )
 
     @Test
@@ -49,7 +55,8 @@ class FoodQualityEngineTest {
     @Test
     fun `a fast-food meal gets the AI's swap on day one but is not a habit yet`() {
         val result = FoodQualityEngine.analyzeDietQuality(
-            listOf(food("Cheeseburger", 650.0, 25.0, junkTags("burger", "grilled chicken wrap"))), zoneId = zoneId
+            listOf(food("Cheeseburger", 650.0, 25.0, junkTags("burger", "grilled chicken wrap"))),
+            zoneId = zoneId
         )
         val item = result.allRatedItems.single()
         assertEquals(2, item.cleanlinessScore)

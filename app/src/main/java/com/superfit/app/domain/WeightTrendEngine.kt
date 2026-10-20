@@ -32,7 +32,7 @@ object WeightTrendEngine {
     ): WeightGoalMetrics {
         val sorted = weightEntries.sortedByDescending { it.timestamp }
         val latestEntry = sorted.firstOrNull()
-        
+
         val startingWeight = if (profile.startingWeightKg > 0) profile.startingWeightKg else profile.weightKg
         val targetWeight = if (profile.targetWeightKg > 0) profile.targetWeightKg else profile.weightKg
         val currentWeight = latestEntry?.weightKg ?: profile.weightKg
@@ -42,11 +42,11 @@ object WeightTrendEngine {
         val progressPercentage = if (abs(startingWeight - targetWeight) > 0.01) {
             val totalDistance = abs(startingWeight - targetWeight)
             val completedDistance = abs(startingWeight - currentWeight)
-            
+
             // Verify directional progress
             val isLossGoal = targetWeight < startingWeight
             val movedInRightDirection = if (isLossGoal) currentWeight <= startingWeight else currentWeight >= startingWeight
-            
+
             if (movedInRightDirection) {
                 min(100, max(0, ((completedDistance / totalDistance) * 100).toInt()))
             } else {

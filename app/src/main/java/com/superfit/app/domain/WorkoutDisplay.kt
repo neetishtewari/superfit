@@ -77,7 +77,10 @@ object WorkoutDisplay {
     }
 
     private val FOOT_TYPES = setOf(
-        E.EXERCISE_TYPE_RUNNING, E.EXERCISE_TYPE_RUNNING_TREADMILL, E.EXERCISE_TYPE_WALKING, E.EXERCISE_TYPE_HIKING
+        E.EXERCISE_TYPE_RUNNING,
+        E.EXERCISE_TYPE_RUNNING_TREADMILL,
+        E.EXERCISE_TYPE_WALKING,
+        E.EXERCISE_TYPE_HIKING
     )
     private val WHEEL_TYPES = setOf(E.EXERCISE_TYPE_BIKING, E.EXERCISE_TYPE_BIKING_STATIONARY)
 
@@ -91,7 +94,10 @@ object WorkoutDisplay {
     /** "from your run", or "from your workouts" when the day had several. */
     fun boostSource(imported: List<WorkoutView>, voiceLoggedCount: Int): String {
         val withKcal = imported.filter { (it.exerciseKcal ?: 0.0) > 0 }
-        return if (withKcal.size == 1 && voiceLoggedCount == 0) "from your ${withKcal.first().noun}"
-        else "from your workouts"
+        return if (withKcal.size == 1 && voiceLoggedCount == 0) {
+            "from your ${withKcal.first().noun}"
+        } else {
+            "from your workouts"
+        }
     }
 }

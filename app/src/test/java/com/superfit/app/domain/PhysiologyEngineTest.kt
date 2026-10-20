@@ -107,7 +107,7 @@ class PhysiologyEngineTest {
         // Target Calories = TDEE + Calorie Offset = 2136.0
         // Default goal (lose weight) -> Protein = 80 * 1.6 = 128g
         // Active calories are ignored for macro target scaling
-        
+
         val tdee = PhysiologyEngine.calculateTdee(1780.0, 1.2, 500.0)
         assertEquals(2136.0, tdee, 0.01)
 
@@ -119,18 +119,23 @@ class PhysiologyEngineTest {
 
         assertEquals(2136.0, targets.calories, 0.01)
         assertEquals(128.0, targets.proteinG, 0.01)
-        
+
         // Fat target: 2136.0 * 0.25 / 9 = 59.33g
         assertEquals(59.33, targets.fatG, 0.01)
-        
+
         // Carbs target: (2136.0 - (128.0 * 4) - (59.33 * 9)) / 4 = (2136.0 - 512 - 534.0) / 4 = 272.5g
         assertEquals(272.50, targets.carbsG, 0.01)
     }
 
     // 80 kg, 180 cm, 30-year-old man: BMR 1,780. Chose "moderately active" (1.55) at sign-up.
     private val runner = UserProfileEntity(
-        age = 30, heightCm = 180.0, weightKg = 80.0, isMale = true,
-        activityMultiplier = 1.55, goal = "LOSE_WEIGHT", calorieOffset = -500
+        age = 30,
+        heightCm = 180.0,
+        weightKg = 80.0,
+        isMale = true,
+        activityMultiplier = 1.55,
+        goal = "LOSE_WEIGHT",
+        calorieOffset = -500
     )
 
     @Test

@@ -5,10 +5,10 @@ import android.content.SharedPreferences
 import com.google.firebase.auth.FirebaseAuth
 import com.superfit.app.widget.SuperfitWidget
 import com.superfit.app.widget.WidgetSnapshotStore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 fun getUserSharedPrefs(context: Context): SharedPreferences {
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
@@ -162,8 +162,6 @@ class DataRepository(
         return com.superfit.app.domain.FoodPredictor.predict(allEntries, currentHour)
     }
 
-
-
     fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> {
         val zoneId = ZoneId.systemDefault()
         val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
@@ -305,4 +303,3 @@ class DataRepository(
         firebaseSyncManager.uploadHabitEntry(updated)
     }
 }
-

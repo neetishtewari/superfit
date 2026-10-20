@@ -89,13 +89,18 @@ object GoalForecast {
         val milestones = milestones(startKg, targetKg, currentKg, sorted, dir)
 
         fun forecastFor(rate: Double?): LocalDate? =
-            if (rate == null || rate < MIN_RATE || toGo <= 0) null
-            else today.plusDays(ceil(toGo / rate * 7).roundToLong())
+            if (rate == null || rate < MIN_RATE || toGo <= 0) {
+                null
+            } else {
+                today.plusDays(ceil(toGo / rate * 7).roundToLong())
+            }
 
         val forecastDate = forecastFor(recent)
         val weeksLate = if (forecastDate != null && targetDate != null) {
             ceil(ChronoUnit.DAYS.between(targetDate, forecastDate) / 7.0).toInt()
-        } else null
+        } else {
+            null
+        }
         val slowed = recent != null && earlier != null && earlier >= MIN_RATE && recent <= earlier * 0.6
 
         val status = when {
@@ -115,22 +120,28 @@ object GoalForecast {
             else -> "At your current habits you'll reach $goal kg around ${forecastDate!!.format(dayMonth)}."
         }
         val explanation = buildList {
-            if (weeksLate != null && targetDate != null) add(
-                when {
-                    weeksLate > 0 -> "That's ${weeks(weeksLate)} later than your target date of ${targetDate.format(dayMonth)}."
-                    weeksLate < 0 -> "That's ${weeks(-weeksLate)} ahead of your target date of ${targetDate.format(dayMonth)}."
-                    else -> "Right on your target date of ${targetDate.format(dayMonth)}."
-                }
-            )
-            if (slowed) add("Your pace has slowed from ${rate(earlier!!)} to ${rate(recent!!.coerceAtLeast(0.0))} kg a week over the last month.")
-            else if (recent != null && status != ForecastStatus.REACHED && status != ForecastStatus.OFF_TRACK) {
+            if (weeksLate != null && targetDate != null) {
+                add(
+                    when {
+                        weeksLate > 0 -> "That's ${weeks(weeksLate)} later than your target date of ${targetDate.format(dayMonth)}."
+                        weeksLate < 0 -> "That's ${weeks(-weeksLate)} ahead of your target date of ${targetDate.format(dayMonth)}."
+                        else -> "Right on your target date of ${targetDate.format(dayMonth)}."
+                    }
+                )
+            }
+            if (slowed) {
+                add("Your pace has slowed from ${rate(earlier!!)} to ${rate(recent!!.coerceAtLeast(0.0))} kg a week over the last month.")
+            } else if (recent != null && status != ForecastStatus.REACHED && status != ForecastStatus.OFF_TRACK) {
                 add("You're ${if (dir < 0) "losing" else "gaining"} about ${rate(recent)} kg a week${if (fromWeighIns) "" else ", going by your logged meals"}.")
             }
             if (status == ForecastStatus.REACHED) add("Set your next goal, or switch to maintaining.")
         }.joinToString(" ")
 
-        val fixes = if (status == ForecastStatus.REACHED || status == ForecastStatus.NOT_ENOUGH_DATA) emptyList()
-        else fixes(month, prevMonth, dir < 0, recent ?: 0.0, forecastDate, ::forecastFor)
+        val fixes = if (status == ForecastStatus.REACHED || status == ForecastStatus.NOT_ENOUGH_DATA) {
+            emptyList()
+        } else {
+            fixes(month, prevMonth, dir < 0, recent ?: 0.0, forecastDate, ::forecastFor)
+        }
         val extraAll = fixExtras(month, prevMonth, dir < 0).sumOf { it.second }
         val allFixesDate = if (fixes.size >= 2) forecastFor((recent ?: 0.0) + extraAll / KCAL_PER_KG) else null
 
@@ -186,17 +197,19 @@ object GoalForecast {
     }
 
     private fun slowingReasons(month: List<DayTotals>, prev: List<DayTotals>, lose: Boolean): List<Insight> = buildList {
-        if (lose) InsightsEngine.weekendSplit(month)?.let { (weekendAvg, share) ->
-            if (weekendAvg >= 300 && share >= 0.3) {
-                val weekdayAvg = month.filter { it.logged && it.date.dayOfWeek.value <= 5 }.map { -it.net }.average()
-                add(
-                    Insight(
-                        "weekend",
-                        "Weekends undo ${if (share >= 0.75) "most" else "much"} of your weekday deficit",
-                        "You average ${InsightsEngine.kcal(weekdayAvg)} kcal under target Mon to Fri, but ${InsightsEngine.kcal(weekendAvg)} over on Sat and Sun.",
-                        "weekends"
+        if (lose) {
+            InsightsEngine.weekendSplit(month)?.let { (weekendAvg, share) ->
+                if (weekendAvg >= 300 && share >= 0.3) {
+                    val weekdayAvg = month.filter { it.logged && it.date.dayOfWeek.value <= 5 }.map { -it.net }.average()
+                    add(
+                        Insight(
+                            "weekend",
+                            "Weekends undo ${if (share >= 0.75) "most" else "much"} of your weekday deficit",
+                            "You average ${InsightsEngine.kcal(weekdayAvg)} kcal under target Mon to Fri, but ${InsightsEngine.kcal(weekendAvg)} over on Sat and Sun.",
+                            "weekends"
+                        )
                     )
-                )
+                }
             }
         }
         val now = month.sumOf { it.workouts.size } / 4.0
@@ -217,8 +230,10 @@ object GoalForecast {
 
     /** Each fix with the extra kcal a week it would save (or burn). */
     private fun fixExtras(month: List<DayTotals>, prev: List<DayTotals>, lose: Boolean): List<Pair<String, Double>> = buildList {
-        if (lose) InsightsEngine.weekendSplit(month)?.let { (weekendAvg, share) ->
-            if (weekendAvg > 300 && share >= 0.3) add("Keep weekends within 300 kcal of target" to 2 * (weekendAvg - 300))
+        if (lose) {
+            InsightsEngine.weekendSplit(month)?.let { (weekendAvg, share) ->
+                if (weekendAvg > 300 && share >= 0.3) add("Keep weekends within 300 kcal of target" to 2 * (weekendAvg - 300))
+            }
         }
         val nowCount = month.sumOf { it.workouts.size } / 4.0
         val beforeCount = prev.sumOf { it.workouts.size } / 4.0

@@ -232,4 +232,3 @@ interface HabitDao {
     @Query("SELECT * FROM habit_entries WHERE date = :date")
     suspend fun getHabitEntry(date: String): HabitEntryEntity?
 }
-

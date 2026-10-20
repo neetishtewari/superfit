@@ -5,25 +5,29 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
-import com.superfit.app.domain.NutritionParser
-import com.superfit.app.domain.WorkoutParser
-import com.superfit.app.domain.PhysiologyEngine
-import com.superfit.app.domain.MacroTargets
+import com.superfit.app.domain.BestKind
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.CoachingEngine
-import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.LogRouter
-import com.superfit.app.domain.RepeatMealCache
-import com.superfit.app.domain.BestKind
+import com.superfit.app.domain.MacroTargets
+import com.superfit.app.domain.MealTags
+import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.PersonalBests
+import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.RepeatMealCache
 import com.superfit.app.domain.StreakEngine
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
+import com.superfit.app.domain.WorkoutParser
 import com.superfit.app.domain.WorkoutView
+import com.superfit.app.widget.SuperfitWidget
+import com.superfit.app.widget.WidgetSnapshot
+import com.superfit.app.widget.WidgetSnapshotStore
+import java.time.LocalDate
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,10 +38,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.superfit.app.widget.SuperfitWidget
-import com.superfit.app.widget.WidgetSnapshot
-import com.superfit.app.widget.WidgetSnapshotStore
-import java.time.LocalDate
 
 class DashboardViewModel(
     private val repository: DataRepository,
@@ -47,6 +47,7 @@ class DashboardViewModel(
     val healthConnectManager = repository.healthConnectManager
 
     private val appContext = context.applicationContext
+
     // The day the dashboard's flows were built for; a ViewModel kept past midnight still shows that day.
     private val dashboardDate = LocalDate.now().toString()
     private val sharedPrefs = getUserSharedPrefs(context)
@@ -86,11 +87,11 @@ class DashboardViewModel(
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
 
-    private val _customMacroTrigger = MutableStateFlow(System.currentTimeMillis())
+    private val customMacroTrigger = MutableStateFlow(System.currentTimeMillis())
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && (key.startsWith("custom_") || key.startsWith(WorkoutImportPrefs.KEY_PREFIX))) {
-            _customMacroTrigger.value = System.currentTimeMillis()
+            customMacroTrigger.value = System.currentTimeMillis()
             // Also catches the switch being restored from the cloud backup.
             if (key.startsWith(WorkoutImportPrefs.KEY_PREFIX)) {
                 _workoutImportEnabled.value = repository.workoutImportPrefs.enabled
@@ -161,7 +162,6 @@ class DashboardViewModel(
         }
     }
 
-
     fun clearChat() {
         _chatMessages.value = listOf(
             ChatMessage(MessageSender.Coach, "Hi! I'm your Superfit AI Coach. Ask me anything about your metrics, meal logging, or workout plans!")
@@ -172,7 +172,7 @@ class DashboardViewModel(
         if (text.isBlank()) return
         val userMsg = ChatMessage(MessageSender.User, text)
         _chatMessages.value = _chatMessages.value + userMsg
-        
+
         val key = _apiKey.value
 
         val currentState = dashboardState.value
@@ -199,7 +199,7 @@ class DashboardViewModel(
                 } else {
                     "No sleep telemetry logged today."
                 }
-                
+
                 val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
                     "Protein: ${proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
                     "Carbs: ${carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
@@ -209,15 +209,17 @@ class DashboardViewModel(
                 val workoutsText = if (currentState.workoutList.isEmpty() && currentState.importedWorkouts.isEmpty()) {
                     "No workouts logged today."
                 } else {
-                    (currentState.workoutList.map {
-                        if (it.workoutType == "Strength") {
-                            "${it.description} (Strength, ${it.setsCount} sets x ${it.repsCount} reps, ~${it.caloriesBurned.toInt()} kcal)"
-                        } else {
-                            "${it.description} (Cardio, ~${it.caloriesBurned.toInt()} kcal)"
+                    (
+                        currentState.workoutList.map {
+                            if (it.workoutType == "Strength") {
+                                "${it.description} (Strength, ${it.setsCount} sets x ${it.repsCount} reps, ~${it.caloriesBurned.toInt()} kcal)"
+                            } else {
+                                "${it.description} (Cardio, ~${it.caloriesBurned.toInt()} kcal)"
+                            }
+                        } + currentState.importedWorkouts.map {
+                            ImportedWorkouts.coachEntry(it).let { e -> "${e.description}, ~${e.caloriesBurned.toInt()} exercise kcal" }
                         }
-                    } + currentState.importedWorkouts.map {
-                        ImportedWorkouts.coachEntry(it).let { e -> "${e.description}, ~${e.caloriesBurned.toInt()} exercise kcal" }
-                    }).joinToString()
+                        ).joinToString()
                 }
 
                 val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
@@ -432,7 +434,7 @@ class DashboardViewModel(
         repository.weightEntriesFlow,
         repository.streakStateFlow,
         repository.getHabitEntryFlow(LocalDate.now().toString()),
-        _customMacroTrigger,
+        customMacroTrigger,
         repository.allNutritionEntriesFlow,
         repository.getImportedWorkoutsForDay(LocalDate.now()),
         repository.importedWorkoutCountFlow
@@ -440,15 +442,20 @@ class DashboardViewModel(
         val profile = array[0] as? UserProfileEntity
         val activity = array[1] as? ActivityTelemetryEntity
         val sleep = array[2] as? SleepTelemetryEntity
+
         @Suppress("UNCHECKED_CAST")
         val nutrition = array[3] as? List<NutritionEntryEntity> ?: emptyList()
+
         @Suppress("UNCHECKED_CAST")
         val workouts = array[4] as? List<WorkoutEntryEntity> ?: emptyList()
+
         @Suppress("UNCHECKED_CAST")
         val weightEntries = array[5] as? List<WeightEntryEntity> ?: emptyList()
         val rawHabit = array[7] as? HabitEntryEntity
+
         @Suppress("UNCHECKED_CAST")
         val allNutritionHistory = array[9] as? List<NutritionEntryEntity> ?: emptyList()
+
         @Suppress("UNCHECKED_CAST")
         val importedRows = array[10] as? List<ImportedWorkoutEntity> ?: emptyList()
         val importedCount = array[11] as? Int ?: 0
@@ -466,7 +473,9 @@ class DashboardViewModel(
             val workoutPrefs = repository.workoutImportPrefs
             val importedWorkouts = if (workoutPrefs.enabled) {
                 ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
-            } else emptyList()
+            } else {
+                emptyList()
+            }
             val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
             // What the body burns today with all of today's workouts, for the coach's deficit sums.
             val tdee = dailyTarget.maintenance
@@ -590,13 +599,15 @@ class DashboardViewModel(
         repository.profileFlow,
         repository.allImportedWorkoutsFlow,
         repository.allNutritionEntriesFlow,
-        _customMacroTrigger
+        customMacroTrigger
     ) { profile, rows, meals, _ ->
         if (profile == null) return@combine BestsUiState()
         val prefs = repository.workoutImportPrefs
         val views = if (prefs.enabled && prefs.lastImportMillis > 0) {
             ImportedWorkouts.views(appContext, rows, prefs, PhysiologyEngine.calculateBmr(profile))
-        } else emptyList()
+        } else {
+            emptyList()
+        }
         val streak = StreakEngine.fromMealTimestamps(meals.map { it.timestamp })
         val bests = PersonalBests.compute(views, streak.longestStreak)
         val baseline = prefs.bestBaseline
@@ -715,12 +726,18 @@ class DashboardViewModel(
 
                 val (meal, workout) = coroutineScope {
                     val mealJob = async {
-                        if (routed.food.isBlank()) null
-                        else runCatching { NutritionParser(key).parseFoodInput(routed.food, history) }
+                        if (routed.food.isBlank()) {
+                            null
+                        } else {
+                            runCatching { NutritionParser(key).parseFoodInput(routed.food, history) }
+                        }
                     }
                     val workoutJob = async {
-                        if (routed.exercise.isBlank()) null
-                        else runCatching { WorkoutParser(key).parseWorkoutInput(routed.exercise) }
+                        if (routed.exercise.isBlank()) {
+                            null
+                        } else {
+                            runCatching { WorkoutParser(key).parseWorkoutInput(routed.exercise) }
+                        }
                     }
                     mealJob.await() to workoutJob.await()
                 }
@@ -750,8 +767,11 @@ class DashboardViewModel(
                     )
                     workoutResult != null -> ParsingState.Success(
                         workoutResult.workoutText,
-                        message = if (foodMissed) "Logged workout: ${workoutResult.workoutText} · Couldn't log the food. Try saying it again."
-                            else "Logged workout: ${workoutResult.workoutText}"
+                        message = if (foodMissed) {
+                            "Logged workout: ${workoutResult.workoutText} · Couldn't log the food. Try saying it again."
+                        } else {
+                            "Logged workout: ${workoutResult.workoutText}"
+                        }
                     )
                     else -> {
                         val failure = meal?.exceptionOrNull() ?: workout?.exceptionOrNull()
@@ -810,7 +830,7 @@ class DashboardViewModel(
                 val history = repository.getAllNutritionEntries()
                 val parser = NutritionParser(key)
                 val result = parser.parseFoodInput(input, history)
-                
+
                 if (result.foodText == "invalid") {
                     _parsingState.value = ParsingState.Error("Could not recognize any food items. Please try saying 'one apple and some greek yogurt'.")
                     return@launch
@@ -883,7 +903,7 @@ class DashboardViewModel(
             try {
                 val parser = WorkoutParser(key)
                 val result = parser.parseWorkoutInput(input)
-                
+
                 if (result.workoutText == "invalid") {
                     _workoutParsingState.value = ParsingState.Error("Could not recognize any exercises. Please try saying 'I ran 2 miles' or '3 sets of 10 pushups'.")
                     return@launch
@@ -972,6 +992,7 @@ private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try
 sealed interface ParsingState {
     object Idle : ParsingState
     object Loading : ParsingState
+
     /** [message] replaces the usual "Logged: …" banner, e.g. when a workout was logged too. */
     data class Success(val foodText: String, val message: String? = null) : ParsingState
     data class Error(val message: String) : ParsingState

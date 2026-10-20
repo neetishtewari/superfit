@@ -1,5 +1,8 @@
 package com.superfit.app
 
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,6 +19,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.GeminiKeyStore
 import com.superfit.app.data.HealthConnectManager
+import com.superfit.app.data.ReminderNotifications
+import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.auth.LoginViewModel
 import com.superfit.app.ui.dashboard.DashboardScreen
@@ -23,14 +28,9 @@ import com.superfit.app.ui.dashboard.DashboardViewModel
 import com.superfit.app.ui.dashboard.SettingsScreen
 import com.superfit.app.ui.history.HistoryScreen
 import com.superfit.app.ui.history.HistoryViewModel
-import android.content.Context
-import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.ui.onboarding.OnboardingScreen
 import com.superfit.app.ui.onboarding.OnboardingViewModel
 import kotlinx.coroutines.launch
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import com.superfit.app.data.ReminderNotifications
 
 @Composable
 fun MainNavigation(
@@ -121,7 +121,11 @@ fun MainNavigation(
                         backStack.removeLastOrNull()
                         backStack.add(Dashboard)
                     },
-                    onBack = if (backStack.size > 1) { { backStack.removeLastOrNull() } } else null
+                    onBack = if (backStack.size > 1) {
+                        { backStack.removeLastOrNull() }
+                    } else {
+                        null
+                    }
                 )
             }
             entry<Dashboard> {
