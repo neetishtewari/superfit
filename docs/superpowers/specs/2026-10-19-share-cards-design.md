@@ -3,11 +3,13 @@
 Date: 2026-10-19. Draft for Neetish's OK. Mock-ups (look approved 2026-10-19): https://claude.ai/artifact/4bhYzyEehfAy47APWyWe8f
 
 ## What the user gets
-Three kinds of picture to share, all Story size (tall, 9:16, made at 1080 x 1920), dark background, Superfit logo top left, "Tracked with Superfit · On Google Play" at the bottom.
+Three kinds of picture to share, all Story size (tall, 9:16, made at 1080 x 1920), dark background, the date (and time on workout cards) at the top, and a large Superfit badge (logo + name) with "Get it on Google Play" at the bottom. Updated 2026-10-20: the top and bottom strips are left clear (content starts 80 dp from the top and ends 96 dp from the bottom) because Instagram and WhatsApp cover them.
 
 1. **Daily card.** Date, "MY DAY", the meal streak, then four tiles: Protein (eaten vs goal, with a bar), Diet Quality (7-day score /100, with a bar), Steps, and the day's main workout. Under them, one coach line.
 2. **Activity card.** One workout: type and start time ("Morning run · 6:42 AM"), a big distance, then Time, Pace (or Speed for rides), Average heart rate and Calories burned (exercise calories, the same number the app shows).
 3. **Personal-best card.** "NEW PERSONAL BEST", which best it is, the big new number, and a strip with the previous best, its date and the gain ("+2.2 km").
+
+4. **Your own photo (workout and personal-best cards).** Added 2026-10-20. In the preview, "Add your photo" picks one picture from the gallery (Android's photo picker, no permission needed). The photo fills the card, with a dark fade at the bottom carrying the numbers and the Superfit badge. "Remove photo" goes back to the plain card. The photo stays in memory only: it is never saved by the app or uploaded. The daily card has no photo option.
 
 ## Where Share appears
 - **Home, daily card:** a small Share icon on the day summary at the top of Home.

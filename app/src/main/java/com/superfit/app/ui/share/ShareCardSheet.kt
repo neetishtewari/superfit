@@ -4,7 +4,14 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +30,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -30,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -44,7 +54,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -88,6 +100,17 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     val layer = rememberGraphicsLayer()
     var accent by remember(card) { mutableStateOf(defaultAccent(card)) }
     var busy by remember { mutableStateOf(false) }
+    // The user's photo lives only in memory while the sheet is open; it is never saved or uploaded.
+    var photo by remember(card) { mutableStateOf<ImageBitmap?>(null) }
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val loaded = withContext(Dispatchers.IO) { loadPhoto(context, uri) }
+                if (loaded != null) photo = loaded.asImageBitmap()
+                else Toast.makeText(context, "Couldn't open that photo.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -106,7 +129,25 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CapturableCard(card, accent, layer, Modifier.fillMaxWidth(0.7f))
+            CapturableCard(card, accent, photo, layer, Modifier.fillMaxWidth(0.7f))
+            if (card !is ShareCard.Daily) {
+                if (photo == null) {
+                    OutlinedButton(
+                        onClick = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add your photo")
+                    }
+                } else {
+                    OutlinedButton(onClick = { photo = null }, shape = RoundedCornerShape(12.dp)) {
+                        Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Remove photo")
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 CardAccents.forEachIndexed { i, color ->
                     val picked = color == accent
@@ -154,7 +195,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
  * picture is always 1080 x 1920 whatever the phone's screen.
  */
 @Composable
-private fun CapturableCard(card: ShareCard, accent: Color, layer: GraphicsLayer, modifier: Modifier) {
+private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, layer: GraphicsLayer, modifier: Modifier) {
     BoxWithConstraints(modifier) {
         val widthPx = constraints.maxWidth
         val scale = widthPx / CARD_WIDTH_PX.toFloat()
@@ -180,7 +221,7 @@ private fun CapturableCard(card: ShareCard, accent: Color, layer: GraphicsLayer,
                 }
         ) {
             CompositionLocalProvider(LocalDensity provides CardDensity) {
-                ShareCardView(card, accent)
+                ShareCardView(card, accent, photo = photo)
             }
         }
     }
@@ -205,4 +246,27 @@ private suspend fun shareImage(context: Context, bitmap: Bitmap) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(send, "Share"))
+}
+
+/**
+ * Reads a gallery photo at roughly card size (about 1080 x 1920), turned the right way up.
+ * Returns null if it can't be read.
+ */
+private fun loadPhoto(context: Context, uri: Uri): Bitmap? = try {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+            val shrink = maxOf(1, minOf(info.size.width / CARD_WIDTH_PX, info.size.height / CARD_HEIGHT_PX))
+            decoder.setTargetSize(info.size.width / shrink, info.size.height / shrink)
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    } else {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= CARD_WIDTH_PX && bounds.outHeight / (sample * 2) >= CARD_HEIGHT_PX) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }
+} catch (e: Exception) {
+    null
 }
