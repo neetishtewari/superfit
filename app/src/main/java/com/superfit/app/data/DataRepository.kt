@@ -135,9 +135,9 @@ class DataRepository(
         }
     }
 
-    suspend fun clearAllCloudData() {
-        firebaseSyncManager.clearAllCloudData()
-    }
+    suspend fun clearAllCloudData(): Boolean = firebaseSyncManager.clearAllCloudData()
+
+    suspend fun deleteAccount(): AccountDeletion = firebaseSyncManager.deleteAccount()
 
     val allNutritionEntriesFlow: Flow<List<NutritionEntryEntity>> = database.nutritionDao().getAllEntriesFlow()
 
