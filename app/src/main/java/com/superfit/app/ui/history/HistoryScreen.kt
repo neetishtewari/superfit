@@ -63,6 +63,7 @@ fun HistoryScreen(
 ) {
     val scrollState = rememberScrollState()
     var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 = Insights, 1 = Journey, 2 = Log
+    LaunchedEffect(selectedTab) { com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab]) }
     val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
     val bests = dashboardViewModel?.personalBests?.collectAsState()?.value
     var showWeighIn by remember { mutableStateOf(false) }

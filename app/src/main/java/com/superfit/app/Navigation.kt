@@ -16,6 +16,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.google.firebase.auth.FirebaseAuth
+import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.GeminiKeyStore
 import com.superfit.app.data.HealthConnectManager
@@ -130,6 +131,7 @@ fun MainNavigation(
             }
             entry<Dashboard> {
                 AskForNotificationPermissionOnce()
+                LaunchedEffect(Unit) { AppAnalytics.screenOpened("home") }
                 val dashboardViewModel: DashboardViewModel = viewModel {
                     DashboardViewModel(repository, context.applicationContext)
                 }
@@ -154,6 +156,7 @@ fun MainNavigation(
                 )
             }
             entry<Settings> {
+                LaunchedEffect(Unit) { AppAnalytics.screenOpened("settings") }
                 val dashboardViewModel: DashboardViewModel = viewModel {
                     DashboardViewModel(repository, context.applicationContext)
                 }

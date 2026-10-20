@@ -7,6 +7,7 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
   id("kotlin-kapt")
   alias(libs.plugins.google.services)
+  alias(libs.plugins.firebase.crashlytics)
 }
 
 val localProperties = Properties().apply {
@@ -55,6 +56,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // The dev app never sends crash reports, so there is no decoder to upload for it.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
         release {
             isMinifyEnabled = true
@@ -184,6 +189,8 @@ dependencies {
   implementation(libs.firebase.firestore)
   // Gemini through Firebase AI Logic (billed to Superfit's Firebase project), protected by App Check
   implementation(libs.firebase.ai)
+  implementation(libs.firebase.analytics)
+  implementation(libs.firebase.crashlytics)
   implementation(libs.firebase.appcheck.playintegrity)
   debugImplementation(libs.firebase.appcheck.debug)
 }

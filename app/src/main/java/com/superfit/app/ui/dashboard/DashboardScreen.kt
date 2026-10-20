@@ -291,6 +291,13 @@ fun DashboardScreen(
                     controller = foodCameraController,
                     apiKey = apiKey,
                     onLogged = { entry, isPackaged ->
+                        com.superfit.app.data.AppAnalytics.mealLogged(
+                            when (foodCameraController.mode) {
+                                com.superfit.app.ui.camera.CameraMode.BARCODE -> "barcode"
+                                com.superfit.app.ui.camera.CameraMode.LABEL -> "label"
+                                else -> "photo"
+                            }
+                        )
                         viewModel.addPhotoMeal(entry, isPackaged)
                         showFoodCamera = false
                     },

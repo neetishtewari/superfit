@@ -172,6 +172,13 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                         try {
                             val bitmap = layer.toImageBitmap().asAndroidBitmap()
                             shareImage(context, bitmap)
+                            com.superfit.app.data.AppAnalytics.cardShared(
+                                when (card) {
+                                    is ShareCard.Daily -> "day"
+                                    is ShareCard.Activity -> "activity"
+                                    is ShareCard.Best -> "best"
+                                }
+                            )
                             onShared()
                         } catch (e: Exception) {
                             Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
