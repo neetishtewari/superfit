@@ -25,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.superfit.app.theme.*
 import com.superfit.app.ui.dashboard.DashboardViewModel
 import com.superfit.app.ui.dashboard.DashboardUiState
-import com.superfit.app.ui.dashboard.GoalProgressCard
+import com.superfit.app.ui.dashboard.PersonalBestsList
+import com.superfit.app.ui.dashboard.WeighInDialog
 import com.superfit.app.ui.dashboard.FoodQualityCard
 import com.superfit.app.ui.dashboard.FoodSwapCard
 import java.time.LocalDate
@@ -60,8 +62,12 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
-    var selectedTab by remember { mutableStateOf(0) } // 0 = LOG HISTORY, 1 = PROGRESS & ANALYTICS
+    var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 = Insights, 1 = Journey, 2 = Log
     val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
+    val bests = dashboardViewModel?.personalBests?.collectAsState()?.value
+    var showWeighIn by remember { mutableStateOf(false) }
+    var showGoalEdit by remember { mutableStateOf(false) }
+    var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
 
     // Refresh data when navigating to this screen
     LaunchedEffect(Unit) {
@@ -104,7 +110,7 @@ fun HistoryScreen(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = if (selectedTab == 0) "HISTORY LEDGER" else "PROGRESS METRICS",
+                            text = "INSIGHTS",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 2.sp,
@@ -138,151 +144,158 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Segmented Control Tab Switcher
+                // Insights | Journey | Log
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
+                        .height(44.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(ThemeCardBgTranslucent)
                         .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
                         .padding(3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(if (selectedTab == 0) NeonMint else Color.Transparent)
-                            .clickable { selectedTab = 0 },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "LOG HISTORY",
-                            color = if (selectedTab == 0) Color.Black else ThemeTextSecondary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(if (selectedTab == 1) NeonMint else Color.Transparent)
-                            .clickable { selectedTab = 1 },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "PROGRESS",
-                            color = if (selectedTab == 1) Color.Black else ThemeTextSecondary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                    listOf("INSIGHTS", "JOURNEY", "LOG").forEachIndexed { index, label ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (selectedTab == index) NeonMint else Color.Transparent)
+                                .clickable { selectedTab = index },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selectedTab == index) Color.Black else ThemeTextSecondary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
 
-                if (selectedTab == 1 && dashboardState is DashboardUiState.Success) {
-                    val state = dashboardState as DashboardUiState.Success
-
-                    // Meal logging streaks
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TrendItem(
-                            label = "CURRENT STREAK",
-                            value = "${state.streakState.currentStreak} ${if (state.streakState.currentStreak == 1) "day" else "days"}",
-                            valueColor = CoralRed,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TrendItem(
-                            label = "LONGEST STREAK",
-                            value = "${state.streakState.longestStreak} ${if (state.streakState.longestStreak == 1) "day" else "days"}",
-                            valueColor = ElectricCyan,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    // Goal & Weight Tracker Card
-                    GoalProgressCard(
-                        metrics = state.weightMetrics,
-                        onLogWeight = { weight, note ->
-                            dashboardViewModel?.logWeight(weight, note)
-                        },
-                        onUpdateGoal = { start, target ->
-                            dashboardViewModel?.updateWeightGoal(start, target)
-                        }
-                    )
-
-                    // Food Quality Index Card
-                    FoodQualityCard(
-                        metrics = state.dietQualityMetrics
-                    )
-
-                    // Smart Food Swaps
-                    state.dietQualityMetrics.swapSuggestions.forEach { swap ->
-                        FoodSwapCard(
-                            swap = swap,
-                            onLogSwap = { foodText ->
-                                dashboardViewModel?.parseAndAddMeal(foodText)
+                when (selectedTab) {
+                    0 -> viewModel.weekReport?.let { report ->
+                        InsightsTab(
+                            report = report,
+                            onOpenJourney = { selectedTab = 1 },
+                            foodQuality = {
+                                if (dashboardState is DashboardUiState.Success) {
+                                    FoodQualityCard(metrics = dashboardState.dietQualityMetrics)
+                                    dashboardState.dietQualityMetrics.swapSuggestions.forEach { swap ->
+                                        FoodSwapCard(swap = swap, onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) })
+                                    }
+                                }
+                            },
+                            bests = {
+                                PersonalBestsList(bests = bests?.all.orEmpty(), onShare = { best ->
+                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = false, today = LocalDate.now())
+                                })
+                            },
+                            trends = {
+                                if (dashboardState is DashboardUiState.Success) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        TrendItem(
+                                            label = "CURRENT STREAK",
+                                            value = "${dashboardState.streakState.currentStreak} ${if (dashboardState.streakState.currentStreak == 1) "day" else "days"}",
+                                            valueColor = CoralRed,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        TrendItem(
+                                            label = "LONGEST STREAK",
+                                            value = "${dashboardState.streakState.longestStreak} ${if (dashboardState.streakState.longestStreak == 1) "day" else "days"}",
+                                            valueColor = ElectricCyan,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                                ConsistencyScoreGauge(
+                                    deficitScore = viewModel.consistencyScore,
+                                    deficitDays = viewModel.deficitDaysCount,
+                                    loggedDays = viewModel.loggedDaysCount,
+                                    trainingScore = viewModel.workoutConsistencyScore
+                                )
+                                viewModel.weeklyTrends?.let { trends -> WeeklyTrendsCard(trends = trends) }
                             }
                         )
                     }
-                } else {
-                    // 1. Consistency Score Gauge
-                    ConsistencyScoreGauge(
-                        deficitScore = viewModel.consistencyScore,
-                        deficitDays = viewModel.deficitDaysCount,
-                        loggedDays = viewModel.loggedDaysCount,
-                        trainingScore = viewModel.workoutConsistencyScore
-                    )
-                }
+                    1 -> viewModel.journey?.let { journey ->
+                        JourneyTab(
+                            j = journey,
+                            goalSet = viewModel.goalSet,
+                            onWeighIn = { showWeighIn = true },
+                            onEditGoal = { showGoalEdit = true }
+                        )
+                    }
+                    else -> {
+                        // Calorie Trend Chart for the week up to the chosen day
+                        val daysInMonth = viewModel.daysInMonth
+                        if (daysInMonth.isNotEmpty()) {
+                            val selectedDate = viewModel.selectedDate
+                            val chartDays = remember(daysInMonth, selectedDate) {
+                                val selectedIndex = daysInMonth.indexOfFirst { it.date == selectedDate }
+                                if (selectedIndex != -1) {
+                                    val start = (selectedIndex - 6).coerceAtLeast(0)
+                                    daysInMonth.subList(start, selectedIndex + 1)
+                                } else {
+                                    daysInMonth.takeLast(7)
+                                }
+                            }
+                            CalorieTrendChart(days = chartDays)
+                        }
 
-                // Calorie Trend Chart
-                val daysInMonth = viewModel.daysInMonth
-                if (daysInMonth.isNotEmpty()) {
-                    val selectedDate = viewModel.selectedDate
-                    val chartDays = remember(daysInMonth, selectedDate) {
-                        val selectedIndex = daysInMonth.indexOfFirst { it.date == selectedDate }
-                        if (selectedIndex != -1) {
-                            val start = (selectedIndex - 6).coerceAtLeast(0)
-                            daysInMonth.subList(start, selectedIndex + 1)
-                        } else {
-                            daysInMonth.takeLast(7)
+                        CalendarCard(
+                            currentMonthName = viewModel.currentMonth.month.getDisplayName(TextStyle.FULL, Locale.US) + " " + viewModel.currentMonth.year,
+                            daysInMonth = viewModel.daysInMonth,
+                            selectedDate = viewModel.selectedDate,
+                            onDateSelected = { viewModel.selectDate(it) },
+                            onPrevMonth = { viewModel.prevMonth() },
+                            onNextMonth = { viewModel.nextMonth() }
+                        )
+
+                        viewModel.selectedSummary?.let { summary ->
+                            DayBalanceCard(
+                                summary = summary,
+                                selectedDate = viewModel.selectedDate,
+                                viewModel = viewModel
+                            )
                         }
                     }
-                    CalorieTrendChart(days = chartDays)
-                }
-
-                // 1.5 Weekly Trends Card
-                viewModel.weeklyTrends?.let { trends ->
-                    WeeklyTrendsCard(trends = trends)
-                }
-
-                // 2. Calendar Card
-                CalendarCard(
-                    currentMonthName = viewModel.currentMonth.month.getDisplayName(TextStyle.FULL, Locale.US) + " " + viewModel.currentMonth.year,
-                    daysInMonth = viewModel.daysInMonth,
-                    selectedDate = viewModel.selectedDate,
-                    onDateSelected = { viewModel.selectDate(it) },
-                    onPrevMonth = { viewModel.prevMonth() },
-                    onNextMonth = { viewModel.nextMonth() }
-                )
-
-                // 3. Selected Day's Balance Card
-                viewModel.selectedSummary?.let { summary ->
-                    DayBalanceCard(
-                        summary = summary,
-                        selectedDate = viewModel.selectedDate,
-                        viewModel = viewModel
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
+        }
+        if (showWeighIn) {
+            WeighInDialog(
+                currentWeight = viewModel.journey?.currentKg ?: 70.0,
+                onDismiss = { showWeighIn = false },
+                onConfirm = { kg ->
+                    viewModel.logWeight(kg)
+                    showWeighIn = false
+                }
+            )
+        }
+        if (showGoalEdit) {
+            viewModel.journey?.let { j ->
+                GoalEditDialog(
+                    startingWeight = j.startKg,
+                    targetWeight = j.targetKg,
+                    targetDate = viewModel.goalTargetDate,
+                    onDismiss = { showGoalEdit = false },
+                    onConfirm = { start, target, date ->
+                        viewModel.updateGoal(start, target, date)
+                        showGoalEdit = false
+                    }
+                )
+            }
+        }
+        shareCard?.let { card ->
+            com.superfit.app.ui.share.ShareCardSheet(card = card, onDismiss = { shareCard = null })
         }
     }
 }

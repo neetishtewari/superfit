@@ -221,6 +221,7 @@ class DashboardViewModel(
                 }
 
                 val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
+                val vsUsualText = todayVsUsual(currentState, usualDay.value).chatLine()
 
                 val weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000
                 val weekWorkoutsText = repository.getImportedWorkoutViews(currentState.bmr)
@@ -242,6 +243,7 @@ class DashboardViewModel(
                     - Macro Targets: Protein: ${macroTargets.proteinG.toInt()}g, Carbs: ${macroTargets.carbsG.toInt()}g, Fat: ${macroTargets.fatG.toInt()}g, Calories: ${macroTargets.calories.toInt()} kcal
                     - Daily Nutrition: $nutritionText
                     - Daily Activity: $activityText
+                    - $vsUsualText
                     - Daily Workouts: $workoutsText
                     - Workouts from other apps, last 7 days: $weekWorkoutsText
                     - Daily Sleep: $sleepText
@@ -290,6 +292,17 @@ class DashboardViewModel(
             }
         }
     }
+
+    /** Today's steps and workouts next to the usual for this weekday. */
+    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?) =
+        com.superfit.app.domain.TodayVsUsual.of(
+            today = LocalDate.now(),
+            steps = state.activity.steps,
+            workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
+                com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
+            },
+            usual = usual
+        )
 
     private fun loadCachedCoachingInsight() {
         CoachInsightStore.loadForDay(sharedPrefs, LocalDate.now())?.let {
@@ -543,6 +556,32 @@ class DashboardViewModel(
     )
 
     /**
+     * The same weekday's usual activity over the last 4 weeks, for Home's "vs your usual" and the
+     * coach. Re-read whenever today's steps or the imported workouts change.
+     */
+    val usualDay: StateFlow<com.superfit.app.domain.UsualDay?> = combine(
+        repository.profileFlow,
+        repository.allImportedWorkoutsFlow,
+        repository.getActivityFlow(LocalDate.now().toString())
+    ) { profile, _, _ ->
+        if (profile == null) return@combine null
+        val imported = com.superfit.app.data.ImportedWorkouts.byDate(repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)))
+        val days = InsightsData.days(
+            nutrition = emptyList(),
+            voiceWorkouts = repository.getAllWorkoutEntries(),
+            activity = repository.getAllActivityTelemetry(),
+            imported = imported,
+            kcalTarget = { 0.0 },
+            proteinTargetG = 0.0
+        )
+        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now())
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+    /**
      * Personal bests from every imported workout and the meal streak, plus the one new best to
      * offer on Home. Workout bests wait for the first import to finish, so it sets the starting
      * points quietly.
@@ -623,6 +662,7 @@ class DashboardViewModel(
                     )
                 )
             }
+            GoalDatePref.markGoalSet(sharedPrefs)
         }
     }
 
