@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -64,8 +65,9 @@ fun LoginScreen(
     val secondaryColor = ElectricCyan
 
     val context = LocalContext.current
+    val resources = LocalResources.current
     val webClientId = try {
-        context.getString(com.superfit.app.R.string.default_web_client_id)
+        resources.getString(com.superfit.app.R.string.default_web_client_id)
     } catch (e: Exception) {
         null
     }
