@@ -40,6 +40,10 @@ jobs:
       - name: Android Lint
         run: ./gradlew --stacktrace lintDebug
 
+      - name: Print lint findings
+        if: failure()
+        run: cat app/build/reports/lint-results-debug.txt || true
+
       # Release builds use their own App Check provider (src/release), so compile that code too.
       - name: Compile release code
         run: ./gradlew --stacktrace compileReleaseKotlin

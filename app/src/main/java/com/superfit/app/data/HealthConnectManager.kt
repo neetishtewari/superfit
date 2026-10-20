@@ -88,7 +88,7 @@ class HealthConnectManager(private val context: Context) {
 
             // Find the sleep sessions that end on the given date (morning of localDate)
             val relevantSessions = response.records.filter { record ->
-                val recordEndDate = LocalDate.ofInstant(record.endTime, zoneId)
+                val recordEndDate = record.endTime.atZone(zoneId).toLocalDate()
                 recordEndDate == localDate
             }
 
@@ -97,9 +97,9 @@ class HealthConnectManager(private val context: Context) {
             } else {
                 val lastRecord = response.records.lastOrNull()
                 if (lastRecord != null) {
-                    val lastRecordEndDate = LocalDate.ofInstant(lastRecord.endTime, zoneId)
+                    val lastRecordEndDate = lastRecord.endTime.atZone(zoneId).toLocalDate()
                     response.records.filter { record ->
-                        LocalDate.ofInstant(record.endTime, zoneId) == lastRecordEndDate
+                        record.endTime.atZone(zoneId).toLocalDate() == lastRecordEndDate
                     }
                 } else {
                     emptyList()
