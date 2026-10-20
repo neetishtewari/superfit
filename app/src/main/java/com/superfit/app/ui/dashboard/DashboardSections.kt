@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
@@ -131,8 +132,8 @@ internal fun DashboardHeader(
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Default.DateRange,
-                    contentDescription = "History Ledger"
+                    imageVector = Icons.Default.Insights,
+                    contentDescription = "Insights"
                 )
             }
 
@@ -775,6 +776,7 @@ internal fun TrackMealsCard(
 @Composable
 internal fun ActivityPerformanceCard(
     state: DashboardUiState.Success,
+    vsUsual: com.superfit.app.domain.TodayVsUsual? = null,
     onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
     onHideImportedWorkout: (com.superfit.app.domain.WorkoutView) -> Unit = {},
     workoutImportEnabled: Boolean = false,
@@ -799,31 +801,63 @@ internal fun ActivityPerformanceCard(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column {
-            Text(
-                text = "Activity & Performance",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = ThemeTextPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            val distanceKm = state.activity.steps * 0.00075
-            Text(
-                text = String.format("Estimated Distance: %.2f km", distanceKm),
-                color = ElectricCyan,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        // Steps Progress
-        ActivityProgressBar(
-            label = "Steps",
-            current = state.activity.steps.toDouble(),
-            target = 10000.0,
-            color = ElectricCyan,
-            unit = "steps"
+        Text(
+            text = "Activity & Performance",
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = ThemeTextPrimary
         )
+
+        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(LocalDate.now(), state.activity.steps, emptyList(), null)
+        val usual = today.usual
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TodayTile(
+                    label = "Steps",
+                    value = String.format(java.util.Locale.US, "%,d", today.steps),
+                    usual = usual?.let { String.format(java.util.Locale.US, "%,d", it.steps) },
+                    ahead = usual != null && usual.steps > 0 && today.steps >= usual.steps,
+                    color = ElectricCyan,
+                    modifier = Modifier.weight(1f)
+                )
+                TodayTile(
+                    label = "Distance (est.)",
+                    value = String.format(java.util.Locale.US, "%.1f km", today.distanceKm),
+                    usual = usual?.let { String.format(java.util.Locale.US, "%.1f km", it.distanceKm) },
+                    ahead = usual != null && usual.distanceKm > 0 && today.distanceKm >= usual.distanceKm,
+                    color = ElectricCyan,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TodayTile(
+                    label = "Move time",
+                    value = "${today.moveMinutes} min",
+                    usual = usual?.let { "${it.moveMinutes} min" },
+                    ahead = usual != null && usual.moveMinutes > 0 && today.moveMinutes >= usual.moveMinutes,
+                    color = NeonMint,
+                    modifier = Modifier.weight(1f)
+                )
+                TodayTile(
+                    label = "Burned in workouts",
+                    value = "${today.workoutKcal.toInt()} kcal",
+                    usual = usual?.let { "${it.workoutKcal.toInt()} kcal" },
+                    ahead = usual != null && usual.workoutKcal > 0 && today.workoutKcal >= usual.workoutKcal,
+                    color = EnergeticCoral,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            today.coachLine(java.time.LocalTime.now().hour)?.let { line ->
+                Text(text = line, fontSize = 13.sp, color = ThemeTextPrimary, lineHeight = 18.sp)
+            }
+            if (usual == null) {
+                Text(
+                    text = "A couple more weeks of data and Superfit will compare each day with your usual for that weekday.",
+                    fontSize = 11.sp,
+                    color = ThemeTextSecondary
+                )
+            }
+        }
 
         if (workoutImportEnabled) {
             Text(
@@ -1068,6 +1102,27 @@ private fun AnnotatedString.Builder.appendBold(text: String) {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
         } else {
             append(part)
+        }
+    }
+}
+
+/** One of Home's activity numbers, with this weekday's usual underneath. */
+@Composable
+private fun TodayTile(label: String, value: String, usual: String?, ahead: Boolean, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.04f))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(text = label, fontSize = 11.sp, color = ThemeTextSecondary)
+        Text(text = value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color)
+        if (usual != null) {
+            Text(
+                text = if (ahead) "Above your usual $usual" else "Usual $usual",
+                fontSize = 11.sp,
+                color = if (ahead) NeonMint else ThemeTextSecondary
+            )
         }
     }
 }

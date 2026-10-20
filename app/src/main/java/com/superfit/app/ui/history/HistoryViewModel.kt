@@ -16,6 +16,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
+import kotlin.math.abs
 
 enum class DayStatus {
     Deficit,
@@ -101,6 +102,21 @@ class HistoryViewModel(
         private set
 
     var predictedFoods by mutableStateOf<List<PredictedFood>>(emptyList())
+        private set
+
+    /** The Insights view: last 7 full days, what's working and what to watch. */
+    var weekReport by mutableStateOf<com.superfit.app.domain.WeekReport?>(null)
+        private set
+
+    /** The Journey view: goal covered and the forecast at current habits. */
+    var journey by mutableStateOf<com.superfit.app.domain.JourneyForecast?>(null)
+        private set
+
+    var goalTargetDate by mutableStateOf<LocalDate?>(null)
+        private set
+
+    /** False until the user saves a goal weight; Journey asks for one instead of forecasting a made-up goal. */
+    var goalSet by mutableStateOf(true)
         private set
 
 
@@ -326,7 +342,45 @@ class HistoryViewModel(
 
             predictedFoods = repository.getPredictedFoods()
 
+            val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
+            val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
+            val loseGoal = profile.targetWeightKg < profile.startingWeightKg
+            weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal)
+            goalTargetDate = GoalDatePref.get(sharedPrefs)
+            val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
+            goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
+            journey = com.superfit.app.domain.GoalForecast.compute(
+                startKg = profile.startingWeightKg,
+                targetKg = profile.targetWeightKg,
+                startDate = Instant.ofEpochMilli(profile.startDateTimestamp).atZone(ZoneId.systemDefault()).toLocalDate(),
+                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()),
+                days = dayTotals,
+                calorieOffset = profile.calorieOffset,
+                targetDate = goalTargetDate,
+                today = today,
+                fallbackCurrentKg = profile.weightKg
+            )
+
             updateSelectedSummary()
+        }
+    }
+
+    fun logWeight(weightKg: Double) {
+        viewModelScope.launch {
+            repository.addWeightEntry(weightKg)
+            loadData()
+        }
+    }
+
+    /** Start weight, goal weight and the optional date to reach it by. */
+    fun updateGoal(startingWeightKg: Double, targetWeightKg: Double, targetDate: LocalDate?) {
+        viewModelScope.launch {
+            repository.getProfile()?.let {
+                repository.saveProfile(it.copy(startingWeightKg = startingWeightKg, targetWeightKg = targetWeightKg))
+            }
+            GoalDatePref.set(sharedPrefs, targetDate)
+            GoalDatePref.markGoalSet(sharedPrefs)
+            loadData()
         }
     }
 

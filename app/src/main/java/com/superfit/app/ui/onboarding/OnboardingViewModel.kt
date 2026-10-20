@@ -116,6 +116,9 @@ class OnboardingViewModel(
 
         viewModelScope.launch {
             try {
+                // Keep a goal the user already set; a new profile starts from today's weight until
+                // they set a goal weight in Insights > Journey (it used to default to 75 -> 70 kg).
+                val existing = repository.getProfile()
                 val profile = UserProfileEntity(
                     id = 0,
                     age = ageInt,
@@ -124,7 +127,10 @@ class OnboardingViewModel(
                     isMale = state.isMale,
                     activityMultiplier = state.activityMultiplier,
                     goal = state.goal,
-                    calorieOffset = state.calorieOffset
+                    calorieOffset = state.calorieOffset,
+                    startingWeightKg = existing?.startingWeightKg ?: weightDouble,
+                    targetWeightKg = existing?.targetWeightKg ?: weightDouble,
+                    startDateTimestamp = existing?.startDateTimestamp ?: System.currentTimeMillis()
                 )
                 repository.saveProfile(profile)
                 onSuccess()
