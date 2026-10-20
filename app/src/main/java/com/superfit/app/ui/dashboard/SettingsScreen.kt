@@ -875,6 +875,47 @@ fun SettingsScreen(
                 }
             }
 
+            // Anonymous usage and crash reports (see AppAnalytics)
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        1.dp,
+                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
+                        RoundedCornerShape(20.dp)
+                    )
+            ) {
+                var usageReports by remember { mutableStateOf(com.superfit.app.data.AppAnalytics.isEnabled(context)) }
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Share anonymous usage and crash reports",
+                            fontWeight = FontWeight.Bold,
+                            color = SuperfitTheme.colors.textPrimary,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Helps fix crashes and see which features people use. Never includes what you eat, your weight, health data, photos, or your name or email.",
+                            fontSize = 11.sp,
+                            color = SuperfitTheme.colors.textSecondary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = usageReports,
+                        onCheckedChange = { enabled ->
+                            usageReports = enabled
+                            com.superfit.app.data.AppAnalytics.setEnabled(context, enabled)
+                        }
+                    )
+                }
+            }
+
             // SECTION 6: Account Actions
             Card(
                 shape = RoundedCornerShape(20.dp),

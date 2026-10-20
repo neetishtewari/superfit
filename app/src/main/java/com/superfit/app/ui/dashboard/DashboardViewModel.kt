@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
+import com.superfit.app.data.AppAnalytics
 import com.superfit.app.domain.BestKind
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
@@ -171,6 +172,7 @@ class DashboardViewModel(
     fun sendChatMessage(text: String) {
         if (text.isBlank()) return
         val userMsg = ChatMessage(MessageSender.User, text)
+        AppAnalytics.coachMessageSent()
         _chatMessages.value = _chatMessages.value + userMsg
 
         val key = _apiKey.value
@@ -348,6 +350,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             repository.setWorkoutImportEnabled(enabled)
             _workoutImportEnabled.value = enabled
+            if (enabled) AppAnalytics.workoutsConnected()
         }
     }
 
@@ -659,6 +662,7 @@ class DashboardViewModel(
     fun logWeight(weightKg: Double, note: String = "") {
         viewModelScope.launch {
             repository.addWeightEntry(weightKg, note)
+            AppAnalytics.weighIn()
         }
     }
 
@@ -674,6 +678,7 @@ class DashboardViewModel(
                 )
             }
             GoalDatePref.markGoalSet(sharedPrefs)
+            AppAnalytics.goalSet(withDate = false)
         }
     }
 
@@ -801,6 +806,7 @@ class DashboardViewModel(
                 items = result.items?.encode()
             )
         )
+        AppAnalytics.mealLogged(if (lastInputWasSpoken) "voice" else "typed")
         loadFrequentMeals()
     }
 
@@ -816,6 +822,7 @@ class DashboardViewModel(
                 difficultyRating = difficultyRating
             )
         )
+        AppAnalytics.workoutLogged()
         offerDuplicateCheck(id, result.workoutText, result.workoutType)
     }
 
@@ -881,6 +888,7 @@ class DashboardViewModel(
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
+            AppAnalytics.mealEdited()
         }
     }
 

@@ -85,6 +85,11 @@ private fun snapshotChanges(context: Context): Flow<WidgetSnapshot?> = callbackF
 
 class SuperfitWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = SuperfitWidget()
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        com.superfit.app.data.AppAnalytics.widgetAdded()
+    }
 }
 
 private val TextPrimary = ColorProvider(Color.White)

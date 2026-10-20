@@ -65,7 +65,7 @@
 <body>
     <div class="container">
         <h1>Privacy Policy</h1>
-        <p><strong>Last Updated: June 5, 2026</strong></p>
+        <p><strong>Last Updated: October 20, 2026</strong></p>
         <p>Superfit is built to empower users with personalized physiological feedback. We are committed to protecting your privacy. This policy describes how Superfit handles data, specifically relating to local execution, Google Health Connect integration, and Gemini AI queries.</p>
 
         <h2>1. Data Collection & Usage</h2>
@@ -73,13 +73,13 @@
         <ul>
             <li><strong>Height & Weight:</strong> Used to compute your Basal Metabolic Rate (BMR) using scientific formulas.</li>
             <li><strong>Steps & Activity:</strong> Used to estimate daily active metabolic rate increments, shifting recovery macronutrient targets reactively.</li>
-            <li><strong>Sleep Telemetry:</strong> Duration and quality of sleep are used to shape your daily Recovery Score, dynamically adapting protein and carbohydrate ratios.</li>
+            <li><strong>Sleep Telemetry:</strong> Duration and quality of sleep are used to show your daily Readiness Score.</li>
             <li><strong>Active Calories:</strong> Used to record completed exercises and calculate daily energy balances.</li>
         </ul>
 
         <h2>2. Local Storage & Processing</h2>
         <p class="highlight">All data processed by Superfit is stored locally on your device.</p>
-        <p>Superfit runs all calculation logic locally using an on-device SQLite database (Room). Your raw biometric data, steps record, sleep tracking, and calorie ledger are stored on your device and are not uploaded to any remote server or third-party service, with the exception of your own personal Firebase sync if configured.</p>
+        <p>Superfit runs all calculation logic locally using an on-device SQLite database (Room). Your raw biometric data, steps record, sleep tracking, and calorie ledger are stored on your device and are not uploaded to any remote server or third-party service. The exception is your backup: when you sign in, your logs (meals, workouts, weigh-ins) and daily summaries (steps, sleep) are backed up to your own Superfit account in Google Firebase, so you can restore them on a new phone.</p>
 
         <h2>3. Google Health Connect Policy Compliance</h2>
         <p>Superfit strictly complies with the <span class="highlight">Google Play Health Connect Developer Policies</span>, including the Additional Requirements:</p>
@@ -93,10 +93,13 @@
         <p>To turn spoken or typed meal and workout logs into calories and nutrients, Superfit sends what you said or typed to Google's Gemini AI, through Google Firebase AI Logic. If you add your own Gemini API key in Settings, requests go directly to Google using that key instead; the key is stored only on your device.</p>
         <p><strong>Photos and barcodes.</strong> If you log food with the camera, the photo of your meal or of a nutrition label is sent to Google's Gemini AI to estimate nutrition. Photos are held in memory only while they are read and are never saved on your device or by Superfit. When you scan a barcode, only the barcode number is sent to Open Food Facts (openfoodfacts.org), a free public food database, to look up the product's nutrition.</p>
 
-        <h2>5. Your Rights & Data Portability</h2>
+        <h2>5. Usage and Crash Reports</h2>
+        <p>To improve Superfit, the app sends anonymous usage statistics (for example, which screens are opened and how meals are logged, such as by voice or photo) and crash reports to Google Firebase (Google Analytics for Firebase and Firebase Crashlytics). These never include what you eat, your weight, your health or fitness data, photos, or your name or email, and they do not use your advertising ID. You can turn this off at any time in Settings under "Share anonymous usage and crash reports".</p>
+
+        <h2>6. Your Rights & Data Portability</h2>
         <p>Because all data resides in the local database of your device, you have complete ownership of it. If you choose to clear the app storage or uninstall the application, all stored logs are permanently deleted from your device.</p>
 
-        <h2>6. Changes to this Policy</h2>
+        <h2>7. Changes to this Policy</h2>
         <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
 
         <div class="footer">

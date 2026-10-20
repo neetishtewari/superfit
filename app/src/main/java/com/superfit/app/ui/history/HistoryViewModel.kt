@@ -367,6 +367,7 @@ class HistoryViewModel(
     fun logWeight(weightKg: Double) {
         viewModelScope.launch {
             repository.addWeightEntry(weightKg)
+            com.superfit.app.data.AppAnalytics.weighIn()
             loadData()
         }
     }
@@ -379,6 +380,7 @@ class HistoryViewModel(
             }
             GoalDatePref.set(sharedPrefs, targetDate)
             GoalDatePref.markGoalSet(sharedPrefs)
+            com.superfit.app.data.AppAnalytics.goalSet(withDate = targetDate != null)
             loadData()
         }
     }
@@ -391,6 +393,7 @@ class HistoryViewModel(
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
+            com.superfit.app.data.AppAnalytics.mealEdited()
             loadData()
         }
     }
@@ -449,6 +452,7 @@ class HistoryViewModel(
                     items = result.items?.encode()
                 )
                 repository.addNutritionEntry(entry)
+                com.superfit.app.data.AppAnalytics.mealLogged("typed")
                 loadData()
                 _parsingState.value = HistoryParsingState.Success(result.foodText)
             } catch (e: Exception) {
