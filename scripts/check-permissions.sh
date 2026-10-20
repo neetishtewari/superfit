@@ -18,7 +18,8 @@ if [ -z "$manifest" ]; then
 fi
 
 actual=$(grep -oE '<uses-permission(-sdk-23)? [^>]*android:name="[^"]+"' "$manifest" \
-    | sed -E 's/.*android:name="([^"]+)"/\1/' | sort -u)
+    | sed -E 's/.*android:name="([^"]+)"/\1/' \
+    | sed -E 's/^com\.superfit\.aifitness(\.debug)?\./APP./' | sort -u)
 expected=$(grep -vE '^\s*(#|$)' app/permissions.txt | sort -u)
 
 added=$(comm -13 <(echo "$expected") <(echo "$actual"))

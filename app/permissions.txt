@@ -1,6 +1,7 @@
 # Every permission the app requests, including ones added by libraries.
 # scripts/check-permissions.sh (run in CI) fails when the built app's list differs from this one.
 # A new permission is shown to users and needs the Play Data safety form checked before release.
+# APP. stands for the app's own package (com.superfit.aifitness, or .debug for the dev app).
 android.permission.ACCESS_NETWORK_STATE
 android.permission.CAMERA
 android.permission.INTERNET
@@ -16,3 +17,9 @@ android.permission.health.READ_SLEEP
 android.permission.health.READ_STEPS
 android.permission.health.READ_TOTAL_CALORIES_BURNED
 android.permission.health.READ_WEIGHT
+# Added by libraries: WorkManager (reminders, widget, sync), Firebase, AndroidX
+android.permission.FOREGROUND_SERVICE
+android.permission.RECEIVE_BOOT_COMPLETED
+android.permission.WAKE_LOCK
+com.google.android.providers.gsf.permission.READ_GSERVICES
+APP.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
