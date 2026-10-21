@@ -64,6 +64,7 @@ internal fun HealthConnectStep(
     requestPermissionsLauncher: androidx.activity.result.ActivityResultLauncher<Set<String>>,
     onNext: () -> Unit
 ) {
+    val context = LocalContext.current
     val isHcSynced = uiState.hasHealthConnectPermissions
     Text(
         text = "Google Health Sync",
@@ -127,7 +128,7 @@ internal fun HealthConnectStep(
                 if (isHcSynced) {
                     onNext()
                 } else {
-                    requestPermissionsLauncher.launch(healthConnectManager.permissions)
+                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, healthConnectManager.permissions)
                 }
             },
             modifier = Modifier
