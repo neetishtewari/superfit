@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
+import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.WorkoutEntryEntity
@@ -73,15 +74,25 @@ class SpeechRecognizerHelper(
     private val context: Context,
     private val onResult: (String) -> Unit,
     private val onError: (String) -> Unit,
-    private val onListeningStateChange: (Boolean) -> Unit
+    private val onListeningStateChange: (Boolean) -> Unit,
+    /**
+     * Called when the in-app recognizer can't run on this phone (no speech service, or the
+     * phone's own service refuses to connect, seen on some OPPO/OnePlus builds). The screen
+     * then opens the phone's standard voice-typing dialog instead.
+     */
+    private val onNeedsSystemDialog: () -> Unit = {}
 ) {
     private var speechRecognizer: SpeechRecognizer? = null
+
+    /** True once the service said it's listening; a client error after that is just a stop, not a broken service. */
+    private var startedListening = false
 
     private fun getOrCreateRecognizer(): SpeechRecognizer {
         if (speechRecognizer == null) {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context.applicationContext).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
+                        startedListening = true
                         onListeningStateChange(true)
                     }
 
@@ -97,9 +108,18 @@ class SpeechRecognizerHelper(
 
                     override fun onError(error: Int) {
                         onListeningStateChange(false)
+                        if (error !in USER_ERRORS) {
+                            AppAnalytics.recordError(IllegalStateException("Speech recognizer error $error"))
+                        }
+                        if (error in SERVICE_ERRORS && !startedListening) {
+                            // The phone's speech service is broken or missing; don't leave the
+                            // user stuck on an error, try the system dialog instead.
+                            destroy()
+                            onNeedsSystemDialog()
+                            return
+                        }
                         val message = when (error) {
                             SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                            SpeechRecognizer.ERROR_CLIENT -> "Client side error."
                             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission denied."
                             SpeechRecognizer.ERROR_NETWORK -> "Network error."
                             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
@@ -107,7 +127,7 @@ class SpeechRecognizerHelper(
                             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy."
                             SpeechRecognizer.ERROR_SERVER -> "Server connection error."
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected."
-                            11 -> "Binding error. Try again."
+                            SpeechRecognizer.ERROR_CLIENT -> "Voice input stopped. Try again."
                             else -> "Speech error: $error"
                         }
                         onError(message)
@@ -134,12 +154,13 @@ class SpeechRecognizerHelper(
 
     fun startListening() {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            onError("Speech recognition is not available on this device.")
+            onNeedsSystemDialog()
             return
         }
 
         try {
             speechRecognizer?.cancel()
+            startedListening = false
             val recognizer = getOrCreateRecognizer()
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -151,7 +172,9 @@ class SpeechRecognizerHelper(
             }
             recognizer.startListening(intent)
         } catch (e: Exception) {
-            onError("Failed to start listening: ${e.localizedMessage}")
+            AppAnalytics.recordError(e)
+            destroy()
+            onNeedsSystemDialog()
         }
     }
 
@@ -172,6 +195,25 @@ class SpeechRecognizerHelper(
         }
         speechRecognizer = null
         onListeningStateChange(false)
+    }
+
+    companion object {
+        /** Ordinary outcomes (nothing said, not understood), not worth a crash report. */
+        private val USER_ERRORS = setOf(
+            SpeechRecognizer.ERROR_NO_MATCH,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
+        )
+
+        /** The speech service failed before listening: client error, server disconnected (11), language unsupported (12, 13). */
+        private val SERVICE_ERRORS = setOf(SpeechRecognizer.ERROR_CLIENT, 11, 12, 13)
+
+        /** The phone's standard voice-typing dialog, the fallback when the in-app recognizer can't run. */
+        fun systemDialogIntent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what you ate or did")
+        }
     }
 }
 
