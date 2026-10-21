@@ -323,7 +323,7 @@ class SpeechRecognizerHelper(
 
     companion object {
         /** Finish by itself after this long without hearing anything new. */
-        private const val FINISH_SILENCE_MS = 4_000L
+        private const val FINISH_SILENCE_MS = 2_500L
 
         /** Safety net for a session left running. */
         private const val MAX_SESSION_MS = 60_000L
