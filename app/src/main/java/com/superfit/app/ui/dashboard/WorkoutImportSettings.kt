@@ -48,6 +48,7 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
         if (enabled) sourceApps = viewModel.workoutSourceApps()
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val launcher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
         viewModel.onWorkoutPermissionsResult(granted)
     }
@@ -74,7 +75,7 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
             Switch(
                 checked = enabled,
                 onCheckedChange = { on ->
-                    if (on) launcher.launch(WorkoutImporter.permissions) else viewModel.setWorkoutImportEnabled(false)
+                    if (on) com.superfit.app.ui.launchHealthConnectPermissions(context, launcher, WorkoutImporter.permissions) else viewModel.setWorkoutImportEnabled(false)
                 },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = NeonMint,
