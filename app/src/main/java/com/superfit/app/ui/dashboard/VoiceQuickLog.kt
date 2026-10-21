@@ -1,13 +1,18 @@
 package com.superfit.app.ui.dashboard
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.speech.RecognitionListener
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.format.DateUtils
@@ -70,86 +75,183 @@ import com.superfit.app.theme.*
 import java.time.LocalDate
 
 // Voice Speech Recognition Helper class
+/**
+ * One voice-logging session: listens until the person taps Stop, keeps going through natural
+ * pauses ("two rotis... and dal"), and finishes by itself after a longer silence or a minute.
+ * Android's recognizer ends each stretch of speech on its own, so we restart it and join the
+ * pieces. Prefers Google's speech service, then the phone's default, then the phone's standard
+ * voice-typing dialog.
+ */
 class SpeechRecognizerHelper(
     private val context: Context,
     private val onResult: (String) -> Unit,
     private val onError: (String) -> Unit,
     private val onListeningStateChange: (Boolean) -> Unit,
     /**
-     * Called when the in-app recognizer can't run on this phone (no speech service, or the
-     * phone's own service refuses to connect, seen on some OPPO/OnePlus builds). The screen
-     * then opens the phone's standard voice-typing dialog instead.
+     * Called when no in-app recognizer can run on this phone (no speech service, or every
+     * service refuses to connect). The screen then opens the phone's voice-typing dialog.
      */
-    private val onNeedsSystemDialog: () -> Unit = {}
+    private val onNeedsSystemDialog: () -> Unit = {},
+    /** What's been heard so far in this session, for showing on screen while listening. */
+    private val onLiveText: (String) -> Unit = {}
 ) {
+    private val handler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
+
+    /** Try Google's service first; after it fails, the phone's default. */
+    private var useGoogleService = true
+
+    /** A session is running: the mic button shows Stop. */
+    private var active = false
+
+    /** The person tapped Stop; finish with whatever comes back. */
+    private var stopRequested = false
 
     /** True once the service said it's listening; a client error after that is just a stop, not a broken service. */
     private var startedListening = false
 
-    private fun getOrCreateRecognizer(): SpeechRecognizer {
-        if (speechRecognizer == null) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context.applicationContext).apply {
-                setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        startedListening = true
-                        onListeningStateChange(true)
-                    }
+    private val heardSegments = mutableListOf<String>()
+    private var partial: String? = null
+    private var sessionStartedAt = 0L
+    private var lastSpeechAt = 0L
 
-                    override fun onBeginningOfSpeech() {}
+    private fun fullText(): String = (heardSegments + listOfNotNull(partial)).joinToString(" ").trim()
 
-                    override fun onRmsChanged(rmsdB: Float) {}
-
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-
-                    override fun onEndOfSpeech() {
-                        onListeningStateChange(false)
-                    }
-
-                    override fun onError(error: Int) {
-                        onListeningStateChange(false)
-                        if (error !in USER_ERRORS) {
-                            AppAnalytics.recordError(IllegalStateException("Speech recognizer error $error"))
-                        }
-                        if (error in SERVICE_ERRORS && !startedListening) {
-                            // The phone's speech service is broken or missing; don't leave the
-                            // user stuck on an error, try the system dialog instead.
-                            destroy()
-                            onNeedsSystemDialog()
-                            return
-                        }
-                        val message = when (error) {
-                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission denied."
-                            SpeechRecognizer.ERROR_NETWORK -> "Network error."
-                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
-                            SpeechRecognizer.ERROR_NO_MATCH -> "Could not understand audio. Try again."
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy."
-                            SpeechRecognizer.ERROR_SERVER -> "Server connection error."
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected."
-                            SpeechRecognizer.ERROR_CLIENT -> "Voice input stopped. Try again."
-                            else -> "Speech error: $error"
-                        }
-                        onError(message)
-                    }
-
-                    override fun onResults(results: Bundle?) {
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull()
-                        if (!text.isNullOrBlank()) {
-                            onResult(text)
-                        } else {
-                            onError("Could not understand speech.")
-                        }
-                    }
-
-                    override fun onPartialResults(partialResults: Bundle?) {}
-
-                    override fun onEvent(eventType: Int, params: Bundle?) {}
-                })
-            }
+    private fun createRecognizer(): SpeechRecognizer {
+        val app = context.applicationContext
+        val google = if (useGoogleService) googleRecognitionService(app) else null
+        AppAnalytics.setSpeechService(google?.packageName ?: "default")
+        val recognizer = if (google != null) {
+            SpeechRecognizer.createSpeechRecognizer(app, google)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(app)
         }
-        return speechRecognizer!!
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                startedListening = true
+            }
+
+            override fun onBeginningOfSpeech() {
+                lastSpeechAt = SystemClock.elapsedRealtime()
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {}
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {}
+
+            override fun onError(error: Int) {
+                if (!active) return
+                if (error in SERVICE_ERRORS && !startedListening && heardSegments.isEmpty() && partial == null) {
+                    AppAnalytics.recordError(IllegalStateException("Speech service error $error (google=$useGoogleService)"))
+                    releaseRecognizer()
+                    if (useGoogleService && googleRecognitionService(context.applicationContext) != null) {
+                        // Google's service failed on this phone; try the phone's own.
+                        useGoogleService = false
+                        listenOnce()
+                    } else {
+                        endSession()
+                        onNeedsSystemDialog()
+                    }
+                    return
+                }
+                partial?.let { heardSegments += it }
+                partial = null
+                if (error in SILENCE_ERRORS && !stopRequested && heardSegments.isEmpty() && withinLimits()) {
+                    // Nothing said yet: keep waiting rather than giving up after a short silence.
+                    handler.post { if (active) listenOnce() }
+                    return
+                }
+                if (error !in SILENCE_ERRORS && error != SpeechRecognizer.ERROR_CLIENT) {
+                    AppAnalytics.recordError(IllegalStateException("Speech recognizer error $error"))
+                }
+                if (heardSegments.isNotEmpty()) {
+                    finishWithText()
+                    return
+                }
+                endSession()
+                val message = when (error) {
+                    SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission denied."
+                    SpeechRecognizer.ERROR_NETWORK -> "Network error."
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout."
+                    SpeechRecognizer.ERROR_NO_MATCH -> "Could not understand audio. Try again."
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy."
+                    SpeechRecognizer.ERROR_SERVER -> "Server connection error."
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected."
+                    SpeechRecognizer.ERROR_CLIENT -> if (stopRequested) return else "Voice input stopped. Try again."
+                    else -> "Speech error: $error"
+                }
+                onError(message)
+            }
+
+            override fun onResults(results: Bundle?) {
+                if (!active) return
+                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: partial
+                partial = null
+                if (!text.isNullOrBlank()) {
+                    heardSegments += text
+                    lastSpeechAt = SystemClock.elapsedRealtime()
+                    onLiveText(fullText())
+                }
+                if (!stopRequested && withinLimits()) {
+                    // A pause ended this stretch; keep listening for the rest of the sentence.
+                    // Restarting on the next tick avoids "recognizer busy" on some services.
+                    handler.post { if (active) listenOnce() }
+                } else if (heardSegments.isNotEmpty()) {
+                    finishWithText()
+                } else {
+                    endSession()
+                    onError("Could not understand speech.")
+                }
+            }
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let {
+                        partial = it
+                        lastSpeechAt = SystemClock.elapsedRealtime()
+                        onLiveText(fullText())
+                    }
+            }
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        return recognizer
+    }
+
+    /** Under a minute in total, and spoken to within the last few seconds. */
+    private fun withinLimits(): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        return now - sessionStartedAt < MAX_SESSION_MS && now - lastSpeechAt < FINISH_SILENCE_MS
+    }
+
+    private fun listenOnce() {
+        try {
+            startedListening = false
+            val recognizer = speechRecognizer ?: createRecognizer().also { speechRecognizer = it }
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                // Allow natural pauses before a stretch ends. Many services ignore these, which is
+                // why the session restarts listening after each stretch anyway.
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+            }
+            recognizer.startListening(intent)
+        } catch (e: Exception) {
+            AppAnalytics.recordError(e)
+            releaseRecognizer()
+            endSession()
+            onNeedsSystemDialog()
+        }
     }
 
     fun startListening() {
@@ -157,56 +259,106 @@ class SpeechRecognizerHelper(
             onNeedsSystemDialog()
             return
         }
-
-        try {
-            speechRecognizer?.cancel()
-            startedListening = false
-            val recognizer = getOrCreateRecognizer()
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                // Speed up recognition response: finish 800ms after speech ends instead of waiting 3000ms
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L)
-            }
-            recognizer.startListening(intent)
-        } catch (e: Exception) {
-            AppAnalytics.recordError(e)
-            destroy()
-            onNeedsSystemDialog()
-        }
+        releaseRecognizer()
+        heardSegments.clear()
+        partial = null
+        stopRequested = false
+        sessionStartedAt = SystemClock.elapsedRealtime()
+        lastSpeechAt = sessionStartedAt
+        active = true
+        onListeningStateChange(true)
+        onLiveText("")
+        handler.removeCallbacksAndMessages(null)
+        handler.postDelayed({ if (active) stopListening() }, MAX_SESSION_MS)
+        listenOnce()
     }
 
+    /** The person tapped Stop: log what was heard so far. */
     fun stopListening() {
+        if (!active) {
+            onListeningStateChange(false)
+            return
+        }
+        stopRequested = true
         try {
             speechRecognizer?.stopListening()
         } catch (e: Exception) {
             // Ignore
         }
+        // Some services never answer a stop; don't leave the mic spinning.
+        handler.postDelayed({ if (active) finishWithText() }, STOP_GRACE_MS)
+    }
+
+    private fun finishWithText() {
+        partial?.let { heardSegments += it }
+        partial = null
+        val text = heardSegments.joinToString(" ").trim()
+        endSession()
+        if (text.isNotBlank()) onResult(text) else onError("No speech input detected.")
+    }
+
+    private fun endSession() {
+        active = false
+        handler.removeCallbacksAndMessages(null)
+        releaseRecognizer()
         onListeningStateChange(false)
     }
 
-    fun destroy() {
+    private fun releaseRecognizer() {
         try {
+            speechRecognizer?.cancel()
             speechRecognizer?.destroy()
         } catch (e: Exception) {
             // Ignore
         }
         speechRecognizer = null
+    }
+
+    fun destroy() {
+        active = false
+        handler.removeCallbacksAndMessages(null)
+        releaseRecognizer()
         onListeningStateChange(false)
     }
 
     companion object {
-        /** Ordinary outcomes (nothing said, not understood), not worth a crash report. */
-        private val USER_ERRORS = setOf(
+        /** Finish by itself after this long without hearing anything new. */
+        private const val FINISH_SILENCE_MS = 4_000L
+
+        /** Safety net for a session left running. */
+        private const val MAX_SESSION_MS = 60_000L
+
+        /** How long to wait for final words after Stop before logging what we have. */
+        private const val STOP_GRACE_MS = 2_500L
+
+        /** Ordinary silence outcomes, not worth a crash report. */
+        private val SILENCE_ERRORS = setOf(
             SpeechRecognizer.ERROR_NO_MATCH,
-            SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
-            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT
         )
 
         /** The speech service failed before listening: client error, server disconnected (11), language unsupported (12, 13). */
         private val SERVICE_ERRORS = setOf(SpeechRecognizer.ERROR_CLIENT, 11, 12, 13)
+
+        /**
+         * Google's speech service when it's installed. Some phones (OnePlus, OPPO, Xiaomi) default
+         * to their own service, which is less accurate for food names and ignores pause settings.
+         */
+        private val GOOGLE_SPEECH_PACKAGES = listOf(
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.tts"
+        )
+
+        private fun googleRecognitionService(context: Context): ComponentName? = try {
+            val services = context.packageManager
+                .queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+                .mapNotNull { it.serviceInfo }
+            GOOGLE_SPEECH_PACKAGES.firstNotNullOfOrNull { pkg ->
+                services.firstOrNull { it.packageName == pkg }?.let { ComponentName(it.packageName, it.name) }
+            }
+        } catch (e: Exception) {
+            null
+        }
 
         /** The phone's standard voice-typing dialog, the fallback when the in-app recognizer can't run. */
         fun systemDialogIntent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -227,6 +379,8 @@ fun VoiceQuickLogCard(
     onMicClick: () -> Unit,
     onStopClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Words heard so far while listening. */
+    liveText: String = "",
     /** Opens the food camera. Null on phones without a camera, which hides the button. */
     onCameraClick: (() -> Unit)? = null
 ) {
@@ -374,7 +528,8 @@ fun VoiceQuickLogCard(
                     )
                     Text(
                         text = when {
-                            isListening -> "Say what you ate or did..."
+                            isListening && liveText.isNotBlank() -> "\u201C$liveText\u201D · tap the mic when done"
+                            isListening -> "Say what you ate or did, then tap the mic when done"
                             isProcessing -> "Logging food, exercise or both"
                             logType == "MEAL" && onCameraClick != null -> "Tap the mic and say what you ate or did, or snap a photo"
                             else -> "Tap the mic and say what you ate or did"

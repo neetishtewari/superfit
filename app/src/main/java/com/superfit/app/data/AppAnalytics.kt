@@ -67,6 +67,15 @@ object AppAnalytics {
     fun widgetAdded() = log("widget_added")
     fun coachMessageSent() = log("coach_message_sent")
 
+    /** Which speech service voice logging used, attached to any later crash report. */
+    fun setSpeechService(name: String) {
+        if (!active) return
+        try {
+            FirebaseCrashlytics.getInstance().setCustomKey("speech_service", name)
+        } catch (_: Exception) {
+        }
+    }
+
     /** A handled error worth seeing in Crashlytics, such as a background job failing. */
     fun recordError(e: Throwable) {
         if (!active) return

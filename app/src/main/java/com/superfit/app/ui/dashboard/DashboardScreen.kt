@@ -135,6 +135,7 @@ fun DashboardScreen(
         if (!text.isNullOrBlank()) viewModel.smartLog(text)
     }
     var showMicOffDialog by remember { mutableStateOf(false) }
+    var voiceLiveText by remember { mutableStateOf("") }
 
     // Speech recognizer helper instantiation
     val speechHelper = remember {
@@ -152,6 +153,7 @@ fun DashboardScreen(
             onListeningStateChange = { listening ->
                 isListening = listening
             },
+            onLiveText = { voiceLiveText = it },
             onNeedsSystemDialog = {
                 try {
                     systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent())
@@ -465,6 +467,7 @@ fun DashboardScreen(
                         onLogTypeChange = { logType = it },
                         isListening = isListening,
                         isProcessing = isProcessing,
+                        liveText = voiceLiveText,
                         onMicClick = {
                             val hasPermission = ContextCompat.checkSelfPermission(
                                 context,
