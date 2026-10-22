@@ -66,6 +66,7 @@ object AppAnalytics {
     fun weighIn() = log("weigh_in")
     fun widgetAdded() = log("widget_added")
     fun coachMessageSent() = log("coach_message_sent")
+    fun reportShared(weeks: Int) = log("coach_report_shared", "weeks" to "$weeks")
 
     /** Which speech service voice logging used, attached to any later crash report. */
     fun setSpeechService(name: String) {

@@ -22,16 +22,18 @@ object GeminiClient {
 
     private const val TAG = "GeminiClient"
 
-    // Multi-model failover cascade prioritized for lowest latency:
-    // 1. gemini-3.1-flash-lite: Production-proven ultra-low latency model (<1s, zero thinking latency overhead)
-    // 2. gemini-2.5-flash: High-performance balanced fallback
-    // 3. gemini-3.5-flash: Frontier multimodal fallback
-    // 4. gemini-2.0-flash: Universal base fallback
+    // Multi-model failover cascade prioritized for lowest latency. All four are current stable
+    // models in Firebase AI Logic (gemini-2.0-flash shut down 2026-06-01 and gemini-2.5-flash is
+    // deprecated, so both were replaced):
+    // 1. gemini-3.1-flash-lite: ultra-low latency, no thinking overhead
+    // 2. gemini-3.5-flash-lite: newer lite model, same speed class
+    // 3. gemini-3.5-flash: frontier multimodal fallback
+    // 4. gemini-3.8-flash: newest flash model, last resort
     val MODEL_CASCADE = listOf(
         "gemini-3.1-flash-lite",
-        "gemini-2.5-flash",
+        "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
-        "gemini-2.0-flash"
+        "gemini-3.8-flash"
     )
 
     // Per-attempt timeout. Long prompts (coaching with full history) can legitimately take
@@ -70,6 +72,9 @@ object GeminiClient {
 
         /** Bad key, bad request, blocked prompt: other models won't help, stop. */
         FATAL,
+
+        /** The project's prepaid Gemini credit is used up: every model will refuse, stop. */
+        OUT_OF_CREDIT,
 
         /** Anything else: try the next model once. */
         OTHER
@@ -225,6 +230,11 @@ object GeminiClient {
                 when (kind) {
                     ErrorKind.BUSY -> continue
                     ErrorKind.FATAL -> throw Exception(sanitizeError(error), error)
+                    ErrorKind.OUT_OF_CREDIT -> {
+                        // Shows up in Crashlytics as its own issue, so an empty balance gets noticed.
+                        com.superfit.app.data.AppAnalytics.recordError(OutOfCreditException(error))
+                        throw Exception(sanitizeError(error), error)
+                    }
                     ErrorKind.RATE_LIMITED, ErrorKind.MODEL_UNAVAILABLE, ErrorKind.OTHER -> break
                 }
             }
@@ -243,6 +253,9 @@ object GeminiClient {
         fun has(vararg needles: String) = needles.any { msg.contains(it, ignoreCase = true) }
 
         return when {
+            // Google sends this as a 429, so it must be checked before the rate-limit case.
+            has("prepayment credit", "credits are depleted", "credit balance") -> ErrorKind.OUT_OF_CREDIT
+
             types.contains("InvalidAPIKeyException") ||
                 types.contains("PromptBlockedException") ||
                 types.contains("UnsupportedUserLocationException") ||
@@ -289,6 +302,7 @@ object GeminiClient {
                 }
             }
             ErrorKind.RATE_LIMITED -> "Too many AI requests right now. Please wait a minute and try again."
+            ErrorKind.OUT_OF_CREDIT -> AI_UNAVAILABLE_MESSAGE
             ErrorKind.FATAL -> {
                 val chain = generateSequence(e) { it.cause }.take(5).toList()
                 // A disabled Firebase AI service, a rejected App Check token or a refused project
@@ -315,6 +329,9 @@ object GeminiClient {
             }
         }
     }
+
+    /** Reported to Crashlytics when the Gemini credit runs out, named so it stands out. */
+    class OutOfCreditException(cause: Throwable) : Exception("Gemini prepaid credit is used up", cause)
 
     private const val AI_UNAVAILABLE_MESSAGE = "The AI assistant is unavailable right now. Please try again later."
 
