@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
+import com.superfit.app.data.AppAnalytics
 import com.superfit.app.domain.BestKind
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
@@ -51,10 +52,6 @@ class DashboardViewModel(
     // The day the dashboard's flows were built for; a ViewModel kept past midnight still shows that day.
     private val dashboardDate = LocalDate.now().toString()
     private val sharedPrefs = getUserSharedPrefs(context)
-    private val geminiKeyStore = GeminiKeyStore(context)
-
-    private val _apiKey = MutableStateFlow(geminiKeyStore.get())
-    val apiKey: StateFlow<String> = _apiKey
 
     private val _parsingState = MutableStateFlow<ParsingState>(ParsingState.Idle)
     val parsingState: StateFlow<ParsingState> = _parsingState
@@ -139,7 +136,7 @@ class DashboardViewModel(
                     .filter { it.timestamp >= cutoff && it.id != 0L && needsTags(it) }
                     .sortedByDescending { it.timestamp }
                     .take(60)
-                val tagger = com.superfit.app.domain.MealTagger(_apiKey.value)
+                val tagger = com.superfit.app.domain.MealTagger()
                 untagged.chunked(20).forEach { batch ->
                     val tags = tagger.tag(batch)
                     batch.forEach { entry -> tags[entry.id]?.let { repository.saveMealTags(entry, it.encode()) } }
@@ -171,9 +168,8 @@ class DashboardViewModel(
     fun sendChatMessage(text: String) {
         if (text.isBlank()) return
         val userMsg = ChatMessage(MessageSender.User, text)
+        AppAnalytics.coachMessageSent()
         _chatMessages.value = _chatMessages.value + userMsg
-
-        val key = _apiKey.value
 
         val currentState = dashboardState.value
         if (currentState !is DashboardUiState.Success) {
@@ -279,7 +275,6 @@ class DashboardViewModel(
                 }
 
                 val coachResponseText = GeminiClient.chat(
-                    apiKey = key,
                     systemInstructionText = systemInstructionText,
                     history = history,
                     message = text
@@ -348,6 +343,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             repository.setWorkoutImportEnabled(enabled)
             _workoutImportEnabled.value = enabled
+            if (enabled) AppAnalytics.workoutsConnected()
         }
     }
 
@@ -416,12 +412,6 @@ class DashboardViewModel(
 
     fun keepBothWorkouts() {
         _duplicateWorkoutPrompt.value = null
-    }
-
-    fun updateApiKey(key: String) {
-        val trimmed = key.trim()
-        _apiKey.value = trimmed
-        geminiKeyStore.set(trimmed)
     }
 
     // Dynamic state combinations
@@ -659,6 +649,7 @@ class DashboardViewModel(
     fun logWeight(weightKg: Double, note: String = "") {
         viewModelScope.launch {
             repository.addWeightEntry(weightKg, note)
+            AppAnalytics.weighIn()
         }
     }
 
@@ -674,6 +665,7 @@ class DashboardViewModel(
                 )
             }
             GoalDatePref.markGoalSet(sharedPrefs)
+            AppAnalytics.goalSet(withDate = false)
         }
     }
 
@@ -704,7 +696,6 @@ class DashboardViewModel(
      * its usual parser. If one part can't be understood, the other is still logged.
      */
     fun smartLog(input: String) {
-        val key = _apiKey.value
         lastMealInput = input
         lastInputWasSpoken = true
 
@@ -718,7 +709,7 @@ class DashboardViewModel(
                     return@launch
                 }
 
-                val routed = LogRouter(key).route(input)
+                val routed = LogRouter().route(input)
                 if (routed.isEmpty) {
                     _parsingState.value = ParsingState.Error(NOTHING_RECOGNISED)
                     return@launch
@@ -729,14 +720,14 @@ class DashboardViewModel(
                         if (routed.food.isBlank()) {
                             null
                         } else {
-                            runCatching { NutritionParser(key).parseFoodInput(routed.food, history) }
+                            runCatching { NutritionParser().parseFoodInput(routed.food, history) }
                         }
                     }
                     val workoutJob = async {
                         if (routed.exercise.isBlank()) {
                             null
                         } else {
-                            runCatching { WorkoutParser(key).parseWorkoutInput(routed.exercise) }
+                            runCatching { WorkoutParser().parseWorkoutInput(routed.exercise) }
                         }
                     }
                     mealJob.await() to workoutJob.await()
@@ -801,6 +792,7 @@ class DashboardViewModel(
                 items = result.items?.encode()
             )
         )
+        AppAnalytics.mealLogged(if (lastInputWasSpoken) "voice" else "typed")
         loadFrequentMeals()
     }
 
@@ -816,11 +808,11 @@ class DashboardViewModel(
                 difficultyRating = difficultyRating
             )
         )
+        AppAnalytics.workoutLogged()
         offerDuplicateCheck(id, result.workoutText, result.workoutType)
     }
 
     fun parseAndAddMeal(input: String) {
-        val key = _apiKey.value
         lastMealInput = input
         lastInputWasSpoken = false
 
@@ -828,7 +820,7 @@ class DashboardViewModel(
             _parsingState.value = ParsingState.Loading
             try {
                 val history = repository.getAllNutritionEntries()
-                val parser = NutritionParser(key)
+                val parser = NutritionParser()
                 val result = parser.parseFoodInput(input, history)
 
                 if (result.foodText == "invalid") {
@@ -859,7 +851,7 @@ class DashboardViewModel(
                 if (isPackaged) {
                     val saved = entry.copy(id = id)
                     try {
-                        com.superfit.app.domain.MealTagger(_apiKey.value).tag(listOf(saved))[id]
+                        com.superfit.app.domain.MealTagger().tag(listOf(saved))[id]
                             ?.let { repository.saveMealTags(saved, it.encode()) }
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
@@ -881,6 +873,7 @@ class DashboardViewModel(
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
+            AppAnalytics.mealEdited()
         }
     }
 
@@ -896,12 +889,10 @@ class DashboardViewModel(
     }
 
     fun parseAndAddWorkout(input: String, difficultyRating: String = "JUST_RIGHT") {
-        val key = _apiKey.value
-
         viewModelScope.launch {
             _workoutParsingState.value = ParsingState.Loading
             try {
-                val parser = WorkoutParser(key)
+                val parser = WorkoutParser()
                 val result = parser.parseWorkoutInput(input)
 
                 if (result.workoutText == "invalid") {
@@ -946,8 +937,6 @@ class DashboardViewModel(
     }
 
     fun refreshCoachingInsight() {
-        val key = _apiKey.value
-
         val currentState = dashboardState.value
         if (currentState !is DashboardUiState.Success) {
             _coachingState.value = CoachingInsightState.Error("Daily metrics are not loaded yet.")
@@ -958,7 +947,7 @@ class DashboardViewModel(
             _coachingState.value = CoachingInsightState.Loading
             try {
                 val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-                val insight = CoachingEngine(key).generateDailyInsight(
+                val insight = CoachingEngine().generateDailyInsight(
                     profile = currentState.profile,
                     macroTargets = currentState.macroTargets,
                     maintenanceCalories = if (customMacroEnabled) null else currentState.tdee,

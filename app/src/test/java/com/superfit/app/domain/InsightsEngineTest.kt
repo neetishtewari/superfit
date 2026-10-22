@@ -44,6 +44,40 @@ class InsightsEngineTest {
     }
 
     @Test
+    fun proteinIsAPercentOfGoalWithEachDayCappedAndBlankDaysLeftOut() {
+        val days = map(
+            day(today.minusDays(1), protein = 88.0), // 80%
+            day(today.minusDays(2), protein = 220.0), // 200%, counts as 100%
+            day(today.minusDays(3), protein = 66.0), // 60%
+            day(today.minusDays(4), protein = 0.0, meals = 0) // not logged: left out
+        )
+        val s = InsightsEngine.weekReport(days, today).thisWeek
+        assertEquals(80, s.proteinPct)
+        assertEquals(1, s.proteinDaysHit)
+        assertEquals(3, s.loggedDays)
+    }
+
+    @Test
+    fun closeToProteinGoalEveryDayIsNotFlaggedAsShort() {
+        val days = map(*(1L..5L).map { day(today.minusDays(it), protein = 97.0) }.toTypedArray()) // 88% each
+        val r = InsightsEngine.weekReport(days, today)
+        assertEquals(88, r.thisWeek.proteinPct)
+        assertTrue(r.watch.none { it.id == "protein_low" })
+    }
+
+    @Test
+    fun proteinWellUnderGoalIsWatched() {
+        val days = map(*(1L..4L).map { day(today.minusDays(it), protein = 55.0) }.toTypedArray()) // 50%
+        val r = InsightsEngine.weekReport(days, today)
+        assertTrue(r.watch.any { it.id == "protein_low" && it.detail.contains("50%") })
+    }
+
+    @Test
+    fun noLoggedDaysHasNoProteinPercent() {
+        assertNull(InsightsEngine.weekReport(emptyMap(), today).thisWeek.proteinPct)
+    }
+
+    @Test
     fun blankDaysAreUnknownNotUnderEating() {
         val days = map(day(today.minusDays(1), eaten = 300.0, meals = 1))
         val r = InsightsEngine.weekReport(days, today)

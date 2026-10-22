@@ -2,7 +2,7 @@
 <!--
    Backup rules for Android 12 (API 31) and higher.
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   The Gemini API key store (see GeminiKeyStore) is never uploaded to cloud backup.
+   Old Gemini API keys (see GeminiKeyStore, which deletes them) are never uploaded to cloud backup.
 -->
 <data-extraction-rules>
     <cloud-backup>

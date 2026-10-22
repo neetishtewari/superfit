@@ -62,7 +62,9 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 = Insights, 1 = Journey, 2 = Log
+    LaunchedEffect(selectedTab) { com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab]) }
     val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
     val bests = dashboardViewModel?.personalBests?.collectAsState()?.value
     var showWeighIn by remember { mutableStateOf(false) }
@@ -180,6 +182,7 @@ fun HistoryScreen(
                         InsightsTab(
                             report = report,
                             onOpenJourney = { selectedTab = 1 },
+                            onShareWithCoach = { weeks -> viewModel.shareWithCoach(context, weeks) },
                             foodQuality = {
                                 if (dashboardState is DashboardUiState.Success) {
                                     FoodQualityCard(metrics = dashboardState.dietQualityMetrics)

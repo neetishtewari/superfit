@@ -46,6 +46,9 @@ data class DayTotals(
     val logged: Boolean get() = meals >= 2
     val net: Double get() = kcalEaten - kcalTarget
     val proteinHit: Boolean get() = logged && proteinTargetG > 0 && proteinG >= proteinTargetG * 0.9
+
+    /** Share of the protein goal eaten, capped at 1 so one big day can't hide short ones; null if not counted. */
+    val proteinShare: Double? get() = if (logged && proteinTargetG > 0) (proteinG / proteinTargetG).coerceAtMost(1.0) else null
     val moveMinutes: Long get() = workouts.sumOf { it.minutes }
     val workoutKcal: Double get() = workouts.sumOf { it.kcal }
     val workoutKm: Double get() = workouts.sumOf { it.distanceKm ?: 0.0 }
@@ -66,7 +69,9 @@ data class WeekStats(
     val activeDays: Int,
     val loggedDays: Int,
     val netKcal: Double,
-    val proteinDaysHit: Int
+    val proteinDaysHit: Int,
+    /** Average share of the protein goal over logged days, 0-100; null when nothing was logged. */
+    val proteinPct: Int?
 )
 
 data class WeekReport(
@@ -117,7 +122,8 @@ object InsightsEngine {
         activeDays = days.count { it.active },
         loggedDays = days.count { it.logged },
         netKcal = days.filter { it.logged }.sumOf { it.net },
-        proteinDaysHit = days.count { it.proteinHit }
+        proteinDaysHit = days.count { it.proteinHit },
+        proteinPct = days.mapNotNull { it.proteinShare }.takeIf { it.isNotEmpty() }?.let { (it.average() * 100).roundToInt() }
     )
 
     /** Every day from [from] to [to], with empty days filled in. */
@@ -150,14 +156,14 @@ object InsightsEngine {
                 )
             }
         }
-        if (s.loggedDays >= 4 && s.proteinDaysHit >= s.loggedDays - 1) {
-            add(Insight("protein", "Protein on target", "Hit on ${s.proteinDaysHit} of ${s.loggedDays} logged days.", "you hit protein on most days"))
+        if (s.loggedDays >= 4 && (s.proteinPct ?: 0) >= 90) {
+            add(Insight("protein", "Protein on target", "Averaging ${s.proteinPct}% of your goal, reached on ${s.proteinDaysHit} of ${s.loggedDays} logged days.", "you got close to your protein goal"))
         }
         if (loseGoal && s.loggedDays >= 4 && s.netKcal <= -1000) {
             add(Insight("deficit", "Steady calorie deficit", "About ${kcal(-s.netKcal)} kcal under target across logged days.", "you kept a steady deficit"))
         }
-        if (!loseGoal && s.loggedDays >= 4 && s.netKcal >= 0 && s.proteinDaysHit >= s.loggedDays / 2) {
-            add(Insight("fuel", "Eating enough to build", "At or above target on logged days, with protein on ${s.proteinDaysHit}.", "you ate enough to build"))
+        if (!loseGoal && s.loggedDays >= 4 && s.netKcal >= 0 && (s.proteinPct ?: 0) >= 80) {
+            add(Insight("fuel", "Eating enough to build", "At or above target on logged days, with protein at ${s.proteinPct}% of goal.", "you ate enough to build"))
         }
         val moreMin = s.moveMinutes - last.moveMinutes
         if (moreMin >= 60 && s.moveMinutes >= last.moveMinutes * 1.25) {
@@ -195,8 +201,8 @@ object InsightsEngine {
         if (usual >= 2 && s.workouts <= usual * 0.6) {
             add(Insight("fewer", "Fewer workouts", "${s.workouts} this week, down from about ${usual.roundToInt()} a week.", "you did fewer workouts"))
         }
-        if (s.loggedDays >= 3 && s.proteinDaysHit * 3 <= s.loggedDays) {
-            add(Insight("protein_low", "Protein short most days", "Hit on ${s.proteinDaysHit} of ${s.loggedDays} logged days.", "protein fell short most days"))
+        if (s.loggedDays >= 3 && (s.proteinPct ?: 100) < 70) {
+            add(Insight("protein_low", "Protein running short", "Averaging ${s.proteinPct}% of your goal on logged days.", "protein ran short"))
         }
         if (loseGoal && s.loggedDays >= 4 && s.netKcal > 0 && none { it.id == "weekend" }) {
             add(Insight("over", "Above target this week", "About ${kcal(s.netKcal)} kcal over across logged days.", "you ate above target"))

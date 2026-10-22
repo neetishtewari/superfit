@@ -2,12 +2,12 @@ package com.superfit.app.domain
 
 import android.graphics.Bitmap
 import android.util.Log
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.content
-import com.google.ai.client.generativeai.type.generationConfig
 import com.google.firebase.Firebase
+import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.content
+import com.google.firebase.ai.type.generationConfig
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -15,26 +15,25 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * All Gemini calls go through here.
- *
- * With no key of the user's own (the normal case), requests go through Firebase AI Logic and are
- * billed to Superfit's Firebase project, protected by App Check. If someone has added their own
- * Gemini key in Settings, requests go straight to Google with that key instead.
+ * All Gemini calls go through here. Requests go through Firebase AI Logic and are billed to
+ * Superfit's Firebase project, protected by App Check.
  */
 object GeminiClient {
 
     private const val TAG = "GeminiClient"
 
-    // Multi-model failover cascade prioritized for lowest latency:
-    // 1. gemini-3.1-flash-lite: Production-proven ultra-low latency model (<1s, zero thinking latency overhead)
-    // 2. gemini-2.5-flash: High-performance balanced fallback
-    // 3. gemini-3.5-flash: Frontier multimodal fallback
-    // 4. gemini-2.0-flash: Universal base fallback
+    // Multi-model failover cascade prioritized for lowest latency. All four are current stable
+    // models in Firebase AI Logic (gemini-2.0-flash shut down 2026-06-01 and gemini-2.5-flash is
+    // deprecated, so both were replaced):
+    // 1. gemini-3.1-flash-lite: ultra-low latency, no thinking overhead
+    // 2. gemini-3.5-flash-lite: newer lite model, same speed class
+    // 3. gemini-3.5-flash: frontier multimodal fallback
+    // 4. gemini-3.8-flash: newest flash model, last resort
     val MODEL_CASCADE = listOf(
         "gemini-3.1-flash-lite",
-        "gemini-2.5-flash",
+        "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
-        "gemini-2.0-flash"
+        "gemini-3.8-flash"
     )
 
     // Per-attempt timeout. Long prompts (coaching with full history) can legitimately take
@@ -56,9 +55,7 @@ object GeminiClient {
     private const val TOTAL_BUDGET_MS = 45_000L
 
     // Cache GenerativeModel instances to maintain warm HTTP/2 & TLS connection pools.
-    // The key includes the API key so a changed key takes effect immediately.
-    private val modelCache = ConcurrentHashMap<String, GenerativeModel>()
-    private val firebaseModelCache = ConcurrentHashMap<String, com.google.firebase.ai.GenerativeModel>()
+    private val firebaseModelCache = ConcurrentHashMap<String, GenerativeModel>()
 
     /** One message in a coach conversation, for [chat]. */
     data class ChatTurn(val fromUser: Boolean, val text: String)
@@ -76,40 +73,18 @@ object GeminiClient {
         /** Bad key, bad request, blocked prompt: other models won't help, stop. */
         FATAL,
 
+        /** The project's prepaid Gemini credit is used up: every model will refuse, stop. */
+        OUT_OF_CREDIT,
+
         /** Anything else: try the next model once. */
         OTHER
-    }
-
-    private fun getOrCreateModel(
-        modelName: String,
-        apiKey: String,
-        systemInstructionText: String?,
-        isJson: Boolean
-    ): GenerativeModel {
-        val cacheKey = "$modelName:${apiKey.hashCode()}:${systemInstructionText?.hashCode() ?: 0}:$isJson"
-        return modelCache.getOrPut(cacheKey) {
-            GenerativeModel(
-                modelName = modelName,
-                apiKey = apiKey,
-                generationConfig = generationConfig {
-                    if (isJson) {
-                        responseMimeType = "application/json"
-                    }
-                },
-                systemInstruction = if (systemInstructionText != null) {
-                    content { text(systemInstructionText) }
-                } else {
-                    null
-                }
-            )
-        }
     }
 
     private fun getOrCreateFirebaseModel(
         modelName: String,
         systemInstructionText: String?,
         isJson: Boolean
-    ): com.google.firebase.ai.GenerativeModel {
+    ): GenerativeModel {
         val cacheKey = "$modelName:${systemInstructionText?.hashCode() ?: 0}:$isJson"
         return firebaseModelCache.getOrPut(cacheKey) {
             buildFirebaseModel(modelName, systemInstructionText, isJson)
@@ -120,38 +95,28 @@ object GeminiClient {
         modelName: String,
         systemInstructionText: String?,
         isJson: Boolean
-    ): com.google.firebase.ai.GenerativeModel =
+    ): GenerativeModel =
         Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel(
             modelName = modelName,
-            generationConfig = com.google.firebase.ai.type.generationConfig {
+            generationConfig = generationConfig {
                 if (isJson) {
                     responseMimeType = "application/json"
                 }
             },
             systemInstruction = if (systemInstructionText != null) {
-                com.google.firebase.ai.type.content { text(systemInstructionText) }
+                content { text(systemInstructionText) }
             } else {
                 null
             }
         )
 
-    /**
-     * Executes generation with retries and an automatic multi-model failover cascade.
-     * A blank [apiKey] means "use Superfit's own AI access through Firebase".
-     */
+    /** Executes generation with retries and an automatic multi-model failover cascade. */
     suspend fun generateContent(
-        apiKey: String,
         prompt: String,
         systemInstructionText: String? = null,
         isJson: Boolean = true
-    ): String = withFirebaseWording(apiKey) {
-        runWithFailover { modelName ->
-            if (apiKey.isBlank()) {
-                getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(prompt).text
-            } else {
-                getOrCreateModel(modelName, apiKey, systemInstructionText, isJson).generateContent(prompt).text
-            }
-        }
+    ): String = runWithFailover { modelName ->
+        getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(prompt).text
     }
 
     /**
@@ -159,7 +124,6 @@ object GeminiClient {
      * 1024 px on its long edge first; the SDK sends it as JPEG. It is never saved.
      */
     suspend fun generateContentWithImage(
-        apiKey: String,
         image: Bitmap,
         prompt: String,
         systemInstructionText: String?,
@@ -169,22 +133,12 @@ object GeminiClient {
             val (w, h) = scaledSize(image.width, image.height)
             if (w == image.width && h == image.height) image else Bitmap.createScaledBitmap(image, w, h, true)
         }
-        return withFirebaseWording(apiKey) {
-            runWithFailover { modelName ->
-                if (apiKey.isBlank()) {
-                    val input = com.google.firebase.ai.type.content {
-                        image(scaled)
-                        text(prompt)
-                    }
-                    getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(input).text
-                } else {
-                    val input = content {
-                        image(scaled)
-                        text(prompt)
-                    }
-                    getOrCreateModel(modelName, apiKey, systemInstructionText, isJson).generateContent(input).text
-                }
+        return runWithFailover { modelName ->
+            val input = content {
+                image(scaled)
+                text(prompt)
             }
+            getOrCreateFirebaseModel(modelName, systemInstructionText, isJson).generateContent(input).text
         }
     }
 
@@ -198,49 +152,19 @@ object GeminiClient {
 
     /**
      * Sends [message] in a coach conversation that already contains [history], with the same
-     * retries and failover as [generateContent]. A blank [apiKey] uses Firebase.
+     * retries and failover as [generateContent].
      */
     suspend fun chat(
-        apiKey: String,
         systemInstructionText: String,
         history: List<ChatTurn>,
         message: String
-    ): String = withFirebaseWording(apiKey) {
-        runWithFailover { modelName ->
-            if (apiKey.isBlank()) {
-                // Not cached: the coach's instructions carry today's live numbers, so they change often.
-                val model = buildFirebaseModel(modelName, systemInstructionText, isJson = false)
-                val firebaseHistory = history.map { turn ->
-                    com.google.firebase.ai.type.content(role = if (turn.fromUser) "user" else "model") { text(turn.text) }
-                }
-                model.startChat(history = firebaseHistory).sendMessage(message).text
-            } else {
-                val model = GenerativeModel(
-                    modelName = modelName,
-                    apiKey = apiKey,
-                    systemInstruction = content { text(systemInstructionText) }
-                )
-                val keyHistory = history.map { turn ->
-                    content(role = if (turn.fromUser) "user" else "model") { text(turn.text) }
-                }
-                model.startChat(history = keyHistory).sendMessage(message).text
-            }
+    ): String = runWithFailover { modelName ->
+        // Not cached: the coach's instructions carry today's live numbers, so they change often.
+        val model = buildFirebaseModel(modelName, systemInstructionText, isJson = false)
+        val firebaseHistory = history.map { turn ->
+            content(role = if (turn.fromUser) "user" else "model") { text(turn.text) }
         }
-    }
-
-    /**
-     * People using Superfit's own AI access have no key to fix, so a refused request
-     * (for example an App Check rejection) must not tell them to update their API key.
-     */
-    private suspend fun withFirebaseWording(apiKey: String, block: suspend () -> String): String {
-        if (apiKey.isNotBlank()) return block()
-        return try {
-            block()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (e.message == INVALID_KEY_MESSAGE) throw Exception(AI_UNAVAILABLE_MESSAGE, e) else throw e
-        }
+        model.startChat(history = firebaseHistory).sendMessage(message).text
     }
 
     /**
@@ -306,6 +230,11 @@ object GeminiClient {
                 when (kind) {
                     ErrorKind.BUSY -> continue
                     ErrorKind.FATAL -> throw Exception(sanitizeError(error), error)
+                    ErrorKind.OUT_OF_CREDIT -> {
+                        // Shows up in Crashlytics as its own issue, so an empty balance gets noticed.
+                        com.superfit.app.data.AppAnalytics.recordError(OutOfCreditException(error))
+                        throw Exception(sanitizeError(error), error)
+                    }
                     ErrorKind.RATE_LIMITED, ErrorKind.MODEL_UNAVAILABLE, ErrorKind.OTHER -> break
                 }
             }
@@ -324,6 +253,9 @@ object GeminiClient {
         fun has(vararg needles: String) = needles.any { msg.contains(it, ignoreCase = true) }
 
         return when {
+            // Google sends this as a 429, so it must be checked before the rate-limit case.
+            has("prepayment credit", "credits are depleted", "credit balance") -> ErrorKind.OUT_OF_CREDIT
+
             types.contains("InvalidAPIKeyException") ||
                 types.contains("PromptBlockedException") ||
                 types.contains("UnsupportedUserLocationException") ||
@@ -370,24 +302,22 @@ object GeminiClient {
                 }
             }
             ErrorKind.RATE_LIMITED -> "Too many AI requests right now. Please wait a minute and try again."
+            ErrorKind.OUT_OF_CREDIT -> AI_UNAVAILABLE_MESSAGE
             ErrorKind.FATAL -> {
                 val chain = generateSequence(e) { it.cause }.take(5).toList()
-                val isKeyProblem = chain.any {
+                // A disabled Firebase AI service, a rejected App Check token or a refused project
+                // key: the user can't fix any of these by rephrasing or retrying.
+                val isServiceProblem = chain.any {
                     it.javaClass.simpleName == "InvalidAPIKeyException" ||
                         (it.message ?: "").contains("API key", ignoreCase = true) ||
                         (it.message ?: "").contains("API_KEY", ignoreCase = true) ||
-                        (it.message ?: "").contains("PERMISSION_DENIED", ignoreCase = true)
-                }
-                // A disabled Firebase AI service or a rejected App Check token: the user can't fix
-                // either by rephrasing or retrying.
-                val isServiceProblem = chain.any {
-                    it.javaClass.simpleName == "ServiceDisabledException" ||
+                        (it.message ?: "").contains("PERMISSION_DENIED", ignoreCase = true) ||
+                        it.javaClass.simpleName == "ServiceDisabledException" ||
                         (it.message ?: "").contains("App Check", ignoreCase = true) ||
                         (it.message ?: "").contains("attestation", ignoreCase = true)
                 }
                 when {
                     isServiceProblem -> AI_UNAVAILABLE_MESSAGE
-                    isKeyProblem -> INVALID_KEY_MESSAGE
                     else -> "The AI couldn't process this request. Please rephrase and try again."
                 }
             }
@@ -400,7 +330,9 @@ object GeminiClient {
         }
     }
 
-    private const val INVALID_KEY_MESSAGE = "Your own Gemini key in Settings isn't working. Remove it there to use Superfit's built-in AI."
+    /** Reported to Crashlytics when the Gemini credit runs out, named so it stands out. */
+    class OutOfCreditException(cause: Throwable) : Exception("Gemini prepaid credit is used up", cause)
+
     private const val AI_UNAVAILABLE_MESSAGE = "The AI assistant is unavailable right now. Please try again later."
 
     private val FRIENDLY_MESSAGES = setOf(
@@ -408,7 +340,6 @@ object GeminiClient {
         "AI servers are currently experiencing high demand. Please try again shortly.",
         "The AI took too long to respond. Please check your connection and try again.",
         "Too many AI requests right now. Please wait a minute and try again.",
-        INVALID_KEY_MESSAGE,
         "The AI couldn't process this request. Please rephrase and try again.",
         "Connection problem. Please check your internet connection.",
         "AI service is temporarily busy. Please try again.",

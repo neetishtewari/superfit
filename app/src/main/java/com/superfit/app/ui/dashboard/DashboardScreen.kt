@@ -89,7 +89,6 @@ fun DashboardScreen(
     onPhotoLogTriggeredHandled: () -> Unit = {}
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
-    val apiKey by viewModel.apiKey.collectAsState()
     val parsingState by viewModel.parsingState.collectAsState()
     val workoutParsingState by viewModel.workoutParsingState.collectAsState()
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
@@ -125,6 +124,18 @@ fun DashboardScreen(
     var voiceBannerColor by remember { mutableStateOf(Color.Transparent) }
     var showVoiceBanner by remember { mutableStateOf(false) }
 
+    // The phone's own voice-typing dialog, used when the in-app recognizer can't run on this phone.
+    val systemSpeechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val text = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+        if (!text.isNullOrBlank()) viewModel.smartLog(text)
+    }
+    var showMicOffDialog by remember { mutableStateOf(false) }
+    var voiceLiveText by remember { mutableStateOf("") }
+
     // Speech recognizer helper instantiation
     val speechHelper = remember {
         SpeechRecognizerHelper(
@@ -140,6 +151,16 @@ fun DashboardScreen(
             },
             onListeningStateChange = { listening ->
                 isListening = listening
+            },
+            onLiveText = { voiceLiveText = it },
+            onNeedsSystemDialog = {
+                try {
+                    systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent())
+                } catch (e: Exception) {
+                    voiceMessage = "Voice input isn't available on this phone. Type your meal or use the camera instead."
+                    voiceBannerColor = EnergeticCoral
+                    showVoiceBanner = true
+                }
             }
         )
     }
@@ -151,16 +172,38 @@ fun DashboardScreen(
         if (isGranted) {
             speechHelper.startListening()
         } else {
-            Toast.makeText(context, "Opening Settings to enable microphone permission...", Toast.LENGTH_LONG).show()
-            try {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                }
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(context, "Please open Settings and grant microphone permissions manually.", Toast.LENGTH_SHORT).show()
-            }
+            // Explain first. Jumping straight to system Settings looked like the app had closed.
+            showMicOffDialog = true
         }
+    }
+
+    if (showMicOffDialog) {
+        AlertDialog(
+            onDismissRequest = { showMicOffDialog = false },
+            title = { Text("Microphone is off for Superfit") },
+            text = {
+                Text(
+                    "Superfit needs the microphone to hear what you ate or did. Nothing is recorded or kept. " +
+                        "You can turn it on in Settings, or type your meal or use the camera instead."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMicOffDialog = false
+                    try {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Please open Settings and allow the microphone for Superfit.", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("Open Settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMicOffDialog = false }) { Text("Not now") }
+            }
+        )
     }
 
     // Auto-dismiss voice feedback banner
@@ -289,8 +332,14 @@ fun DashboardScreen(
             ) {
                 FoodCameraScreen(
                     controller = foodCameraController,
-                    apiKey = apiKey,
                     onLogged = { entry, isPackaged ->
+                        com.superfit.app.data.AppAnalytics.mealLogged(
+                            when (foodCameraController.mode) {
+                                com.superfit.app.ui.camera.CameraMode.BARCODE -> "barcode"
+                                com.superfit.app.ui.camera.CameraMode.LABEL -> "label"
+                                else -> "photo"
+                            }
+                        )
                         viewModel.addPhotoMeal(entry, isPackaged)
                         showFoodCamera = false
                     },
@@ -416,6 +465,7 @@ fun DashboardScreen(
                         onLogTypeChange = { logType = it },
                         isListening = isListening,
                         isProcessing = isProcessing,
+                        liveText = voiceLiveText,
                         onMicClick = {
                             val hasPermission = ContextCompat.checkSelfPermission(
                                 context,

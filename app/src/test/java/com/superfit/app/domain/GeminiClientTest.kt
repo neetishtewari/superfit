@@ -48,7 +48,22 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `invalid key stops immediately with a friendly message`() = runTest {
+    fun `used-up credit stops at once instead of trying every model`() = runTest {
+        var callCount = 0
+        try {
+            GeminiClient.runWithFailover(models) {
+                callCount++
+                throw QuotaExceededException("429 RESOURCE_EXHAUSTED: Your prepayment credits are depleted.")
+            }
+            fail("expected an exception")
+        } catch (e: Exception) {
+            assertEquals("The AI assistant is unavailable right now. Please try again later.", e.message)
+        }
+        assertEquals(1, callCount)
+    }
+
+    @Test
+    fun `refused key stops immediately with a friendly message`() = runTest {
         var callCount = 0
         try {
             GeminiClient.runWithFailover(models) {
@@ -57,7 +72,7 @@ class GeminiClientTest {
             }
             fail("expected an exception")
         } catch (e: Exception) {
-            assertEquals("Your own Gemini key in Settings isn't working. Remove it there to use Superfit's built-in AI.", e.message)
+            assertEquals("The AI assistant is unavailable right now. Please try again later.", e.message)
         }
         assertEquals(1, callCount)
     }

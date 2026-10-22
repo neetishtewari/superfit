@@ -224,7 +224,8 @@ fun WeeklyTrendsCard(
     val balanceLabel = if (trends.avgNetCalories < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
 
     val sleepHours = trends.avgSleepDurationSeconds / 3600.0
-    val sleepText = String.format("%.1fh (${trends.avgSleepReadiness}%%)", sleepHours)
+    // No sleep tracker: say so instead of showing 0.0h and a made-up readiness.
+    val sleepText = if (trends.avgSleepDurationSeconds > 0) String.format("%.1fh (${trends.avgSleepReadiness}%%)", sleepHours) else "Not tracked"
 
     Card(
         shape = RoundedCornerShape(24.dp),

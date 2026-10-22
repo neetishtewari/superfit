@@ -94,7 +94,6 @@ class DailyReminderWorker(
             )
         } else {
             // Log is complete -> Send Daily AI Coaching Summary
-            val apiKey = GeminiKeyStore(applicationContext).get()
             try {
                 val coachProfile = profile ?: UserProfileEntity(age = 30, weightKg = 70.0, heightCm = 175.0, isMale = true, activityMultiplier = 1.2)
                 val dailyTarget = todayTarget(coachProfile)
@@ -111,7 +110,7 @@ class DailyReminderWorker(
                     dailyTarget.targets
                 }
 
-                val insight = CoachingEngine(apiKey).generateDailyInsight(
+                val insight = CoachingEngine().generateDailyInsight(
                     profile = coachProfile,
                     macroTargets = targets,
                     maintenanceCalories = if (customMacroEnabled) null else tdee,

@@ -7,6 +7,7 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
   id("kotlin-kapt")
   alias(libs.plugins.google.services)
+  alias(libs.plugins.firebase.crashlytics)
 }
 
 val localProperties = Properties().apply {
@@ -24,8 +25,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 33
-        versionName = "1.0.29"
+        versionCode = 35
+        versionName = "1.0.31"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
@@ -55,6 +56,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // The dev app never sends crash reports, so there is no decoder to upload for it.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
         release {
             isMinifyEnabled = true
@@ -174,9 +179,6 @@ dependencies {
   // Google Health Connect
   implementation(libs.androidx.health.connect)
 
-  // Google AI (Gemini) SDK, used only when someone adds their own Gemini key in Settings
-  implementation(libs.google.generativeai)
-
   // Firebase
   implementation(platform(libs.firebase.bom))
   implementation(libs.firebase.auth)
@@ -184,6 +186,8 @@ dependencies {
   implementation(libs.firebase.firestore)
   // Gemini through Firebase AI Logic (billed to Superfit's Firebase project), protected by App Check
   implementation(libs.firebase.ai)
+  implementation(libs.firebase.analytics)
+  implementation(libs.firebase.crashlytics)
   implementation(libs.firebase.appcheck.playintegrity)
   debugImplementation(libs.firebase.appcheck.debug)
 }

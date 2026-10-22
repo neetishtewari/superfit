@@ -4,13 +4,12 @@ import com.superfit.app.data.NutritionEntryEntity
 import org.json.JSONObject
 
 /** Asks the AI to tag meals that were logged before quality tags existed, in batches. */
-class MealTagger(private val apiKey: String) {
+class MealTagger {
 
     suspend fun tag(entries: List<NutritionEntryEntity>): Map<Long, MealTags> {
         if (entries.isEmpty()) return emptyMap()
         val list = entries.mapIndexed { i, e -> "${i + 1}. ${e.foodText} (${e.calories.toInt()} kcal)" }.joinToString("\n")
         val response = GeminiClient.generateContent(
-            apiKey = apiKey,
             prompt = "Meals:\n$list",
             systemInstructionText = SYSTEM_INSTRUCTION,
             isJson = true

@@ -58,7 +58,7 @@ object CoachMemory {
         (existing.filter { it.date != entry.date } + entry).sortedByDescending { it.date }.take(KEEP)
 }
 
-class CoachingEngine(private val apiKey: String) {
+class CoachingEngine {
 
     suspend fun generateDailyInsight(
         profile: UserProfileEntity,
@@ -94,7 +94,6 @@ class CoachingEngine(private val apiKey: String) {
         val prompt = buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition)
         return try {
             val response = GeminiClient.generateContent(
-                apiKey = apiKey,
                 prompt = prompt,
                 systemInstructionText = SYSTEM_INSTRUCTION,
                 isJson = true

@@ -12,11 +12,10 @@ data class RoutedLog(val food: String, val exercise: String) {
  * then goes to its usual parser. The AI decides what is food and what is exercise; there are no
  * word lists here.
  */
-class LogRouter(private val apiKey: String) {
+class LogRouter {
 
     suspend fun route(input: String): RoutedLog = parse(
         GeminiClient.generateContent(
-            apiKey = apiKey,
             prompt = "Said: \"$input\"",
             systemInstructionText = SYSTEM_INSTRUCTION,
             isJson = true

@@ -3,7 +3,7 @@ package com.superfit.app.domain
 import com.superfit.app.data.NutritionEntryEntity
 import org.json.JSONObject
 
-class NutritionParser(private val apiKey: String) {
+class NutritionParser {
 
     internal val systemInstructionText =
         "You are an expert clinical nutrition AI. Parse the user's natural language meal description and estimate " +
@@ -42,7 +42,6 @@ class NutritionParser(private val apiKey: String) {
 
         // 2. Cascade across Gemini models (2.5-flash -> 2.0-flash -> 1.5-flash)
         val jsonText = GeminiClient.generateContent(
-            apiKey = apiKey,
             prompt = "Meal input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true
