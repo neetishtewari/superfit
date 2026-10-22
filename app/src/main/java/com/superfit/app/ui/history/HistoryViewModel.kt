@@ -123,6 +123,8 @@ class HistoryViewModel(
     private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
     private var importedByDate: Map<LocalDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
     private var profile: UserProfileEntity? = null
+    private var dayTotals: Map<LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
+    private var allMeals: List<NutritionEntryEntity> = emptyList()
 
     /** The day's calorie target, including that day's workouts for people who connected them. */
     private fun calculateTargetCalories(date: LocalDate): Double {
@@ -342,6 +344,8 @@ class HistoryViewModel(
 
             val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
             val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
+            this@HistoryViewModel.dayTotals = dayTotals
+            allMeals = allNutrition
             val loseGoal = profile.targetWeightKg < profile.startingWeightKg
             weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal)
             goalTargetDate = GoalDatePref.get(sharedPrefs)
@@ -360,6 +364,41 @@ class HistoryViewModel(
             )
 
             updateSelectedSummary()
+        }
+    }
+
+    /** Builds the coach report for the last [weeks] full weeks and opens the share sheet. */
+    fun shareWithCoach(context: Context, weeks: Int) {
+        viewModelScope.launch {
+            val profile = profile ?: return@launch
+            val today = LocalDate.now()
+            val zone = ZoneId.systemDefault()
+            val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
+            val yesterday = today.minusDays(1)
+            val dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
+                com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday, proteinTarget, calculateTargetCalories(yesterday), zone, weeksAgo)?.score
+            }
+            val report = com.superfit.app.domain.CoachReportBuilder.build(
+                header = com.superfit.app.domain.CoachReportHeader(
+                    name = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName?.takeIf { it.isNotBlank() },
+                    goal = profile.goal,
+                    age = profile.age,
+                    heightCm = profile.heightCm,
+                    isMale = profile.isMale,
+                    startKg = profile.startingWeightKg,
+                    targetKg = profile.targetWeightKg
+                ),
+                weeks = weeks,
+                today = today,
+                days = dayTotals,
+                meals = allMeals,
+                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()),
+                proteinTargetG = proteinTarget,
+                dietScores = dietScores,
+                zone = zone
+            )
+            com.superfit.app.ui.share.CoachReportPdf.share(context, report)
+            com.superfit.app.data.AppAnalytics.reportShared(weeks)
         }
     }
 

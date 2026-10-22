@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -108,6 +109,7 @@ private fun InsightRow(item: Insight) {
 fun InsightsTab(
     report: WeekReport,
     onOpenJourney: () -> Unit,
+    onShareWithCoach: (weeks: Int) -> Unit,
     foodQuality: @Composable () -> Unit,
     bests: @Composable () -> Unit,
     trends: @Composable () -> Unit
@@ -182,7 +184,49 @@ fun InsightsTab(
             ExpandRow("Food Quality and swaps", content = foodQuality)
             ExpandRow("Personal bests", content = bests)
             ExpandRow("All trends", "steps, sleep, protein, streaks", content = trends)
+            ShareWithCoachRow(onShareWithCoach)
         }
+    }
+}
+
+/** "Share with my coach": pick 2 or 4 weeks, then the phone makes a PDF and opens the share sheet. */
+@Composable
+private fun ShareWithCoachRow(onShare: (weeks: Int) -> Unit) {
+    var asking by rememberSaveable { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clickable { asking = true }
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Share with my coach", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = ThemeTextPrimary, modifier = Modifier.weight(1f))
+        Text("PDF", fontSize = 12.sp, color = ThemeTextSecondary)
+    }
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            title = { Text("Share with my coach") },
+            text = {
+                Text("Makes a PDF of your meals, calories, protein, workouts and weight, then lets you send it by WhatsApp, email or any other app. It's made on your phone and only goes where you send it.")
+            },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = {
+                        asking = false
+                        onShare(2)
+                    }) { Text("Last 2 weeks") }
+                    TextButton(onClick = {
+                        asking = false
+                        onShare(4)
+                    }) { Text("Last 4 weeks") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { asking = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
