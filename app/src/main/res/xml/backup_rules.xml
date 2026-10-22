@@ -2,7 +2,7 @@
 <!--
    Backup rules for Android 11 (API 30) and lower.
    See https://developer.android.com/guide/topics/data/autobackup
-   The Gemini API key store (see GeminiKeyStore) is kept on the device only.
+   Old Gemini API keys (see GeminiKeyStore, which deletes them) are kept on the device only.
 -->
 <full-backup-content>
     <exclude domain="sharedpref" path="superfit_secrets.xml" />

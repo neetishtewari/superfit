@@ -89,7 +89,6 @@ fun DashboardScreen(
     onPhotoLogTriggeredHandled: () -> Unit = {}
 ) {
     val dashboardState by viewModel.dashboardState.collectAsState()
-    val apiKey by viewModel.apiKey.collectAsState()
     val parsingState by viewModel.parsingState.collectAsState()
     val workoutParsingState by viewModel.workoutParsingState.collectAsState()
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
@@ -333,7 +332,6 @@ fun DashboardScreen(
             ) {
                 FoodCameraScreen(
                     controller = foodCameraController,
-                    apiKey = apiKey,
                     onLogged = { entry, isPackaged ->
                         com.superfit.app.data.AppAnalytics.mealLogged(
                             when (foodCameraController.mode) {

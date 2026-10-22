@@ -25,8 +25,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 34
-        versionName = "1.0.30"
+        versionCode = 35
+        versionName = "1.0.31"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
@@ -178,9 +178,6 @@ dependencies {
 
   // Google Health Connect
   implementation(libs.androidx.health.connect)
-
-  // Google AI (Gemini) SDK, used only when someone adds their own Gemini key in Settings
-  implementation(libs.google.generativeai)
 
   // Firebase
   implementation(platform(libs.firebase.bom))

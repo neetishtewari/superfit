@@ -32,9 +32,6 @@ sealed interface CameraState {
  */
 class FoodCameraController : ViewModel() {
 
-    /** Blank means Superfit's built-in AI. Set by the screen each time it opens. */
-    var apiKey: String = ""
-
     var mode by mutableStateOf(CameraMode.MEAL)
         private set
     var state by mutableStateOf<CameraState>(CameraState.Viewfinder)
@@ -81,7 +78,7 @@ class FoodCameraController : ViewModel() {
         state = CameraState.Working(if (photoMode == CameraMode.LABEL) "Reading the label…" else "Reading your meal…")
         job = viewModelScope.launch {
             state = try {
-                val parser = FoodPhotoParser(apiKey)
+                val parser = FoodPhotoParser()
                 if (photoMode == CameraMode.LABEL) {
                     parser.parseLabel(bitmap)?.let { CameraState.PackResult(it) }
                         ?: CameraState.Failed("We couldn't read this label. Try a straight, close-up photo.")
