@@ -48,6 +48,21 @@ class GeminiClientTest {
     }
 
     @Test
+    fun `used-up credit stops at once instead of trying every model`() = runTest {
+        var callCount = 0
+        try {
+            GeminiClient.runWithFailover(models) {
+                callCount++
+                throw QuotaExceededException("429 RESOURCE_EXHAUSTED: Your prepayment credits are depleted.")
+            }
+            fail("expected an exception")
+        } catch (e: Exception) {
+            assertEquals("The AI assistant is unavailable right now. Please try again later.", e.message)
+        }
+        assertEquals(1, callCount)
+    }
+
+    @Test
     fun `refused key stops immediately with a friendly message`() = runTest {
         var callCount = 0
         try {

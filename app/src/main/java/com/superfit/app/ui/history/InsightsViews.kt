@@ -127,11 +127,20 @@ fun InsightsTab(
                     val net = signedKcal(s.netKcal)
                     val vs = if (l.loggedDays > 0) "vs ${signedKcal(l.netKcal)}" else ""
                     WeekTile(net, "kcal net", Delta(vs, ThemeTextSecondary), Modifier.weight(1f))
-                    WeekTile("${s.proteinDaysHit}/${s.loggedDays}", "protein days", delta((s.proteinDaysHit - l.proteinDaysHit).toDouble(), "${abs(s.proteinDaysHit - l.proteinDaysHit)}", higherIsGood = true), Modifier.weight(1f))
+                    val pct = s.proteinPct ?: 0
+                    val pctDelta = l.proteinPct?.let { delta((pct - it).toDouble(), "${abs(pct - it)} pts", higherIsGood = true) } ?: Delta("", ThemeTextSecondary)
+                    WeekTile("$pct%", "protein goal", pctDelta, Modifier.weight(1f))
                 } else {
                     WeekTile("${s.workouts}", "workouts", delta((s.workouts - l.workouts).toDouble(), "${abs(s.workouts - l.workouts)}", higherIsGood = true), Modifier.weight(1f))
                     WeekTile("${s.activeDays}/7", "active days", delta((s.activeDays - l.activeDays).toDouble(), "${abs(s.activeDays - l.activeDays)}", higherIsGood = true), Modifier.weight(1f))
                 }
+            }
+            if (s.loggedDays > 0) {
+                Text(
+                    "Protein goal reached on ${s.proteinDaysHit} of ${s.loggedDays} logged ${if (s.loggedDays == 1) "day" else "days"}",
+                    fontSize = 12.sp,
+                    color = ThemeTextSecondary
+                )
             }
         }
 

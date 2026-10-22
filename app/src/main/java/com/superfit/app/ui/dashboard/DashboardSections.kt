@@ -995,29 +995,31 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
                     .padding(end = 8.dp)
             )
 
-            // Status Pill
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        when (state.readinessScore) {
-                            in 85..100 -> NeonGreen.copy(alpha = 0.2f)
-                            in 70..84 -> ElectricCyan.copy(alpha = 0.2f)
-                            else -> EnergeticCoral.copy(alpha = 0.2f)
-                        }
+            // Status Pill: only when there's sleep to base it on, otherwise the score is a guess.
+            if (state.sleep != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            when (state.readinessScore) {
+                                in 85..100 -> NeonGreen.copy(alpha = 0.2f)
+                                in 70..84 -> ElectricCyan.copy(alpha = 0.2f)
+                                else -> EnergeticCoral.copy(alpha = 0.2f)
+                            }
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Readiness: ${state.readinessScore}%",
+                        color = when (state.readinessScore) {
+                            in 85..100 -> NeonGreen
+                            in 70..84 -> ElectricCyan
+                            else -> EnergeticCoral
+                        },
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
                     )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "Readiness: ${state.readinessScore}%",
-                    color = when (state.readinessScore) {
-                        in 85..100 -> NeonGreen
-                        in 70..84 -> ElectricCyan
-                        else -> EnergeticCoral
-                    },
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
+                }
             }
         }
 
@@ -1028,13 +1030,13 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
             else -> "Critical Exhaustion - Rest day strongly recommended."
         }
 
-        Text(
-            text = readinessDesc,
-            fontSize = 13.sp,
-            color = ThemeTextSecondary
-        )
-
         if (state.sleep != null) {
+            Text(
+                text = readinessDesc,
+                fontSize = 13.sp,
+                color = ThemeTextSecondary
+            )
+
             val hours = state.sleep.sleepDurationSeconds / 3600
             val minutes = (state.sleep.sleepDurationSeconds % 3600) / 60
             Row(
@@ -1056,9 +1058,11 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
             }
         } else {
             Text(
-                text = "No sleep record synced for today. Connect Google Sleep or record sleep details to enable active recovery shifting.",
-                fontSize = 12.sp,
-                color = Color.Gray
+                text = "Your sleep shows here if you track it with a watch, ring or sleep app that saves to Health Connect. " +
+                    "Once it does, Superfit uses it to tell you when to push and when to take it easy.",
+                fontSize = 13.sp,
+                color = ThemeTextSecondary,
+                lineHeight = 18.sp
             )
         }
     }

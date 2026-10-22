@@ -144,6 +144,53 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // SECTION 1: Which account is signed in, so people with two accounts can tell them apart.
+            val account = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
+            if (account != null) {
+                val viaGoogle = account.providerData.any { it.providerId == "google.com" }
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            1.dp,
+                            Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
+                            RoundedCornerShape(20.dp)
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "Signed in as",
+                            fontSize = 12.sp,
+                            color = SuperfitTheme.colors.textSecondary
+                        )
+                        account.displayName?.takeIf { it.isNotBlank() }?.let {
+                            Text(
+                                text = it,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = SuperfitTheme.colors.textPrimary
+                            )
+                        }
+                        Text(
+                            text = account.email ?: "Account without an email",
+                            fontWeight = if (account.displayName.isNullOrBlank()) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 14.sp,
+                            color = SuperfitTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = if (viaGoogle) "Google sign-in" else "Email and password",
+                            fontSize = 12.sp,
+                            color = SuperfitTheme.colors.textSecondary
+                        )
+                    }
+                }
+            }
+
             // SECTION 2: Google Health Connect
             Card(
                 shape = RoundedCornerShape(20.dp),
