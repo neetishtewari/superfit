@@ -37,6 +37,9 @@ jobs:
       - name: Check R8 kept reflection-created classes
         run: scripts/check-r8-keeps.sh
 
+      - name: Check the app's permissions
+        run: scripts/check-permissions.sh
+
       - name: Android Lint
         run: ./gradlew --stacktrace lintDebug
 

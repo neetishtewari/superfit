@@ -1,6 +1,7 @@
 package com.superfit.app
 
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.google.firebase.auth.FirebaseAuth
+import com.superfit.app.data.AccountDeletion
 import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.GeminiKeyStore
@@ -165,14 +167,32 @@ fun MainNavigation(
                     onBack = {
                         backStack.removeLastOrNull()
                     },
-                    onLogout = {
+                    onDeleteAccount = {
                         coroutineScope.launch {
-                            repository.clearAllCloudData()
+                            Toast.makeText(context, "Deleting your account…", Toast.LENGTH_SHORT).show()
+                            // Cloud data first: once the account is gone, its data can no longer be deleted.
+                            if (!repository.clearAllCloudData()) {
+                                Toast.makeText(
+                                    context,
+                                    "Couldn't finish deleting your data. Check your internet connection and try again.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@launch
+                            }
+                            val deletion = repository.deleteAccount()
                             repository.clearAllLocalData()
                             val prefs = getUserSharedPrefs(context)
                             prefs.edit().clear().commit()
                             GeminiKeyStore.forgetOldKeys(context)
                             FirebaseAuth.getInstance().signOut()
+                            val message = when (deletion) {
+                                AccountDeletion.DELETED -> "Your account and data are deleted."
+                                AccountDeletion.NEEDS_RECENT_SIGN_IN ->
+                                    "Your data is deleted. For your security, sign in once more and tap Delete account again to remove the account."
+                                AccountDeletion.FAILED ->
+                                    "Your data is deleted, but the account couldn't be removed. Sign in and tap Delete account again."
+                            }
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                             backStack.removeLastOrNull() // pop Settings
                             backStack.removeLastOrNull() // pop Dashboard
                             backStack.add(Login)

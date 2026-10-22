@@ -41,7 +41,7 @@ import com.superfit.app.widget.WidgetPin
 fun SettingsScreen(
     viewModel: DashboardViewModel,
     onBack: () -> Unit,
-    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
     onSignOut: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
     modifier: Modifier = Modifier
@@ -53,6 +53,31 @@ fun SettingsScreen(
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val scrollState = rememberScrollState()
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            title = { Text("Delete your account?") },
+            text = {
+                Text(
+                    "This permanently deletes your Superfit account and everything in it: meals, workouts, " +
+                        "weight, sleep and settings, on this phone and in the cloud backup. It can't be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteAccountDialog = false
+                    onDeleteAccount()
+                }) {
+                    Text("Delete account", color = CoralRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     // Custom Targets Overrides State
     var customMacroEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("custom_macro_enabled", false)) }
@@ -932,7 +957,7 @@ fun SettingsScreen(
                     }
 
                     Button(
-                        onClick = onLogout,
+                        onClick = { showDeleteAccountDialog = true },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CoralRed.copy(alpha = 0.15f),
                             contentColor = CoralRed
@@ -943,7 +968,7 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = "Clear & Sign Out",
+                            text = "Delete account",
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )

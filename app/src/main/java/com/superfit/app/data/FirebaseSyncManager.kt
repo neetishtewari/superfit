@@ -340,8 +340,14 @@ class FirebaseSyncManager(private val context: Context) {
         }
     }
 
-    suspend fun clearAllCloudData() {
-        val userId = auth.currentUser?.uid ?: return
+    /** Deletes the signed-in user's cloud data. Returns false if it couldn't finish (offline or an error). */
+    suspend fun clearAllCloudData(): Boolean {
+        val userId = auth.currentUser?.uid ?: return true
+        // A delete only completes once the server has it, so give up rather than hang when offline.
+        return kotlinx.coroutines.withTimeoutOrNull(30_000) { clearCloudData(userId) } ?: false
+    }
+
+    private suspend fun clearCloudData(userId: String): Boolean {
         try {
             // 1. Delete profile doc
             firestore.collection("users").document(userId).delete().await()
@@ -404,8 +410,27 @@ class FirebaseSyncManager(private val context: Context) {
             }
 
             Log.d(tag, "Full Firestore cloud data wipe complete.")
+            return true
         } catch (e: Exception) {
             Log.e(tag, "Error clearing cloud data: ${e.message}", e)
+            return false
+        }
+    }
+
+    /**
+     * Deletes the Firebase account itself. Call after [clearAllCloudData], since the data can't be
+     * deleted once the account is gone. Firebase refuses if the user last signed in too long ago.
+     */
+    suspend fun deleteAccount(): AccountDeletion {
+        val user = auth.currentUser ?: return AccountDeletion.DELETED
+        return try {
+            user.delete().await()
+            AccountDeletion.DELETED
+        } catch (e: com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException) {
+            AccountDeletion.NEEDS_RECENT_SIGN_IN
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting account: ${e.message}", e)
+            AccountDeletion.FAILED
         }
     }
 
@@ -570,3 +595,5 @@ class FirebaseSyncManager(private val context: Context) {
         private const val WORKOUT_IMPORT_DOC = "workoutImport"
     }
 }
+
+enum class AccountDeletion { DELETED, NEEDS_RECENT_SIGN_IN, FAILED }

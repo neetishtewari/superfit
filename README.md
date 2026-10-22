@@ -40,6 +40,7 @@ CI (`.github/workflows/ci.yml`) runs all of these on every pull request and ever
 The debug build is shrunk with R8 using the same rules as release, so the dev app runs the same processed code as the Play Store app. Bugs that only appear after shrinking (in 1.0.25, R8 removed a WorkManager constructor and the home-screen widget never finished loading) show up while testing the dev app, not after an upload.
 
 - `scripts/check-r8-keeps.sh` fails if R8 removed a worker or a WorkManager input merger. CI runs it after `assembleDebug`.
+- `scripts/check-permissions.sh` fails if the built app requests a permission not listed in `app/permissions.txt` (libraries can add them silently). CI runs it after `assembleDebug`; add a new permission to the list in the same pull request.
 - `scripts/device-smoke-test.sh` builds and installs the dev app on a USB-connected phone, launches it, forces every scheduled background job to run (including the daily reminder, so a reminder notification appears), and fails on crashes or WorkManager errors. Run it before building a release. It never touches the Play Store app.
 
 When a feature is created by reflection (a new worker, a library that instantiates classes by name), add a `-keep` rule to `app/proguard-rules.pro`, and add the class to `scripts/check-r8-keeps.sh` if it isn't a worker. `docs/release-checklist.md` lists the checks to run before each Play upload.
