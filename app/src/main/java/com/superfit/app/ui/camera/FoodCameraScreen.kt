@@ -74,14 +74,12 @@ import kotlinx.coroutines.asExecutor
 @Composable
 fun FoodCameraScreen(
     controller: FoodCameraController,
-    apiKey: String,
     onLogged: (NutritionEntryEntity, Boolean) -> Unit,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptics = LocalHapticFeedback.current
-    controller.apiKey = apiKey
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)

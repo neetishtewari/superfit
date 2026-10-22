@@ -171,7 +171,7 @@ fun MainNavigation(
                             repository.clearAllLocalData()
                             val prefs = getUserSharedPrefs(context)
                             prefs.edit().clear().commit()
-                            GeminiKeyStore(context).clear()
+                            GeminiKeyStore.forgetOldKeys(context)
                             FirebaseAuth.getInstance().signOut()
                             backStack.removeLastOrNull() // pop Settings
                             backStack.removeLastOrNull() // pop Dashboard

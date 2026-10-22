@@ -17,8 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,8 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -54,7 +50,6 @@ fun SettingsScreen(
     val sharedPrefs = remember { getUserSharedPrefs(context) }
 
     val dashboardState by viewModel.dashboardState.collectAsState()
-    val apiKey by viewModel.apiKey.collectAsState()
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val scrollState = rememberScrollState()
@@ -149,69 +144,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // SECTION 1: Gemini API
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Your own Gemini key (optional)",
-                        fontWeight = FontWeight.Bold,
-                        color = SuperfitTheme.colors.textPrimary,
-                        fontSize = 14.sp
-                    )
-                    var keyVisible by remember { mutableStateOf(false) }
-
-                    OutlinedTextField(
-                        value = apiKey,
-                        onValueChange = { viewModel.updateApiKey(it) },
-                        label = { Text("Gemini API Key", color = SuperfitTheme.colors.textSecondary) },
-                        visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (keyVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                            IconButton(onClick = { keyVisible = !keyVisible }) {
-                                Icon(
-                                    imageVector = image,
-                                    contentDescription = if (keyVisible) "Hide API Key" else "Show API Key",
-                                    tint = SuperfitTheme.colors.textTertiary
-                                )
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                            unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                            focusedLabelColor = SuperfitTheme.colors.secondaryAccent,
-                            unfocusedLabelColor = SuperfitTheme.colors.textSecondary,
-                            focusedTextColor = SuperfitTheme.colors.textPrimary,
-                            unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = "Superfit's AI works without a key. If you add your own Google AI Studio key, " +
-                            "AI requests go straight to Google using your key instead.\n" +
-                            "• Your key is stored only on this phone and is never sent to Superfit.\n" +
-                            "• Leave this empty to use Superfit's built-in AI.\n" +
-                            "• Meal photos are sent to Google's Gemini AI to estimate nutrition and are not stored.",
-                        fontSize = 11.sp,
-                        color = SuperfitTheme.colors.textTertiary
-                    )
-                }
-            }
-
             // SECTION 2: Google Health Connect
             Card(
                 shape = RoundedCornerShape(20.dp),

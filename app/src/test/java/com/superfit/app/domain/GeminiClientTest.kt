@@ -48,7 +48,7 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `invalid key stops immediately with a friendly message`() = runTest {
+    fun `refused key stops immediately with a friendly message`() = runTest {
         var callCount = 0
         try {
             GeminiClient.runWithFailover(models) {
@@ -57,7 +57,7 @@ class GeminiClientTest {
             }
             fail("expected an exception")
         } catch (e: Exception) {
-            assertEquals("Your own Gemini key in Settings isn't working. Remove it there to use Superfit's built-in AI.", e.message)
+            assertEquals("The AI assistant is unavailable right now. Please try again later.", e.message)
         }
         assertEquals(1, callCount)
     }

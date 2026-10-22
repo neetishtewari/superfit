@@ -8,10 +8,6 @@
 }
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Gemini AI SDK reflection support
--keep class com.google.ai.client.generativeai.** { *; }
--dontwarn com.google.ai.client.generativeai.**
-
 # WorkManager creates the input merger of every one-off job by reflection. Without this, R8 removes
 # the constructor and each OneTimeWorkRequest fails in release ("Could not create Input Merger"),
 # which left the widget loading forever and stopped the daily reminder.

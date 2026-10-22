@@ -20,6 +20,7 @@ class SuperfitApplication : Application() {
         super.onCreate()
         installAppCheck()
         com.superfit.app.data.AppAnalytics.init(this)
+        com.superfit.app.data.GeminiKeyStore.forgetOldKeys(this)
         com.superfit.app.data.ReminderNotifications.ensureChannel(this)
         scheduleTelemetrySync()
         scheduleDailyReminder()

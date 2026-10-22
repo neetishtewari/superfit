@@ -69,7 +69,6 @@ class HistoryViewModel(
 ) : ViewModel() {
 
     private val sharedPrefs = getUserSharedPrefs(context)
-    private val geminiKeyStore = GeminiKeyStore(context)
 
     private val _parsingState = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
     val parsingState: StateFlow<HistoryParsingState> = _parsingState.asStateFlow()
@@ -421,13 +420,11 @@ class HistoryViewModel(
     }
 
     fun parseAndAddMeal(input: String) {
-        val key = geminiKeyStore.get()
-
         viewModelScope.launch {
             _parsingState.value = HistoryParsingState.Loading
             try {
                 val history = repository.getAllNutritionEntries()
-                val parser = com.superfit.app.domain.NutritionParser(key)
+                val parser = com.superfit.app.domain.NutritionParser()
                 val result = parser.parseFoodInput(input, history)
 
                 if (result.foodText == "invalid") {

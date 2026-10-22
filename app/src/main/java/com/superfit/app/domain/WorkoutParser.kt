@@ -2,7 +2,7 @@ package com.superfit.app.domain
 
 import org.json.JSONObject
 
-class WorkoutParser(private val apiKey: String) {
+class WorkoutParser {
 
     private val systemInstructionText =
         "You are an expert exercise physiology AI. Parse the user's natural language workout or exercise description " +
@@ -22,7 +22,6 @@ class WorkoutParser(private val apiKey: String) {
         }
 
         val jsonText = GeminiClient.generateContent(
-            apiKey = apiKey,
             prompt = "Workout input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true
