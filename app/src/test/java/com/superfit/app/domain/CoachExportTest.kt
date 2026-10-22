@@ -9,11 +9,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class CoachReportTest {
+class CoachExportTest {
 
     private val today = LocalDate.of(2026, 10, 22)
     private val zone = ZoneOffset.UTC
-    private val header = CoachReportHeader("Sam", "LOSE_WEIGHT", 34, 175.0, true, 82.0, 75.0)
+    private val header = CoachExportHeader("Sam", "LOSE_WEIGHT", 34, 175.0, true, 82.0, 75.0)
 
     private fun meal(date: LocalDate, hour: Int, name: String, kcal: Double, protein: Double) = NutritionEntryEntity(
         foodText = name,
@@ -24,12 +24,12 @@ class CoachReportTest {
         timestamp = date.atTime(hour, 0).toInstant(zone).toEpochMilli()
     )
 
-    private fun build(meals: List<NutritionEntryEntity>, weeks: Int = 2, weighIns: List<Pair<LocalDate, Double>> = emptyList(), workouts: Map<LocalDate, List<ActivityFact>> = emptyMap()): CoachReport {
+    private fun build(meals: List<NutritionEntryEntity>, weeks: Int = 2, weighIns: List<Pair<LocalDate, Double>> = emptyList(), workouts: Map<LocalDate, List<ActivityFact>> = emptyMap()): CoachExport {
         val days = meals.groupBy { java.time.Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
             .mapValues { (date, list) -> DayTotals(date, list.sumOf { it.calories }, 2000.0, list.size, list.sumOf { it.proteinG }, 120.0, 0, workouts[date].orEmpty()) }
             .toMutableMap()
         workouts.forEach { (date, w) -> if (date !in days) days[date] = DayTotals(date, 0.0, 2000.0, 0, 0.0, 120.0, 0, w) }
-        return CoachReportBuilder.build(header, weeks, today, days, meals, weighIns, 120.0, listOf(null, 70), zone)
+        return CoachExportBuilder.build(header, weeks, today, days, meals, weighIns, 120.0, listOf(null, 70), zone)
     }
 
     @Test

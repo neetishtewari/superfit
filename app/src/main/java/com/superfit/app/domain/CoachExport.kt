@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 /** Who the report is about, shown at the top of page 1. */
-data class CoachReportHeader(
+data class CoachExportHeader(
     val name: String?,
     val goal: String,
     val age: Int,
@@ -18,9 +18,9 @@ data class CoachReportHeader(
     val targetKg: Double
 )
 
-data class CoachReportMeal(val time: String, val name: String, val kcal: Int, val proteinG: Int)
+data class CoachExportMeal(val time: String, val name: String, val kcal: Int, val proteinG: Int)
 
-data class CoachReportDay(
+data class CoachExportDay(
     val date: LocalDate,
     /** Two or more meals; days with fewer are shown as not (fully) logged, never as zero eating. */
     val logged: Boolean,
@@ -32,11 +32,11 @@ data class CoachReportDay(
     val steps: Int,
     val workouts: List<String>,
     val weightKg: Double?,
-    val meals: List<CoachReportMeal>
+    val meals: List<CoachExportMeal>
 )
 
-data class CoachReport(
-    val header: CoachReportHeader,
+data class CoachExport(
+    val header: CoachExportHeader,
     val from: LocalDate,
     val to: LocalDate,
     val daysLogged: Int,
@@ -55,7 +55,7 @@ data class CoachReport(
     val weightEnd: Pair<LocalDate, Double>?,
     /** Diet Quality per week of the period, oldest first; null for a week with too little logged. */
     val dietScores: List<Int?>,
-    val days: List<CoachReportDay>
+    val days: List<CoachExportDay>
 ) {
     val totalDays: Int get() = days.size
 }
@@ -64,12 +64,12 @@ data class CoachReport(
  * Builds the "Share with my coach" summary from the same day totals Insights uses. Averages
  * count only logged days, so a forgotten day never reads as under-eating. No AI.
  */
-object CoachReportBuilder {
+object CoachExportBuilder {
 
     private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
     fun build(
-        header: CoachReportHeader,
+        header: CoachExportHeader,
         weeks: Int,
         today: LocalDate,
         days: Map<LocalDate, DayTotals>,
@@ -78,7 +78,7 @@ object CoachReportBuilder {
         proteinTargetG: Double,
         dietScores: List<Int?>,
         zone: ZoneId = ZoneId.systemDefault()
-    ): CoachReport {
+    ): CoachExport {
         // Ends yesterday, like Insights: today isn't over yet.
         val to = today.minusDays(1)
         val from = to.minusDays(weeks * 7L - 1)
@@ -87,7 +87,7 @@ object CoachReportBuilder {
 
         val reportDays = InsightsEngine.range(days, from, to).map { d ->
             val dayMeals = mealsByDate[d.date].orEmpty().sortedBy { it.timestamp }
-            CoachReportDay(
+            CoachExportDay(
                 date = d.date,
                 logged = d.logged,
                 kcal = d.kcalEaten.roundToInt(),
@@ -99,7 +99,7 @@ object CoachReportBuilder {
                 workouts = d.workouts.map { describe(it) },
                 weightKg = weightByDate[d.date],
                 meals = dayMeals.map {
-                    CoachReportMeal(
+                    CoachExportMeal(
                         time = Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalTime().format(timeFormat),
                         name = it.foodText,
                         kcal = it.calories.roundToInt(),
@@ -110,12 +110,12 @@ object CoachReportBuilder {
         }
 
         val logged = reportDays.filter { it.logged }
-        fun avg(f: (CoachReportDay) -> Int): Int? = if (logged.isEmpty()) null else logged.map(f).average().roundToInt()
+        fun avg(f: (CoachExportDay) -> Int): Int? = if (logged.isEmpty()) null else logged.map(f).average().roundToInt()
         val stats = InsightsEngine.stats(InsightsEngine.range(days, from, to))
         val withSteps = reportDays.filter { it.steps > 0 }
         val inPeriod = weighIns.filter { !it.first.isBefore(from) && !it.first.isAfter(to) }.sortedBy { it.first }
 
-        return CoachReport(
+        return CoachExport(
             header = header,
             from = from,
             to = to,

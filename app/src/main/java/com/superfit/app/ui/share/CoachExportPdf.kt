@@ -9,8 +9,8 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
-import com.superfit.app.domain.CoachReport
-import com.superfit.app.domain.CoachReportBuilder
+import com.superfit.app.domain.CoachExport
+import com.superfit.app.domain.CoachExportBuilder
 import java.io.File
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -18,10 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Draws a [CoachReport] as an A4 PDF: a summary page, a day-by-day table, then each day's meals.
+ * Draws a [CoachExport] as an A4 PDF: a summary page, a day-by-day table, then each day's meals.
  * Made on the phone and only leaves it through the share sheet.
  */
-object CoachReportPdf {
+object CoachExportPdf {
 
     private const val PAGE_W = 595 // A4 in PDF points
     private const val PAGE_H = 842
@@ -32,7 +32,7 @@ object CoachReportPdf {
     private val rangeFormat = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.US)
 
     /** Writes the PDF to the app's share cache (replacing the last share) and opens the share sheet. */
-    suspend fun share(context: Context, report: CoachReport) {
+    suspend fun share(context: Context, report: CoachExport) {
         val file = withContext(Dispatchers.IO) {
             val dir = File(context.cacheDir, "shares").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
@@ -51,7 +51,7 @@ object CoachReportPdf {
         context.startActivity(Intent.createChooser(send, "Share with your coach"))
     }
 
-    fun write(report: CoachReport, file: File) {
+    fun write(report: CoachExport, file: File) {
         val doc = PdfDocument()
         val pen = Pen(doc)
         summary(pen, report)
@@ -62,7 +62,7 @@ object CoachReportPdf {
         doc.close()
     }
 
-    private fun summary(pen: Pen, r: CoachReport) {
+    private fun summary(pen: Pen, r: CoachExport) {
         val h = r.header
         pen.text("Superfit report", 22f, bold = true)
         pen.gap(4f)
@@ -71,7 +71,7 @@ object CoachReportPdf {
 
         pen.heading("About")
         h.name?.let { pen.row("Name", it) }
-        pen.row("Goal", CoachReportBuilder.goalLabel(h.goal))
+        pen.row("Goal", CoachExportBuilder.goalLabel(h.goal))
         pen.row("Start / goal weight", "${kg(h.startKg)} / ${kg(h.targetKg)}")
         pen.row("Age, height, sex", "${h.age} · ${h.heightCm.toInt()} cm · ${if (h.isMale) "Male" else "Female"}")
         pen.gap(10f)
@@ -110,7 +110,7 @@ object CoachReportPdf {
 
     private val columns = listOf("Day" to 0f, "kcal" to 90f, "Protein" to 140f, "Carbs" to 195f, "Fat" to 245f, "Steps" to 290f, "Weight" to 345f, "Workouts" to 400f)
 
-    private fun dayTable(pen: Pen, r: CoachReport) {
+    private fun dayTable(pen: Pen, r: CoachExport) {
         pen.newPage()
         pen.text("Day by day", 16f, bold = true)
         pen.gap(8f)
@@ -133,7 +133,7 @@ object CoachReportPdf {
         pen.text("Days with fewer than two meals logged are greyed out; they aren't counted in averages.", 9f, grey = true)
     }
 
-    private fun mealPages(pen: Pen, r: CoachReport) {
+    private fun mealPages(pen: Pen, r: CoachExport) {
         pen.newPage()
         pen.text("Meals", 16f, bold = true)
         r.days.filter { it.meals.isNotEmpty() }.forEach { d ->

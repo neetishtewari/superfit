@@ -378,8 +378,8 @@ class HistoryViewModel(
             val dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
                 com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday, proteinTarget, calculateTargetCalories(yesterday), zone, weeksAgo)?.score
             }
-            val report = com.superfit.app.domain.CoachReportBuilder.build(
-                header = com.superfit.app.domain.CoachReportHeader(
+            val report = com.superfit.app.domain.CoachExportBuilder.build(
+                header = com.superfit.app.domain.CoachExportHeader(
                     name = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName?.takeIf { it.isNotBlank() },
                     goal = profile.goal,
                     age = profile.age,
@@ -397,7 +397,7 @@ class HistoryViewModel(
                 dietScores = dietScores,
                 zone = zone
             )
-            com.superfit.app.ui.share.CoachReportPdf.share(context, report)
+            com.superfit.app.ui.share.CoachExportPdf.share(context, report)
             com.superfit.app.data.AppAnalytics.reportShared(weeks)
         }
     }
