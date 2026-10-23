@@ -442,7 +442,7 @@ fun MealItemRow(
             Icon(
                 imageVector = Icons.Default.Delete,
                 contentDescription = "Delete entry",
-                tint = EnergeticCoral.copy(alpha = 0.7f)
+                tint = DeleteRed.copy(alpha = 0.7f)
             )
         }
     }

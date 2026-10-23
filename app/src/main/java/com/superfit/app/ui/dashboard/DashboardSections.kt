@@ -948,7 +948,7 @@ internal fun ActivityPerformanceCard(
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = "Delete Workout",
-                                    tint = EnergeticCoral,
+                                    tint = DeleteRed,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }

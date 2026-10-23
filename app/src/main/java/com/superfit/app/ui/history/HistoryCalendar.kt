@@ -170,7 +170,7 @@ fun CalendarCard(
             ) {
                 LegendItem(color = NeonMint, label = "Deficit")
                 val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
-                LegendItem(color = CoralRed, label = "Surplus")
+                LegendItem(color = SolarAmber, label = "Surplus")
                 LegendItem(color = untrackedColor, label = "Untracked (<2 meals)")
             }
         }
@@ -187,7 +187,7 @@ fun CalendarDayCell(
     val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
     val bgColor = when (dayState.status) {
         DayStatus.Deficit -> NeonMint.copy(alpha = 0.20f)
-        DayStatus.Surplus -> CoralRed.copy(alpha = 0.20f)
+        DayStatus.Surplus -> SolarAmber.copy(alpha = 0.20f)
         DayStatus.Insufficient -> untrackedColor.copy(alpha = 0.3f)
     }
 
@@ -196,7 +196,7 @@ fun CalendarDayCell(
         dayState.date == LocalDate.now() -> HyperViolet.copy(alpha = 0.6f)
         else -> when (dayState.status) {
             DayStatus.Deficit -> NeonMint
-            DayStatus.Surplus -> CoralRed
+            DayStatus.Surplus -> SolarAmber
             DayStatus.Insufficient -> Color.Transparent
         }
     }
@@ -232,7 +232,7 @@ fun CalendarDayCell(
                     text = "${if (net > 0) "+" else ""}$net",
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Medium,
-                    color = if (net < 0) NeonMint else CoralRed
+                    color = if (net < 0) NeonMint else SolarAmber
                 )
             }
         }

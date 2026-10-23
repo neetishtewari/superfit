@@ -60,7 +60,6 @@ import com.superfit.app.domain.InsightsEngine
 import com.superfit.app.domain.JourneyForecast
 import com.superfit.app.domain.MeasuredBody
 import com.superfit.app.domain.WeekReport
-import com.superfit.app.theme.CoralRed
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
@@ -400,7 +399,7 @@ fun JourneyTab(
         val (statusLabel, statusColor) = when (j.status) {
             ForecastStatus.ON_TRACK -> "ON TRACK" to NeonMint
             ForecastStatus.AT_RISK -> "AT RISK" to SolarAmber
-            ForecastStatus.OFF_TRACK -> "OFF TRACK" to CoralRed
+            ForecastStatus.OFF_TRACK -> "OFF TRACK" to SolarAmber
             ForecastStatus.REACHED -> "GOAL REACHED" to NeonMint
             ForecastStatus.NOT_ENOUGH_DATA -> "NEEDS MORE DATA" to ThemeTextSecondary
         }

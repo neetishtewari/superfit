@@ -444,7 +444,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
         "GREEN" -> NeonMint
         "YELLOW" -> ElectricCyan
         "ORANGE" -> SolarAmber
-        "RED" -> CoralRed
+        "RED" -> SolarAmber
         else -> ElectricCyan
     }
 
@@ -616,7 +616,7 @@ fun FoodSwapCard(
                         text = swap.originalFood,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = CoralRed
+                        color = SolarAmber
                     )
                 }
 

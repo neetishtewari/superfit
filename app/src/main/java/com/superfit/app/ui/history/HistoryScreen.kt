@@ -214,7 +214,7 @@ fun HistoryScreen(
                                         TrendItem(
                                             label = "CURRENT STREAK",
                                             value = "${dashboardState.streakState.currentStreak} ${if (dashboardState.streakState.currentStreak == 1) "day" else "days"}",
-                                            valueColor = CoralRed,
+                                            valueColor = SolarAmber,
                                             modifier = Modifier.weight(1f)
                                         )
                                         TrendItem(

@@ -27,6 +27,7 @@ import com.superfit.app.domain.Level
 import com.superfit.app.domain.MealItem
 import com.superfit.app.domain.MealItems
 import com.superfit.app.domain.withItems
+import com.superfit.app.theme.DeleteRed
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
@@ -178,7 +179,7 @@ private fun MealItemEditRow(
             Spacer(modifier = Modifier.weight(1f))
             if (canRemove) {
                 IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove ${item.name}", tint = EnergeticCoral.copy(alpha = 0.8f))
+                    Icon(Icons.Default.Close, contentDescription = "Remove ${item.name}", tint = DeleteRed.copy(alpha = 0.8f))
                 }
             }
         }

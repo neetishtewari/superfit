@@ -67,7 +67,7 @@ fun DayBalanceCard(
     var shareCard by remember { mutableStateOf<ShareCard?>(null) }
     shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
 
-    val netColor = if (summary.netBalance < 0) NeonMint else CoralRed
+    val netColor = if (summary.netBalance < 0) NeonMint else SolarAmber
     val balanceLabel = if (summary.netBalance < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
 
     val today = LocalDate.now()
@@ -114,11 +114,11 @@ fun DayBalanceCard(
                     text = if (summary.netBalance < 0) "ON TARGET" else "SURPLUS",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (summary.netBalance < 0) NeonMint else CoralRed,
+                    color = if (summary.netBalance < 0) NeonMint else SolarAmber,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background((if (summary.netBalance < 0) NeonMint else CoralRed).copy(alpha = 0.15f))
-                        .border(1.dp, (if (summary.netBalance < 0) NeonMint else CoralRed).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .background((if (summary.netBalance < 0) NeonMint else SolarAmber).copy(alpha = 0.15f))
+                        .border(1.dp, (if (summary.netBalance < 0) NeonMint else SolarAmber).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
@@ -142,7 +142,7 @@ fun DayBalanceCard(
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                     Text(text = "BURN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    Text(text = "${summary.activeBurn.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CoralRed)
+                    Text(text = "${summary.activeBurn.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SolarAmber)
                 }
             }
 
@@ -249,7 +249,7 @@ fun DayBalanceCard(
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete Meal",
-                                        tint = CoralRed,
+                                        tint = DeleteRed,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -332,7 +332,7 @@ fun DayBalanceCard(
                                     text = "~${entry.caloriesBurned.toInt()} kcal",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = CoralRed
+                                    color = SolarAmber
                                 )
                                 IconButton(
                                     onClick = { shareCard = ShareCards.activity(entry) },
@@ -352,7 +352,7 @@ fun DayBalanceCard(
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete Workout",
-                                        tint = CoralRed,
+                                        tint = DeleteRed,
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -507,7 +507,7 @@ fun DayBalanceCard(
                 statusMessage?.let { msg ->
                     Text(
                         text = msg,
-                        color = if (isErrorState) CoralRed else NeonMint,
+                        color = if (isErrorState) SolarAmber else NeonMint,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 4.dp)
