@@ -176,6 +176,9 @@ dependencies {
   // Home-screen widget
   implementation(libs.androidx.glance.appwidget)
 
+  // Play Store rating sheet
+  implementation(libs.play.review)
+
   // Google Health Connect
   implementation(libs.androidx.health.connect)
 
