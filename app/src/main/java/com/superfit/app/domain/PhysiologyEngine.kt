@@ -7,7 +7,12 @@ object PhysiologyEngine {
     /**
      * Calculates the Basal Metabolic Rate (BMR) using the Mifflin-St Jeor Equation.
      */
-    fun calculateBmr(profile: UserProfileEntity): Double {
+    /**
+     * Resting calories. When the user's smart scale gave a recent body fat reading, this works from
+     * lean mass instead, which counts muscle that the weight-only formula can't.
+     */
+    fun calculateBmr(profile: UserProfileEntity, bodyFatPct: Double? = MeasuredBody.currentBodyFat()): Double {
+        if (bodyFatPct != null) return BodyReadings.leanMassBmr(profile.weightKg, bodyFatPct)
         return calculateBmr(
             weightKg = profile.weightKg,
             heightCm = profile.heightCm,

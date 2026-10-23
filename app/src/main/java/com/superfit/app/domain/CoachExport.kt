@@ -55,7 +55,9 @@ data class CoachExport(
     val weightEnd: Pair<LocalDate, Double>?,
     /** Diet Quality per week of the period, oldest first; null for a week with too little logged. */
     val dietScores: List<Int?>,
-    val days: List<CoachExportDay>
+    val days: List<CoachExportDay>,
+    /** From the user's smart scale, when they have one. */
+    val body: BodySummary? = null
 ) {
     val totalDays: Int get() = days.size
 }
@@ -77,7 +79,8 @@ object CoachExportBuilder {
         weighIns: List<Pair<LocalDate, Double>>,
         proteinTargetG: Double,
         dietScores: List<Int?>,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
+        body: BodySummary? = null
     ): CoachExport {
         // Ends yesterday, like Insights: today isn't over yet.
         val to = today.minusDays(1)
@@ -133,7 +136,8 @@ object CoachExportBuilder {
             weightStart = inPeriod.firstOrNull(),
             weightEnd = inPeriod.lastOrNull()?.takeIf { inPeriod.size > 1 },
             dietScores = dietScores,
-            days = reportDays
+            days = reportDays,
+            body = body?.takeIf { it.hasScaleData }
         )
     }
 

@@ -63,6 +63,9 @@ fun HistoryScreen(
 ) {
     val scrollState = rememberScrollState()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val bodyPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    ) { viewModel.onBodyAccessResult() }
     var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 = Insights, 1 = Journey, 2 = Log
     LaunchedEffect(selectedTab) { com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab]) }
     val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
@@ -231,7 +234,12 @@ fun HistoryScreen(
                             j = journey,
                             goalSet = viewModel.goalSet,
                             onWeighIn = { showWeighIn = true },
-                            onEditGoal = { showGoalEdit = true }
+                            onEditGoal = { showGoalEdit = true },
+                            body = viewModel.body,
+                            canAskBodyAccess = viewModel.canAskBodyAccess,
+                            onAllowBody = {
+                                com.superfit.app.ui.launchHealthConnectPermissions(context, bodyPermissionLauncher, viewModel.bodyPermissions)
+                            }
                         )
                     }
                     else -> {

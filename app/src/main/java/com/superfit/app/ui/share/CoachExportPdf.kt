@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import com.superfit.app.domain.BodyReadings
 import com.superfit.app.domain.CoachExport
 import com.superfit.app.domain.CoachExportBuilder
 import java.io.File
@@ -105,6 +106,12 @@ object CoachExportPdf {
                 pen.row("End", "${kg(end.second)} on ${end.first.format(dayFormat)}")
                 pen.row("Change", "${if (change > 0) "+" else ""}${kg(change)}")
             }
+        }
+        r.body?.let { b ->
+            b.bodyFatPct?.let { pen.row("Body fat", "${BodyReadings.fmt(it)}%" + (b.bodyFatChange?.let { c -> " (${if (c > 0) "+" else ""}${BodyReadings.fmt(c)} pts over 4 weeks)" } ?: "")) }
+            b.leanKg?.let { pen.row("Lean mass", "${BodyReadings.fmt(it)} kg") }
+            b.source?.let { pen.row("Measured by", it) }
+            b.insight?.let { pen.wrapped(it, 10f, indent = 0f) }
         }
     }
 

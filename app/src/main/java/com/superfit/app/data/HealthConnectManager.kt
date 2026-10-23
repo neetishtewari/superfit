@@ -4,7 +4,12 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BasalMetabolicRateRecord
+import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.BoneMassRecord
 import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.LeanBodyMassRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -33,6 +38,72 @@ class HealthConnectManager(private val context: Context) {
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(HeightRecord::class)
     )
+
+    /** Body fat, lean mass, bone mass and BMR from smart scale apps. Asked for separately, so people without a scale aren't asked. */
+    val bodyPermissions = setOf(
+        HealthPermission.getReadPermission(BodyFatRecord::class),
+        HealthPermission.getReadPermission(LeanBodyMassRecord::class),
+        HealthPermission.getReadPermission(BoneMassRecord::class),
+        HealthPermission.getReadPermission(BasalMetabolicRateRecord::class)
+    )
+
+    suspend fun hasBodyPermissions(): Boolean {
+        val client = healthConnectClient ?: return false
+        return try {
+            client.permissionController.getGrantedPermissions().containsAll(bodyPermissions)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Every weigh-in since [since], from any app. Empty if weight access is off or the read fails. */
+    suspend fun readWeighIns(since: Instant): List<com.superfit.app.domain.ScaleReading> = readAll(WeightRecord::class, since).map {
+        com.superfit.app.domain.ScaleReading(
+            id = it.metadata.id,
+            time = it.time,
+            weightKg = it.weight.inKilograms,
+            source = it.metadata.dataOrigin.packageName
+        )
+    }
+
+    suspend fun readBodyFat(since: Instant) = readAll(BodyFatRecord::class, since).map {
+        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.percentage.value)
+    }
+
+    suspend fun readLeanMass(since: Instant) = readAll(LeanBodyMassRecord::class, since).map {
+        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.mass.inKilograms)
+    }
+
+    suspend fun readBoneMass(since: Instant) = readAll(BoneMassRecord::class, since).map {
+        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.mass.inKilograms)
+    }
+
+    suspend fun readScaleBmr(since: Instant) = readAll(BasalMetabolicRateRecord::class, since).map {
+        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.basalMetabolicRate.inKilocaloriesPerDay)
+    }
+
+    /** All records of one type since [since], following pages. Empty when not allowed or on failure. */
+    private suspend fun <T : Record> readAll(type: kotlin.reflect.KClass<T>, since: Instant): List<T> {
+        val client = healthConnectClient ?: return emptyList()
+        return try {
+            val out = mutableListOf<T>()
+            var token: String? = null
+            do {
+                val response = client.readRecords(
+                    ReadRecordsRequest(
+                        recordType = type,
+                        timeRangeFilter = TimeRangeFilter.between(since, Instant.now()),
+                        pageToken = token
+                    )
+                )
+                out += response.records
+                token = response.pageToken
+            } while (token != null && out.size < 5000)
+            out
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
     fun isAvailable(): Boolean {
         return HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE && healthConnectClient != null

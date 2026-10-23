@@ -280,6 +280,7 @@ fun DashboardScreen(
     val workoutPermissionMissing by viewModel.workoutPermissionMissing.collectAsState()
     val workoutImportRunning by viewModel.workoutImportRunning.collectAsState()
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
+    val pendingScaleReading by viewModel.pendingScaleReading.collectAsState()
     val personalBests by viewModel.personalBests.collectAsState()
     // The card in the share preview, and the new best it shows (remembered once it's shared).
     var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
@@ -605,6 +606,15 @@ fun DashboardScreen(
                     shareBest = null
                 },
                 onShared = { shareBest?.let { viewModel.acknowledgeBest(it) } }
+            )
+        }
+
+        pendingScaleReading?.let { reading ->
+            ScaleReadingDialog(
+                reading = reading,
+                onMe = { viewModel.answerScaleReading(isMe = true) },
+                onNotMe = { viewModel.answerScaleReading(isMe = false) },
+                onLater = { viewModel.postponeScaleReading() }
             )
         }
 

@@ -291,7 +291,7 @@ fun SettingsScreen(
                                         Toast.makeText(context, "Could not open Health Connect settings.", Toast.LENGTH_SHORT).show()
                                     }
                                 } else {
-                                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, viewModel.healthConnectManager.permissions)
+                                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, viewModel.healthConnectManager.permissions + viewModel.healthConnectManager.bodyPermissions)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(

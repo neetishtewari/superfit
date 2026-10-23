@@ -113,7 +113,13 @@ class DashboardViewModel(
     private val _duplicateWorkoutPrompt = MutableStateFlow<DuplicateWorkoutPrompt?>(null)
     val duplicateWorkoutPrompt: StateFlow<DuplicateWorkoutPrompt?> = _duplicateWorkoutPrompt.asStateFlow()
 
+    /** A smart scale reading that might be someone else's, waiting for "Is this you?". */
+    private val _pendingScaleReading = MutableStateFlow<com.superfit.app.domain.ScaleReading?>(null)
+    val pendingScaleReading: StateFlow<com.superfit.app.domain.ScaleReading?> = _pendingScaleReading.asStateFlow()
+
     init {
+        com.superfit.app.data.BodyImporter.load(appContext)
+        _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
         checkPermissions()
         loadCachedCoachingInsight()
         loadFrequentMeals()
@@ -232,11 +238,28 @@ class DashboardViewModel(
                     .joinToString()
                     .ifEmpty { "none recorded" }
 
+                val body = com.superfit.app.domain.BodyReadings.summary(
+                    com.superfit.app.data.BodyImporter.mine(appContext),
+                    profile.weightKg,
+                    profile.heightCm,
+                    LocalDate.now()
+                )
+                val bodyText = if (body.hasScaleData) {
+                    listOfNotNull(
+                        body.bodyFatPct?.let { "body fat ${com.superfit.app.domain.BodyReadings.fmt(it)}%" + (body.bodyFatChange?.let { c -> " (${if (c > 0) "+" else ""}${com.superfit.app.domain.BodyReadings.fmt(c)} pts over 4 weeks)" } ?: "") },
+                        body.leanKg?.let { "lean mass ${com.superfit.app.domain.BodyReadings.fmt(it)} kg" },
+                        body.insight
+                    ).joinToString(", ")
+                } else {
+                    "no smart scale data"
+                }
+
                 val systemInstructionText = """
                     You are Superfit AI Coach, a premium, friendly, highly analytical personal trainer and health scientist.
                     Answer the user's questions about their fitness, diet, sleep, or daily telemetry.
                     Use the user's live daily metrics below for context:
                     - User Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
+                    - Body (smart scale): $bodyText
                     - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
                     - Macro Targets: Protein: ${macroTargets.proteinG.toInt()}g, Carbs: ${macroTargets.carbsG.toInt()}g, Fat: ${macroTargets.fatG.toInt()}g, Calories: ${macroTargets.calories.toInt()} kcal
                     - Daily Nutrition: $nutritionText
@@ -669,9 +692,25 @@ class DashboardViewModel(
         }
     }
 
+    /** The answer to "Is this you?" for the waiting scale reading. */
+    fun answerScaleReading(isMe: Boolean) {
+        val reading = _pendingScaleReading.value ?: return
+        _pendingScaleReading.value = null
+        viewModelScope.launch {
+            com.superfit.app.data.BodyImporter.answer(appContext, repository, reading.id, isMe)
+            _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
+        }
+    }
+
+    /** "Not now" on "Is this you?": ask again next time the app opens. */
+    fun postponeScaleReading() {
+        _pendingScaleReading.value = null
+    }
+
     fun syncTelemetry() {
         viewModelScope.launch {
             repository.syncHealthConnectTelemetry(LocalDate.now())
+            _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()
             sharedPrefs.edit().putLong("last_telemetry_sync", now).apply()
             _lastSyncTime.value = now

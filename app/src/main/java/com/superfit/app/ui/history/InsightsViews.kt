@@ -51,11 +51,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.domain.BodyReadings
+import com.superfit.app.domain.BodySummary
 import com.superfit.app.domain.ForecastStatus
 import com.superfit.app.domain.GoalForecast
 import com.superfit.app.domain.Insight
 import com.superfit.app.domain.InsightsEngine
 import com.superfit.app.domain.JourneyForecast
+import com.superfit.app.domain.MeasuredBody
 import com.superfit.app.domain.WeekReport
 import com.superfit.app.theme.CoralRed
 import com.superfit.app.theme.ElectricCyan
@@ -327,7 +330,15 @@ private fun ExpandRow(title: String, hint: String = "", content: @Composable () 
 
 /** Journey: how much of the goal is done, when the user will get there at current habits, and what would help. */
 @Composable
-fun JourneyTab(j: JourneyForecast, goalSet: Boolean, onWeighIn: () -> Unit, onEditGoal: () -> Unit) {
+fun JourneyTab(
+    j: JourneyForecast,
+    goalSet: Boolean,
+    onWeighIn: () -> Unit,
+    onEditGoal: () -> Unit,
+    body: BodySummary? = null,
+    canAskBodyAccess: Boolean = false,
+    onAllowBody: () -> Unit = {}
+) {
     val lose = j.targetKg < j.startKg
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (!goalSet) {
@@ -347,6 +358,7 @@ fun JourneyTab(j: JourneyForecast, goalSet: Boolean, onWeighIn: () -> Unit, onEd
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) { Text("Set my goal", fontWeight = FontWeight.Bold) }
             }
+            body?.let { BodyCard(it, canAskBodyAccess, onAllowBody) }
             WeighInCard(j, onWeighIn)
             return@Column
         }
@@ -449,8 +461,72 @@ fun JourneyTab(j: JourneyForecast, goalSet: Boolean, onWeighIn: () -> Unit, onEd
             }
         }
 
+        body?.let { BodyCard(it, canAskBodyAccess, onAllowBody) }
         WeighInCard(j, onWeighIn)
     }
+}
+
+/**
+ * What the user's smart scale measures, and nothing it doesn't: body fat, muscle, bone, BMR, plus
+ * BMI for everyone. Without a scale it says what would fill it in.
+ */
+@Composable
+private fun BodyCard(b: BodySummary, canAskBodyAccess: Boolean, onAllowBody: () -> Unit) {
+    SectionCard {
+        SectionLabel("BODY", ElectricCyan)
+        b.insight?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary, lineHeight = 21.sp) }
+        b.bodyFatPct?.let { BodyRow("Body fat", "${BodyReadings.fmt(it)}%", b.bodyFatChange?.let { c -> change(c, "pts", lowerIsGood = true) }) }
+        b.leanKg?.let { BodyRow("Muscle (lean mass)", "${BodyReadings.fmt(it)} kg", b.leanChange?.let { c -> change(c, "kg", lowerIsGood = false) }) }
+        b.boneKg?.let { BodyRow("Bone mass", "${BodyReadings.fmt(it)} kg", null) }
+        b.scaleBmr?.let { BodyRow("Resting burn (from scale)", "${it.toInt()} kcal", null) }
+        b.bmi?.let { BodyRow("BMI", BodyReadings.fmt(it), null) }
+        when {
+            b.hasScaleData -> {
+                val from = listOfNotNull(b.source?.let { "From $it" }, b.measuredOn?.let { "measured ${it.format(shortDate)}" }).joinToString(", ")
+                val usesIt = MeasuredBody.currentBodyFat() != null
+                Text(
+                    listOf(from, if (usesIt) "Your calorie target uses this body fat." else "").filter { it.isNotEmpty() }.joinToString(". "),
+                    fontSize = 12.sp,
+                    color = ThemeTextSecondary,
+                    lineHeight = 17.sp
+                )
+            }
+            canAskBodyAccess -> {
+                Text(
+                    "Use a smart scale? Let Superfit read body fat, muscle and more from it through Health Connect.",
+                    fontSize = 13.sp,
+                    color = ThemeTextSecondary,
+                    lineHeight = 18.sp
+                )
+                TextButton(onClick = onAllowBody, modifier = Modifier.heightIn(min = 44.dp)) {
+                    Text("Allow body measurements", color = NeonMint, fontWeight = FontWeight.Bold)
+                }
+            }
+            else -> Text(
+                "A smart scale app that saves to Health Connect (like FitDays) can add body fat and more here.",
+                fontSize = 13.sp,
+                color = ThemeTextSecondary,
+                lineHeight = 18.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun BodyRow(label: String, value: String, delta: Delta?) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontSize = 14.sp, color = ThemeTextSecondary, modifier = Modifier.weight(1f))
+        delta?.let { Text(it.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = it.color, modifier = Modifier.padding(end = 10.dp)) }
+        Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
+    }
+}
+
+/** "▼ 1.2 pts in 4 wks", green when it moved the healthy way. */
+@Composable
+private fun change(diff: Double, unit: String, lowerIsGood: Boolean): Delta? {
+    if (abs(diff) < 0.1) return null
+    val good = (diff < 0) == lowerIsGood
+    return Delta("${if (diff > 0) "▲" else "▼"} ${BodyReadings.fmt(abs(diff))} $unit in 4 wks", if (good) NeonMint else SolarAmber)
 }
 
 @Composable
