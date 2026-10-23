@@ -66,6 +66,7 @@ import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.theme.*
 import com.superfit.app.ui.camera.FoodCameraController
@@ -288,6 +289,17 @@ fun DashboardScreen(
     // Auto sync on entry
     LaunchedEffect(Unit) {
         viewModel.syncTelemetry()
+    }
+
+    // Play Store rating, asked once after meals on 5 different days (not while a new best is offered)
+    val mealDaysLogged = (dashboardState as? DashboardUiState.Success)?.mealDaysLogged ?: 0
+    val bestOffered = personalBests.toOffer != null
+    LaunchedEffect(mealDaysLogged, bestOffered) {
+        val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+            .firstNotNullOfOrNull { it as? android.app.Activity } ?: return@LaunchedEffect
+        if (ReviewPrompt.shouldAsk(mealDaysLogged, ReviewPrompt.wasAsked(context), bestOffered)) {
+            ReviewPrompt.ask(activity)
+        }
     }
 
     // Camera button on the home-screen widget
