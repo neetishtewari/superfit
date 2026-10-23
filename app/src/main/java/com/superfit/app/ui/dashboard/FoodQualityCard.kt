@@ -31,6 +31,7 @@ import com.superfit.app.domain.DietQualityMetrics
 import com.superfit.app.domain.DietScorePart
 import com.superfit.app.domain.FoodItemRating
 import com.superfit.app.domain.FoodSwapSuggestion
+import com.superfit.app.domain.FoodVerdict
 import com.superfit.app.theme.*
 
 @Composable
@@ -406,6 +407,34 @@ fun DietQualityDetailBottomSheet(
                         )
                     }
 
+                    val avoid = metrics.allRatedItems.filter { it.rated && it.verdict == FoodVerdict.AVOID }
+                    if (avoid.isNotEmpty()) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = SolarAmber.copy(alpha = 0.10f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "AVOID FOR NOW",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp,
+                                        color = SolarAmber
+                                    )
+                                    Text(
+                                        text = avoid.joinToString(", ") { it.foodText } +
+                                            ". These work against your goal, so skip them until you get there. Treats are different: a couple a week is fine.",
+                                        fontSize = 12.sp,
+                                        lineHeight = 17.sp,
+                                        color = SuperfitTheme.colors.textPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     items(metrics.allRatedItems) { item ->
                         FoodRatingItemRow(item = item, onFineForMe = onFineForMe)
                     }
@@ -440,12 +469,16 @@ fun DietQualityDetailBottomSheet(
 
 @Composable
 fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boolean) -> Unit)? = null) {
-    val actionColor = when (item.actionColorType) {
-        "GREEN" -> NeonMint
-        "YELLOW" -> ElectricCyan
-        "ORANGE" -> SolarAmber
-        "RED" -> SolarAmber
-        else -> ElectricCyan
+    val actionColor = if (!item.rated) {
+        ElectricCyan
+    } else {
+        when (item.verdict) {
+            FoodVerdict.GREAT -> NeonMint
+            FoodVerdict.GOOD -> ElectricCyan
+            FoodVerdict.PORTION -> SolarAmber
+            FoodVerdict.TREAT -> HyperViolet
+            FoodVerdict.AVOID -> SolarAmber
+        }
     }
 
     Surface(
@@ -484,7 +517,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                     color = actionColor.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = if (item.rated) "${item.cleanlinessScore}/10" else "Not rated yet",
+                        text = if (item.rated) item.verdict.label else "Not rated yet",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = actionColor,
@@ -515,7 +548,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                 }
             }
 
-            if (onFineForMe != null && item.rated && (item.approved || item.cleanlinessScore <= 6)) {
+            if (onFineForMe != null && item.rated && (item.approved || item.verdict !in setOf(FoodVerdict.GREAT, FoodVerdict.GOOD))) {
                 TextButton(
                     onClick = { onFineForMe(item, !item.approved) },
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)

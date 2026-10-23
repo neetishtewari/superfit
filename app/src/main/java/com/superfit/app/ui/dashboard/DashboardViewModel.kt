@@ -167,7 +167,7 @@ class DashboardViewModel(
      */
     private fun needsTags(entry: NutritionEntryEntity, rerate: Boolean): Boolean {
         val tags = MealTags.decode(entry.qualityTags) ?: return true
-        if (rerate && (tags.rating == null || tags.adviceVersion != com.superfit.app.domain.PersonalNutrition.adviceVersion())) return true
+        if (rerate && (tags.rating == null || tags.verdict == null || tags.adviceVersion != com.superfit.app.domain.PersonalNutrition.adviceVersion())) return true
         return !tags.hasAdvice && FoodQualityEngine.scoreFromTags(tags, isHighProtein = false) <= 5
     }
 
@@ -1086,7 +1086,7 @@ class DashboardViewModel(
 
     companion object {
         /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
-        private const val BACKFILL_KEY = "meal_tag_backfill_date_v2"
+        private const val BACKFILL_KEY = "meal_tag_backfill_date_v3"
         private const val RERATE_DAYS = 14L
     }
 }

@@ -62,8 +62,8 @@ object NutritionistNote {
         metrics.breakdown.forEach { append("- ${it.label}: ${it.points}/${it.maxPoints}. ${it.detail}\n") }
         val foods = metrics.allRatedItems.filter { it.rated }.take(12)
         if (foods.isNotEmpty()) {
-            append("Foods this week (times logged, rating /10, the rater's reason):\n")
-            foods.forEach { append("- ${it.foodText}: ${it.weeklyFrequency}x, ${it.cleanlinessScore}/10. ${it.scoreRationale}\n") }
+            append("Foods this week (times logged, verdict, the rater's reason):\n")
+            foods.forEach { append("- ${it.foodText}: ${it.weeklyFrequency}x, ${it.verdict.label}. ${it.scoreRationale}\n") }
         }
     }
 

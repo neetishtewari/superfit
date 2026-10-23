@@ -260,17 +260,26 @@ object DietScoreEngine {
         val treats = treatOccasions(tagged)
         val allowance = CoachPatternEngine.WEEKLY_TREAT_ALLOWANCE
         val extra = (treats - allowance).coerceAtLeast(0)
+        // Foods to avoid until the goal is reached have no free allowance.
+        val avoid = tagged.filter { (e, t) -> PersonalNutrition.countsAsAvoid(e, t) }
+        val avoidNames = avoid.map { (e, t) -> t.foodType.ifBlank { e.foodText.lowercase().take(30) } }.distinct()
+        val lost = extra * 3 + avoid.size * 3
+        val treatText = if (extra == 0) {
+            "$treats treats, within the $allowance a week that fit any plan"
+        } else {
+            "$treats treats; $allowance a week fit any plan"
+        }
         return DietScorePart(
             key = "treats",
-            label = "Treats",
-            points = (max - extra * 3).coerceAtLeast(0),
+            label = "Treats & foods to avoid",
+            points = (max - lost).coerceAtLeast(0),
             maxPoints = max,
-            detail = if (extra == 0) {
-                "$treats treats, within the $allowance a week that fit any plan"
+            detail = treatText + (if (avoid.isNotEmpty()) ". Best avoided for now: ${avoidNames.take(3).joinToString(", ")}" else ""),
+            tip = if (avoid.isNotEmpty()) {
+                "Skip ${avoidNames.first()} until you reach your goal; treats are fine up to $allowance a week."
             } else {
-                "$treats treats; $allowance a week fit any plan, the extra $extra cost ${minOf(max, extra * 3)} points"
-            },
-            tip = "Keep treats to $allowance a week, and save them for the ones you'll really enjoy."
+                "Keep treats to $allowance a week, and save them for the ones you'll really enjoy."
+            }
         )
     }
 

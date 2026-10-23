@@ -35,7 +35,9 @@ data class MealTags(
     /** How many different vegetables and fruits are in it, for a colourful plate. */
     val vegKinds: Int = 0,
     /** [PersonalNutrition.adviceVersion] when the meal was rated, so new advice re-rates recent meals. */
-    val adviceVersion: String? = null
+    val adviceVersion: String? = null,
+    /** The AI's plain verdict for the person: great, good, portion, treat or avoid (see [FoodVerdict]). */
+    val verdict: String? = null
 ) {
     /** True when the AI also gave its reason and swap, which meals tagged before those existed lack. */
     val hasAdvice: Boolean get() = why != null
@@ -67,7 +69,8 @@ data class MealTags(
             rating?.let { "r=$it" },
             if (fruitServings > 0) "fs=${String.format(Locale.US, "%.1f", fruitServings)}" else null,
             if (vegKinds > 0) "vk=$vegKinds" else null,
-            adviceVersion?.let { "av=${clean(it, 8)}" }
+            adviceVersion?.let { "av=${clean(it, 8)}" },
+            verdict?.let { "vd=${clean(it, 10)}" }
         )
     ).joinToString("|")
 
@@ -96,7 +99,8 @@ data class MealTags(
                 rating = fields["r"]?.toIntOrNull()?.coerceIn(1, 10),
                 fruitServings = fields["fs"]?.toDoubleOrNull() ?: 0.0,
                 vegKinds = fields["vk"]?.toIntOrNull() ?: 0,
-                adviceVersion = fields["av"]
+                adviceVersion = fields["av"],
+                verdict = fields["vd"]?.takeIf { it in FoodVerdict.KEYS }
             )
         }
 
@@ -124,7 +128,8 @@ data class MealTags(
                 rating = json.optInt("rating", 0).takeIf { it in 1..10 },
                 fruitServings = json.optDouble("fruitServings", 0.0).takeIf { !it.isNaN() }?.coerceIn(0.0, 10.0) ?: 0.0,
                 vegKinds = json.optInt("vegKinds", 0).coerceIn(0, 15),
-                adviceVersion = if (json.has("rating")) PersonalNutrition.adviceVersion() else null
+                adviceVersion = if (json.has("rating")) PersonalNutrition.adviceVersion() else null,
+                verdict = json.optString("verdict", "").trim().lowercase().takeIf { it in FoodVerdict.KEYS }
             )
         }
 
@@ -156,6 +161,11 @@ data class MealTags(
                 "Treats and fast food are 2-4, fried snacks 3-4, sugary drinks 2. " +
                 "Use the person's goal, targets, own nutritionist's advice and approved foods given with the meal; their nutritionist's advice outranks these rules. " +
                 "The \"why\" sentence should explain the rating in plain words, mentioning the amount when it matters.\n" +
+                "- \"verdict\": String, one of: \"great\" (a choice that helps their goal), \"good\" (fine, normal food), " +
+                "\"portion\" (a good food, but this amount is too much for their goal), \"treat\" (fine now and then, even while working on the goal), " +
+                "\"avoid\" (best skipped completely until their goal is reached, because it works directly against it: for example sugary soft drinks, " +
+                "regular alcohol or deep-fried snacks when losing weight). Use \"avoid\" sparingly, never for normal home food, " +
+                "never for a food on their approved list, and follow their nutritionist's advice.\n" +
                 "Write all text in English, even when the meal is described in Hindi or another language or script.\n"
 
         /**
@@ -181,3 +191,31 @@ data class MealTags(
 
 /** A healthier swap for a meal, suggested by the AI. */
 data class MealSwap(val alternative: String, val kcalSaved: Int, val benefit: String)
+
+/** The plain words shown for a food instead of a number. */
+enum class FoodVerdict(val key: String, val label: String) {
+    GREAT("great", "Great"),
+    GOOD("good", "Good"),
+    PORTION("portion", "Watch the portion"),
+    TREAT("treat", "Treat"),
+    AVOID("avoid", "Avoid for now");
+
+    companion object {
+        val KEYS = entries.map { it.key }.toSet()
+
+        /**
+         * The AI's verdict when it gave one; older ratings are put into words from their number.
+         * A food the user marked "Fine for me" is always at least Good.
+         */
+        fun of(tags: MealTags, rating: Int, approved: Boolean): FoodVerdict {
+            val fromAi = entries.firstOrNull { it.key == tags.verdict }
+            val v = fromAi ?: when {
+                tags.treat -> TREAT
+                rating >= 8 -> GREAT
+                rating >= 6 -> GOOD
+                else -> PORTION
+            }
+            return if (approved && v !in setOf(GREAT, GOOD)) GOOD else v
+        }
+    }
+}

@@ -118,6 +118,30 @@ class DietScoreEngineTest {
     }
 
     @Test
+    fun `foods to avoid for now cost points with no free allowance, unless marked fine`() {
+        val cola = MealTags(3, fried = false, addedSugar = true, vegFruitServings = 0.0, fiberG = 0.0, treat = true, foodType = "cola", rating = 2, verdict = "avoid")
+        val week = (1..6).flatMap { goodDay(it) } + meal(2, 16, 150.0, 0.0, cola, "cola")
+        val treats = score(week)!!.part("treats")
+        assertEquals(7, treats.points)
+        assertTrue(treats.detail.contains("Best avoided for now: cola"))
+
+        PersonalNutrition.approvedFoods = setOf("cola")
+        assertEquals(10, score(week)!!.part("treats").points)
+    }
+
+    @Test
+    fun `foods get plain words instead of numbers`() {
+        assertEquals(FoodVerdict.AVOID, FoodVerdict.of(homeCooked.copy(verdict = "avoid"), 2, approved = false))
+        assertEquals(FoodVerdict.GOOD, FoodVerdict.of(homeCooked.copy(verdict = "avoid"), 2, approved = true))
+        // Older ratings without the AI's verdict are put into words from the number.
+        assertEquals(FoodVerdict.GREAT, FoodVerdict.of(homeCooked, 9, approved = false))
+        assertEquals(FoodVerdict.GOOD, FoodVerdict.of(homeCooked, 7, approved = false))
+        assertEquals(FoodVerdict.PORTION, FoodVerdict.of(homeCooked, 5, approved = false))
+        assertEquals(FoodVerdict.TREAT, FoodVerdict.of(burger, 3, approved = false))
+        assertEquals("avoid", MealTags.decode(homeCooked.copy(verdict = "avoid").encode())!!.verdict)
+    }
+
+    @Test
     fun `carb-heavy days lose balance points and the tip says so`() {
         // Lots of roti or rice: 75% of calories from carbs every day.
         val entries = (1..6).flatMap { d -> goodDay(d).map { it.copy(carbsG = it.calories * 0.75 / 4, fatG = (it.calories * 0.25 - it.proteinG * 4).coerceAtLeast(0.0) / 9) } }

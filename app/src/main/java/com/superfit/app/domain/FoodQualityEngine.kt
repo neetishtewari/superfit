@@ -31,7 +31,9 @@ data class FoodItemRating(
     /** The name "Fine for me" is saved under: the AI's generic food name, else the logged text. */
     val approvalKey: String = "",
     /** The user marked this food "Fine for me": never a treat, never a swap. */
-    val approved: Boolean = false
+    val approved: Boolean = false,
+    /** Plain words shown instead of the number: Great, Good, Watch the portion, Treat or Avoid for now. */
+    val verdict: FoodVerdict = FoodVerdict.GOOD
 )
 
 data class FoodSwapSuggestion(
@@ -133,13 +135,15 @@ object FoodQualityEngine {
             val portionFactor = max(0.5, avgCals / 250.0)
 
             // Habit Risk: A food is a genuine habitual risk ONLY if consumed across multiple distinct days and is lower quality (score <= 5)
-            val isHabitual = !approved && baseScore <= 5 && foodDistinctDays >= 2
+            val isHabitual = !approved && (baseScore <= 5 || tags?.verdict == FoodVerdict.AVOID.key) && foodDistinctDays >= 2
             val habitDoseMultiplier = if (foodDistinctDays >= 2) (1.0 + (foodDistinctDays - 1) * 0.5) else 1.0
             val rawRisk = (11 - baseScore) * habitDoseMultiplier * portionFactor
 
             // Determine frequency and quality recommendation with fitness coach insight
             val (recommendation, colorType) = if (approved) {
                 Pair("Fine for you, as you marked it", "GREEN")
+            } else if (tags?.verdict == FoodVerdict.AVOID.key) {
+                Pair("Best skipped until you reach your goal", "RED")
             } else if (tags == null) {
                 Pair("Not rated yet — the AI rates new meals within a day", "YELLOW")
             } else {
@@ -172,7 +176,8 @@ object FoodQualityEngine {
                 actionColorType = colorType,
                 rated = tags != null,
                 approvalKey = PersonalNutrition.key(tags?.foodType?.takeIf { it.isNotBlank() } ?: foodName),
-                approved = approved
+                approved = approved,
+                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved) } ?: FoodVerdict.GOOD
             )
         }.sortedWith(
             compareByDescending<FoodItemRating> { it.weeklyFrequency * 5 + it.daysLoggedCount * 10 }
@@ -209,7 +214,7 @@ object FoodQualityEngine {
         // Generate Smart Food Swaps for relevant lower-quality foods:
         // Priority 1: Recurring habitual risk foods
         // Priority 2: Genuine moderate/high risk items (cleanlinessScore <= 5)
-        val candidateItemsForSwap = (flaggedHabitual + ratedItems.filter { it.cleanlinessScore <= 5 && !it.approved })
+        val candidateItemsForSwap = (flaggedHabitual + ratedItems.filter { (it.cleanlinessScore <= 5 || it.verdict == FoodVerdict.AVOID) && !it.approved })
             .distinctBy { it.foodText.lowercase() }
             .sortedWith(
                 compareByDescending<FoodItemRating> { it.isHabitualRisk }
