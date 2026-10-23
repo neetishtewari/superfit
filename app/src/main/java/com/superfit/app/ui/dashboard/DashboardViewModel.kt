@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
 import com.superfit.app.data.AppAnalytics
+import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.domain.BestKind
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
@@ -569,6 +570,7 @@ class DashboardViewModel(
                 weightEntries = weightEntries,
                 weightMetrics = weightMetrics,
                 streakState = streakState,
+                mealDaysLogged = ReviewPrompt.daysWithMeals(allNutritionHistory.map { it.timestamp }),
                 habitEntry = habitEntry,
                 dietQualityMetrics = dietQualityMetrics,
                 bmr = bmr,
@@ -1114,6 +1116,8 @@ sealed interface DashboardUiState {
         val weightEntries: List<WeightEntryEntity> = emptyList(),
         val weightMetrics: com.superfit.app.domain.WeightGoalMetrics,
         val streakState: StreakStateEntity = StreakStateEntity(),
+        /** Different days with at least one meal logged, ever; used to time the rating prompt. */
+        val mealDaysLogged: Int = 0,
         val habitEntry: HabitEntryEntity = HabitEntryEntity(date = ""),
         val dietQualityMetrics: com.superfit.app.domain.DietQualityMetrics = com.superfit.app.domain.DietQualityMetrics(85, "BALANCED", emptyList(), emptyList(), emptyList()),
         val bmr: Double,
