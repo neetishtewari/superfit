@@ -27,7 +27,13 @@ data class FoodItemRating(
     val actionRecommendation: String = "", // "Keep amount same", "Reduce frequency", etc.
     val actionColorType: String, // "GREEN", "YELLOW", "ORANGE", "RED"
     /** False until the AI has tagged this food; its score is then only a placeholder. */
-    val rated: Boolean = true
+    val rated: Boolean = true,
+    /** The name "Fine for me" is saved under: the AI's generic food name, else the logged text. */
+    val approvalKey: String = "",
+    /** The user marked this food "Fine for me": never a treat, never a swap. */
+    val approved: Boolean = false,
+    /** Plain words shown instead of the number: Great, Good, Watch the portion, Treat or Avoid for now. */
+    val verdict: FoodVerdict = FoodVerdict.GOOD
 )
 
 data class FoodSwapSuggestion(
@@ -109,10 +115,12 @@ object FoodQualityEngine {
             val proteinCalsRatio = if (avgCals > 0) (avgProtein * 4.0) / avgCals else 0.0
             val isHighProtein = avgProtein >= 14.0 || proteinCalsRatio >= 0.25
 
-            // Coach perspective: evaluate base score considering whole food status and protein utility
+            // The AI's nutritionist rating, which weighs the amount, the goal and the user's own advice
             val tags = tagsByFood[foodName]?.firstOrNull()
+            val newest = entries.maxBy { it.timestamp }
+            val approved = PersonalNutrition.isApproved(newest, tags)
             // Meals the AI hasn't rated yet sit in the middle: never praised, flagged or swapped.
-            val baseScore = tags?.let { scoreFromTags(it, isHighProtein) } ?: UNRATED_SCORE
+            val baseScore = tags?.let { DietScoreEngine.mealRating(newest, it) } ?: UNRATED_SCORE
             val tier = evaluateTier(baseScore)
 
             // Number of distinct calendar days this specific food was logged
@@ -127,12 +135,16 @@ object FoodQualityEngine {
             val portionFactor = max(0.5, avgCals / 250.0)
 
             // Habit Risk: A food is a genuine habitual risk ONLY if consumed across multiple distinct days and is lower quality (score <= 5)
-            val isHabitual = baseScore <= 5 && foodDistinctDays >= 2
+            val isHabitual = !approved && (baseScore <= 5 || tags?.verdict == FoodVerdict.AVOID.key) && foodDistinctDays >= 2
             val habitDoseMultiplier = if (foodDistinctDays >= 2) (1.0 + (foodDistinctDays - 1) * 0.5) else 1.0
             val rawRisk = (11 - baseScore) * habitDoseMultiplier * portionFactor
 
             // Determine frequency and quality recommendation with fitness coach insight
-            val (recommendation, colorType) = if (tags == null) {
+            val (recommendation, colorType) = if (approved) {
+                Pair("Fine for you, as you marked it", "GREEN")
+            } else if (tags?.verdict == FoodVerdict.AVOID.key) {
+                Pair("Best skipped until you reach your goal", "RED")
+            } else if (tags == null) {
                 Pair("Not rated yet — the AI rates new meals within a day", "YELLOW")
             } else {
                 evaluateRecommendation(
@@ -162,7 +174,10 @@ object FoodQualityEngine {
                 scoreRationale = rationale,
                 actionRecommendation = recommendation,
                 actionColorType = colorType,
-                rated = tags != null
+                rated = tags != null,
+                approvalKey = PersonalNutrition.key(tags?.foodType?.takeIf { it.isNotBlank() } ?: foodName),
+                approved = approved,
+                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved) } ?: FoodVerdict.GOOD
             )
         }.sortedWith(
             compareByDescending<FoodItemRating> { it.weeklyFrequency * 5 + it.daysLoggedCount * 10 }
@@ -184,8 +199,8 @@ object FoodQualityEngine {
             .take(3)
 
         // The overall score judges the week's eating pattern, not an average of single foods.
-        val thisWeek = DietScoreEngine.score(nutritionHistory, today, proteinTargetG, calorieTarget, zoneId)
-        val lastWeek = DietScoreEngine.score(nutritionHistory, today, proteinTargetG, calorieTarget, zoneId, weeksAgo = 1)
+        val thisWeek = DietScoreEngine.score(nutritionHistory, today, proteinTargetG, calorieTarget, zoneId, goal = userGoal)
+        val lastWeek = DietScoreEngine.score(nutritionHistory, today, proteinTargetG, calorieTarget, zoneId, weeksAgo = 1, goal = userGoal)
         val finalOverallScore = thisWeek?.score ?: 0
 
         val scoreCategory = when {
@@ -199,7 +214,7 @@ object FoodQualityEngine {
         // Generate Smart Food Swaps for relevant lower-quality foods:
         // Priority 1: Recurring habitual risk foods
         // Priority 2: Genuine moderate/high risk items (cleanlinessScore <= 5)
-        val candidateItemsForSwap = (flaggedHabitual + ratedItems.filter { it.cleanlinessScore <= 5 })
+        val candidateItemsForSwap = (flaggedHabitual + ratedItems.filter { (it.cleanlinessScore <= 5 || it.verdict == FoodVerdict.AVOID) && !it.approved })
             .distinctBy { it.foodText.lowercase() }
             .sortedWith(
                 compareByDescending<FoodItemRating> { it.isHabitualRisk }

@@ -115,6 +115,12 @@ class DataRepository(
                 importWorkouts()
 
                 try {
+                    BodyImporter.importNew(context, this)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                try {
                     val sleep = healthConnectManager.readSleepTelemetry(date)
                     if (sleep != null) {
                         database.telemetryDao().insertSleep(sleep)
@@ -258,6 +264,26 @@ class DataRepository(
         if (profile != null) {
             saveProfile(profile.copy(weightKg = weightKg))
         }
+    }
+
+    /**
+     * Adds a smart scale weigh-in at the time it was taken. One reading a day: a weight the user
+     * typed that day wins, and a later scale reading replaces an earlier one.
+     */
+    suspend fun addImportedWeight(weightKg: Double, timestamp: Long, note: String) {
+        val zone = java.time.ZoneId.systemDefault()
+        fun dayOf(ms: Long) = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+        val day = dayOf(timestamp)
+        val sameDay = database.weightDao().getAllWeightEntries().filter { dayOf(it.timestamp) == day }
+        if (sameDay.any { !BodyImporter.isImported(it) }) return
+        if (sameDay.any { it.timestamp >= timestamp }) return
+        sameDay.forEach { deleteWeightEntry(it) }
+        val entry = WeightEntryEntity(weightKg = weightKg, timestamp = timestamp, note = note)
+        val id = database.weightDao().insertWeight(entry)
+        firebaseSyncManager.uploadWeight(entry.copy(id = id))
+        val latest = database.weightDao().getLatestWeightEntry()
+        val profile = getProfile()
+        if (profile != null && latest?.timestamp == timestamp) saveProfile(profile.copy(weightKg = weightKg))
     }
 
     suspend fun deleteWeightEntry(entry: WeightEntryEntity) {

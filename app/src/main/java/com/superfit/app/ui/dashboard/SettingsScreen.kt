@@ -70,7 +70,7 @@ fun SettingsScreen(
                     showDeleteAccountDialog = false
                     onDeleteAccount()
                 }) {
-                    Text("Delete account", color = CoralRed, fontWeight = FontWeight.Bold)
+                    Text("Delete account", color = DeleteRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -253,14 +253,14 @@ fun SettingsScreen(
                                     if (hasHealthConnectPermissions) {
                                         NeonMint.copy(alpha = 0.15f)
                                     } else {
-                                        CoralRed.copy(alpha = 0.15f)
+                                        SolarAmber.copy(alpha = 0.15f)
                                     }
                                 )
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = if (hasHealthConnectPermissions) "Connected 🟢" else "Disconnected 🔴",
-                                color = if (hasHealthConnectPermissions) NeonMint else CoralRed,
+                                color = if (hasHealthConnectPermissions) NeonMint else SolarAmber,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -291,7 +291,7 @@ fun SettingsScreen(
                                         Toast.makeText(context, "Could not open Health Connect settings.", Toast.LENGTH_SHORT).show()
                                     }
                                 } else {
-                                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, viewModel.healthConnectManager.permissions)
+                                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, viewModel.healthConnectManager.permissions + viewModel.healthConnectManager.bodyPermissions)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
@@ -409,6 +409,10 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
+
+                    NutritionistAdviceSettings(viewModel)
 
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
 
@@ -959,8 +963,8 @@ fun SettingsScreen(
                     Button(
                         onClick = { showDeleteAccountDialog = true },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CoralRed.copy(alpha = 0.15f),
-                            contentColor = CoralRed
+                            containerColor = DeleteRed.copy(alpha = 0.15f),
+                            contentColor = DeleteRed
                         ),
                         modifier = Modifier
                             .weight(1f)

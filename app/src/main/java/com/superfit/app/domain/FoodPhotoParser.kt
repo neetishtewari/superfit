@@ -10,7 +10,7 @@ class FoodPhotoParser {
     suspend fun parseMeal(photo: Bitmap): ParsedNutritionResult {
         val json = GeminiClient.generateContentWithImage(
             image = photo,
-            prompt = "Estimate the nutrition of the meal in this photo. Describe what you see as the user's meal. " +
+            prompt = PersonalNutrition.promptContext() + "Estimate the nutrition of the meal in this photo. Describe what you see as the user's meal. " +
                 "If the photo shows no food or drink, treat it as unrelated to food.",
             systemInstructionText = NutritionParser().systemInstructionText
         )

@@ -16,6 +16,9 @@ val HyperViolet = Color(0xFF8B5CF6)
 val SolarAmber = Color(0xFFF59E0B)
 val CoralRed = Color(0xFFFF476A)
 
+// Red is kept for delete and other actions that can't be undone; warnings use SolarAmber.
+val DeleteRed = CoralRed
+
 // Glassmorphic Border System
 val GlassBorder = Color(0x24FFFFFF)
 val GlassBorderGlow = Color(0x3BFFFFFF)
@@ -68,7 +71,7 @@ val DarkColors = SuperfitColors(
     primaryAccent = HyperViolet,
     secondaryAccent = ElectricCyan,
     tertiaryAccent = NeonMint,
-    errorColor = CoralRed,
+    errorColor = SolarAmber,
     isDark = true
 )
 
@@ -85,7 +88,7 @@ val LightColors = SuperfitColors(
     primaryAccent = Color(0xFF7C3AED), // vibrant violet-600
     secondaryAccent = Color(0xFF0891B2), // vibrant cyan-600
     tertiaryAccent = Color(0xFF059669), // vibrant emerald-600
-    errorColor = Color(0xFFDC2626), // clean red-600
+    errorColor = Color(0xFFD97706), // amber-600; red is kept for delete
     isDark = false
 )
 

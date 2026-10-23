@@ -26,17 +26,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.domain.DietNote
 import com.superfit.app.domain.DietQualityMetrics
 import com.superfit.app.domain.DietScorePart
 import com.superfit.app.domain.FoodItemRating
 import com.superfit.app.domain.FoodSwapSuggestion
+import com.superfit.app.domain.FoodVerdict
 import com.superfit.app.theme.*
 
 @Composable
 fun FoodQualityCard(
     metrics: DietQualityMetrics,
     modifier: Modifier = Modifier,
-    onLogSwap: ((String) -> Unit)? = null
+    onLogSwap: ((String) -> Unit)? = null,
+    note: DietNote? = null,
+    onFineForMe: ((FoodItemRating, Boolean) -> Unit)? = null
 ) {
     var showDetailBottomSheet by remember { mutableStateOf(false) }
 
@@ -163,7 +167,12 @@ fun FoodQualityCard(
                     trackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.1f)
                 )
 
-                metrics.focusTip?.let { tip ->
+                if (note != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    DietNoteBlock(note)
+                }
+
+                metrics.focusTip?.takeIf { note == null }?.let { tip ->
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Biggest win available: $tip",
@@ -210,7 +219,7 @@ fun FoodQualityCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Top Clean Staples: " + metrics.topCleanFoods.joinToString(", "),
+                        text = "Your best choices: " + metrics.topCleanFoods.joinToString(", "),
                         fontSize = 11.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
@@ -223,8 +232,35 @@ fun FoodQualityCard(
         DietQualityDetailBottomSheet(
             metrics = metrics,
             onDismiss = { showDetailBottomSheet = false },
-            onLogSwap = onLogSwap
+            onLogSwap = onLogSwap,
+            onFineForMe = onFineForMe
         )
+    }
+}
+
+/** The nutritionist's note: what's going well and up to two things to change. */
+@Composable
+private fun DietNoteBlock(note: DietNote) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = NeonMint.copy(alpha = 0.08f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "YOUR NUTRITIONIST'S NOTE",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = SuperfitTheme.colors.textTertiary
+            )
+            if (note.good.isNotBlank()) {
+                Text(text = "✓ ${note.good}", fontSize = 12.sp, lineHeight = 17.sp, color = SuperfitTheme.colors.textPrimary)
+            }
+            note.fixes.forEach { fix ->
+                Text(text = "→ $fix", fontSize = 12.sp, lineHeight = 17.sp, color = SuperfitTheme.colors.textPrimary)
+            }
+        }
     }
 }
 
@@ -274,7 +310,8 @@ private fun DietScorePartRow(part: DietScorePart) {
 fun DietQualityDetailBottomSheet(
     metrics: DietQualityMetrics,
     onDismiss: () -> Unit,
-    onLogSwap: ((String) -> Unit)? = null
+    onLogSwap: ((String) -> Unit)? = null,
+    onFineForMe: ((FoodItemRating, Boolean) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -305,8 +342,8 @@ fun DietQualityDetailBottomSheet(
                         else -> "🥗 7-Day Diet Quality Breakdown"
                     }
                     val sheetSubtitle = when {
-                        metrics.distinctDaysLogged <= 1 -> "Itemized food cleanliness scores & day 1 feedback"
-                        else -> "Itemized food cleanliness scores & frequency impact"
+                        metrics.distinctDaysLogged <= 1 -> "Each food rated as a nutritionist would"
+                        else -> "Each food rated as a nutritionist would, for its amount and your goal"
                     }
                     Text(
                         text = sheetTitle,
@@ -370,8 +407,36 @@ fun DietQualityDetailBottomSheet(
                         )
                     }
 
+                    val avoid = metrics.allRatedItems.filter { it.rated && it.verdict == FoodVerdict.AVOID }
+                    if (avoid.isNotEmpty()) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = SolarAmber.copy(alpha = 0.10f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = "AVOID FOR NOW",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp,
+                                        color = SolarAmber
+                                    )
+                                    Text(
+                                        text = avoid.joinToString(", ") { it.foodText } +
+                                            ". These work against your goal, so skip them until you get there. Treats are different: a couple a week is fine.",
+                                        fontSize = 12.sp,
+                                        lineHeight = 17.sp,
+                                        color = SuperfitTheme.colors.textPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     items(metrics.allRatedItems) { item ->
-                        FoodRatingItemRow(item = item)
+                        FoodRatingItemRow(item = item, onFineForMe = onFineForMe)
                     }
 
                     if (metrics.swapSuggestions.isNotEmpty()) {
@@ -403,13 +468,17 @@ fun DietQualityDetailBottomSheet(
 }
 
 @Composable
-fun FoodRatingItemRow(item: FoodItemRating) {
-    val actionColor = when (item.actionColorType) {
-        "GREEN" -> NeonMint
-        "YELLOW" -> ElectricCyan
-        "ORANGE" -> SolarAmber
-        "RED" -> CoralRed
-        else -> ElectricCyan
+fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boolean) -> Unit)? = null) {
+    val actionColor = if (!item.rated) {
+        ElectricCyan
+    } else {
+        when (item.verdict) {
+            FoodVerdict.GREAT -> NeonMint
+            FoodVerdict.GOOD -> ElectricCyan
+            FoodVerdict.PORTION -> SolarAmber
+            FoodVerdict.TREAT -> HyperViolet
+            FoodVerdict.AVOID -> SolarAmber
+        }
     }
 
     Surface(
@@ -448,7 +517,7 @@ fun FoodRatingItemRow(item: FoodItemRating) {
                     color = actionColor.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = if (item.rated) "${item.cleanlinessScore}/10 Clean" else "Not rated yet",
+                        text = if (item.rated) item.verdict.label else "Not rated yet",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = actionColor,
@@ -475,6 +544,20 @@ fun FoodRatingItemRow(item: FoodItemRating) {
                         fontWeight = FontWeight.Medium,
                         color = actionColor,
                         lineHeight = 15.sp
+                    )
+                }
+            }
+
+            if (onFineForMe != null && item.rated && (item.approved || item.verdict !in setOf(FoodVerdict.GREAT, FoodVerdict.GOOD))) {
+                TextButton(
+                    onClick = { onFineForMe(item, !item.approved) },
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = if (item.approved) "✓ Fine for me · undo" else "Mark as fine for me (e.g. my nutritionist approves)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (item.approved) NeonMint else ElectricCyan
                     )
                 }
             }
@@ -566,7 +649,7 @@ fun FoodSwapCard(
                         text = swap.originalFood,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = CoralRed
+                        color = SolarAmber
                     )
                 }
 

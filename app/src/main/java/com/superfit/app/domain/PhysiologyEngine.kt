@@ -7,7 +7,12 @@ object PhysiologyEngine {
     /**
      * Calculates the Basal Metabolic Rate (BMR) using the Mifflin-St Jeor Equation.
      */
-    fun calculateBmr(profile: UserProfileEntity): Double {
+    /**
+     * Resting calories. When the user's smart scale gave a recent body fat reading, this works from
+     * lean mass instead, which counts muscle that the weight-only formula can't.
+     */
+    fun calculateBmr(profile: UserProfileEntity, bodyFatPct: Double? = MeasuredBody.currentBodyFat()): Double {
+        if (bodyFatPct != null) return BodyReadings.leanMassBmr(profile.weightKg, bodyFatPct)
         return calculateBmr(
             weightKg = profile.weightKg,
             heightCm = profile.heightCm,
@@ -67,22 +72,22 @@ object PhysiologyEngine {
     fun calculateMacroTargets(
         profile: UserProfileEntity,
         tdee: Double,
-        activeCalories: Double = 0.0
+        activeCalories: Double = 0.0,
+        advice: AdviceTargets? = PersonalNutrition.targets
     ): MacroTargets {
-        // Apply the calorie offset to the computed TDEE
-        val adjustedTargetCalories = (tdee + profile.calorieOffset).coerceAtLeast(1200.0)
+        // Apply the calorie offset to the computed TDEE, unless the user's nutritionist set the calories
+        val adjustedTargetCalories = advice?.calories ?: (tdee + profile.calorieOffset).coerceAtLeast(1200.0)
 
-        val proteinG = (proteinReferenceWeightKg(profile) * proteinPerKg(profile.goal)).coerceAtLeast(40.0)
+        val proteinG = advice?.proteinG ?: defaultProteinG(profile)
 
         // Fat: hormonal baseline, 25% of adjusted target calories
-        val fatCalories = adjustedTargetCalories * 0.25
-        val fatG = (fatCalories / 9.0).coerceAtLeast(30.0)
+        val fatG = advice?.fatG ?: (adjustedTargetCalories * 0.25 / 9.0).coerceAtLeast(30.0)
 
         // Carbs: remainder of calories
         val proteinCalories = proteinG * 4.0
         val fatCalActual = fatG * 9.0
         val remainingCalories = (adjustedTargetCalories - proteinCalories - fatCalActual).coerceAtLeast(0.0)
-        val carbsG = (remainingCalories / 4.0).coerceAtLeast(50.0)
+        val carbsG = advice?.carbsG ?: (remainingCalories / 4.0).coerceAtLeast(50.0)
 
         return MacroTargets(
             calories = adjustedTargetCalories,
@@ -91,6 +96,13 @@ object PhysiologyEngine {
             fatG = fatG
         )
     }
+
+    /** The day's protein target: the user's nutritionist's number when they confirmed one, else ours. */
+    fun proteinTargetG(profile: UserProfileEntity, advice: AdviceTargets? = PersonalNutrition.targets): Double =
+        advice?.proteinG ?: defaultProteinG(profile)
+
+    private fun defaultProteinG(profile: UserProfileEntity): Double =
+        (proteinReferenceWeightKg(profile) * proteinPerKg(profile.goal)).coerceAtLeast(40.0)
 
     /** Activity level for everyday life without workouts, used when workouts are added separately. */
     const val EVERYDAY_ACTIVITY_MULTIPLIER = 1.2

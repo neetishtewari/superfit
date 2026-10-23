@@ -42,7 +42,7 @@ class NutritionParser {
 
         // 2. Cascade across Gemini models (2.5-flash -> 2.0-flash -> 1.5-flash)
         val jsonText = GeminiClient.generateContent(
-            prompt = "Meal input: \"$input\"",
+            prompt = PersonalNutrition.promptContext() + "Meal input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true
         )

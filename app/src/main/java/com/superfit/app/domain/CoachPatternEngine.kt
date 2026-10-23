@@ -894,7 +894,8 @@ object CoachPatternEngine {
     // ---------------------------------------------------------------------------------------
 
     /** About 14g of fibre per 1,000 kcal eaten, kept between 25g and 38g a day. */
-    fun fibreTargetG(calories: Double): Double = (calories / 1000.0 * 14.0).coerceIn(25.0, 38.0).roundToInt().toDouble()
+    fun fibreTargetG(calories: Double): Double =
+        PersonalNutrition.targets?.fibreG ?: (calories / 1000.0 * 14.0).coerceIn(25.0, 38.0).roundToInt().toDouble()
 
     fun fibreMeaning(target: Double): String =
         "Your ${target.roundToInt()}g fibre target (about 14g per 1,000 kcal you eat) keeps you full for longer, " +
@@ -941,7 +942,7 @@ object CoachPatternEngine {
     /** Treat category of a logged meal from the AI's tags; null when it isn't a treat or isn't tagged yet. */
     fun treatCategoryOf(entry: NutritionEntryEntity): String? {
         val tags = MealTags.decode(entry.qualityTags) ?: return null
-        if (!tags.treat) return null
+        if (!PersonalNutrition.countsAsTreat(entry, tags)) return null
         return tags.foodType.ifBlank { "treat" }
     }
 

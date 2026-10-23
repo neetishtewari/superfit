@@ -59,7 +59,7 @@ fun StreakHeaderCard(
                 Icon(
                     imageVector = Icons.Default.LocalFireDepartment,
                     contentDescription = "Streak Fire",
-                    tint = CoralRed,
+                    tint = SolarAmber,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -79,7 +79,7 @@ fun StreakHeaderCard(
                     // Yesterday was missed: the grace day is holding the streak until a meal is logged today
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = CoralRed.copy(alpha = 0.15f)
+                        color = SolarAmber.copy(alpha = 0.15f)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -88,7 +88,7 @@ fun StreakHeaderCard(
                             Icon(
                                 imageVector = Icons.Default.Shield,
                                 contentDescription = "Grace Active",
-                                tint = CoralRed,
+                                tint = SolarAmber,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -96,7 +96,7 @@ fun StreakHeaderCard(
                                 text = "Log today to keep it",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = CoralRed,
+                                color = SolarAmber,
                                 maxLines = 1
                             )
                         }

@@ -167,6 +167,10 @@ fun RationaleScreen(
                 RationaleItem(
                     title = "Height & Weight",
                     description = "Baseline physical metrics are necessary to compute your Basal Metabolic Rate (BMR) using scientific formulas (Mifflin-St Jeor)."
+                ),
+                RationaleItem(
+                    title = "Body Measurements",
+                    description = "If a smart scale app saves body fat, lean mass, bone mass or BMR, Superfit shows them on your Journey and uses body fat for a more accurate calorie target (Katch-McArdle). Readings that don't look like yours are asked about first."
                 )
             )
 

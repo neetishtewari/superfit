@@ -91,7 +91,7 @@ class CoachingEngine {
         val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
         val why = whyLines(focus, report)
 
-        val prompt = buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition)
+        val prompt = PersonalNutrition.adviceLine() + buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition)
         return try {
             val response = GeminiClient.generateContent(
                 prompt = prompt,

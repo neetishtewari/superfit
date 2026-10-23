@@ -69,6 +69,7 @@ class HistoryViewModel(
 ) : ViewModel() {
 
     private val sharedPrefs = getUserSharedPrefs(context)
+    private val appContext = context.applicationContext
 
     private val _parsingState = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
     val parsingState: StateFlow<HistoryParsingState> = _parsingState.asStateFlow()
@@ -112,6 +113,14 @@ class HistoryViewModel(
         private set
 
     var goalTargetDate by mutableStateOf<LocalDate?>(null)
+        private set
+
+    /** The Body card in Journey: what the user's smart scale measures, plus BMI. */
+    var body by mutableStateOf<com.superfit.app.domain.BodySummary?>(null)
+        private set
+
+    /** Health Connect is on the phone but body measurements (body fat, BMR...) aren't allowed yet. */
+    var canAskBodyAccess by mutableStateOf(false)
         private set
 
     /** False until the user saves a goal weight; Journey asks for one instead of forecasting a made-up goal. */
@@ -342,7 +351,7 @@ class HistoryViewModel(
 
             predictedFoods = repository.getPredictedFoods()
 
-            val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
+            val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
             this@HistoryViewModel.dayTotals = dayTotals
             allMeals = allNutrition
@@ -363,7 +372,29 @@ class HistoryViewModel(
                 fallbackCurrentKg = profile.weightKg
             )
 
+            body = com.superfit.app.domain.BodyReadings.summary(
+                mine = com.superfit.app.data.BodyImporter.mine(appContext),
+                latestWeightKg = repository.getAllWeightEntries().maxByOrNull { it.timestamp }?.weightKg ?: profile.weightKg,
+                heightCm = profile.heightCm,
+                today = today
+            )
+            val hc = repository.healthConnectManager
+            canAskBodyAccess = hc.isAvailable() && !hc.hasBodyPermissions()
+
             updateSelectedSummary()
+        }
+    }
+
+    val bodyPermissions: Set<String> get() = repository.healthConnectManager.bodyPermissions
+
+    /** After the body measurements permission screen: bring in body fat for recent readings too. */
+    fun onBodyAccessResult() {
+        viewModelScope.launch {
+            if (repository.healthConnectManager.hasBodyPermissions()) {
+                com.superfit.app.data.BodyImporter.rescanRecent(appContext)
+                repository.syncHealthConnectTelemetry(LocalDate.now())
+            }
+            loadData()
         }
     }
 
@@ -373,7 +404,7 @@ class HistoryViewModel(
             val profile = profile ?: return@launch
             val today = LocalDate.now()
             val zone = ZoneId.systemDefault()
-            val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
+            val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val yesterday = today.minusDays(1)
             val dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
                 com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday, proteinTarget, calculateTargetCalories(yesterday), zone, weeksAgo)?.score
@@ -395,7 +426,8 @@ class HistoryViewModel(
                 weighIns = InsightsData.weighIns(repository.getAllWeightEntries()),
                 proteinTargetG = proteinTarget,
                 dietScores = dietScores,
-                zone = zone
+                zone = zone,
+                body = body
             )
             com.superfit.app.ui.share.CoachExportPdf.share(context, report)
             com.superfit.app.data.AppAnalytics.reportShared(weeks)

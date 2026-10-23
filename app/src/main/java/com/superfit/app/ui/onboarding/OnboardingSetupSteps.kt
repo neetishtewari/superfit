@@ -128,7 +128,7 @@ internal fun HealthConnectStep(
                 if (isHcSynced) {
                     onNext()
                 } else {
-                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, healthConnectManager.permissions)
+                    com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, healthConnectManager.permissions + healthConnectManager.bodyPermissions)
                 }
             },
             modifier = Modifier

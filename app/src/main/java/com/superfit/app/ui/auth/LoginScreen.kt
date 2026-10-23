@@ -323,7 +323,7 @@ fun LoginScreen(
                 if (viewModel.errorMessage != null) {
                     Text(
                         text = viewModel.errorMessage!!,
-                        color = CoralRed,
+                        color = SolarAmber,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
@@ -513,7 +513,7 @@ fun LoginScreen(
                         if (resetErrorMessage != null) {
                             Text(
                                 text = resetErrorMessage!!,
-                                color = CoralRed,
+                                color = SolarAmber,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )

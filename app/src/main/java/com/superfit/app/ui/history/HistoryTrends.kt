@@ -215,7 +215,7 @@ fun WeeklyTrendsCard(
     trends: WeeklyTrendsState,
     modifier: Modifier = Modifier
 ) {
-    val netColor = if (trends.avgNetCalories < 0) NeonMint else CoralRed
+    val netColor = if (trends.avgNetCalories < 0) NeonMint else SolarAmber
     val balanceText = if (trends.avgNetCalories < 0) {
         "${trends.avgNetCalories.toInt()} kcal"
     } else {
