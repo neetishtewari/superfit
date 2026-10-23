@@ -548,15 +548,9 @@ fun DashboardScreen(
                             onOpenChat = { showChatBottomSheet = true }
                         )
 
-                        // 5. Diet Quality Index Card (7-Day Rolling)
-                        FoodQualityCard(
-                            metrics = state.dietQualityMetrics,
-                            onLogSwap = { alternative ->
-                                viewModel.parseAndAddMeal(alternative)
-                            }
-                        )
+                        // Diet Quality (a 7-day score) lives in Insights; Home stays about today.
 
-                        // 6. Track Your Meals Card (With Text Box, Chips, and Logged List)
+                        // 5. Track Your Meals Card (With Text Box, Chips, and Logged List)
                         TrackMealsCard(
                             state = state,
                             viewModel = viewModel,
