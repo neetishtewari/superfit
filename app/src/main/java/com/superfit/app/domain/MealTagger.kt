@@ -10,7 +10,7 @@ class MealTagger {
         if (entries.isEmpty()) return emptyMap()
         val list = entries.mapIndexed { i, e -> "${i + 1}. ${e.foodText} (${e.calories.toInt()} kcal)" }.joinToString("\n")
         val response = GeminiClient.generateContent(
-            prompt = "Meals:\n$list",
+            prompt = PersonalNutrition.promptContext() + "Meals:\n$list",
             systemInstructionText = SYSTEM_INSTRUCTION,
             isJson = true
         )

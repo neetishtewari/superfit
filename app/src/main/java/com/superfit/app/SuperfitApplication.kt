@@ -22,6 +22,7 @@ class SuperfitApplication : Application() {
         com.superfit.app.data.AppAnalytics.init(this)
         com.superfit.app.data.GeminiKeyStore.forgetOldKeys(this)
         com.superfit.app.data.BodyImporter.load(this)
+        com.superfit.app.data.NutritionAdviceStore.load(this)
         com.superfit.app.data.ReminderNotifications.ensureChannel(this)
         scheduleTelemetrySync()
         scheduleDailyReminder()

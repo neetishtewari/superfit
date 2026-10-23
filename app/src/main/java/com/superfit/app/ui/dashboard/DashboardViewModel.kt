@@ -117,8 +117,14 @@ class DashboardViewModel(
     private val _pendingScaleReading = MutableStateFlow<com.superfit.app.domain.ScaleReading?>(null)
     val pendingScaleReading: StateFlow<com.superfit.app.domain.ScaleReading?> = _pendingScaleReading.asStateFlow()
 
+    /** The nutritionist's weekly note at the top of Diet Quality; the last one shows until today's is written. */
+    private val _dietNote = MutableStateFlow(com.superfit.app.data.NutritionAdviceStore.lastNote(appContext))
+    val dietNote: StateFlow<com.superfit.app.domain.DietNote?> = _dietNote.asStateFlow()
+    private var dietNoteRunning = false
+
     init {
         com.superfit.app.data.BodyImporter.load(appContext)
+        com.superfit.app.data.NutritionAdviceStore.load(appContext)
         _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
         checkPermissions()
         loadCachedCoachingInsight()
@@ -134,12 +140,13 @@ class DashboardViewModel(
      */
     private fun tagOlderMeals() {
         val todayStr = LocalDate.now().toString()
-        if (sharedPrefs.getString("meal_tag_backfill_date", "") == todayStr) return
+        if (sharedPrefs.getString(BACKFILL_KEY, "") == todayStr) return
         viewModelScope.launch {
             try {
                 val cutoff = System.currentTimeMillis() - 28L * 24 * 3600 * 1000
+                val rerateFrom = System.currentTimeMillis() - RERATE_DAYS * 24 * 3600 * 1000
                 val untagged = repository.getAllNutritionEntries()
-                    .filter { it.timestamp >= cutoff && it.id != 0L && needsTags(it) }
+                    .filter { it.timestamp >= cutoff && it.id != 0L && needsTags(it, rerate = it.timestamp >= rerateFrom) }
                     .sortedByDescending { it.timestamp }
                     .take(60)
                 val tagger = com.superfit.app.domain.MealTagger()
@@ -147,15 +154,20 @@ class DashboardViewModel(
                     val tags = tagger.tag(batch)
                     batch.forEach { entry -> tags[entry.id]?.let { repository.saveMealTags(entry, it.encode()) } }
                 }
-                sharedPrefs.edit().putString("meal_tag_backfill_date", todayStr).apply()
+                sharedPrefs.edit().putString(BACKFILL_KEY, todayStr).apply()
             } catch (e: Exception) {
                 android.util.Log.w("DashboardViewModel", "Tagging older meals failed; will retry next launch", e)
             }
         }
     }
 
-    private fun needsTags(entry: NutritionEntryEntity): Boolean {
+    /**
+     * Untagged meals always; recent meals also when they have no nutritionist rating yet, or were
+     * rated before the user's nutritionist's advice last changed.
+     */
+    private fun needsTags(entry: NutritionEntryEntity, rerate: Boolean): Boolean {
         val tags = MealTags.decode(entry.qualityTags) ?: return true
+        if (rerate && (tags.rating == null || tags.adviceVersion != com.superfit.app.domain.PersonalNutrition.adviceVersion())) return true
         return !tags.hasAdvice && FoodQualityEngine.scoreFromTags(tags, isHighProtein = false) <= 5
     }
 
@@ -261,6 +273,7 @@ class DashboardViewModel(
                     - User Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
                     - Body (smart scale): $bodyText
                     - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
+                    - Their own nutritionist's advice (follow it, never contradict it): ${com.superfit.app.domain.PersonalNutrition.advice ?: "none given"}
                     - Macro Targets: Protein: ${macroTargets.proteinG.toInt()}g, Carbs: ${macroTargets.carbsG.toInt()}g, Fat: ${macroTargets.fatG.toInt()}g, Calories: ${macroTargets.calories.toInt()} kcal
                     - Daily Nutrition: $nutritionText
                     - Daily Activity: $activityText
@@ -535,6 +548,11 @@ class DashboardViewModel(
                 workoutMins = workoutMins
             )
 
+            // What the AI should weigh when it rates this person's meals
+            com.superfit.app.domain.PersonalNutrition.goal = profile.goal
+            com.superfit.app.domain.PersonalNutrition.calorieTarget = macroTargets.calories
+            com.superfit.app.domain.PersonalNutrition.proteinTargetG = macroTargets.proteinG
+
             val dietQualityMetrics = com.superfit.app.domain.FoodQualityEngine.analyzeDietQuality(
                 nutritionHistory = allNutritionHistory,
                 userGoal = profile.goal,
@@ -570,7 +588,10 @@ class DashboardViewModel(
             )
         }
     }.onEach { state ->
-        if (state is DashboardUiState.Success) updateWidget(state)
+        if (state is DashboardUiState.Success) {
+            updateWidget(state)
+            writeDietNote(state.dietQualityMetrics)
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -1009,9 +1030,64 @@ class DashboardViewModel(
         }
     }
 
+    /** Writes today's nutritionist note once, when the week has enough logs for a score. */
+    private fun writeDietNote(metrics: com.superfit.app.domain.DietQualityMetrics) {
+        if (!metrics.hasEnoughData || dietNoteRunning) return
+        val stamp = LocalDate.now().toString()
+        com.superfit.app.data.NutritionAdviceStore.note(appContext, stamp)?.let {
+            _dietNote.value = it
+            return
+        }
+        dietNoteRunning = true
+        viewModelScope.launch {
+            try {
+                com.superfit.app.domain.NutritionistNote.write(metrics)?.let { note ->
+                    com.superfit.app.data.NutritionAdviceStore.saveNote(appContext, stamp, note)
+                    _dietNote.value = note
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("DashboardViewModel", "Diet Quality note failed; the last one stays", e)
+            } finally {
+                dietNoteRunning = false
+            }
+        }
+    }
+
+    /** "Fine for me": the food stops counting as a treat and stops getting swaps. */
+    fun setFineForMe(key: String, fine: Boolean) {
+        com.superfit.app.data.NutritionAdviceStore.setFineForMe(appContext, key, fine)
+    }
+
+    /**
+     * Saves the user's nutritionist's advice and re-rates recent meals with it. Returns the daily
+     * targets the advice names, for the user to confirm, or null when it names none.
+     */
+    suspend fun saveNutritionistAdvice(text: String): com.superfit.app.domain.AdviceTargets? {
+        com.superfit.app.data.NutritionAdviceStore.saveAdvice(appContext, text)
+        sharedPrefs.edit().remove(BACKFILL_KEY).apply()
+        tagOlderMeals()
+        if (text.isBlank()) return null
+        return try {
+            com.superfit.app.domain.NutritionistNote.readTargets(text)
+        } catch (e: Exception) {
+            android.util.Log.w("DashboardViewModel", "Couldn't read targets from the advice", e)
+            null
+        }
+    }
+
+    fun applyNutritionistTargets(targets: com.superfit.app.domain.AdviceTargets?) {
+        com.superfit.app.data.NutritionAdviceStore.applyTargets(appContext, targets)
+    }
+
     override fun onCleared() {
         super.onCleared()
         sharedPrefs.unregisterOnSharedPreferenceChangeListener(preferenceListener)
+    }
+
+    companion object {
+        /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
+        private const val BACKFILL_KEY = "meal_tag_backfill_date_v2"
+        private const val RERATE_DAYS = 14L
     }
 }
 

@@ -16,7 +16,7 @@ data class MealTags(
     /** Rough servings of vegetables or fruit (a serving is about a cup of sabzi, salad or a piece of fruit). */
     val vegFruitServings: Double,
     val fiberG: Double,
-    /** Something most coaches would call a treat: fast food, sweets, desserts, fried snacks, sugary drinks, alcohol. */
+    /** A real treat in a real amount: desserts, mithai, fried snacks, fast food, sugary drinks, alcohol. */
     val treat: Boolean,
     /** Short generic dish name, e.g. "burger", "biryani", "dal". */
     val foodType: String,
@@ -27,7 +27,15 @@ data class MealTags(
     /** The AI's one-line reason this meal is good or not, shown as the food's "Why". */
     val why: String? = null,
     /** The AI's suggested healthier swap in the same cuisine, or null when the meal is fine as it is. */
-    val swap: MealSwap? = null
+    val swap: MealSwap? = null,
+    /** The AI's 1 to 10 rating as a nutritionist, weighing the amount, the person's goal and their own advice. */
+    val rating: Int? = null,
+    /** Servings of fruit, part of [vegFruitServings]. */
+    val fruitServings: Double = 0.0,
+    /** How many different vegetables and fruits are in it, for a colourful plate. */
+    val vegKinds: Int = 0,
+    /** [PersonalNutrition.adviceVersion] when the meal was rated, so new advice re-rates recent meals. */
+    val adviceVersion: String? = null
 ) {
     /** True when the AI also gave its reason and swap, which meals tagged before those existed lack. */
     val hasAdvice: Boolean get() = why != null
@@ -36,6 +44,7 @@ data class MealTags(
     fun scaled(factor: Double): MealTags = copy(
         vegFruitServings = (vegFruitServings * factor).coerceIn(0.0, 10.0),
         fiberG = (fiberG * factor).coerceIn(0.0, 100.0),
+        fruitServings = (fruitServings * factor).coerceIn(0.0, 10.0),
         swap = swap?.let { it.copy(kcalSaved = (it.kcalSaved * factor).toInt()) }
     )
 
@@ -54,7 +63,11 @@ data class MealTags(
             why?.let { "why=${clean(it, 160)}" },
             swap?.let { "sw=${clean(it.alternative, 80)}" },
             swap?.let { "sv=${it.kcalSaved}" },
-            swap?.let { "sb=${clean(it.benefit, 80)}" }
+            swap?.let { "sb=${clean(it.benefit, 80)}" },
+            rating?.let { "r=$it" },
+            if (fruitServings > 0) "fs=${String.format(Locale.US, "%.1f", fruitServings)}" else null,
+            if (vegKinds > 0) "vk=$vegKinds" else null,
+            adviceVersion?.let { "av=${clean(it, 8)}" }
         )
     ).joinToString("|")
 
@@ -79,7 +92,11 @@ data class MealTags(
                 why = fields["why"]?.takeIf { it.isNotBlank() },
                 swap = fields["sw"]?.takeIf { it.isNotBlank() }?.let { alt ->
                     MealSwap(alt, fields["sv"]?.toIntOrNull() ?: 0, fields["sb"].orEmpty())
-                }
+                },
+                rating = fields["r"]?.toIntOrNull()?.coerceIn(1, 10),
+                fruitServings = fields["fs"]?.toDoubleOrNull() ?: 0.0,
+                vegKinds = fields["vk"]?.toIntOrNull() ?: 0,
+                adviceVersion = fields["av"]
             )
         }
 
@@ -103,7 +120,11 @@ data class MealTags(
                     } else {
                         MealSwap(alternative, sw.optInt("kcalSaved", 0).coerceIn(0, 2000), sw.optString("benefit", "").trim())
                     }
-                }
+                },
+                rating = json.optInt("rating", 0).takeIf { it in 1..10 },
+                fruitServings = json.optDouble("fruitServings", 0.0).takeIf { !it.isNaN() }?.coerceIn(0.0, 10.0) ?: 0.0,
+                vegKinds = json.optInt("vegKinds", 0).coerceIn(0, 15),
+                adviceVersion = if (json.has("rating")) PersonalNutrition.adviceVersion() else null
             )
         }
 
@@ -116,14 +137,25 @@ data class MealTags(
                 "- \"addedSugar\": Boolean (true if it has a noticeable amount of added sugar)\n" +
                 "- \"vegFruitServings\": Double (servings of vegetables or fruit; about a cup of cooked vegetables, a bowl of salad or one piece of fruit is 1)\n" +
                 "- \"fiber\": Double (estimated grams of fibre)\n" +
-                "- \"treat\": Boolean (true for fast food, desserts, sweets, fried snacks, sugary drinks or alcohol)\n" +
+                "- \"treat\": Boolean (true only for a real treat in a real amount: desserts, mithai, fried snacks, fast food, sugary drinks or alcohol. " +
+                "Small amounts are not treats: a square or two of dark chocolate, tea or coffee with a little sugar, roasted chana, chana chaat, a home thali)\n" +
                 "- \"foodType\": String (the main dish as a short generic name in lowercase, one or two words, e.g. \"burger\", \"pizza\", \"biryani\", \"dal\", \"salad\")\n" +
                 "- \"hiddenOil\": Boolean (true if it carries a lot of oil, ghee or butter that is easy to miss, not counting deep-frying, such as restaurant gravies, butter chicken, dal makhani, ghee-laden parathas or oily sabzi)\n" +
                 "- \"why\": String (one plain sentence, at most 15 words, on what makes this meal good or not for health)\n" +
-                "- \"swap\": Object or null. If the meal is fried, sugary, oily, processed or a treat, suggest one realistic healthier swap this person would enjoy: " +
+                "- \"swap\": Object or null. If the meal rates 5 or lower, suggest one realistic healthier swap this person would enjoy: " +
                 "the same cuisine and region, the same kind of meal (a breakfast for a breakfast, a snack for a snack, a sweet for a sweet) and at least as much protein. " +
                 "{\"alternative\": String (short, e.g. \"moong dal chilla with curd\"), \"kcalSaved\": Int (calories saved, 0 if about the same), \"benefit\": String (at most 10 words)}. " +
                 "Use null when the meal is already a healthy choice.\n" +
+                "- \"fruitServings\": Double (the part of vegFruitServings that is fruit)\n" +
+                "- \"vegKinds\": Int (how many different vegetables and fruits are in it)\n" +
+                "- \"rating\": Int 1-10. Rate it as an experienced nutritionist who lets people live a normal life and only corrects what matters for their goal. " +
+                "Weigh the amount: 2 rotis with sabzi is balanced, 6 rotis is a heavy carb load, more so for weight loss. " +
+                "Normal home food (dal rice, roti sabzi, curd rice, a home thali) starts around 7; more for good protein and vegetables, less for very large portions or a lot of ghee or oil. " +
+                "Don't mark a home meal down for being a little low in protein; protein is judged separately over the day. " +
+                "Judge supplements and packaged foods by what they do for this person: whey or a protein shake that helps reach the protein goal is about 8. " +
+                "Treats and fast food are 2-4, fried snacks 3-4, sugary drinks 2. " +
+                "Use the person's goal, targets, own nutritionist's advice and approved foods given with the meal; their nutritionist's advice outranks these rules. " +
+                "The \"why\" sentence should explain the rating in plain words, mentioning the amount when it matters.\n" +
                 "Write all text in English, even when the meal is described in Hindi or another language or script.\n"
 
         /**

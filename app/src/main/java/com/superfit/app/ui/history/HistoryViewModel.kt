@@ -351,7 +351,7 @@ class HistoryViewModel(
 
             predictedFoods = repository.getPredictedFoods()
 
-            val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
+            val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
             this@HistoryViewModel.dayTotals = dayTotals
             allMeals = allNutrition
@@ -404,7 +404,7 @@ class HistoryViewModel(
             val profile = profile ?: return@launch
             val today = LocalDate.now()
             val zone = ZoneId.systemDefault()
-            val proteinTarget = PhysiologyEngine.proteinPerKg(profile.goal) * PhysiologyEngine.proteinReferenceWeightKg(profile)
+            val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val yesterday = today.minusDays(1)
             val dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
                 com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday, proteinTarget, calculateTargetCalories(yesterday), zone, weeksAgo)?.score

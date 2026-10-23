@@ -70,6 +70,7 @@ fun HistoryScreen(
     LaunchedEffect(selectedTab) { com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab]) }
     val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
     val bests = dashboardViewModel?.personalBests?.collectAsState()?.value
+    val dietNote = dashboardViewModel?.dietNote?.collectAsState()?.value
     var showWeighIn by remember { mutableStateOf(false) }
     var showGoalEdit by remember { mutableStateOf(false) }
     var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
@@ -188,7 +189,12 @@ fun HistoryScreen(
                             onShareWithCoach = { weeks -> viewModel.shareWithCoach(context, weeks) },
                             foodQuality = {
                                 if (dashboardState is DashboardUiState.Success) {
-                                    FoodQualityCard(metrics = dashboardState.dietQualityMetrics)
+                                    FoodQualityCard(
+                                        metrics = dashboardState.dietQualityMetrics,
+                                        onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) },
+                                        note = dietNote,
+                                        onFineForMe = { item, fine -> dashboardViewModel?.setFineForMe(item.approvalKey, fine) }
+                                    )
                                     dashboardState.dietQualityMetrics.swapSuggestions.forEach { swap ->
                                         FoodSwapCard(swap = swap, onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) })
                                     }

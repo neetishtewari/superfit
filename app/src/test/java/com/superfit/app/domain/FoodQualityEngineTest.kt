@@ -14,7 +14,7 @@ class FoodQualityEngineTest {
     private val oneDayMs = 24 * 3600 * 1000L
 
     // What the AI returns for each kind of meal. The engine knows foods only through these tags.
-    private val cleanTags = MealTags(1, fried = false, addedSugar = false, vegFruitServings = 1.0, fiberG = 5.0, treat = false, foodType = "salad")
+    private val cleanTags = MealTags(1, fried = false, addedSugar = false, vegFruitServings = 1.5, fiberG = 5.0, treat = false, foodType = "salad", vegKinds = 2)
 
     private fun junkTags(type: String, swap: String?, sugar: Boolean = false) = MealTags(
         3, fried = !sugar, addedSugar = sugar, vegFruitServings = 0.0, fiberG = 1.0, treat = true, foodType = type,
@@ -22,12 +22,13 @@ class FoodQualityEngineTest {
         swap = swap?.let { MealSwap(it, 200, "Lighter and more protein") }
     )
 
+    // Carbs are 45% of each food's calories and fat makes up the rest, so days look balanced.
     private fun food(text: String, kcal: Double, protein: Double, tags: MealTags?, timestamp: Long = now) = NutritionEntryEntity(
         foodText = text,
         calories = kcal,
         proteinG = protein,
-        carbsG = 0.0,
-        fatG = 0.0,
+        carbsG = kcal * 0.45 / 4,
+        fatG = ((kcal * 0.55 - protein * 4) / 9).coerceAtLeast(0.0),
         timestamp = timestamp,
         qualityTags = tags?.encode()
     )

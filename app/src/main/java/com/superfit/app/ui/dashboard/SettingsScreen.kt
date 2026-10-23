@@ -412,6 +412,10 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
 
+                    NutritionistAdviceSettings(viewModel)
+
+                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
