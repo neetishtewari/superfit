@@ -136,6 +136,9 @@ class CoachChatTest {
         assertTrue(CoachChat.isRoastRequest("Roast my day"))
         assertTrue(CoachChat.isRoastRequest("roast my day!"))
         assertTrue(CoachChat.isRoastRequest("Can you roast my day please"))
+        assertTrue(CoachChat.isRoastRequest("Roast"))
+        assertTrue(CoachChat.isRoastRequest("roast me"))
+        assertTrue(!CoachChat.isRoastRequest("Is roast chicken okay?"))
         assertTrue(!CoachChat.isRoastRequest("How did my day go?"))
         assertTrue(!CoachChat.isRoastRequest(null))
     }

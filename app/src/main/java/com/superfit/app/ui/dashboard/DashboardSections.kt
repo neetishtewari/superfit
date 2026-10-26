@@ -520,7 +520,7 @@ internal fun CoachInsightsCard(
                     shape = RoundedCornerShape(50),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Icon(Icons.Default.LocalFireDepartment, contentDescription = "Roast my day", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.LocalFireDepartment, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Roast", style = MaterialTheme.typography.labelLarge, maxLines = 1)
                 }

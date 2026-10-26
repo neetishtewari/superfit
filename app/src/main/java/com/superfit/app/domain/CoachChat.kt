@@ -159,13 +159,14 @@ object CoachChat {
     }
 
     /**
-     * True when [question] asks for a roast of the day: the chip, or the same words typed or
-     * spoken ("roast my day!", "Roast my day please").
+     * True when [question] asks for a roast: the Roast button, or the same ask typed or spoken
+     * ("roast", "Roast my day!", "roast me please").
      */
     fun isRoastRequest(question: String?): Boolean {
         if (question == null) return false
         val words = question.lowercase(Locale.ENGLISH).replace(Regex("[^a-z ]"), " ").split(' ').filter { it.isNotBlank() }
-        return words.windowed(3).any { it == listOf("roast", "my", "day") }
+        if (words == listOf("roast")) return true
+        return words.windowed(2).any { it == listOf("roast", "me") } || words.windowed(3).any { it == listOf("roast", "my", "day") }
     }
 
     fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
