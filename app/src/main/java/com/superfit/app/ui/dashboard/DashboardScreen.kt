@@ -105,6 +105,7 @@ fun DashboardScreen(
     var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
 
     var showChatBottomSheet by remember { mutableStateOf(false) }
+    val coachStyle by viewModel.coachStyle.collectAsState()
     var foodInputText by remember { mutableStateOf("") }
 
     var showFavoritesDialog by remember { mutableStateOf(false) }
@@ -546,7 +547,11 @@ fun DashboardScreen(
                             CoachInsightsCard(
                                 coachingState = coachingState,
                                 onRefresh = { viewModel.refreshCoachingInsight() },
-                                onOpenChat = { showChatBottomSheet = true }
+                                onOpenChat = { showChatBottomSheet = true },
+                                onRoast = {
+                                    viewModel.sendChatMessage(DashboardViewModel.ROAST_MY_DAY, how = "chip")
+                                    showChatBottomSheet = true
+                                }.takeIf { coachStyle == com.superfit.app.domain.CoachStyle.ROAST }
                             )
 
                             // Diet Quality (a 7-day score) lives in Insights; Home stays about today.
@@ -627,11 +632,11 @@ fun DashboardScreen(
             CoachChatSheet(
                 viewModel = viewModel,
                 onDismiss = { showChatBottomSheet = false },
-                // Only a day with meals logged can be roasted on a card.
+                // Any roast can go on a card, even one about an empty log.
                 onShareRoast = { line: String ->
                     showChatBottomSheet = false
                     shareCard = com.superfit.app.domain.ShareCards.roast(dailyShareCard(dayState, coachingState), line)
-                }.takeIf { dayState.nutritionList.isNotEmpty() }
+                }
             )
         }
     }

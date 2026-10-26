@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -34,7 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -321,16 +325,32 @@ internal fun CoachChatSheet(
                 val questions = remember(chatMessages.size) { viewModel.coachQuestions() }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(questions) { q ->
-                        Text(
-                            text = q,
-                            color = ThemeTextPrimary,
-                            fontSize = 12.sp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
-                                .clickable { viewModel.sendChatMessage(q, how = "chip") }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
+                        if (q == DashboardViewModel.ROAST_MY_DAY) {
+                            // The roast is the fun bit of Roast me style, so it looks like a button, not a question.
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(com.superfit.app.theme.SolarAmber)
+                                    .clickable { viewModel.sendChatMessage(q, how = "chip") }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Text(text = q, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Text(
+                                text = q,
+                                color = ThemeTextPrimary,
+                                fontSize = 12.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
+                                    .clickable { viewModel.sendChatMessage(q, how = "chip") }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -496,6 +516,8 @@ private fun ChatMessageRow(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp)
             ) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(6.dp))
                 Text("Share as a card", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }

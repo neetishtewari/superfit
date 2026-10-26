@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -292,7 +293,8 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
 internal fun CoachInsightsCard(
     coachingState: CoachingInsightState,
     onRefresh: () -> Unit,
-    onOpenChat: () -> Unit
+    onOpenChat: () -> Unit,
+    onRoast: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -496,16 +498,30 @@ internal fun CoachInsightsCard(
                 }
             }
         }
-        // Chat is always one tap away, whatever state the tip is in.
-        Button(
-            onClick = onOpenChat,
-            colors = ButtonDefaults.buttonColors(containerColor = HyperViolet, contentColor = Color.White),
-            shape = RoundedCornerShape(50),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-        ) {
-            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Chat with coach", style = MaterialTheme.typography.labelLarge)
+        // Chat is always one tap away, whatever state the tip is in. In Roast me style, so is the roast.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onOpenChat,
+                colors = ButtonDefaults.buttonColors(containerColor = HyperViolet, contentColor = Color.White),
+                shape = RoundedCornerShape(50),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Chat with coach", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            }
+            if (onRoast != null) {
+                Button(
+                    onClick = onRoast,
+                    colors = ButtonDefaults.buttonColors(containerColor = SolarAmber, contentColor = Color.White),
+                    shape = RoundedCornerShape(50),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Default.LocalFireDepartment, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Roast my day", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                }
+            }
         }
     }
 }
