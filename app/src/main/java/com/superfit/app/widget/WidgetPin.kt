@@ -16,8 +16,11 @@ object WidgetPin {
     fun canPin(context: Context): Boolean =
         AppWidgetManager.getInstance(context).isRequestPinAppWidgetSupported
 
-    fun isPlaced(context: Context): Boolean =
-        AppWidgetManager.getInstance(context).getAppWidgetIds(provider(context)).isNotEmpty()
+    fun isPlaced(context: Context): Boolean = count(context) > 0
+
+    /** How many Superfit widgets are on the home screen. */
+    fun count(context: Context): Int =
+        AppWidgetManager.getInstance(context).getAppWidgetIds(provider(context)).size
 
     /** Shows Android's own "Add to home screen" prompt. */
     fun requestPin(context: Context): Boolean =

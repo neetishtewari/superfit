@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +36,7 @@ import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.widget.WidgetPin
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +96,24 @@ fun SettingsScreen(
     var notificationsAllowed by remember { mutableStateOf(ReminderNotifications.canPost(context)) }
     val canPinWidget = remember { WidgetPin.canPin(context) }
     var widgetPlaced by remember { mutableStateOf(WidgetPin.isPlaced(context)) }
+    // True from the tap until the widget shows up (or we give up waiting), so extra taps on the
+    // card don't stack up more "Add to home screen" prompts and widgets.
+    var widgetAdding by remember { mutableStateOf(false) }
+    LaunchedEffect(widgetAdding) {
+        if (!widgetAdding) return@LaunchedEffect
+        val wasPlaced = WidgetPin.count(context)
+        // The launcher adds the widget a moment after the user confirms, so keep checking.
+        repeat(60) {
+            delay(500)
+            if (WidgetPin.count(context) > wasPlaced) {
+                widgetPlaced = true
+                widgetAdding = false
+                Toast.makeText(context, "Widget added to your home screen", Toast.LENGTH_SHORT).show()
+                return@LaunchedEffect
+            }
+        }
+        widgetAdding = false
+    }
     LifecycleResumeEffect(Unit) {
         notificationsAllowed = ReminderNotifications.canPost(context)
         widgetPlaced = WidgetPin.isPlaced(context)
@@ -380,7 +400,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(
                                 text = "Daily targets",
                                 fontWeight = FontWeight.Bold,
@@ -528,7 +548,8 @@ fun SettingsScreen(
                             ThemeConfig.MODE_DARK to "Dark"
                         ),
                         selected = themeMode,
-                        onSelect = { ThemeConfig.setMode(context, it) }
+                        onSelect = { ThemeConfig.setMode(context, it) },
+                        fitLabels = true
                     )
                 }
             }
@@ -690,7 +711,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-                        .clickable { WidgetPin.requestPin(context) }
+                        .clickable(enabled = !widgetAdding) { widgetAdding = WidgetPin.requestPin(context) }
                 ) {
                     Row(
                         modifier = Modifier
@@ -707,8 +728,10 @@ fun SettingsScreen(
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = if (widgetPlaced) {
-                                    "Already on your home screen. Tap to add another."
+                                text = if (widgetAdding) {
+                                    "Confirm on the prompt to place it."
+                                } else if (widgetPlaced) {
+                                    "On your home screen. You can add another."
                                 } else {
                                     "Calories left, plus mic and camera buttons to log in seconds."
                                 },
@@ -716,7 +739,14 @@ fun SettingsScreen(
                                 color = SuperfitTheme.colors.textSecondary
                             )
                         }
-                        Text(text = "Add", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                        when {
+                            widgetAdding -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = NeonMint, strokeWidth = 2.dp)
+                            widgetPlaced -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = NeonMint, modifier = Modifier.size(18.dp))
+                                Text(text = "Added", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                            }
+                            else -> Text(text = "Add", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                        }
                     }
                 }
             }

@@ -540,9 +540,18 @@ private fun LogButton(
     }
 }
 
-/** Pill-shaped switch used for Food / Activity and the Progress tabs. */
+/**
+ * Pill-shaped switch used for Food / Activity and the Progress tabs. [fitLabels] gives longer
+ * labels more of the width, so one long label (like "Match my phone") stays on one line.
+ */
 @Composable
-fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SegmentedPills(
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    fitLabels: Boolean = false
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -554,18 +563,20 @@ fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSele
             val isOn = key == selected
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(if (fitLabels) label.length + 4f else 1f)
                     .clip(RoundedCornerShape(50))
                     .background(if (isOn) ThemeCardBg else Color.Transparent)
                     .clickable { onSelect(key) }
                     .heightIn(min = 40.dp)
-                    .padding(vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isOn) ThemeTextPrimary else ThemeTextSecondary
+                    color = if (isOn) ThemeTextPrimary else ThemeTextSecondary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
         }
