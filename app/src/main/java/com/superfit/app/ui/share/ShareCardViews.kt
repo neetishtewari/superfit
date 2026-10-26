@@ -89,7 +89,7 @@ fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier,
             modifier = Modifier
                 .fillMaxSize()
                 // Top and bottom strips stay clear: Instagram and WhatsApp draw their own bars there.
-                .padding(start = 24.dp, end = 24.dp, top = 80.dp, bottom = 96.dp)
+                .padding(start = 24.dp, end = 24.dp, top = SAFE_TOP, bottom = 96.dp)
         ) {
             CardHeader(card.dateLine)
             when (card) {
@@ -102,10 +102,26 @@ fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier,
     }
 }
 
-/** Just the date (and time) at the top; the Superfit badge lives at the bottom. */
+/**
+ * Clear of Instagram's top bar (progress lines, profile picture, name), which covers about the top
+ * 13% of a story, with room to spare so the logo is never hidden behind the profile picture.
+ */
+private val SAFE_TOP = 100.dp
+
+/** The Superfit "S" and the date at the top; the full Superfit badge lives at the bottom. */
 @Composable
-private fun CardHeader(dateLine: String) {
-    Text(dateLine, color = TextDate, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+private fun CardHeader(dateLine: String, dateColor: Color = TextDate) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painter = painterResource(R.drawable.ic_superfit_launcher),
+            contentDescription = "Superfit logo",
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(10.dp))
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(dateLine, color = dateColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+    }
 }
 
 @Composable
@@ -403,13 +419,9 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, mo
                     )
                 )
         )
-        Text(
-            card.dateLine,
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 22.dp, top = 80.dp)
-        )
+        Box(Modifier.padding(start = 22.dp, top = SAFE_TOP)) {
+            CardHeader(card.dateLine, dateColor = Color.White)
+        }
         Column(
             Modifier
                 .align(Alignment.BottomStart)
