@@ -301,6 +301,7 @@ internal fun CoachInsightsCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(ThemeCoachSoft)
+            .border(1.dp, HyperViolet.copy(alpha = if (SuperfitTheme.isDark) 0.35f else 0.12f), RoundedCornerShape(20.dp))
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -499,7 +500,9 @@ internal fun CoachInsightsCard(
             }
         }
         // Chat is always one tap away, whatever state the tip is in. In Roast me style, so is the roast.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wraps the roast button onto its own line when both don't fit, instead of cutting it off.
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = onOpenChat,
                 colors = ButtonDefaults.buttonColors(containerColor = HyperViolet, contentColor = Color.White),
