@@ -150,6 +150,14 @@ object CoachChat {
     }
 
     /** "Today", "Yesterday" or "Fri 23 Oct", for the line between days in the chat. */
+
+    /** The user's question that the coach reply at [index] answers, or null for a user message or an error. */
+    fun questionFor(entries: List<ChatEntry>, index: Int): String? {
+        val entry = entries.getOrNull(index) ?: return null
+        if (entry.fromUser || entry.isError) return null
+        return entries.getOrNull(index - 1)?.takeIf { it.fromUser }?.text
+    }
+
     fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
         today -> "Today"
         today.minusDays(1) -> "Yesterday"

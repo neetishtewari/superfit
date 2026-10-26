@@ -38,6 +38,20 @@ class ShareCardsTest {
     }
 
     @Test
+    fun roastMyDayReplacesTheCoachLineAndKeepsTheTiles() {
+        val day = ShareCards.daily(
+            today, streakDays = 3, mealsToday = 2, proteinEatenG = 48.0, proteinGoalG = 105.0,
+            dietScore = null, steps = 3100, workout = null, coachLine = "Protein is short."
+        )
+        val card = ShareCards.roast(day, "Two samosas **and** a gulab jamun. Bold.")
+        assertTrue(card.roast)
+        assertEquals("Two samosas and a gulab jamun. Bold.", card.coachLine)
+        assertEquals(day.tiles, card.tiles)
+        assertEquals(ShareCards.ROAST_MAX, ShareCards.roast(day, "x".repeat(400)).coachLine?.length)
+        assertTrue(!day.roast)
+    }
+
+    @Test
     fun blankRestDayLeavesTilesOutInsteadOfZeros() {
         val card = ShareCards.daily(
             today, streakDays = 4, mealsToday = 0, proteinEatenG = 0.0, proteinGoalG = 140.0,

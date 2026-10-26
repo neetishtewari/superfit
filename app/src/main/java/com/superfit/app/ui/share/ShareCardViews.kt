@@ -204,9 +204,15 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
                 .background(Divider)
         )
         Spacer(Modifier.height(12.dp))
-        Text("COACH", color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp)
-        Spacer(Modifier.height(6.dp))
-        Text(line, color = TextMain, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        if (card.roast) {
+            Text("🔥 ROAST MY DAY", color = SolarAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(line, color = TextMain, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, maxLines = 6, overflow = TextOverflow.Ellipsis)
+        } else {
+            Text("COACH", color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(line, color = TextMain, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
     }
     Spacer(Modifier.weight(1f))
 }

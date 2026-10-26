@@ -29,7 +29,9 @@ sealed interface ShareCard {
         override val dateLine: String,
         val streakDays: Int,
         val tiles: List<CardStat>,
-        val coachLine: String?
+        val coachLine: String?,
+        // "Roast my day": the coach line is the AI coach's roast of the day.
+        val roast: Boolean = false
     ) : ShareCard
 
     data class Activity(
@@ -207,5 +209,12 @@ object ShareCards {
     private fun pace(secondsPerKm: Long): String = String.format(Locale.US, "%d:%02d", secondsPerKm / 60, secondsPerKm % 60)
 
     /** The coach writes **bold**; a picture shows plain text. */
+
+    /** The daily card with the AI coach's "Roast my day" line in place of the coach line. */
+    fun roast(daily: ShareCard.Daily, line: String): ShareCard.Daily =
+        daily.copy(coachLine = plain(line).take(ROAST_MAX).takeIf { it.isNotBlank() }, roast = true)
+
+    const val ROAST_MAX = 220
+
     private fun plain(text: String): String = text.replace("**", "").trim()
 }

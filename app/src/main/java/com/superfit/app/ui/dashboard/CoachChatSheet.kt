@@ -83,7 +83,7 @@ private sealed interface ChatRow {
         override val key = "day_$label"
     }
 
-    data class Message(val entry: ChatEntry, val isLast: Boolean) : ChatRow {
+    data class Message(val entry: ChatEntry, val isLast: Boolean, val isRoast: Boolean = false) : ChatRow {
         override val key = "msg_${entry.id}"
     }
 }
@@ -97,7 +97,11 @@ private fun chatRows(entries: List<ChatEntry>, today: LocalDate, zone: ZoneId): 
             rows += ChatRow.Day(CoachChat.dayLabel(day, today))
             lastDay = day
         }
-        rows += ChatRow.Message(entry, isLast = index == entries.lastIndex)
+        rows += ChatRow.Message(
+            entry,
+            isLast = index == entries.lastIndex,
+            isRoast = CoachChat.questionFor(entries, index) == DashboardViewModel.ROAST_MY_DAY
+        )
     }
     return rows
 }
@@ -110,7 +114,8 @@ private fun chatRows(entries: List<ChatEntry>, today: LocalDate, zone: ZoneId): 
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun CoachChatSheet(
     viewModel: DashboardViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onShareRoast: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val chatMessages by viewModel.chatMessages.collectAsState()
@@ -288,7 +293,8 @@ internal fun CoachChatSheet(
                                 showTellMeMore = row.isLast && !row.entry.fromUser && !row.entry.isError && !chatLoading,
                                 onUndo = { viewModel.undoChatNotes(row.entry.id) },
                                 onLogMeal = { viewModel.logSuggestedMeal(row.entry.id) },
-                                onTellMeMore = { viewModel.sendChatMessage(CoachChat.TELL_ME_MORE, how = "chip") }
+                                onTellMeMore = { viewModel.sendChatMessage(CoachChat.TELL_ME_MORE, how = "chip") },
+                                onShareRoast = onShareRoast?.takeIf { row.isRoast }?.let { share -> { share(row.entry.text) } }
                             )
                         }
                     }
@@ -415,7 +421,8 @@ private fun ChatMessageRow(
     showTellMeMore: Boolean,
     onUndo: () -> Unit,
     onLogMeal: () -> Unit,
-    onTellMeMore: () -> Unit
+    onTellMeMore: () -> Unit,
+    onShareRoast: (() -> Unit)? = null
 ) {
     if (entry.fromUser) {
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
@@ -486,6 +493,18 @@ private fun ChatMessageRow(
                 ) {
                     Text("+ Log this: $meal", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
+            }
+        }
+
+        if (onShareRoast != null) {
+            Button(
+                onClick = onShareRoast,
+                colors = ButtonDefaults.buttonColors(containerColor = com.superfit.app.theme.SolarAmber, contentColor = Color.Black),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text("🔥 Share as a card", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
 

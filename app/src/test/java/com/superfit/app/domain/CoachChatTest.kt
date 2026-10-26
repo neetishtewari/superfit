@@ -100,6 +100,19 @@ class CoachChatTest {
     }
 
     @Test
+    fun aReplyKnowsWhichQuestionItAnswers() {
+        val entries = listOf(
+            msg(1, true, "Roast my day", 2),
+            msg(2, false, "Two samosas. Bold.", 2),
+            msg(3, false, "Couldn't reach the AI", 1, isError = true)
+        )
+        assertEquals("Roast my day", CoachChat.questionFor(entries, 1))
+        assertNull(CoachChat.questionFor(entries, 0))
+        assertNull(CoachChat.questionFor(entries, 2))
+        assertNull(CoachChat.questionFor(entries, 5))
+    }
+
+    @Test
     fun dayLabels() {
         val today = LocalDate.of(2026, 10, 26)
         assertEquals("Today", CoachChat.dayLabel(today, today))
