@@ -565,7 +565,10 @@ fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSele
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isOn) ThemeTextPrimary else ThemeTextSecondary
+                    color = if (isOn) ThemeTextPrimary else ThemeTextSecondary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 6.dp)
                 )
             }
         }

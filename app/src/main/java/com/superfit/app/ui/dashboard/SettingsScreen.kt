@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -380,7 +381,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(
                                 text = "Daily targets",
                                 fontWeight = FontWeight.Bold,
@@ -684,39 +685,73 @@ fun SettingsScreen(
 
             // Home-screen widget (hidden where the launcher can't add one from an app)
             if (canPinWidget) {
+                // After a tap, wait for the launcher to place it so a second tap doesn't add a second widget.
+                var widgetRequested by remember { mutableStateOf(false) }
+                LaunchedEffect(widgetRequested) {
+                    if (widgetRequested) {
+                        repeat(60) {
+                            kotlinx.coroutines.delay(1000)
+                            if (WidgetPin.isPlaced(context)) {
+                                widgetPlaced = true
+                                widgetRequested = false
+                                return@LaunchedEffect
+                            }
+                        }
+                        widgetRequested = false
+                    }
+                }
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-                        .clickable { WidgetPin.requestPin(context) }
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Add home-screen widget",
+                                text = "Home-screen widget",
                                 fontWeight = FontWeight.Bold,
                                 color = SuperfitTheme.colors.textPrimary,
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = if (widgetPlaced) {
-                                    "Already on your home screen. Tap to add another."
-                                } else {
-                                    "Calories left, plus mic and camera buttons to log in seconds."
+                                text = when {
+                                    widgetPlaced -> "On your home screen."
+                                    widgetRequested -> "Tap Add on the box that pops up."
+                                    else -> "Calories left, plus mic and camera buttons to log in seconds."
                                 },
                                 fontSize = 12.sp,
                                 color = SuperfitTheme.colors.textSecondary
                             )
                         }
-                        Text(text = "Add", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                        if (widgetPlaced) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = NeonMint, modifier = Modifier.size(18.dp))
+                                Text(text = "Added", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    widgetRequested = true
+                                    if (!WidgetPin.requestPin(context)) {
+                                        widgetRequested = false
+                                        Toast.makeText(context, "Your phone couldn't add it. Long-press your home screen, tap Widgets, and find Superfit.", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                enabled = !widgetRequested,
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.White),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Add", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
