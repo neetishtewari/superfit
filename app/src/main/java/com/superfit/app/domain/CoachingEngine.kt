@@ -97,7 +97,7 @@ class CoachingEngine {
         return try {
             val response = GeminiClient.generateContent(
                 prompt = prompt,
-                systemInstructionText = SYSTEM_INSTRUCTION,
+                systemInstructionText = SYSTEM_INSTRUCTION + CoachStyle.current.instruction(),
                 isJson = true
             )
             parseResponse(response, focus, why)
