@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -53,9 +54,8 @@ import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
 
-// The share cards always use their own dark look, whatever theme the app is in.
-/** The card's own colours: dark (the default) or light, picked on the share sheet. */
-private class CardPalette(
+/** A share card's own colours, whatever theme the app is in: dark by default, or light if the user picks it. */
+private data class CardPalette(
     val background: Color,
     val tile: Color,
     val divider: Color,
@@ -80,12 +80,12 @@ private val DarkCard = CardPalette(
 private val LightCard = CardPalette(
     background = Color(0xFFF6F6F9),
     tile = Color(0xFFFFFFFF),
-    divider = Color(0xFFDDDDE6),
-    textMain = Color(0xFF14141C),
+    divider = Color(0xFFDCDCE5),
+    textMain = Color(0xFF15151C),
     textSoft = Color(0xFF5E5E70),
-    textDate = Color(0xFF3F3F50),
+    textDate = Color(0xFF45455A),
     badgeBackground = Color(0xFFFFFFFF),
-    badgeBorder = Color(0xFFDDDDE6)
+    badgeBorder = Color(0xFFD5D5DF)
 )
 
 private val LocalCardPalette = staticCompositionLocalOf { DarkCard }
@@ -110,16 +110,19 @@ fun defaultAccent(card: ShareCard): Color = if (card is ShareCard.Best) HyperVio
 fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier, photo: ImageBitmap? = null, light: Boolean = false) {
     // The daily card has no photo option; workout and personal-best cards can sit on the user's photo.
     if (photo != null && card !is ShareCard.Daily) {
-        PhotoCardView(card, accent, photo, modifier)
+        CompositionLocalProvider(LocalCardPalette provides DarkCard) {
+            PhotoCardView(card, accent, photo, modifier)
+        }
         return
     }
     CompositionLocalProvider(LocalCardPalette provides if (light) LightCard else DarkCard) {
-        PlainCardView(card, accent, modifier)
+        // The bright accents are hard to read on white, so the light card uses a deeper shade.
+        CardOnBackground(card, if (light) lerp(accent, Color.Black, 0.3f) else accent, modifier)
     }
 }
 
 @Composable
-private fun PlainCardView(card: ShareCard, accent: Color, modifier: Modifier) {
+private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier) {
     Box(
         modifier = modifier
             .size(360.dp, 640.dp)
@@ -138,7 +141,7 @@ private fun PlainCardView(card: ShareCard, accent: Color, modifier: Modifier) {
         ) {
             CardHeader(card.dateLine)
             when (card) {
-                is ShareCard.Daily -> DailyBody(card, accent)
+                is ShareCard.Daily -> if (card.roast) RoastBody(card, accent) else DailyBody(card, accent)
                 is ShareCard.Activity -> ActivityBody(card, accent)
                 is ShareCard.Best -> BestBody(card, accent)
             }
@@ -231,8 +234,7 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
     }
     Spacer(Modifier.height(16.dp))
     // Tiles left out (no meals, rest day) close up, so there are never empty boxes.
-    // A roast needs the room: one row of tiles, then the roast.
-    (if (card.roast && card.coachLine != null) card.tiles.take(2) else card.tiles).chunked(2).forEach { row ->
+    card.tiles.chunked(2).forEach { row ->
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             row.forEach { stat ->
                 DailyTile(stat, barColor = if (stat.label == "PROTEIN") accent else secondBar(accent), modifier = Modifier.weight(1f))
@@ -253,11 +255,7 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
         if (card.roast) {
             Text("🔥 ROAST MY DAY", color = SolarAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
-            // Takes the space left above the footer, so a long roast is shortened instead of pushing the footer off.
-            Box(Modifier.weight(1f)) {
-                Text(line, color = TextMain, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, maxLines = 7, overflow = TextOverflow.Ellipsis)
-            }
-            return
+            Text(line, color = TextMain, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, maxLines = 6, overflow = TextOverflow.Ellipsis)
         } else {
             Text("COACH", color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
@@ -265,6 +263,34 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
         }
     }
     Spacer(Modifier.weight(1f))
+}
+
+/** "Roast my day": the roast is the headline, with one row of the day's numbers under it. */
+@Composable
+private fun ColumnScope.RoastBody(card: ShareCard.Daily, accent: Color) {
+    Spacer(Modifier.height(24.dp))
+    Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+    Spacer(Modifier.height(12.dp))
+    Text(
+        card.coachLine.orEmpty(),
+        color = TextMain,
+        fontSize = 19.sp,
+        lineHeight = 26.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 6,
+        overflow = TextOverflow.Ellipsis
+    )
+    Spacer(Modifier.weight(1f))
+    val tiles = card.tiles.take(2)
+    if (tiles.isNotEmpty()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            tiles.forEach { stat ->
+                DailyTile(stat, barColor = if (stat.label == "PROTEIN") accent else secondBar(accent), modifier = Modifier.weight(1f))
+            }
+            if (tiles.size == 1) Spacer(Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(16.dp))
+    }
 }
 
 private fun secondBar(accent: Color): Color = if (accent == ElectricCyan) NeonMint else ElectricCyan
