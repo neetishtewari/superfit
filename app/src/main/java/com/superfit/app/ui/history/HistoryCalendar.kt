@@ -160,16 +160,17 @@ fun CalendarCard(
                 }
             }
 
-            // Legend / Color indicators
-            Row(
+            // Legend: wraps onto a second line on narrow phones instead of squashing.
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                LegendItem(color = NeonMint, label = "Under what you burned")
                 val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
+                LegendItem(color = NeonMint, label = "Under what you burned")
                 LegendItem(color = SolarAmber, label = "Over")
                 LegendItem(color = untrackedColor, label = "Not fully logged")
             }
@@ -236,6 +237,6 @@ fun LegendItem(
                 .clip(CircleShape)
                 .background(color)
         )
-        Text(text = label, fontSize = 12.sp, color = ThemeTextTertiary)
+        Text(text = label, fontSize = 12.sp, color = ThemeTextSecondary, maxLines = 1)
     }
 }

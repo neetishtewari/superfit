@@ -74,9 +74,9 @@ fun DayBalanceCard(
     val today = LocalDate.now()
     val yesterday = today.minusDays(1)
     val dateLabel = when (selectedDate) {
-        today -> "TODAY"
+        today -> "Today"
         yesterday -> "Yesterday"
-        else -> selectedDate.toString()
+        else -> selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM", java.util.Locale.ENGLISH))
     }
 
     Card(
@@ -101,11 +101,10 @@ fun DayBalanceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "BALANCE FOR $dateLabel",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ThemeTextTertiary,
-                    letterSpacing = 0.sp,
+                    text = dateLabel,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = ThemeTextPrimary,
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 8.dp)
@@ -124,26 +123,15 @@ fun DayBalanceCard(
                 )
             }
 
-            // Stats breakdown grid (Calories, TDEE, Steps, Active Burn)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "EATEN", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
-                    Text(text = "${summary.caloriesEaten.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
+            // Stats: two rows of two, so numbers never wrap on narrow phones.
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    BalanceStat("Eaten", "${"%,d".format(summary.caloriesEaten.toInt())} kcal", ThemeTextPrimary, Modifier.weight(1f))
+                    BalanceStat("Burned in total", "${"%,d".format(summary.tdee.toInt())} kcal", ThemeTextPrimary, Modifier.weight(1f))
                 }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "Burned", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
-                    Text(text = "${summary.tdee.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "STEPS", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
-                    Text(text = String.format("%,d", summary.steps), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "BURN", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
-                    Text(text = "${summary.activeBurn.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SolarAmber)
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    BalanceStat("Steps", "%,d".format(summary.steps), ThemeTextPrimary, Modifier.weight(1f))
+                    BalanceStat("From exercise", "${"%,d".format(summary.activeBurn.toInt())} kcal", com.superfit.app.theme.ElectricCyan, Modifier.weight(1f))
                 }
             }
 
@@ -508,5 +496,13 @@ fun DayBalanceCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BalanceStat(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(text = label, fontSize = 12.sp, color = ThemeTextSecondary, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text = value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1)
     }
 }
