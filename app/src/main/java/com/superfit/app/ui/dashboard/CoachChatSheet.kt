@@ -44,8 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -71,6 +69,7 @@ import com.superfit.app.domain.ChatEntry
 import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -243,7 +242,7 @@ internal fun CoachChatSheet(
                     } else {
                         "Knows your meals, workouts and goal, and remembers what you tell it"
                     },
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = NeonGreen
                 )
             }
@@ -279,9 +278,9 @@ internal fun CoachChatSheet(
                     items(rows, key = { it.key }) { row ->
                         when (row) {
                             is ChatRow.Day -> Text(
-                                text = row.label.uppercase(),
+                                text = row.label,
                                 color = ThemeTextSecondary,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.6.sp,
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -338,21 +337,13 @@ internal fun CoachChatSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
+                SuperfitField(
                     value = if (isListening) liveText else chatInputText,
                     onValueChange = { if (!isListening) chatInputText = it.take(CoachChat.MAX_TEXT) },
                     placeholder = {
                         Text(if (isListening) "Listening… speak your question" else "Ask your AI coach…", fontSize = 13.sp)
                     },
                     readOnly = isListening,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = if (isListening) NeonGreen else ThemeGlassBorder,
-                        focusedTextColor = ThemeTextPrimary,
-                        unfocusedTextColor = ThemeTextPrimary,
-                        focusedPlaceholderColor = ThemeTextSecondary,
-                        unfocusedPlaceholderColor = ThemeTextSecondary
-                    ),
                     modifier = Modifier.weight(1f),
                     maxLines = 4
                 )
@@ -439,7 +430,7 @@ private fun ChatMessageRow(
                     .padding(12.dp)
             ) {
                 if (entry.spoken) {
-                    Text(text = "🎙 Spoken", color = ThemeTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "🎙 Spoken", color = ThemeTextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Text(text = entry.text, color = ThemeTextPrimary, fontSize = 13.sp, lineHeight = 18.sp)
             }
@@ -468,11 +459,11 @@ private fun ChatMessageRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "✓ $line", color = NeonGreen, fontSize = 11.sp, modifier = Modifier.weight(1f, fill = false))
+                Text(text = "✓ $line", color = NeonGreen, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false))
                 Text(
                     text = "Undo",
                     color = ThemeTextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable(onClick = onUndo)
                 )
@@ -482,7 +473,7 @@ private fun ChatMessageRow(
         val meal = entry.mealToLog
         if (meal != null) {
             if (entry.mealLogged) {
-                Text(text = "✓ Added to today's meals: $meal", color = NeonGreen, fontSize = 11.sp)
+                Text(text = "✓ Added to today's meals: $meal", color = NeonGreen, fontSize = 12.sp)
             } else {
                 Button(
                     onClick = onLogMeal,
@@ -491,7 +482,7 @@ private fun ChatMessageRow(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)
                 ) {
-                    Text("+ Log this: $meal", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("+ Log this: $meal", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
             }
         }
@@ -504,7 +495,7 @@ private fun ChatMessageRow(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp)
             ) {
-                Text("🔥 Share as a card", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("🔥 Share as a card", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 

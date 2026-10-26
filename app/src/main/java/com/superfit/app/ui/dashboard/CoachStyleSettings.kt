@@ -70,7 +70,7 @@ fun CoachStyleSettings(viewModel: DashboardViewModel) {
         Text(
             text = style.blurb + if (style == CoachStyle.ROAST) " It roasts your habits, never you, and gets serious about pain or health worries." else "",
             color = SuperfitTheme.colors.textSecondary,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             lineHeight = 15.sp
         )
     }

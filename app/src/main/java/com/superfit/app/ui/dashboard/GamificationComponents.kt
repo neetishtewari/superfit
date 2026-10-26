@@ -64,7 +64,7 @@ fun StreakHeaderCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "${streakState.currentStreak} DAY STREAK",
+                    text = "${streakState.currentStreak}-day streak",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = SuperfitTheme.colors.textPrimary,
@@ -94,7 +94,7 @@ fun StreakHeaderCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Log today to keep it",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SolarAmber,
                                 maxLines = 1
@@ -118,8 +118,8 @@ fun StreakHeaderCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Best: ${streakState.longestStreak}d",
-                                fontSize = 11.sp,
+                                text = "Best ${streakState.longestStreak} days",
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SuperfitTheme.colors.textPrimary,
                                 maxLines = 1
@@ -144,7 +144,7 @@ fun StreakHeaderCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Active",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NeonMint,
                                 maxLines = 1

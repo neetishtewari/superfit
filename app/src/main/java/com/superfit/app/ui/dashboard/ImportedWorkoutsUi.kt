@@ -117,25 +117,24 @@ fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit, showDay: Boolea
                     fontWeight = FontWeight.Bold,
                     color = SuperfitTheme.colors.textPrimary
                 )
-                Text(text = workout.detailLine, fontSize = 11.sp, color = SuperfitTheme.colors.textSecondary)
-                Text(text = "from ${workout.sourceName}", fontSize = 10.sp, color = Color.Gray)
+                Text(text = "${workout.detailLine} · ${workout.sourceName}", fontSize = 12.sp, color = SuperfitTheme.colors.textSecondary)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 workout.exerciseKcal?.let {
                     Text(
                         text = "${it.toInt()} kcal",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = EnergeticCoral
+                        color = ElectricCyan
                     )
                 }
                 if (onShare != null) {
-                    IconButton(onClick = onShare, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = onShare, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Share workout",
                             tint = SuperfitTheme.colors.textSecondary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

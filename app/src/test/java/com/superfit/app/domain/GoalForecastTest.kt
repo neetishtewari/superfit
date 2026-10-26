@@ -125,4 +125,16 @@ class GoalForecastTest {
         assertEquals(start.plusWeeks(4), first.reachedOn)
         assertNull(f.milestones.last().reachedOn)
     }
+
+    @Test
+    fun startDateFallsBackWhenProfileNeverSavedOne() {
+        val weighIn = listOf(LocalDate.of(2026, 9, 28) to 70.0, LocalDate.of(2026, 10, 5) to 69.0)
+        val meal = LocalDate.of(2026, 9, 20)
+        // 1 January 1970 is what an unsaved start date reads as
+        assertEquals(LocalDate.of(2026, 9, 28), GoalForecast.startDate(LocalDate.of(1970, 1, 1), weighIn, meal, today))
+        assertEquals(LocalDate.of(2026, 9, 28), GoalForecast.startDate(null, weighIn, meal, today))
+        assertEquals(meal, GoalForecast.startDate(null, emptyList(), meal, today))
+        assertEquals(today, GoalForecast.startDate(null, emptyList(), null, today))
+        assertEquals(LocalDate.of(2026, 9, 1), GoalForecast.startDate(LocalDate.of(2026, 9, 1), weighIn, meal, today))
+    }
 }

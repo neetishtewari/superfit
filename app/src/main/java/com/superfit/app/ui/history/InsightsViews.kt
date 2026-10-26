@@ -95,7 +95,7 @@ private fun SectionCard(modifier: Modifier = Modifier, borderColor: Color? = nul
 
 @Composable
 private fun SectionLabel(text: String, color: Color = ThemeTextSecondary) {
-    Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, color = color)
+    Text(text, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = color)
 }
 
 @Composable
@@ -118,7 +118,7 @@ fun InsightsTab(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard {
-            SectionLabel("YOUR WEEK · ${report.from.format(shortDate)} to ${report.to.format(shortDate)}", HyperViolet)
+            SectionLabel("Your week · ${report.from.format(shortDate)} to ${report.to.format(shortDate)}", HyperViolet)
             Text(report.verdict, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 24.sp)
             val s = report.thisWeek
             val l = report.lastWeek
@@ -150,13 +150,13 @@ fun InsightsTab(
 
         if (report.working.isNotEmpty()) {
             SectionCard {
-                SectionLabel("WORKING", NeonMint)
+                SectionLabel("Going well", NeonMint)
                 report.working.forEach { InsightRow(it) }
             }
         }
         if (report.watch.isNotEmpty()) {
             SectionCard {
-                SectionLabel("WATCH", SolarAmber)
+                SectionLabel("Watch out", SolarAmber)
                 report.watch.forEach { InsightRow(it) }
                 TextButton(onClick = onOpenJourney, modifier = Modifier.heightIn(min = 44.dp)) {
                     Text("See how this affects your goal date", color = NeonMint, fontWeight = FontWeight.Bold)
@@ -166,7 +166,7 @@ fun InsightsTab(
 
         if (report.dailyNet.any { it.second != null }) {
             SectionCard {
-                SectionLabel("EATING VS TARGET · 7 DAYS")
+                SectionLabel("Eating vs target, last 7 days")
                 NetBars(report.dailyNet)
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     LegendDot(NeonMint, "Under target")
@@ -251,8 +251,8 @@ private fun WeekTile(value: String, label: String, delta: Delta, modifier: Modif
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(value, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, maxLines = 1)
-        Text(label, fontSize = 11.sp, color = ThemeTextSecondary, maxLines = 1)
-        if (delta.text.isNotEmpty()) Text(delta.text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = delta.color, maxLines = 1)
+        Text(label, fontSize = 12.sp, color = ThemeTextSecondary, maxLines = 1)
+        if (delta.text.isNotEmpty()) Text(delta.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = delta.color, maxLines = 1)
     }
 }
 
@@ -261,7 +261,7 @@ private fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(color))
         Spacer(Modifier.width(6.dp))
-        Text(label, fontSize = 11.sp, color = ThemeTextSecondary)
+        Text(label, fontSize = 12.sp, color = ThemeTextSecondary)
     }
 }
 
@@ -294,7 +294,7 @@ private fun NetBars(days: List<Pair<LocalDate, Double?>>) {
     }
     Row(Modifier.fillMaxWidth()) {
         days.forEach { (d, _) ->
-            Text(d.dayOfWeek.name.take(1), modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 11.sp, color = ThemeTextSecondary)
+            Text(d.dayOfWeek.name.take(1), modifier = Modifier.weight(1f), textAlign = TextAlign.Center, fontSize = 12.sp, color = ThemeTextSecondary)
         }
     }
 }
@@ -342,7 +342,7 @@ fun JourneyTab(
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (!goalSet) {
             SectionCard {
-                SectionLabel("YOUR GOAL", NeonMint)
+                SectionLabel("Your goal", NeonMint)
                 Text("Set a goal weight to see your journey", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 26.sp)
                 Text(
                     "Superfit will show how much of it you've covered, when you'll get there at your current habits, and what would get you there sooner.",
@@ -363,7 +363,7 @@ fun JourneyTab(
         }
         SectionCard {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                SectionLabel("GOAL COVERED")
+                SectionLabel("Goal covered")
                 Spacer(Modifier.weight(1f))
                 Text("Day ${j.dayNumber}", fontSize = 13.sp, color = ThemeTextSecondary)
             }
@@ -397,14 +397,14 @@ fun JourneyTab(
         }
 
         val (statusLabel, statusColor) = when (j.status) {
-            ForecastStatus.ON_TRACK -> "ON TRACK" to NeonMint
-            ForecastStatus.AT_RISK -> "AT RISK" to SolarAmber
-            ForecastStatus.OFF_TRACK -> "OFF TRACK" to SolarAmber
-            ForecastStatus.REACHED -> "GOAL REACHED" to NeonMint
-            ForecastStatus.NOT_ENOUGH_DATA -> "NEEDS MORE DATA" to ThemeTextSecondary
+            ForecastStatus.ON_TRACK -> "On track" to NeonMint
+            ForecastStatus.AT_RISK -> "At risk" to SolarAmber
+            ForecastStatus.OFF_TRACK -> "Off track" to SolarAmber
+            ForecastStatus.REACHED -> "Goal reached" to NeonMint
+            ForecastStatus.NOT_ENOUGH_DATA -> "Needs more data" to ThemeTextSecondary
         }
         SectionCard(borderColor = statusColor.copy(alpha = 0.45f)) {
-            SectionLabel("FORECAST · $statusLabel", statusColor)
+            SectionLabel("Forecast · $statusLabel", statusColor)
             Text(j.headline, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 26.sp)
             if (j.explanation.isNotEmpty()) Text(j.explanation, fontSize = 14.sp, color = ThemeTextSecondary, lineHeight = 20.sp)
             if (j.weighIns.isNotEmpty()) {
@@ -419,14 +419,14 @@ fun JourneyTab(
 
         if (j.slowing.isNotEmpty()) {
             SectionCard {
-                SectionLabel("WHAT'S SLOWING YOU DOWN", SolarAmber)
+                SectionLabel("What's slowing you down", SolarAmber)
                 j.slowing.forEach { InsightRow(it) }
             }
         }
 
         if (j.fixes.isNotEmpty()) {
             SectionCard {
-                SectionLabel("WHAT GETS YOU THERE SOONER", NeonMint)
+                SectionLabel("What gets you there sooner", NeonMint)
                 j.fixes.forEach { fix ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(fix.label, fontSize = 15.sp, color = ThemeTextPrimary, modifier = Modifier.weight(1f))
@@ -445,7 +445,7 @@ fun JourneyTab(
 
         if (j.milestones.isNotEmpty()) {
             SectionCard {
-                SectionLabel("MILESTONES")
+                SectionLabel("Milestones")
                 j.milestones.forEach { m ->
                     Row(Modifier.fillMaxWidth()) {
                         Text(m.label, fontSize = 15.sp, color = ThemeTextPrimary, modifier = Modifier.weight(1f))
@@ -472,7 +472,7 @@ fun JourneyTab(
 @Composable
 private fun BodyCard(b: BodySummary, canAskBodyAccess: Boolean, onAllowBody: () -> Unit) {
     SectionCard {
-        SectionLabel("BODY", ElectricCyan)
+        SectionLabel("Body", ElectricCyan)
         b.insight?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary, lineHeight = 21.sp) }
         b.bodyFatPct?.let { BodyRow("Body fat", "${BodyReadings.fmt(it)}%", b.bodyFatChange?.let { c -> change(c, "pts", lowerIsGood = true) }) }
         b.leanKg?.let { BodyRow("Muscle (lean mass)", "${BodyReadings.fmt(it)} kg", b.leanChange?.let { c -> change(c, "kg", lowerIsGood = false) }) }
@@ -593,11 +593,11 @@ private fun JourneyChart(j: JourneyForecast, forecastColor: Color) {
         }
     }
     Row(Modifier.fillMaxWidth()) {
-        Text(first.format(shortDate), fontSize = 11.sp, color = ThemeTextSecondary)
+        Text(first.format(shortDate), fontSize = 12.sp, color = ThemeTextSecondary)
         Spacer(Modifier.weight(1f))
-        Text("Today", fontSize = 11.sp, color = ThemeTextSecondary)
+        Text("Today", fontSize = 12.sp, color = ThemeTextSecondary)
         Spacer(Modifier.weight(1f))
-        Text(end.format(shortDate), fontSize = 11.sp, color = ThemeTextSecondary)
+        Text(end.format(shortDate), fontSize = 12.sp, color = ThemeTextSecondary)
     }
 }
 

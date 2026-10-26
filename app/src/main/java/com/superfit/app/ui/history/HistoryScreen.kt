@@ -119,7 +119,7 @@ fun HistoryScreen(
                             text = "INSIGHTS",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
-                            letterSpacing = 2.sp,
+                            letterSpacing = 0.sp,
                             color = ThemeTextPrimary
                         )
                     },
@@ -212,13 +212,13 @@ fun HistoryScreen(
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         TrendItem(
-                                            label = "CURRENT STREAK",
+                                            label = "Current streak",
                                             value = "${dashboardState.streakState.currentStreak} ${if (dashboardState.streakState.currentStreak == 1) "day" else "days"}",
                                             valueColor = SolarAmber,
                                             modifier = Modifier.weight(1f)
                                         )
                                         TrendItem(
-                                            label = "LONGEST STREAK",
+                                            label = "Longest streak",
                                             value = "${dashboardState.streakState.longestStreak} ${if (dashboardState.streakState.longestStreak == 1) "day" else "days"}",
                                             valueColor = ElectricCyan,
                                             modifier = Modifier.weight(1f)

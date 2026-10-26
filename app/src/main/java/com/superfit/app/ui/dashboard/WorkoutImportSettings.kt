@@ -69,7 +69,7 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
                 Text(
                     text = "Samsung Health, Strava, watches and more. Each workout is counted once.",
                     color = SuperfitTheme.colors.textSecondary,
-                    fontSize = 11.sp
+                    fontSize = 12.sp
                 )
             }
             Switch(
@@ -126,7 +126,7 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
                     WorkoutAddBack.ALL -> "Your target covers everyday life, plus all of each workout's calories that day."
                 },
                 color = SuperfitTheme.colors.textSecondary,
-                fontSize = 11.sp
+                fontSize = 12.sp
             )
 
             if (hiddenCount > 0) {
@@ -160,7 +160,7 @@ private fun MainAppPicker(mainApp: String?, apps: List<Pair<String, String>>, on
             Text(
                 text = "When two apps record the same workout, this one's copy is kept. Automatic keeps the most detailed one.",
                 color = SuperfitTheme.colors.textSecondary,
-                fontSize = 11.sp
+                fontSize = 12.sp
             )
         }
         Box {

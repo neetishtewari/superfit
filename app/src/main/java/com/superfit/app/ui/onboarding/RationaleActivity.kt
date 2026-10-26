@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,6 +36,8 @@ class RationaleActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            val systemDark = isSystemInDarkTheme()
+            LaunchedEffect(systemDark) { ThemeConfig.onSystemDarkChanged(systemDark) }
             val isDark by ThemeConfig.isDarkTheme.collectAsState()
             SuperfitTheme(darkTheme = isDark) {
                 Surface(
@@ -231,7 +235,7 @@ fun RationaleScreen(
 
             Text(
                 text = "Superfit complies with Google Play Health Connect developer policies. Your data is stored on your phone and backed up to your private Superfit account (Google Firebase). To create your coaching insights, a summary of your recent activity, sleep and meals is sent to Google's Gemini AI.",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = textTertiary,
                 textAlign = TextAlign.Center,
                 lineHeight = 16.sp,

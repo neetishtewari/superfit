@@ -55,6 +55,7 @@ import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 
 // 1. Welcome Step View (Step 0)
 @Composable
@@ -76,7 +77,7 @@ internal fun WelcomeStep(
         Text(
             text = "Choose Appearance",
             fontSize = 12.sp,
-            color = Color.Gray,
+            color = ThemeTextTertiary,
             fontWeight = FontWeight.SemiBold
         )
 
@@ -185,7 +186,7 @@ internal fun PhysiologyStep(
     Text(
         text = "Enter your core physical metrics. We use these to calculate your baseline resting metabolism.",
         fontSize = 13.sp,
-        color = Color.Gray,
+        color = ThemeTextTertiary,
         lineHeight = 18.sp
     )
 
@@ -200,7 +201,7 @@ internal fun PhysiologyStep(
     ) {
         // Sex Toggle Segment
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(text = "Biological Sex", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+            Text(text = "Biological Sex", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -252,17 +253,11 @@ internal fun PhysiologyStep(
         }
 
         // Age field
-        OutlinedTextField(
+        SuperfitField(
             value = uiState.age,
             onValueChange = { viewModel.onAgeChanged(it) },
             label = { Text("Age (Years)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = NeonGreen,
-                unfocusedBorderColor = ThemeGlassBorder,
-                focusedTextColor = ThemeTextPrimary,
-                unfocusedTextColor = ThemeTextPrimary
-            ),
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -273,27 +268,21 @@ internal fun PhysiologyStep(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Height", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                Text(text = "Height", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
                 Text(
                     text = "Foot/Inches Helper",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = HyperViolet,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.clickable { onOpenCheatSheet() }
                 )
             }
-            OutlinedTextField(
+            SuperfitField(
                 value = uiState.height,
                 onValueChange = { viewModel.onHeightChanged(it) },
                 placeholder = { Text("e.g. 175") },
                 label = { Text("Height (cm)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NeonGreen,
-                    unfocusedBorderColor = ThemeGlassBorder,
-                    focusedTextColor = ThemeTextPrimary,
-                    unfocusedTextColor = ThemeTextPrimary
-                ),
                 modifier = Modifier.fillMaxWidth()
             )
             // Live Feet/Inches equivalent readout calculation
@@ -308,21 +297,15 @@ internal fun PhysiologyStep(
             } else {
                 "Equivalent: - ft - in"
             }
-            Text(text = ftInReadout, color = com.superfit.app.theme.ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(text = ftInReadout, color = com.superfit.app.theme.ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
 
         // Weight field
-        OutlinedTextField(
+        SuperfitField(
             value = uiState.weight,
             onValueChange = { viewModel.onWeightChanged(it) },
             label = { Text("Weight (kg)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = NeonGreen,
-                unfocusedBorderColor = ThemeGlassBorder,
-                focusedTextColor = ThemeTextPrimary,
-                unfocusedTextColor = ThemeTextPrimary
-            ),
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -368,7 +351,7 @@ internal fun ActivityGoalsStep(
     Text(
         text = "Configure your baseline activity level and goals. We use these to calculate your target calorie budget.",
         fontSize = 13.sp,
-        color = Color.Gray,
+        color = ThemeTextTertiary,
         lineHeight = 18.sp
     )
 
@@ -394,7 +377,7 @@ internal fun ActivityGoalsStep(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = "Activity Level", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                Text(text = "Activity Level", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
                 Text(text = "${uiState.activityMultiplier}", fontSize = 12.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
             }
             Text(text = multiplierDesc, fontSize = 14.sp, color = ThemeTextPrimary, fontWeight = FontWeight.Bold)
@@ -418,7 +401,7 @@ internal fun ActivityGoalsStep(
 
         // Goals Cards selection list
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(text = "Fitness Goal", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.SemiBold)
+            Text(text = "Fitness Goal", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
 
             val goalsList = listOf(
                 Triple("LOSE_WEIGHT", "Weight Loss (-500 kcal)", -500),
@@ -476,10 +459,10 @@ internal fun ActivityGoalsStep(
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Daily TDEE", color = com.superfit.app.theme.ElectricCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Daily TDEE", color = com.superfit.app.theme.ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
                         text = "What is this?",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = HyperViolet,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.clickable { onOpenTdeePopup() }

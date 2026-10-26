@@ -80,10 +80,10 @@ fun FoodQualityCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    val headerTitle = "DIET QUALITY · LAST 7 DAYS"
+                    val headerTitle = "Diet quality · last 7 days"
                     Text(
                         text = headerTitle,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
                         color = SuperfitTheme.colors.textSecondary
@@ -146,7 +146,7 @@ fun FoodQualityCard(
                                 change < 0 -> "▼ ${-change} vs last week"
                                 else -> "Same as last week"
                             },
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (change >= 0) NeonMint else SolarAmber,
                             textAlign = TextAlign.End,
@@ -193,7 +193,7 @@ fun FoodQualityCard(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Some older meals are still being analysed, so this score may shift a little.",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )
                 }
@@ -201,7 +201,7 @@ fun FoodQualityCard(
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = "Tap to see each food ➔",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = ElectricCyan
                 )
@@ -220,7 +220,7 @@ fun FoodQualityCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Your best choices: " + metrics.topCleanFoods.joinToString(", "),
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
                 }
@@ -248,8 +248,8 @@ private fun DietNoteBlock(note: DietNote) {
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = "AI NUTRITION NOTE",
-                fontSize = 10.sp,
+                text = "AI nutrition note",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.8.sp,
                 color = SuperfitTheme.colors.textTertiary
@@ -298,7 +298,7 @@ private fun DietScorePartRow(part: DietScorePart) {
         )
         Text(
             text = part.detail,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             lineHeight = 15.sp,
             color = SuperfitTheme.colors.textSecondary
         )
@@ -400,7 +400,7 @@ fun DietQualityDetailBottomSheet(
                         }
                         Text(
                             text = trackedItemsHeader,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = SuperfitTheme.colors.textTertiary,
                             letterSpacing = 0.8.sp
@@ -417,8 +417,8 @@ fun DietQualityDetailBottomSheet(
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
-                                        text = "AVOID FOR NOW",
-                                        fontSize = 11.sp,
+                                        text = "Avoid for now",
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 0.8.sp,
                                         color = SolarAmber
@@ -444,7 +444,7 @@ fun DietQualityDetailBottomSheet(
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "💡 SMART FOOD SWAP RECOMMENDATIONS",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SuperfitTheme.colors.textTertiary,
                                 letterSpacing = 0.8.sp
@@ -507,7 +507,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                     }
                     Text(
                         text = freqDesc,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
                 }
@@ -518,7 +518,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                 ) {
                     Text(
                         text = if (item.rated) item.verdict.label else "Not rated yet",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = actionColor,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -540,7 +540,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                 ) {
                     Text(
                         text = "💡 Why: ${item.scoreRationale.ifBlank { item.actionRecommendation }}",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = actionColor,
                         lineHeight = 15.sp
@@ -555,7 +555,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                 ) {
                     Text(
                         text = if (item.approved) "✓ Fine for me · undo" else "Mark as fine for me (e.g. my nutritionist approves)",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (item.approved) NeonMint else ElectricCyan
                     )
@@ -606,8 +606,8 @@ fun FoodSwapCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "SMART FOOD SWAP",
-                        fontSize = 11.sp,
+                        text = "Smart food swap",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.2.sp,
                         color = SuperfitTheme.colors.textSecondary
@@ -621,7 +621,7 @@ fun FoodSwapCard(
                     ) {
                         Text(
                             text = "Save ~${swap.calorieSavings} kcal",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = NeonMint,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -642,7 +642,7 @@ fun FoodSwapCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Current Choice",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )
                     Text(
@@ -666,7 +666,7 @@ fun FoodSwapCard(
                 Column(modifier = Modifier.weight(1.2f)) {
                     Text(
                         text = "Recommended Swap",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textTertiary
                     )
                     Text(
@@ -682,7 +682,7 @@ fun FoodSwapCard(
 
             Text(
                 text = "💡 Benefit: ${swap.benefitHighlight}",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = SuperfitTheme.colors.textSecondary
             )

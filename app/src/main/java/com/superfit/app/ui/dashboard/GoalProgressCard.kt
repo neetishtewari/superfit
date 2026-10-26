@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.AreaOfConcern
 import com.superfit.app.domain.WeightGoalMetrics
+import com.superfit.app.ui.components.SuperfitField
 
 @Composable
 fun GoalProgressCard(
@@ -174,7 +175,7 @@ fun GoalProgressCard(
             ) {
                 Text(
                     text = "Start: ${String.format("%.1f", metrics.startingWeightKg)} kg",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .weight(1f)
@@ -189,7 +190,7 @@ fun GoalProgressCard(
                 ) {
                     Text(
                         text = "Goal: ${String.format("%.1f", metrics.targetWeightKg)} kg",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -324,7 +325,7 @@ fun WeighInDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
+                SuperfitField(
                     value = weightInput,
                     onValueChange = {
                         weightInput = it
@@ -340,7 +341,7 @@ fun WeighInDialog(
                     Text(
                         text = "Please enter a valid weight number (e.g. 74.5)",
                         color = MaterialTheme.colorScheme.error,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -395,7 +396,7 @@ fun EditGoalDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                OutlinedTextField(
+                SuperfitField(
                     value = startInput,
                     onValueChange = {
                         startInput = it
@@ -408,7 +409,7 @@ fun EditGoalDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
+                SuperfitField(
                     value = targetInput,
                     onValueChange = {
                         targetInput = it
@@ -425,7 +426,7 @@ fun EditGoalDialog(
                     Text(
                         text = "Please enter valid weight numbers.",
                         color = MaterialTheme.colorScheme.error,
-                        fontSize = 11.sp
+                        fontSize = 12.sp
                     )
                 }
             }

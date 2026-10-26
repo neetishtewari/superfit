@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,6 +26,7 @@ import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.SuperfitField
 import kotlinx.coroutines.launch
 
 /**
@@ -55,10 +55,10 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
         Text(
             text = "Write what your own nutritionist or dietitian told you, in your own words. Meal ratings, Diet Quality and the AI coach will follow it.",
             color = SuperfitTheme.colors.textSecondary,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             lineHeight = 15.sp
         )
-        OutlinedTextField(
+        SuperfitField(
             value = text,
             onValueChange = { text = it.take(2000) },
             placeholder = { Text("e.g. Protein in every meal: eggs, paneer, dal or curd. 2 squares of 70% dark chocolate are fine.", fontSize = 12.sp) },
@@ -75,7 +75,7 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
             Text(
                 text = status.orEmpty(),
                 color = SuperfitTheme.colors.textSecondary,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.weight(1f)
             )
             Button(

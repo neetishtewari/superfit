@@ -12,7 +12,6 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.ui.components.SuperfitField
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -54,7 +54,7 @@ fun GoalEditDialog(
         title = { Text("Your goal", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                SuperfitField(
                     value = startInput,
                     onValueChange = {
                         startInput = it
@@ -66,7 +66,7 @@ fun GoalEditDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                SuperfitField(
                     value = targetInput,
                     onValueChange = {
                         targetInput = it
@@ -90,7 +90,7 @@ fun GoalEditDialog(
                     if (date != null) TextButton(onClick = { date = null }) { Text("No date") }
                 }
                 if (isError) {
-                    Text("Please enter valid weights.", color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                    Text("Please enter valid weights.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 }
             }
         },

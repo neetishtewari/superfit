@@ -274,7 +274,7 @@ fun OnboardingScreen(
                     Text(
                         text = if (voiceGuideEnabled) "Voice: On" else "Voice: Off",
                         color = if (voiceGuideEnabled) ElectricCyan else ThemeTextSecondary,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

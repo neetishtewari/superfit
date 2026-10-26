@@ -12,7 +12,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +31,7 @@ import com.superfit.app.domain.NoteKind
 import com.superfit.app.theme.DeleteRed
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -59,7 +59,7 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
             text = "Notes Superfit's AI coach picked up from your chats, like an injury or a food you don't eat. It uses them for its answers and your daily tip. Remove anything that's wrong. " +
                 "This is separate from your nutritionist's advice, which comes from a real person and always comes first.",
             color = SuperfitTheme.colors.textSecondary,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             lineHeight = 15.sp
         )
         if (active.isEmpty()) {
@@ -75,14 +75,14 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
         Text(
             text = "Add things yourself, one per line. You can paste a list.",
             color = SuperfitTheme.colors.textSecondary,
-            fontSize = 11.sp
+            fontSize = 12.sp
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
+            SuperfitField(
                 value = newNote,
                 onValueChange = { newNote = it.take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE) },
                 placeholder = { Text("e.g. Vegetarian on Tuesdays\nNight shifts Mon to Thu", fontSize = 12.sp) },
@@ -147,7 +147,7 @@ private fun NoteRow(note: CoachNote, today: LocalDate, onRemove: () -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = kind + note.text, color = SuperfitTheme.colors.textPrimary, fontSize = 13.sp)
-            Text(text = source + fades, color = SuperfitTheme.colors.textSecondary, fontSize = 10.sp)
+            Text(text = source + fades, color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
         }
         Icon(
             imageVector = Icons.Default.Close,

@@ -75,7 +75,7 @@ internal fun HealthConnectStep(
     Text(
         text = "Sync your baseline activity telemetry. Superfit reads steps, sleep cycles, and active workouts locally from your device.",
         fontSize = 13.sp,
-        color = Color.Gray,
+        color = ThemeTextTertiary,
         lineHeight = 18.sp
     )
 
@@ -118,8 +118,8 @@ internal fun HealthConnectStep(
     }
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 4.dp)) {
-        Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
-        Text(text = "Your health data stays on your phone and in your private Superfit backup.", fontSize = 11.sp, color = Color.Gray)
+        Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = ThemeTextTertiary, modifier = Modifier.size(16.dp))
+        Text(text = "Your health data stays on your phone and in your private Superfit backup.", fontSize = 12.sp, color = ThemeTextTertiary)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -156,7 +156,7 @@ internal fun HealthConnectStep(
         TextButton(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = if (isHcSynced) "Skip / Connect Later" else "Skip / Connect Later",
-                color = Color.Gray,
+                color = ThemeTextTertiary,
                 fontSize = 13.sp
             )
         }
@@ -178,7 +178,7 @@ internal fun OnboardingSummaryStep(
     Text(
         text = "Tracking your meals and workouts is now easier than ever! By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful and accurate in helping you reach your fitness goals.",
         fontSize = 13.sp,
-        color = Color.Gray,
+        color = ThemeTextTertiary,
         lineHeight = 18.sp
     )
 
@@ -220,7 +220,7 @@ internal fun OnboardingSummaryStep(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "CALCULATED BMR", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text(text = "Resting burn", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThemeTextTertiary)
                     Text(text = "${Math.round(bmr)} kcal", fontSize = 18.sp, fontWeight = FontWeight.Black, color = ThemeTextPrimary)
                 }
             }
@@ -234,7 +234,7 @@ internal fun OnboardingSummaryStep(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "DAILY BUDGET", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text(text = "Daily target", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThemeTextTertiary)
                     Text(text = "$calories kcal", fontSize = 18.sp, fontWeight = FontWeight.Black, color = NeonGreen)
                 }
             }

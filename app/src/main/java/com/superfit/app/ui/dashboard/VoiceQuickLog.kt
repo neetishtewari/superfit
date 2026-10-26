@@ -389,7 +389,8 @@ class SpeechRecognizerHelper(
     }
 }
 
-// Voice Quick Log UI Composable Card
+// Home's log buttons: "Snap your plate" and "Say what you ate" side by side on Food,
+// one wide "Say your workout" on Activity. The mic understands food and exercise either way.
 @Composable
 fun VoiceQuickLogCard(
     logType: String,
@@ -404,178 +405,168 @@ fun VoiceQuickLogCard(
     /** Opens the food camera. Null on phones without a camera, which hides the button. */
     onCameraClick: (() -> Unit)? = null
 ) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = ThemeCardBgTranslucent),
+    val showCamera = logType == "MEAL" && onCameraClick != null
+    val micAction = { if (isListening) onStopClick() else onMicClick() }
+    val micTitle = when {
+        isListening -> "Listening…"
+        isProcessing -> "Working it out…"
+        logType == "MEAL" -> "Say what you ate"
+        else -> "Say your workout"
+    }
+    val micHint = when {
+        isListening -> "Tap when you're done"
+        isProcessing -> "Logging food, exercise or both"
+        logType == "MEAL" && showCamera -> "Best after a meal"
+        logType == "MEAL" -> "Or what you did"
+        else -> "e.g. \u201C20 push-ups and 50 dumbbell curls\u201D"
+    }
+
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (showCamera) {
+                LogButton(
+                    title = "Snap your plate",
+                    hint = "Best while you eat",
+                    icon = Icons.Default.PhotoCamera,
+                    iconDescription = "Log a meal with the camera",
+                    enabled = !isListening && !isProcessing,
+                    onClick = onCameraClick!!,
+                    vertical = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
+            LogButton(
+                title = micTitle,
+                hint = micHint,
+                icon = Icons.Default.Mic,
+                iconDescription = if (isListening) "Stop listening" else "Log by voice",
+                enabled = !isProcessing,
+                onClick = micAction,
+                vertical = showCamera,
+                listening = isListening,
+                processing = isProcessing,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            )
+        }
+
+        AnimatedVisibility(visible = isListening && liveText.isNotBlank()) {
+            Text(
+                text = "\u201C$liveText\u201D",
+                style = MaterialTheme.typography.bodyMedium,
+                color = ThemeTextSecondary,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+
+        // Food / Activity picks which cards show below.
+        SegmentedPills(
+            options = listOf("MEAL" to "Food", "WORKOUT" to "Activity"),
+            selected = logType,
+            onSelect = onLogTypeChange
+        )
+    }
+}
+
+@Composable
+private fun LogButton(
+    title: String,
+    hint: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    vertical: Boolean,
+    modifier: Modifier = Modifier,
+    listening: Boolean = false,
+    processing: Boolean = false
+) {
+    val pulse = rememberInfiniteTransition(label = "MicPulse")
+    val scale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = if (listening) 1.12f else 1f,
+        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+        label = "Scale"
+    )
+    val iconCircle: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier
+                .size((44 * scale).dp)
+                .clip(CircleShape)
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            if (processing) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), color = BrandGreenDeep, strokeWidth = 2.5.dp)
+            } else {
+                Icon(icon, contentDescription = iconDescription, tint = BrandGreenDeep, modifier = Modifier.size(24.dp))
+            }
+        }
+    }
+    val texts: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text(text = hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
+        }
+    }
+    val shape = RoundedCornerShape(20.dp)
+    val content = Modifier
+        .clip(shape)
+        .background(if (listening) BrandGreenDeep else NeonMint)
+        .clickable(enabled = enabled, onClick = onClick)
+        .padding(14.dp)
+    if (vertical) {
+        Column(modifier = modifier.then(content), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            iconCircle()
+            texts()
+        }
+    } else {
+        Row(
+            modifier = modifier.then(content),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            iconCircle()
+            texts()
+        }
+    }
+}
+
+/** Pill-shaped switch used for Food / Activity and the Progress tabs. */
+@Composable
+fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        ThemeGlassBorder,
-                        ThemeGlassBorderGlow
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
+            .clip(RoundedCornerShape(50))
+            .background(ThemeFieldBg)
+            .padding(4.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // FOOD / ACTIVITY tab: picks which cards show below. The mic handles both either way.
-            Row(
+        options.forEach { (key, label) ->
+            val isOn = key == selected
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp))
-                    .padding(2.dp)
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isOn) ThemeCardBg else Color.Transparent)
+                    .clickable { onSelect(key) }
+                    .heightIn(min = 40.dp)
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (logType == "MEAL") ThemeTextPrimary.copy(alpha = 0.08f) else Color.Transparent)
-                        .clickable { onLogTypeChange("MEAL") },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "FOOD",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (logType == "MEAL") ThemeSecondaryAccent else ThemeTextTertiary,
-                        letterSpacing = 1.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (logType == "WORKOUT") ThemeTextPrimary.copy(alpha = 0.08f) else Color.Transparent)
-                        .clickable { onLogTypeChange("WORKOUT") },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "ACTIVITY",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (logType == "WORKOUT") ThemeSecondaryAccent else ThemeTextTertiary,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Pulse animated scale for listening indicator
-                val infiniteTransition = rememberInfiniteTransition(label = "MicPulse")
-                val scale by if (isListening) {
-                    infiniteTransition.animateFloat(
-                        initialValue = 1f,
-                        targetValue = 1.25f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(800, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "Scale"
-                    )
-                } else {
-                    remember { mutableStateOf(1f) }
-                }
-
-                val glowBg = if (isListening) {
-                    HyperViolet.copy(alpha = 0.3f)
-                } else {
-                    ThemeTextPrimary.copy(alpha = 0.05f)
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .background(glowBg)
-                        .clickable(enabled = !isProcessing) {
-                            if (isListening) onStopClick() else onMicClick()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = ThemeSecondaryAccent,
-                            strokeWidth = 2.5.dp
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size((36.dp.value * scale).dp)
-                                .clip(CircleShape)
-                                .background(if (isListening) NeonMint else Color.Transparent),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Mic,
-                                contentDescription = "Quick Voice Log Microphone",
-                                tint = if (isListening) Color.Black else ThemeTextPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = when {
-                            isListening -> "Listening..."
-                            isProcessing -> "Working it out…"
-                            else -> "Quick log"
-                        },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = when {
-                            isListening -> NeonMint
-                            isProcessing -> ThemeSecondaryAccent
-                            else -> ThemeTextPrimary
-                        }
-                    )
-                    Text(
-                        text = when {
-                            isListening && liveText.isNotBlank() -> "\u201C$liveText\u201D · tap the mic when done"
-                            isListening -> "Say what you ate or did, then tap the mic when done"
-                            isProcessing -> "Logging food, exercise or both"
-                            logType == "MEAL" && onCameraClick != null -> "Tap the mic and say what you ate or did, or snap a photo"
-                            else -> "Tap the mic and say what you ate or did"
-                        },
-                        fontSize = 11.sp,
-                        color = ThemeTextSecondary
-                    )
-                }
-
-                if (logType == "MEAL" && onCameraClick != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(ThemeTextPrimary.copy(alpha = 0.05f))
-                            .clickable(enabled = !isListening && !isProcessing, onClick = onCameraClick),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = "Log a meal with the camera",
-                            tint = ThemeTextPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isOn) ThemeTextPrimary else ThemeTextSecondary
+                )
             }
         }
     }

@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.widget.WidgetPin
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -261,7 +262,7 @@ fun SettingsScreen(
                             Text(
                                 text = if (hasHealthConnectPermissions) "Connected 🟢" else "Disconnected 🔴",
                                 color = if (hasHealthConnectPermissions) NeonMint else SolarAmber,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -273,7 +274,7 @@ fun SettingsScreen(
                         } else {
                             "Telemetry sync paused. Grant permissions to enable automatic step count and sleep duration tracking."
                         },
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
@@ -304,7 +305,7 @@ fun SettingsScreen(
                             Text(
                                 text = if (hasHealthConnectPermissions) "Manage Permissions" else "Grant Permissions",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         }
 
@@ -320,7 +321,7 @@ fun SettingsScreen(
                             Text(
                                 text = "Sync Telemetry Now",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -335,7 +336,7 @@ fun SettingsScreen(
                     }
                     Text(
                         text = syncText,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textTertiary,
                         modifier = Modifier.align(Alignment.End)
                     )
@@ -431,7 +432,7 @@ fun SettingsScreen(
                             Text(
                                 text = "Override computed recommended values",
                                 color = SuperfitTheme.colors.textSecondary,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         }
                         Switch(
@@ -455,35 +456,19 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customCalories,
                                     onValueChange = { customCalories = it },
                                     label = { Text("Calories (kcal)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
 
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customProtein,
                                     onValueChange = { customProtein = it },
                                     label = { Text("Protein (g)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -492,35 +477,19 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customCarbs,
                                     onValueChange = { customCarbs = it },
                                     label = { Text("Carbohydrates (g)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
 
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customFat,
                                     onValueChange = { customFat = it },
                                     label = { Text("Fat (g)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -597,7 +566,7 @@ fun SettingsScreen(
 
                     Text(
                         text = "Toggle between Dark Mode and dynamic Glassmorphic Light Mode.",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
@@ -678,7 +647,7 @@ fun SettingsScreen(
 
                     Text(
                         text = "Superfit will remind you to log meals at your scheduled time. If your logs are complete, you will receive your dynamic AI Coaching insight instead.",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
@@ -840,7 +809,7 @@ fun SettingsScreen(
                                 } else {
                                     "Calories left, plus mic and camera buttons to log in seconds."
                                 },
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = SuperfitTheme.colors.textSecondary
                             )
                         }
@@ -878,7 +847,7 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Preview and test the onboarding flow (body stats, goals and Health Connect) for new users. Your existing meal and workout history will not be lost.",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = SuperfitTheme.colors.textSecondary
                         )
                         Button(
@@ -928,7 +897,7 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Helps fix crashes and see which features people use. Never includes what you eat, your weight, health data, photos, or your name or email.",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = SuperfitTheme.colors.textSecondary
                         )
                     }

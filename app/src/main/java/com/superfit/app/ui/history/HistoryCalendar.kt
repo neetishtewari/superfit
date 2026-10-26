@@ -90,11 +90,11 @@ fun CalendarCard(
                 }
 
                 Text(
-                    text = currentMonthName.uppercase(Locale.US),
+                    text = currentMonthName,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
                     color = ThemeTextPrimary,
-                    letterSpacing = 1.sp,
+                    letterSpacing = 0.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
                 )
@@ -118,9 +118,9 @@ fun CalendarCard(
                         text = day,
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Gray
+                        color = ThemeTextTertiary
                     )
                 }
             }
@@ -230,7 +230,7 @@ fun CalendarDayCell(
                 val net = (dayState.caloriesEaten - dayState.tdee).toInt()
                 Text(
                     text = "${if (net > 0) "+" else ""}$net",
-                    fontSize = 8.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = if (net < 0) NeonMint else SolarAmber
                 )
@@ -255,6 +255,6 @@ fun LegendItem(
                 .background(color.copy(alpha = 0.3f))
                 .border(1.dp, color, RoundedCornerShape(3.dp))
         )
-        Text(text = label, fontSize = 11.sp, color = Color.Gray)
+        Text(text = label, fontSize = 12.sp, color = ThemeTextTertiary)
     }
 }

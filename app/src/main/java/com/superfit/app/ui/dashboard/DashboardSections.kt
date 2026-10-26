@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
@@ -73,110 +75,81 @@ import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
 
 @Composable
 internal fun DashboardHeader(
     grantedPermissions: Set<String>,
     hasHealthConnectPermissions: Boolean,
-    onSyncClick: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
+    val today = LocalDate.now()
+    val dateText = remember(today) {
+        today.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM", java.util.Locale.getDefault()))
+    }
+    val greeting = when (java.time.LocalTime.now().hour) {
+        in 4..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        else -> "Good evening"
+    }
+    // Only point at Settings when Health Connect needs attention.
+    val needsHealthConnect = grantedPermissions.isNotEmpty() && !hasHealthConnectPermissions
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp),
+            .padding(top = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "SUPERFIT",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                color = ThemeTextPrimary,
-                letterSpacing = 1.sp
+                text = dateText,
+                style = MaterialTheme.typography.labelLarge,
+                color = ThemeTextSecondary
             )
             Text(
-                text = LocalDate.now().toString(),
-                fontSize = 12.sp,
-                color = Color.Gray,
-                fontWeight = FontWeight.Bold
+                text = greeting,
+                style = MaterialTheme.typography.headlineMedium,
+                color = ThemeTextPrimary
             )
         }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onSyncClick,
-                colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = ThemeCardBg,
-                    contentColor = ThemeTextPrimary
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Sync Telemetry"
-                )
-            }
-
-            IconButton(
-                onClick = onNavigateToHistory,
-                colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = ThemeCardBg,
-                    contentColor = ThemeTextPrimary
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Insights,
-                    contentDescription = "Insights"
-                )
-            }
-
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HeaderNavButton(icon = Icons.Default.Insights, label = "Insights", onClick = onNavigateToHistory)
             Box {
-                IconButton(
-                    onClick = onNavigateToSettings,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = ThemeCardBg,
-                        contentColor = ThemeTextPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings"
-                    )
-                }
-
-                // Subtle Health Connect Status Badge Dot
-                val badgeColor = remember(grantedPermissions, hasHealthConnectPermissions) {
-                    when {
-                        grantedPermissions.isEmpty() -> Color.Gray
-                        hasHealthConnectPermissions -> NeonGreen
-                        else -> ElectricCyan
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 1.dp, y = (-1).dp)
-                        .size(10.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(ThemeCardBg)
-                        .padding(1.dp)
-                ) {
+                HeaderNavButton(icon = Icons.Default.Settings, label = "Settings", onClick = onNavigateToSettings)
+                if (needsHealthConnect) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(badgeColor)
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(ThemeErrorColor)
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(ThemeCardBg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .widthIn(min = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = ThemeTextPrimary, modifier = Modifier.size(22.dp))
+        Text(text = label, style = MaterialTheme.typography.labelMedium, color = ThemeTextSecondary)
     }
 }
 
@@ -223,18 +196,19 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                val fmt = java.text.NumberFormat.getIntegerInstance()
                 RingLegendItem(
                     label = "Eaten",
-                    value = "${state.caloriesEaten.toInt()} / ${caloriesTarget.toInt()} kcal",
+                    value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())} kcal",
                     color = NeonGreen
                 )
                 RingLegendItem(
                     label = "Steps",
-                    value = "${state.activity.steps} / 10K",
+                    value = "${fmt.format(state.activity.steps)} of 10,000",
                     color = ElectricCyan
                 )
                 workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)?.let {
-                    Text(text = it, fontSize = 11.sp, color = ThemeTextSecondary)
+                    Text(text = it, fontSize = 12.sp, color = ThemeTextSecondary)
                 }
             }
         }
@@ -262,9 +236,8 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Today's Nutrients",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
+            text = "Today's nutrients",
+            style = MaterialTheme.typography.titleLarge,
             color = ThemeTextPrimary
         )
 
@@ -284,7 +257,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Carbohydrates",
             eaten = state.carbsEaten,
             target = state.macroTargets.carbsG,
-            color = CarbYellow,
+            color = NeonGreen,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.carbsG }
@@ -295,7 +268,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Fats",
             eaten = state.fatEaten,
             target = state.macroTargets.fatG,
-            color = ElectricCyan,
+            color = NeonGreen,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.fatG }
@@ -307,7 +280,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Fibre",
             eaten = fibreEaten,
             target = CoachPatternEngine.fibreTargetG(state.macroTargets.calories),
-            color = HyperViolet,
+            color = NeonGreen,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { MealTags.of(it).fiberG }
@@ -325,17 +298,7 @@ internal fun CoachInsightsCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(ThemeCardBgTranslucent)
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        ThemeGlassBorder,
-                        ThemeGlassBorderGlow
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
+            .background(ThemeCoachSoft)
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -349,10 +312,14 @@ internal fun CoachInsightsCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                com.superfit.app.ui.components.IconBadge(
+                    icon = Icons.Default.AutoAwesome,
+                    background = HyperViolet,
+                    tint = Color.White
+                )
                 Text(
-                    text = "✨ AI Daily Coach",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    text = "AI coach",
+                    style = MaterialTheme.typography.titleLarge,
                     color = ThemeTextPrimary
                 )
             }
@@ -378,12 +345,12 @@ internal fun CoachInsightsCard(
                 modifier = Modifier.rotate(rotationAngle),
                 enabled = !isCoachingLoading,
                 colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = ElectricCyan
+                    contentColor = ThemeTertiaryAccent
                 )
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh Insights"
+                    contentDescription = "New tip"
                 )
             }
         }
@@ -392,18 +359,11 @@ internal fun CoachInsightsCard(
             CoachingInsightState.Idle -> {
                 Text(
                     text = "Your coach looks at your last few weeks of meals, steps, sleep and workouts and tells you the one thing that matters most right now.",
-                    color = Color.Gray,
+                    color = ThemeTextTertiary,
                     fontSize = 13.sp
                 )
-                Button(
-                    onClick = onRefresh,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ElectricCyan.copy(alpha = 0.15f),
-                        contentColor = ElectricCyan
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Get today's coaching", fontWeight = FontWeight.Bold)
+                TextButton(onClick = onRefresh) {
+                    Text("Get today's tip", color = ThemeTertiaryAccent, fontWeight = FontWeight.Bold)
                 }
             }
             CoachingInsightState.Loading -> {
@@ -419,12 +379,12 @@ internal fun CoachInsightsCard(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(32.dp),
-                            color = ElectricCyan,
+                            color = ThemeTertiaryAccent,
                             strokeWidth = 3.dp
                         )
                         Text(
                             text = "Looking over your last few weeks...",
-                            color = Color.Gray,
+                            color = ThemeTextTertiary,
                             fontSize = 12.sp
                         )
                     }
@@ -445,14 +405,14 @@ internal fun CoachInsightsCard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(ElectricCyan.copy(alpha = 0.10f))
+                                .background(ThemeCardBg)
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
                                 text = "Today",
-                                color = ElectricCyan,
-                                fontSize = 11.sp,
+                                color = ThemeTertiaryAccent,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -466,7 +426,7 @@ internal fun CoachInsightsCard(
                     if (insight.why.isNotEmpty()) {
                         Text(
                             text = if (showWhy) "Hide why" else "Why?",
-                            color = ElectricCyan,
+                            color = ThemeTertiaryAccent,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
@@ -479,7 +439,7 @@ internal fun CoachInsightsCard(
                                 insight.why.forEach { line ->
                                     Text(
                                         text = "• $line",
-                                        color = Color.Gray,
+                                        color = ThemeTextTertiary,
                                         fontSize = 12.sp,
                                         lineHeight = 17.sp
                                     )
@@ -490,21 +450,10 @@ internal fun CoachInsightsCard(
                     if (insight.note != null) {
                         Text(
                             text = "Couldn't reach the AI just now, so this is a plain summary. ${insight.note}",
-                            color = Color.Gray,
-                            fontSize = 11.sp,
+                            color = ThemeTextTertiary,
+                            fontSize = 12.sp,
                             lineHeight = 15.sp
                         )
-                    }
-                    Button(
-                        onClick = onOpenChat,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = NeonGreen,
-                            contentColor = Color.Black
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Ask AI coach about this 💬", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -540,12 +489,23 @@ internal fun CoachInsightsCard(
                     ) {
                         Text(
                             text = "Try again",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
+        }
+        // Chat is always one tap away, whatever state the tip is in.
+        Button(
+            onClick = onOpenChat,
+            colors = ButtonDefaults.buttonColors(containerColor = HyperViolet, contentColor = Color.White),
+            shape = RoundedCornerShape(50),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+        ) {
+            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Chat with coach", style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -578,64 +538,47 @@ internal fun TrackMealsCard(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Track Your Meals",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
+            text = "Today's meals",
+            style = MaterialTheme.typography.titleLarge,
             color = ThemeTextPrimary
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = foodInputText,
-                onValueChange = onFoodInputChange,
-                label = { Text("Log food in natural language...") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NeonGreen,
-                    unfocusedBorderColor = ThemeGlassBorder,
-                    focusedTextColor = ThemeTextPrimary,
-                    unfocusedTextColor = ThemeTextPrimary,
-                    focusedLabelColor = NeonGreen,
-                    unfocusedLabelColor = ThemeTextSecondary
-                ),
-                placeholder = { Text("e.g. 2 eggs and a banana") },
-                modifier = Modifier.weight(1f)
-            )
-
-            Button(
-                onClick = {
-                    if (foodInputText.isNotBlank()) {
-                        viewModel.parseAndAddMeal(foodInputText)
-                        onFoodInputChange("")
-                    }
-                },
-                modifier = Modifier.height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                enabled = parsingState != ParsingState.Loading
-            ) {
-                if (parsingState == ParsingState.Loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.Black,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Track", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
+        val submitMeal = {
+            if (foodInputText.isNotBlank()) {
+                viewModel.parseAndAddMeal(foodInputText)
+                onFoodInputChange("")
             }
         }
+        SuperfitField(
+            value = foodInputText,
+            onValueChange = onFoodInputChange,
+            placeholder = { Text("Type what you ate, e.g. 2 eggs and a banana") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { submitMeal() }),
+            trailingIcon = {
+                if (parsingState == ParsingState.Loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = NeonGreen, strokeWidth = 2.dp)
+                } else {
+                    com.superfit.app.ui.components.FieldActionButton(
+                        icon = Icons.Default.Check,
+                        contentDescription = "Log this meal",
+                        enabled = foodInputText.isNotBlank(),
+                        onClick = submitMeal,
+                        modifier = Modifier.padding(end = 6.dp)
+                    )
+                }
+            }
+        )
 
         // Suggestions chips
         val predictedFoods by viewModel.predictedFoods.collectAsState()
         if (predictedFoods.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Frequently Tracked (Tap to fill):",
-                    fontSize = 11.sp,
-                    color = Color.Gray,
+                    text = "Your usual foods",
+                    fontSize = 12.sp,
+                    color = ThemeTextTertiary,
                     fontWeight = FontWeight.Bold
                 )
                 LazyRow(
@@ -650,7 +593,7 @@ internal fun TrackMealsCard(
                                 Text(
                                     text = predicted.foodText,
                                     color = ThemeTextPrimary,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     maxLines = 1
                                 )
                             },
@@ -668,9 +611,9 @@ internal fun TrackMealsCard(
                             onClick = onViewAllFoods,
                             label = {
                                 Text(
-                                    text = "View All...",
+                                    text = "See all",
                                     color = NeonGreen,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
@@ -725,7 +668,7 @@ internal fun TrackMealsCard(
                     ) {
                         Text(
                             text = "Try again",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -801,9 +744,8 @@ internal fun ActivityPerformanceCard(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity & Performance",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
+            text = "Today's activity",
+            style = MaterialTheme.typography.titleLarge,
             color = ThemeTextPrimary
         )
 
@@ -834,7 +776,7 @@ internal fun ActivityPerformanceCard(
                     value = "${today.moveMinutes} min",
                     usual = usual?.let { "${it.moveMinutes} min" },
                     ahead = usual != null && usual.moveMinutes > 0 && today.moveMinutes >= usual.moveMinutes,
-                    color = NeonMint,
+                    color = ElectricCyan,
                     modifier = Modifier.weight(1f)
                 )
                 TodayTile(
@@ -842,7 +784,7 @@ internal fun ActivityPerformanceCard(
                     value = "${today.workoutKcal.toInt()} kcal",
                     usual = usual?.let { "${it.workoutKcal.toInt()} kcal" },
                     ahead = usual != null && usual.workoutKcal > 0 && today.workoutKcal >= usual.workoutKcal,
-                    color = EnergeticCoral,
+                    color = ElectricCyan,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -852,7 +794,7 @@ internal fun ActivityPerformanceCard(
             if (usual == null) {
                 Text(
                     text = "A couple more weeks of data and Superfit will compare each day with your usual for that weekday.",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = ThemeTextSecondary
                 )
             }
@@ -865,7 +807,7 @@ internal fun ActivityPerformanceCard(
                     state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once Samsung Health, Strava or your watch shares them with Health Connect."
                     else -> "Workouts from other apps appear here on their own. Older ones are in History."
                 },
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = ThemeTextSecondary
             )
         }
@@ -877,11 +819,11 @@ internal fun ActivityPerformanceCard(
             )
 
             Text(
-                text = "TODAY'S WORKOUTS",
-                fontSize = 11.sp,
+                text = "Today's workouts",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 0.5.sp
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -910,46 +852,46 @@ internal fun ActivityPerformanceCard(
                                 color = ThemeTextPrimary
                             )
                             val subText = if (entry.workoutType == "Strength") {
-                                "Strength | ${entry.setsCount} sets x ${entry.repsCount} reps"
+                                "${entry.setsCount} sets × ${entry.repsCount} reps · you logged this"
                             } else {
-                                "Cardio"
+                                "Cardio · you logged this"
                             }
                             Text(
                                 text = subText,
-                                fontSize = 10.sp,
-                                color = Color.Gray
+                                fontSize = 12.sp,
+                                color = ThemeTextTertiary
                             )
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
                             Text(
                                 text = "~${entry.caloriesBurned.toInt()} kcal",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = EnergeticCoral
+                                color = ElectricCyan
                             )
                             IconButton(
                                 onClick = { onShareWorkout(com.superfit.app.domain.ShareCards.activity(entry)) },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(40.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Share,
                                     contentDescription = "Share workout",
                                     tint = ThemeTextSecondary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                             IconButton(
                                 onClick = { onDeleteWorkout(entry) },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(40.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete Workout",
+                                    contentDescription = "Delete workout",
                                     tint = DeleteRed,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
@@ -986,9 +928,8 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Sleep & Recovery",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                text = "Sleep",
+                style = MaterialTheme.typography.titleLarge,
                 color = ThemeTextPrimary,
                 modifier = Modifier
                     .weight(1f)
@@ -1010,7 +951,12 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "Readiness: ${state.readinessScore}%",
+                        text = when (state.readinessScore) {
+                            in 85..100 -> "Ready to train"
+                            in 70..84 -> "Normal day"
+                            in 50..69 -> "Go easy"
+                            else -> "Rest day"
+                        },
                         color = when (state.readinessScore) {
                             in 85..100 -> NeonGreen
                             in 70..84 -> ElectricCyan
@@ -1024,10 +970,10 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
         }
 
         val readinessDesc = when (state.readinessScore) {
-            in 85..100 -> "Optimum Recovery - Max training capacity authorized."
-            in 70..84 -> "Stable Homeostasis - Baseline performance capacity."
-            in 50..69 -> "Suboptimal Sleep - Focus on active recovery."
-            else -> "Critical Exhaustion - Rest day strongly recommended."
+            in 85..100 -> "Well rested. A good day for a harder workout."
+            in 70..84 -> "Rested enough for your usual training."
+            in 50..69 -> "Short on sleep. A walk or light session is a better fit today."
+            else -> "Very little sleep. Rest today if you can."
         }
 
         if (state.sleep != null) {
@@ -1044,14 +990,14 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 SleepMetricPill(
-                    label = "Duration",
+                    label = "Slept",
                     value = "${hours}h ${minutes}m",
                     modifier = Modifier.weight(1.0f)
                 )
                 val deepHours = state.sleep.deepSleepDurationSeconds / 3600
                 val deepMins = (state.sleep.deepSleepDurationSeconds % 3600) / 60
                 SleepMetricPill(
-                    label = "Deep Sleep (Est)",
+                    label = "Deep sleep (est.)",
                     value = "${deepHours}h ${deepMins}m",
                     modifier = Modifier.weight(1.0f)
                 )
@@ -1114,16 +1060,16 @@ private fun AnnotatedString.Builder.appendBold(text: String) {
 private fun TodayTile(label: String, value: String, usual: String?, ahead: Boolean, color: Color, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(ThemeTextPrimary.copy(alpha = 0.04f))
+            .clip(RoundedCornerShape(14.dp))
+            .background(ThemeFieldBg)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Text(text = label, fontSize = 11.sp, color = ThemeTextSecondary)
-        Text(text = value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color)
+        Text(text = label, style = MaterialTheme.typography.labelMedium, color = ThemeTextSecondary)
+        Text(text = value, style = MaterialTheme.typography.headlineSmall, color = color)
         if (usual != null) {
             Text(
-                text = if (ahead) "Above your usual $usual" else "Usual $usual",
-                fontSize = 11.sp,
+                text = if (ahead) "↑ usual $usual" else "Usual $usual",
+                fontSize = 12.sp,
                 color = if (ahead) NeonMint else ThemeTextSecondary
             )
         }

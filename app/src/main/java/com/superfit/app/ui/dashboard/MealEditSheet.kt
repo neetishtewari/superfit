@@ -47,6 +47,7 @@ import com.superfit.app.theme.ThemeErrorColor
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
+import com.superfit.app.ui.components.SuperfitField
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -350,7 +351,7 @@ private fun ChangeItemBox(
             }
             return@Column
         }
-        OutlinedTextField(
+        SuperfitField(
             value = text,
             onValueChange = { text = it },
             singleLine = true,

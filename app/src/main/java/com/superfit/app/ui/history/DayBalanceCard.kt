@@ -46,6 +46,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.DashboardViewModel
 import com.superfit.app.ui.dashboard.FoodQualityCard
@@ -68,13 +69,13 @@ fun DayBalanceCard(
     shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
 
     val netColor = if (summary.netBalance < 0) NeonMint else SolarAmber
-    val balanceLabel = if (summary.netBalance < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
+    val balanceLabel = if (summary.netBalance < 0) "Under what you burned" else "Over what you burned"
 
     val today = LocalDate.now()
     val yesterday = today.minusDays(1)
     val dateLabel = when (selectedDate) {
         today -> "TODAY"
-        yesterday -> "YESTERDAY"
+        yesterday -> "Yesterday"
         else -> selectedDate.toString()
     }
 
@@ -103,16 +104,16 @@ fun DayBalanceCard(
                     text = "BALANCE FOR $dateLabel",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
-                    letterSpacing = 1.sp,
+                    color = ThemeTextTertiary,
+                    letterSpacing = 0.sp,
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 8.dp)
                 )
 
                 Text(
-                    text = if (summary.netBalance < 0) "ON TARGET" else "SURPLUS",
-                    fontSize = 10.sp,
+                    text = if (summary.netBalance < 0) "On target" else "Over target",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (summary.netBalance < 0) NeonMint else SolarAmber,
                     modifier = Modifier
@@ -129,19 +130,19 @@ fun DayBalanceCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "EATEN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text(text = "EATEN", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.caloriesEaten.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "TDEE", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text(text = "Burned", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.tdee.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "STEPS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text(text = "STEPS", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
                     Text(text = String.format("%,d", summary.steps), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
                 }
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                    Text(text = "BURN", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    Text(text = "BURN", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
                     Text(text = "${summary.activeBurn.toInt()} kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SolarAmber)
                 }
             }
@@ -157,12 +158,12 @@ fun DayBalanceCard(
             ) {
                 Text(
                     text = balanceLabel,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray
+                    color = ThemeTextTertiary
                 )
                 Text(
-                    text = "${if (summary.netBalance > 0) "+" else ""}${summary.netBalance.toInt()} kcal",
+                    text = "${kotlin.math.abs(summary.netBalance.toInt())} kcal",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
                     color = netColor
@@ -171,11 +172,11 @@ fun DayBalanceCard(
 
             // List of meals ledger
             Text(
-                text = "LOGGED MEALS",
-                fontSize = 11.sp,
+                text = "Logged meals",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 0.5.sp
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
             )
 
             if (summary.meals.isEmpty()) {
@@ -223,12 +224,12 @@ fun DayBalanceCard(
                                 )
                                 Text(
                                     text = "P: ${entry.proteinG.toInt()}g | C: ${entry.carbsG.toInt()}g | F: ${entry.fatG.toInt()}g",
-                                    fontSize = 10.sp,
-                                    color = Color.Gray
+                                    fontSize = 12.sp,
+                                    color = ThemeTextTertiary
                                 )
                                 Text(
                                     text = "Tap to edit",
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     color = ThemeTextTertiary
                                 )
                             }
@@ -263,11 +264,11 @@ fun DayBalanceCard(
 
             // List of workouts ledger
             Text(
-                text = "LOGGED WORKOUTS",
-                fontSize = 11.sp,
+                text = "Logged workouts",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 0.5.sp
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
             )
 
             if (summary.importedWorkouts.isNotEmpty()) {
@@ -320,8 +321,8 @@ fun DayBalanceCard(
                                 }
                                 Text(
                                     text = subText,
-                                    fontSize = 10.sp,
-                                    color = Color.Gray
+                                    fontSize = 12.sp,
+                                    color = ThemeTextTertiary
                                 )
                             }
                             Row(
@@ -404,11 +405,11 @@ fun DayBalanceCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "LOG A MISSED MEAL",
-                    fontSize = 11.sp,
+                    text = "Log a missed meal",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
-                    letterSpacing = 0.5.sp
+                    color = ThemeTextTertiary,
+                    letterSpacing = 0.sp
                 )
 
                 Row(
@@ -416,19 +417,11 @@ fun DayBalanceCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    SuperfitField(
                         value = foodText,
                         onValueChange = { foodText = it },
-                        placeholder = { Text("e.g. 1 plate of pasta and chicken breast", fontSize = 12.sp, color = Color.Gray) },
+                        placeholder = { Text("e.g. 1 plate of pasta and chicken breast", fontSize = 12.sp, color = ThemeTextTertiary) },
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricCyan,
-                            unfocusedBorderColor = ThemeGlassBorder,
-                            focusedTextColor = ThemeTextPrimary,
-                            unfocusedTextColor = ThemeTextPrimary,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
-                        ),
                         modifier = Modifier.weight(1f),
                         enabled = parsingState != HistoryParsingState.Loading
                     )
@@ -472,8 +465,8 @@ fun DayBalanceCard(
                     ) {
                         Text(
                             text = "Frequently Tracked (Tap to fill):",
-                            fontSize = 11.sp,
-                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            color = ThemeTextTertiary,
                             fontWeight = FontWeight.Bold
                         )
                         LazyRow(
@@ -487,7 +480,7 @@ fun DayBalanceCard(
                                         Text(
                                             text = predicted.foodText,
                                             color = ThemeTextPrimary,
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             maxLines = 1
                                         )
                                     },
@@ -508,7 +501,7 @@ fun DayBalanceCard(
                     Text(
                         text = msg,
                         color = if (isErrorState) SolarAmber else NeonMint,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
