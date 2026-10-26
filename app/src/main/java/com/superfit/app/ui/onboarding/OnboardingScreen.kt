@@ -422,7 +422,7 @@ fun OnboardingScreen(
                 confirmButton = {
                     Button(
                         onClick = { showHeightHelper = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
                     ) {
                         Text("Done", fontWeight = FontWeight.Bold)
                     }
@@ -457,7 +457,7 @@ fun OnboardingScreen(
                 confirmButton = {
                     Button(
                         onClick = { showTdeeHelper = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
                     ) {
                         Text("Got it", fontWeight = FontWeight.Bold)
                     }

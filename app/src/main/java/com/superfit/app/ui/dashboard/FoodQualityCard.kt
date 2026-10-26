@@ -319,7 +319,7 @@ fun DietQualityDetailBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = SuperfitTheme.colors.cardBg,
-        scrimColor = Color.Black.copy(alpha = 0.6f),
+        scrimColor = Color.White.copy(alpha = 0.6f),
         dragHandle = { BottomSheetDefaults.DragHandle(color = SuperfitTheme.colors.textSecondary) }
     ) {
         Column(
@@ -694,7 +694,7 @@ fun FoodSwapCard(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = NeonMint,
-                    contentColor = Color.Black
+                    contentColor = Color.White
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {

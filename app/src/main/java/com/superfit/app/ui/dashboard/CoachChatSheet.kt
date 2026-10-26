@@ -216,7 +216,7 @@ internal fun CoachChatSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = ThemeCardBg,
-        scrimColor = Color.Black.copy(alpha = 0.6f),
+        scrimColor = Color.White.copy(alpha = 0.6f),
         dragHandle = { BottomSheetDefaults.DragHandle(color = ThemeTextSecondary) }
     ) {
         Column(
@@ -477,7 +477,7 @@ private fun ChatMessageRow(
             } else {
                 Button(
                     onClick = onLogMeal,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp)
@@ -490,7 +490,7 @@ private fun ChatMessageRow(
         if (onShareRoast != null) {
             Button(
                 onClick = onShareRoast,
-                colors = ButtonDefaults.buttonColors(containerColor = com.superfit.app.theme.SolarAmber, contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = com.superfit.app.theme.SolarAmber, contentColor = Color.White),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp)

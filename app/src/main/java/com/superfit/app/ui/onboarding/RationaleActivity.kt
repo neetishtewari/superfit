@@ -222,7 +222,7 @@ fun RationaleScreen(
                     .height(50.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = neonGreen,
-                    contentColor = Color.Black
+                    contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {

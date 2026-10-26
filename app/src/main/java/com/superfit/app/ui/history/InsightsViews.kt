@@ -61,9 +61,9 @@ import com.superfit.app.domain.JourneyForecast
 import com.superfit.app.domain.MeasuredBody
 import com.superfit.app.domain.WeekReport
 import com.superfit.app.theme.ElectricCyan
-import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
+import com.superfit.app.theme.ThemeCardBg
 import com.superfit.app.theme.ThemeCardBgTranslucent
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
@@ -77,16 +77,16 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 private val shortDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
-private val Orange = Color(0xFFF97316)
+private val Orange = SolarAmber
 
 @Composable
 private fun SectionCard(modifier: Modifier = Modifier, borderColor: Color? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(ThemeCardBgTranslucent)
-            .border(1.dp, borderColor ?: ThemeGlassBorder, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(ThemeCardBg)
+            .border(1.dp, borderColor ?: ThemeGlassBorder, RoundedCornerShape(20.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content
@@ -99,10 +99,19 @@ private fun SectionLabel(text: String, color: Color = ThemeTextSecondary) {
 }
 
 @Composable
-private fun InsightRow(item: Insight) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
-        Text(item.detail, fontSize = 13.sp, color = ThemeTextSecondary, lineHeight = 18.sp)
+private fun InsightRow(item: Insight, dot: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            Modifier
+                .padding(top = 6.dp)
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(dot)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
+            Text(item.detail, fontSize = 13.sp, color = ThemeTextSecondary)
+        }
     }
 }
 
@@ -118,7 +127,7 @@ fun InsightsTab(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard {
-            SectionLabel("Your week · ${report.from.format(shortDate)} to ${report.to.format(shortDate)}", HyperViolet)
+            SectionLabel("Your week · ${report.from.format(shortDate)} to ${report.to.format(shortDate)}", NeonMint)
             Text(report.verdict, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 24.sp)
             val s = report.thisWeek
             val l = report.lastWeek
@@ -151,13 +160,13 @@ fun InsightsTab(
         if (report.working.isNotEmpty()) {
             SectionCard {
                 SectionLabel("Going well", NeonMint)
-                report.working.forEach { InsightRow(it) }
+                report.working.forEach { InsightRow(it, NeonMint) }
             }
         }
         if (report.watch.isNotEmpty()) {
             SectionCard {
                 SectionLabel("Watch out", SolarAmber)
-                report.watch.forEach { InsightRow(it) }
+                report.watch.forEach { InsightRow(it, SolarAmber) }
                 TextButton(onClick = onOpenJourney, modifier = Modifier.heightIn(min = 44.dp)) {
                     Text("See how this affects your goal date", color = NeonMint, fontWeight = FontWeight.Bold)
                 }
@@ -179,9 +188,9 @@ fun InsightsTab(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(ThemeCardBgTranslucent)
-                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(ThemeCardBg)
+                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(20.dp))
         ) {
             ExpandRow("Food Quality and swaps", content = foodQuality)
             ExpandRow("Personal bests", content = bests)
@@ -353,7 +362,7 @@ fun JourneyTab(
                 Button(
                     onClick = onEditGoal,
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.White),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) { Text("Set my goal", fontWeight = FontWeight.Bold) }
             }
@@ -549,9 +558,9 @@ private fun WeighInCard(j: JourneyForecast, onWeighIn: () -> Unit) {
             Button(
                 onClick = onWeighIn,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if ((j.daysSinceWeighIn ?: 99) >= 7) NeonMint else ThemeTextPrimary.copy(alpha = 0.1f), contentColor = if ((j.daysSinceWeighIn ?: 99) >= 7) Color.Black else ThemeTextPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.White),
                 modifier = Modifier.heightIn(min = 44.dp)
-            ) { Text("Weigh in", fontWeight = FontWeight.Bold) }
+            ) { Text("Log weight", fontWeight = FontWeight.Bold) }
         }
     }
 }

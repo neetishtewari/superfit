@@ -114,7 +114,7 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
                         shape = RoundedCornerShape(8.dp),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = NeonMint,
-                            selectedLabelColor = Color.Black
+                            selectedLabelColor = Color.White
                         )
                     )
                 }

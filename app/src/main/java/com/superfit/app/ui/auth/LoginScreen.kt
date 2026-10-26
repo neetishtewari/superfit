@@ -517,7 +517,7 @@ fun LoginScreen(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = primaryColor,
-                            contentColor = Color.Black
+                            contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {

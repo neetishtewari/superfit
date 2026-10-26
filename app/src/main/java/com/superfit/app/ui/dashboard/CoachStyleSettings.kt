@@ -60,7 +60,7 @@ fun CoachStyleSettings(viewModel: DashboardViewModel) {
                 ) {
                     Text(
                         text = option.label,
-                        color = if (isSelected) Color.Black else SuperfitTheme.colors.textPrimary,
+                        color = if (isSelected) Color.White else SuperfitTheme.colors.textPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )

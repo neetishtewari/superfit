@@ -1,7 +1,6 @@
 package com.superfit.app.ui.history
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,9 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -84,42 +81,16 @@ fun HistoryScreen(
         modifier = modifier
             .fillMaxSize()
             .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(ThemeBgStart, ThemeBgEnd)
-                )
+                ThemeBgStart
             )
     ) {
-        // Ambient background glow
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(HyperViolet.copy(alpha = 0.10f), Color.Transparent),
-                    center = Offset(size.width * 0.8f, size.height * 0.2f),
-                    radius = size.minDimension * 0.8f
-                ),
-                radius = size.minDimension * 0.8f,
-                center = Offset(size.width * 0.8f, size.height * 0.2f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(NeonMint.copy(alpha = 0.06f), Color.Transparent),
-                    center = Offset(size.width * 0.2f, size.height * 0.7f),
-                    radius = size.minDimension * 0.7f
-                ),
-                radius = size.minDimension * 0.7f,
-                center = Offset(size.width * 0.2f, size.height * 0.7f)
-            )
-        }
-
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = "INSIGHTS",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.sp,
+                            text = "Progress",
+                            style = MaterialTheme.typography.titleLarge,
                             color = ThemeTextPrimary
                         )
                     },
@@ -151,35 +122,13 @@ fun HistoryScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Insights | Journey | Log
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(ThemeCardBgTranslucent)
-                        .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
-                        .padding(3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf("INSIGHTS", "JOURNEY", "LOG").forEachIndexed { index, label ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(if (selectedTab == index) NeonMint else Color.Transparent)
-                                .clickable { selectedTab = index },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (selectedTab == index) Color.Black else ThemeTextSecondary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                }
+                val tabs = listOf("0" to "Insights", "1" to "Journey", "2" to "Log")
+                com.superfit.app.ui.dashboard.SegmentedPills(
+                    options = tabs,
+                    selected = selectedTab.toString(),
+                    onSelect = { selectedTab = it.toInt() },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 when (selectedTab) {
                     0 -> viewModel.weekReport?.let { report ->

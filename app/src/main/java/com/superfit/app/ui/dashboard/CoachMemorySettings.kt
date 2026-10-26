@@ -1,5 +1,6 @@
 package com.superfit.app.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,12 +79,32 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
             color = SuperfitTheme.colors.textSecondary,
             fontSize = 12.sp
         )
+        val speakNote = com.superfit.app.ui.components.rememberVoiceTyping("Say something your coach should know") { said ->
+            newNote = (if (newNote.isBlank()) said else newNote.trimEnd() + "\n" + said).take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE)
+        }
+        // Tap an example to start from it; each adds one line.
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(NOTE_EXAMPLES.size) { i ->
+                val example = NOTE_EXAMPLES[i]
+                Text(
+                    text = "+ $example",
+                    color = SuperfitTheme.colors.textPrimary,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                        .background(SuperfitTheme.colors.fieldBg)
+                        .clickable { newNote = if (newNote.isBlank()) example else newNote.trimEnd() + "\n" + example }
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                )
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SuperfitField(
+                trailingIcon = { com.superfit.app.ui.components.MicButton(onClick = speakNote, modifier = Modifier.padding(end = 6.dp)) },
                 value = newNote,
                 onValueChange = { newNote = it.take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE) },
                 placeholder = { Text("e.g. Vegetarian on Tuesdays\nNight shifts Mon to Thu", fontSize = 12.sp) },
@@ -98,7 +120,7 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = NeonMint)
             ) {
-                Text("Add", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Add", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
         Text(
@@ -159,3 +181,10 @@ private fun NoteRow(note: CoachNote, today: LocalDate, onRemove: () -> Unit) {
         )
     }
 }
+
+private val NOTE_EXAMPLES = listOf(
+    "Vegetarian on Tuesdays",
+    "Night shifts Mon to Thu",
+    "Bad knee, no running",
+    "Training for a 10k"
+)

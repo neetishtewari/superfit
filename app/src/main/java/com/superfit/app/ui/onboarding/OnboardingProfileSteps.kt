@@ -237,7 +237,7 @@ internal fun PhysiologyStep(
                             .clickable { viewModel.onSexChanged(true) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "Male", color = if (uiState.isMale) Color.Black else ThemeTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(text = "Male", color = if (uiState.isMale) Color.White else ThemeTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     Box(
                         modifier = Modifier
@@ -246,7 +246,7 @@ internal fun PhysiologyStep(
                             .clickable { viewModel.onSexChanged(false) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "Female", color = if (!uiState.isMale) Color.Black else ThemeTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(text = "Female", color = if (!uiState.isMale) Color.White else ThemeTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }

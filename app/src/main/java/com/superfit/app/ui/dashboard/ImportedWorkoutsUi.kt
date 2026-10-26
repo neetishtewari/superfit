@@ -84,7 +84,7 @@ fun WorkoutConnectCard(onConnect: () -> Unit, onNotNow: () -> Unit, modifier: Mo
                 }
                 Button(
                     onClick = onConnect,
-                    colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan, contentColor = Color.White),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Connect", fontWeight = FontWeight.Bold)

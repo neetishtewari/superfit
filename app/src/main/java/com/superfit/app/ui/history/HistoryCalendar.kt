@@ -168,10 +168,10 @@ fun CalendarCard(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LegendItem(color = NeonMint, label = "Deficit")
+                LegendItem(color = NeonMint, label = "Under what you burned")
                 val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
-                LegendItem(color = SolarAmber, label = "Surplus")
-                LegendItem(color = untrackedColor, label = "Untracked (<2 meals)")
+                LegendItem(color = SolarAmber, label = "Over")
+                LegendItem(color = untrackedColor, label = "Not fully logged")
             }
         }
     }
@@ -184,57 +184,39 @@ fun CalendarDayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val untrackedColor = if (SuperfitTheme.isDark) Color(0xFF2E2E3A) else Color(0xFFCBD5E1)
-    val bgColor = when (dayState.status) {
-        DayStatus.Deficit -> NeonMint.copy(alpha = 0.20f)
-        DayStatus.Surplus -> SolarAmber.copy(alpha = 0.20f)
-        DayStatus.Insufficient -> untrackedColor.copy(alpha = 0.3f)
+    val isToday = dayState.date == LocalDate.now()
+    val dotColor = when (dayState.status) {
+        DayStatus.Deficit -> NeonMint
+        DayStatus.Surplus -> SolarAmber
+        DayStatus.Insufficient -> Color.Transparent
     }
 
-    val borderColor = when {
-        isSelected -> HyperViolet
-        dayState.date == LocalDate.now() -> HyperViolet.copy(alpha = 0.6f)
-        else -> when (dayState.status) {
-            DayStatus.Deficit -> NeonMint
-            DayStatus.Surplus -> SolarAmber
-            DayStatus.Insufficient -> Color.Transparent
-        }
-    }
-
-    val borderWidth = when {
-        isSelected -> 2.dp
-        dayState.date == LocalDate.now() -> 2.dp
-        else -> 1.dp
-    }
-
+    // A plain number with a coloured dot under it; the chosen day is a filled green circle.
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(bgColor)
-            .clickable { onClick() }
-            .border(
-                width = borderWidth,
-                color = borderColor,
-                shape = RoundedCornerShape(8.dp)
-            ),
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) NeonMint else Color.Transparent)
+            .then(if (isToday && !isSelected) Modifier.border(1.5.dp, NeonMint, RoundedCornerShape(12.dp)) else Modifier)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = dayState.date.dayOfMonth.toString(),
-                fontSize = 13.sp,
-                fontWeight = if (dayState.date == LocalDate.now() || isSelected) FontWeight.Black else FontWeight.Bold,
-                color = if (dayState.status == DayStatus.Insufficient) ThemeTextTertiary else ThemeTextPrimary
+                fontSize = 14.sp,
+                fontWeight = if (isToday || isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                color = when {
+                    isSelected -> Color.White
+                    dayState.status == DayStatus.Insufficient -> ThemeTextTertiary
+                    else -> ThemeTextPrimary
+                }
             )
-            if (dayState.status != DayStatus.Insufficient) {
-                val net = (dayState.caloriesEaten - dayState.tdee).toInt()
-                Text(
-                    text = "${if (net > 0) "+" else ""}$net",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (net < 0) NeonMint else SolarAmber
-                )
-            }
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected && dayState.status != DayStatus.Insufficient) Color.White else dotColor)
+            )
         }
     }
 }
@@ -250,10 +232,9 @@ fun LegendItem(
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(color.copy(alpha = 0.3f))
-                .border(1.dp, color, RoundedCornerShape(3.dp))
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(color)
         )
         Text(text = label, fontSize = 12.sp, color = ThemeTextTertiary)
     }
