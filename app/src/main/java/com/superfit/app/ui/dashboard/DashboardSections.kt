@@ -391,7 +391,7 @@ internal fun CoachInsightsCard(
         when (val cState = coachingState) {
             CoachingInsightState.Idle -> {
                 Text(
-                    text = "Your coach looks at your last few weeks of meals, steps, sleep and workouts and tells you the one thing that matters most right now.",
+                    text = "Your AI coach looks at your last few weeks of meals, steps, sleep and workouts and tells you the one thing that matters most right now.",
                     color = Color.Gray,
                     fontSize = 13.sp
                 )
@@ -504,7 +504,7 @@ internal fun CoachInsightsCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Ask coach about this 💬", fontWeight = FontWeight.Bold)
+                        Text("Ask AI coach about this 💬", fontWeight = FontWeight.Bold)
                     }
                 }
             }

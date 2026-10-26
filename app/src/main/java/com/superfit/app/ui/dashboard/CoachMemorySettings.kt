@@ -37,7 +37,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * "What my coach knows": every note the coach keeps about the user, from chats or typed here.
+ * "What my AI coach knows": every note the AI coach keeps about the user, from chats or typed here.
  * Each can be removed. Also clears the chat history.
  */
 @Composable
@@ -50,20 +50,20 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "What my coach knows",
+            text = "What my AI coach knows",
             fontWeight = FontWeight.Bold,
             color = SuperfitTheme.colors.textPrimary,
             fontSize = 14.sp
         )
         Text(
-            text = "Things the coach picked up from your chats, like an injury or a food you don't eat. It uses them for answers and your daily tip. Remove anything that's wrong.",
+            text = "Things your AI coach picked up from your chats, like an injury or a food you don't eat. It uses them for answers and your daily tip. Remove anything that's wrong.",
             color = SuperfitTheme.colors.textSecondary,
             fontSize = 11.sp,
             lineHeight = 15.sp
         )
         if (active.isEmpty()) {
             Text(
-                text = "Nothing yet. Chat with your coach, or add something below.",
+                text = "Nothing yet. Chat with your AI coach, or add something below.",
                 color = SuperfitTheme.colors.textSecondary,
                 fontSize = 12.sp
             )
@@ -110,7 +110,7 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("Clear chat history?") },
-            text = { Text("Your conversations with the coach are deleted from this phone and your backup. What the coach knows (above) stays until you remove it.") },
+            text = { Text("Your conversations with the AI coach are deleted from this phone and your backup. What the AI coach knows (above) stays until you remove it.") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearChatHistory()

@@ -53,7 +53,7 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
             fontSize = 14.sp
         )
         Text(
-            text = "Write what your nutritionist told you, in your own words. Meal ratings, Diet Quality and the coach will follow it.",
+            text = "Write what your nutritionist told you, in your own words. Meal ratings, Diet Quality and your AI coach will follow it.",
             color = SuperfitTheme.colors.textSecondary,
             fontSize = 11.sp,
             lineHeight = 15.sp
