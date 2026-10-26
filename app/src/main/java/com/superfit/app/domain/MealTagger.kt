@@ -17,6 +17,16 @@ class MealTagger {
         return parse(response, entries)
     }
 
+    /** Tags one saved meal. Null when the AI couldn't; the daily backfill tries again later. */
+    suspend fun tagOne(entry: NutritionEntryEntity): MealTags? = try {
+        tag(listOf(entry))[entry.id]
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        android.util.Log.w("MealTagger", "Tagging meal ${entry.id} failed", e)
+        null
+    }
+
     companion object {
         val SYSTEM_INSTRUCTION =
             "You are a nutrition expert. For each numbered meal, describe what kind of food it is.\n" +

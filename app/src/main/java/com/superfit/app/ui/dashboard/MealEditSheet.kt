@@ -1,5 +1,10 @@
 package com.superfit.app.ui.dashboard
 
+import android.content.ActivityNotFoundException
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,10 +12,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,21 +27,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.domain.Level
 import com.superfit.app.domain.MealItem
+import com.superfit.app.domain.MealItemReplacer
 import com.superfit.app.domain.MealItems
 import com.superfit.app.domain.withItems
 import com.superfit.app.theme.DeleteRed
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.theme.ThemeErrorColor
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /**
  * Lets the user fix a logged meal: the amount of each food, and how much oil and sugar went in.
@@ -91,22 +106,76 @@ fun MealEditSheet(
     }
 }
 
-/** The item rows, oil and sugar pickers and live totals, shared by Edit meal and Check your meal. */
+/**
+ * The item rows, oil and sugar pickers and live totals, shared by Edit meal and Check your meal.
+ * Any item can be changed to a different food; only that item gets new numbers.
+ */
 @Composable
-internal fun MealItemsEditor(meal: MealItems, onChange: (MealItems) -> Unit) {
+internal fun MealItemsEditor(
+    meal: MealItems,
+    onChange: (MealItems) -> Unit,
+    replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> MealItem = MealItemReplacer()::replace
+) {
     val totals = meal.totals()
+    val scope = rememberCoroutineScope()
+    // The item being renamed, and whether the AI is working on it.
+    var changing by remember { mutableStateOf<Int?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         meal.items.forEachIndexed { index, item ->
-            MealItemEditRow(
-                item = item,
-                canRemove = meal.items.size > 1,
-                onQtyChange = { qty ->
-                    onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
-                },
-                onRemove = {
-                    onChange(meal.copy(items = meal.items.toMutableList().also { it.removeAt(index) }))
-                }
-            )
+            if (changing == index) {
+                ChangeItemBox(
+                    item = item,
+                    busy = busy,
+                    failed = failed,
+                    onCancel = {
+                        changing = null
+                        failed = false
+                    },
+                    onChange = { newName ->
+                        busy = true
+                        failed = false
+                        scope.launch {
+                            try {
+                                val replaced = replaceItem(item, newName, meal.items.filterIndexed { i, _ -> i != index })
+                                onChange(meal.replace(index, replaced))
+                                AppAnalytics.mealItemChanged(typed = true)
+                                changing = null
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                android.util.Log.w("MealItemsEditor", "Changing item failed", e)
+                                failed = true
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                )
+            } else {
+                MealItemEditRow(
+                    item = item,
+                    askToCheck = !meal.checked,
+                    canRemove = meal.items.size > 1,
+                    canChange = !busy,
+                    onQtyChange = { qty ->
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
+                    },
+                    onChoose = { choice ->
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.choose(choice) }))
+                        AppAnalytics.mealItemChanged(typed = false)
+                    },
+                    onChangeName = {
+                        changing = index
+                        failed = false
+                    },
+                    onRemove = {
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it.removeAt(index) }))
+                    }
+                )
+            }
         }
 
         if (meal.hasOil) {
@@ -125,31 +194,53 @@ internal fun MealItemsEditor(meal: MealItems, onChange: (MealItems) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun MealItemEditRow(
     item: MealItem,
+    askToCheck: Boolean,
     canRemove: Boolean,
+    canChange: Boolean,
     onQtyChange: (Double) -> Unit,
+    onChoose: (Int) -> Unit,
+    onChangeName: () -> Unit,
     onRemove: () -> Unit
 ) {
+    val highlight = item.isUnsure && askToCheck
     // Name on its own line and the controls below it, so large text sizes never squeeze the name.
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(ThemeTextPrimary.copy(alpha = 0.03f))
-            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, if (highlight) ThemeErrorColor else ThemeGlassBorder, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = item.name.replaceFirstChar { it.titlecase(Locale.getDefault()) },
-                color = ThemeTextPrimary,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                modifier = Modifier.weight(1f)
-            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(enabled = canChange, onClickLabel = "Change this item", onClick = onChangeName)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = item.name.replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                    color = ThemeTextPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = ThemeTextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
             Text(
                 text = "${(item.kcal * item.qty).toInt()} kcal",
                 color = ThemeTextSecondary,
@@ -181,6 +272,115 @@ private fun MealItemEditRow(
                 IconButton(onClick = onRemove) {
                     Icon(Icons.Default.Close, contentDescription = "Remove ${item.name}", tint = DeleteRed.copy(alpha = 0.8f))
                 }
+            }
+        }
+        if (item.isUnsure) {
+            Text(
+                text = if (highlight) "Is it…?" else "Or was it…?",
+                color = if (highlight) ThemeErrorColor else ThemeTextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item.choices.forEachIndexed { i, choice ->
+                    FilterChip(
+                        selected = choice.name.equals(item.name, ignoreCase = true),
+                        onClick = { onChoose(i) },
+                        label = { Text(choice.name.replaceFirstChar { it.titlecase(Locale.getDefault()) }, fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = NeonGreen.copy(alpha = 0.18f),
+                            selectedLabelColor = NeonGreen
+                        )
+                    )
+                }
+                FilterChip(
+                    selected = false,
+                    enabled = canChange,
+                    onClick = onChangeName,
+                    label = { Text("Something else…", fontSize = 13.sp, color = ThemeTextSecondary) }
+                )
+            }
+        }
+    }
+}
+
+/** Type or say what the item really was. */
+@Composable
+private fun ChangeItemBox(
+    item: MealItem,
+    busy: Boolean,
+    failed: Boolean,
+    onCancel: () -> Unit,
+    onChange: (String) -> Unit
+) {
+    var text by remember(item) { mutableStateOf("") }
+    val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let {
+            text = it
+            if (it.isNotBlank()) onChange(it)
+        }
+    }
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+            .border(1.dp, NeonGreen, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "What was it instead of ${item.name}?",
+            color = ThemeTextPrimary,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp
+        )
+        if (busy) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = NeonGreen)
+                Text("Working out the numbers…", color = ThemeTextSecondary, fontSize = 13.sp)
+            }
+            return@Column
+        }
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            singleLine = true,
+            placeholder = { Text("e.g. the right name of the food") },
+            trailingIcon = {
+                IconButton(onClick = {
+                    try {
+                        voice.launch(SpeechRecognizerHelper.systemDialogIntent().putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what it was"))
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Icon(Icons.Default.Mic, contentDescription = "Say it")
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onChange(text) }),
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (failed) {
+            Text("Couldn't change it. Check your internet and try again.", color = ThemeErrorColor, fontSize = 12.sp)
+        }
+        Text(
+            "Amount stays ${formatAmount(item.qty)} ${unitLabel(item.unit)} unless you say a different one.",
+            color = ThemeTextSecondary,
+            fontSize = 12.sp
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+            Button(
+                onClick = { onChange(text) },
+                enabled = text.isNotBlank(),
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
+            ) {
+                Text("Change", fontWeight = FontWeight.Bold)
             }
         }
     }

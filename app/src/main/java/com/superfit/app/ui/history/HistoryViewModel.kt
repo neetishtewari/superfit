@@ -465,6 +465,13 @@ class HistoryViewModel(
             repository.updateNutritionEntry(entry)
             com.superfit.app.data.AppAnalytics.mealEdited()
             loadData()
+            // A changed food drops the old tags (see withItems), so the meal is judged again.
+            if (entry.qualityTags == null) {
+                com.superfit.app.domain.MealTagger().tagOne(entry)?.let {
+                    repository.saveMealTags(entry, it.encode())
+                    loadData()
+                }
+            }
         }
     }
 

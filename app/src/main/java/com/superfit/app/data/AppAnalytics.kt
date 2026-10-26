@@ -56,6 +56,9 @@ object AppAnalytics {
     /** [method]: voice, typed, photo, barcode or label. */
     fun mealLogged(method: String) = log("meal_logged", "method" to method)
     fun mealEdited() = log("meal_edited")
+
+    /** A meal item swapped for a different food, by picking a choice or typing/saying a name. */
+    fun mealItemChanged(typed: Boolean) = log("meal_item_changed", "how" to if (typed) "typed" else "choice")
     fun workoutLogged() = log("workout_logged", "method" to "voice")
     fun workoutsConnected() = log("workouts_connected")
 

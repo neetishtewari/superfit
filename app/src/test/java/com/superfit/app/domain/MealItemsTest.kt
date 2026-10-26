@@ -4,6 +4,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -154,7 +155,7 @@ class MealItemsTest {
         assertEquals(660.0, edited.calories, 0.01)
         assertEquals(23.0, edited.proteinG, 0.01)
         assertEquals(17.0, edited.fatG, 0.01)
-        assertEquals(MealItems(listOf(roti.copy(qty = 4.0), dal)), MealItems.decode(edited.items))
+        assertEquals(MealItems(listOf(roti.copy(qty = 4.0), dal), checked = true), MealItems.decode(edited.items))
         val newTags = MealTags.decode(edited.qualityTags)!!
         assertEquals(16.0, newTags.fiberG, 0.01)
         // Veg/fruit servings follow the change in calories: 420 -> 660.
@@ -180,5 +181,122 @@ class MealItemsTest {
             NutritionEntryEntity(foodText = "2 roti, 1 katori dal", calories = 420.0, proteinG = 16.0, carbsG = 64.0, fatG = 11.0, timestamp = 0L, items = items.encode())
         )
         assertEquals(items, RepeatMealCache.findRepeatMeal("2 roti, 1 katori dal", history)!!.items)
+    }
+
+    // A glass the AI couldn't tell apart: buttermilk (its guess), milk or lassi.
+    private val drinkJson = """[{"name":"buttermilk","quantity":1,"unit":"glass","calories":60,"protein":3,"carbs":5,"fat":2,"fiber":0,"oilG":0,"sugarG":0,
+        "alternatives":[{"name":"milk","calories":150,"protein":8,"carbs":12,"fat":8,"fiber":0,"oilG":0,"sugarG":0},
+        {"name":"Buttermilk","calories":60},{"name":"","calories":10},
+        {"name":"lassi","calories":220,"protein":7,"carbs":30,"fat":7,"sugarG":20},
+        {"name":"kefir","calories":110},{"name":"whey","calories":120}]}]"""
+
+    @Test
+    fun `the ai's look-alikes become choices with its guess first`() {
+        val item = MealItems.fromGemini(JSONArray(drinkJson))!!.items.single()
+        assertTrue(item.isUnsure)
+        // Duplicates and blank names are dropped, and at most three options follow the guess.
+        assertEquals(listOf("buttermilk", "milk", "lassi", "kefir"), item.choices.map { it.name })
+        assertEquals(150.0, item.choices[1].kcal, 0.01)
+        assertEquals(20.0, item.choices[2].sugarG, 0.01)
+    }
+
+    @Test
+    fun `an item the ai was sure about has no choices`() {
+        val item = MealItems.fromGemini(JSONArray("""[{"name":"roti","quantity":2,"unit":"piece","calories":240}]"""))!!.items.single()
+        assertFalse(item.isUnsure)
+        assertTrue(item.choices.isEmpty())
+    }
+
+    @Test
+    fun `choosing another option swaps the numbers and keeps the amount`() {
+        val item = MealItems.fromGemini(JSONArray(drinkJson))!!.items.single().copy(qty = 2.0)
+        val milk = item.choose(1)
+        assertEquals("milk", milk.name)
+        assertEquals(2.0, milk.qty, 0.0)
+        assertEquals("glass", milk.unit)
+        assertEquals(300.0, MealItems(listOf(milk)).totals().kcal, 0.01)
+        // The choices stay, so the user can switch back.
+        assertEquals("buttermilk", milk.choose(0).name)
+        assertEquals(milk, milk.choose(9))
+    }
+
+    @Test
+    fun `choices, checked and what was said survive saving`() {
+        val items = MealItems.fromGemini(JSONArray(drinkJson))!!.copy(said = "a glass of chaas")
+        val decoded = MealItems.decode(items.encode())!!
+        assertEquals(items, decoded)
+        assertEquals(MealItems(listOf(roti), checked = true), MealItems.decode(MealItems(listOf(roti), checked = true).encode()))
+    }
+
+    @Test
+    fun `unsure items need checking until the user has looked at the meal`() {
+        val items = MealItems.fromGemini(JSONArray(drinkJson))!!
+        assertEquals(1, items.copy(items = items.items + roti).itemsToCheck)
+        assertEquals(0, items.copy(checked = true).itemsToCheck)
+        assertEquals(0, MealItems(listOf(roti, dal)).itemsToCheck)
+    }
+
+    @Test
+    fun `replacing an item changes only that item`() {
+        val meal = MealItems(listOf(roti, dal), oil = Level.HIGH)
+        val chana = dal.copy(name = "chana", kcal = 210.0, choices = listOf(dal, roti))
+        val replaced = meal.replace(1, chana)
+        assertEquals(roti, replaced.items[0])
+        assertEquals("chana", replaced.items[1].name)
+        assertTrue(replaced.items[1].choices.isEmpty())
+        assertEquals(Level.HIGH, replaced.oil)
+        assertEquals(meal, meal.replace(5, chana))
+    }
+
+    @Test
+    fun `a different food drops the old tags so the meal is judged again`() {
+        val tags = MealTags(1, fried = false, addedSugar = false, vegFruitServings = 1.0, fiberG = 8.5, treat = false, foodType = "dal")
+        val original = MealItems(listOf(roti, dal))
+        val start = entry(tags = tags.encode(), items = original.encode())
+
+        val renamed = start.withItems(original.replace(1, dal.copy(name = "chicken curry")))
+        assertNull(renamed.qualityTags)
+        assertEquals("2 roti, 1 katori chicken curry", renamed.foodText)
+        assertTrue(MealItems.decode(renamed.items)!!.checked)
+
+        // Removing a food or changing an amount keeps the tags.
+        assertNotNull(start.withItems(MealItems(listOf(roti))).qualityTags)
+        assertNotNull(start.withItems(MealItems(listOf(roti.copy(qty = 3.0), dal))).qualityTags)
+    }
+
+    @Test
+    fun `a corrected meal comes back when the user says the same words again`() {
+        val corrected = MealItems(listOf(roti, dal.copy(name = "chana")), checked = true, said = "2 roti and chaas")
+        val history = listOf(
+            NutritionEntryEntity(foodText = "2 roti, 1 katori chana", calories = 420.0, proteinG = 16.0, carbsG = 64.0, fatG = 11.0, timestamp = 0L, items = corrected.encode())
+        )
+        val result = RepeatMealCache.findRepeatMeal("2 Roti and chaas!", history)!!
+        assertEquals("2 roti, 1 katori chana", result.foodText)
+        assertEquals(corrected, result.items)
+    }
+
+    @Test
+    fun `typed meals remember what was said and photos do not`() {
+        val json = org.json.JSONObject().put("foodText", "chaas").put("items", JSONArray(drinkJson))
+        assertEquals("a glass of chaas", ParsedNutritionResult.fromJson(json, " a glass of chaas ").items!!.said)
+        assertNull(ParsedNutritionResult.fromJson(json, "photo").items!!.said)
+    }
+
+    @Test
+    fun `a replacement keeps the old amount unless the ai gives one`() {
+        val momos = MealItem("veg momos", 6.0, "piece", 35.0, 1.0, 5.0, 1.0, 0.5, 0.5, 0.0)
+        val kept = MealItemReplacer.parse("""{"name":"chicken momos","calories":270,"protein":18}""", momos)!!
+        assertEquals("chicken momos", kept.name)
+        assertEquals(6.0, kept.qty, 0.0)
+        assertEquals("piece", kept.unit)
+        assertEquals(45.0, kept.kcal, 0.01)
+        assertEquals(3.0, kept.protein, 0.01)
+
+        val given = MealItemReplacer.parse("```json\n{\"name\":\"chicken momos\",\"quantity\":8,\"unit\":\"piece\",\"calories\":360}\n```", momos)!!
+        assertEquals(8.0, given.qty, 0.0)
+        assertEquals(45.0, given.kcal, 0.01)
+
+        assertNull(MealItemReplacer.parse("not json", momos))
+        assertNull(MealItemReplacer.parse("""{"calories":100}""", momos))
     }
 }
