@@ -516,14 +516,14 @@ fun SettingsScreen(
                     )
 
                     Text(
-                        text = "Light, dark, or match your phone.",
+                        text = "Auto follows your phone's light or dark setting.",
                         fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
                     SegmentedPills(
                         options = listOf(
-                            ThemeConfig.MODE_SYSTEM to "Match my phone",
+                            ThemeConfig.MODE_SYSTEM to "Auto",
                             ThemeConfig.MODE_LIGHT to "Light",
                             ThemeConfig.MODE_DARK to "Dark"
                         ),
