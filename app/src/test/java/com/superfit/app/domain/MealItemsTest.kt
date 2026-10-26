@@ -299,4 +299,17 @@ class MealItemsTest {
         assertNull(MealItemReplacer.parse("not json", momos))
         assertNull(MealItemReplacer.parse("""{"calories":100}""", momos))
     }
+
+    @Test
+    fun `a replacement is found inside a list or a wrapper`() {
+        val poori = MealItem("poori", 1.0, "piece", 100.0, 2.0, 12.0, 5.0, 0.5, 4.0, 0.0)
+        val inList = MealItemReplacer.parse("""[{"name":"oats cheela","quantity":1,"unit":"piece","calories":150}]""", poori)!!
+        assertEquals("oats cheela", inList.name)
+        assertEquals(150.0, inList.kcal, 0.01)
+
+        val wrapped = MealItemReplacer.parse("""{"item":{"name":"oats cheela","quantity":null,"unit":"","calories":300}}""", poori)!!
+        assertEquals(1.0, wrapped.qty, 0.0)
+        assertEquals("piece", wrapped.unit)
+        assertEquals(300.0, wrapped.kcal, 0.01)
+    }
 }

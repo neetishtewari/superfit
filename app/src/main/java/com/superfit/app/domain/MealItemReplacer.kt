@@ -1,6 +1,8 @@
 package com.superfit.app.domain
 
+import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 
 /** Asks the AI for the numbers of one food the user says an item really was. */
 class MealItemReplacer {
@@ -28,14 +30,29 @@ class MealItemReplacer {
                 "\"oilG\": Double (grams of oil, ghee or butter added in cooking or serving it, 0 if none), " +
                 "\"sugarG\": Double (grams of added sugar, 0 if none)."
 
-        /** The new item, or null when the answer has no name or amount. */
+        /**
+         * The new item, or null when the answer has no food in it. The AI sometimes wraps the
+         * food in a list or under a key such as "item", and leaves out or blanks the amount.
+         */
         fun parse(response: String, old: MealItem): MealItem? {
             val cleaned = response.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-            val json = runCatching { JSONObject(cleaned) }.getOrNull() ?: return null
-            if (!json.has("quantity")) json.put("quantity", old.qty)
-            if (!json.has("unit")) json.put("unit", old.unit)
+            val json = findFood(runCatching { JSONTokener(cleaned).nextValue() }.getOrNull()) ?: return null
+            val qty = json.optDouble("quantity", Double.NaN)
+            if (qty.isNaN() || qty <= 0.0) json.put("quantity", old.qty)
+            if (json.optString("unit", "").isBlank()) json.put("unit", old.unit)
             json.remove("alternatives")
             return MealItems.itemFromGemini(json)
+        }
+
+        /** The first object with a name: the answer itself, or one inside a list or wrapper. */
+        private fun findFood(value: Any?): JSONObject? = when (value) {
+            is JSONObject -> if (value.optString("name", "").isNotBlank()) {
+                value
+            } else {
+                value.keys().asSequence().firstNotNullOfOrNull { findFood(value.opt(it)) }
+            }
+            is JSONArray -> (0 until value.length()).firstNotNullOfOrNull { findFood(value.opt(it)) }
+            else -> null
         }
     }
 }
