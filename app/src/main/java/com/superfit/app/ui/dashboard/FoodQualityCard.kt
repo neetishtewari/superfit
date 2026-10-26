@@ -200,7 +200,7 @@ fun FoodQualityCard(
 
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Tap to see each food ➔",
+                    text = "Tap to see each food",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = ElectricCyan
@@ -337,9 +337,9 @@ fun DietQualityDetailBottomSheet(
             ) {
                 Column {
                     val sheetTitle = when {
-                        metrics.distinctDaysLogged <= 1 -> "🥗 Today's Diet Quality Breakdown"
-                        metrics.distinctDaysLogged < 7 -> "🥗 ${metrics.distinctDaysLogged}-Day Diet Quality Breakdown"
-                        else -> "🥗 7-Day Diet Quality Breakdown"
+                        metrics.distinctDaysLogged <= 1 -> "Today's diet quality"
+                        metrics.distinctDaysLogged < 7 -> "Diet quality, last ${metrics.distinctDaysLogged} days"
+                        else -> "Diet quality, last 7 days"
                     }
                     val sheetSubtitle = when {
                         metrics.distinctDaysLogged <= 1 -> "Each food rated as a nutritionist would"
@@ -443,7 +443,7 @@ fun DietQualityDetailBottomSheet(
                         item {
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "💡 SMART FOOD SWAP RECOMMENDATIONS",
+                                text = "Easy swaps",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SuperfitTheme.colors.textTertiary,
@@ -539,7 +539,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "💡 Why: ${item.scoreRationale.ifBlank { item.actionRecommendation }}",
+                        text = "Why: ${item.scoreRationale.ifBlank { item.actionRecommendation }}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = actionColor,
@@ -681,7 +681,7 @@ fun FoodSwapCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "💡 Benefit: ${swap.benefitHighlight}",
+                text = "Benefit: ${swap.benefitHighlight}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = SuperfitTheme.colors.textSecondary

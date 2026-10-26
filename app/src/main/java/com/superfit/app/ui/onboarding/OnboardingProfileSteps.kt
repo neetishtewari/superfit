@@ -117,7 +117,7 @@ internal fun WelcomeStep(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "🌙 Dark Mode",
+                        text = "Dark",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
@@ -131,7 +131,7 @@ internal fun WelcomeStep(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "☀️ Light Mode",
+                        text = "Light",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
@@ -143,9 +143,9 @@ internal fun WelcomeStep(
 
     // Simplified High-Impact Bullet highlights
     Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-        FeatureItemBullet(icon = "🎙️", title = "Multilingual Voice Log", desc = "Speak naturally. Track macro entries in any Indian language.")
-        FeatureItemBullet(icon = "🔒", title = "100% On-Device Privacy", desc = "Your health telemetry stays strictly on your device.")
-        FeatureItemBullet(icon = "💸", title = "Free & Ad-Free", desc = "Full feature set with no paywalls or subscription barriers.")
+        FeatureItemBullet(icon = "🎙️", title = "Log by voice or photo", desc = "Say what you ate in your own words, or snap your plate.")
+        FeatureItemBullet(icon = "🔒", title = "Private by design", desc = "Your data is never sold or used for ads. Delete it any time.")
+        FeatureItemBullet(icon = "💸", title = "Free, no ads", desc = "Every feature, no paywall.")
     }
 
     Button(

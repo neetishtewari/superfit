@@ -52,7 +52,7 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "✨ What my AI coach knows",
+            text = "What my AI coach knows",
             fontWeight = FontWeight.Bold,
             color = SuperfitTheme.colors.textPrimary,
             fontSize = 14.sp

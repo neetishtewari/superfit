@@ -383,7 +383,7 @@ fun OnboardingScreen(
                 onDismissRequest = { showHeightHelper = false },
                 title = {
                     Text(
-                        text = "📏 Height Conversion Chart",
+                        text = "Height conversion chart",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = ThemeTextPrimary
@@ -438,7 +438,7 @@ fun OnboardingScreen(
                 onDismissRequest = { showTdeeHelper = false },
                 title = {
                     Text(
-                        text = "📊 What is TDEE?",
+                        text = "What you burn in a day",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = ThemeTextPrimary

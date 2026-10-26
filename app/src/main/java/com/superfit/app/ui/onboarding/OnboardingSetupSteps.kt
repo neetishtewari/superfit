@@ -90,7 +90,7 @@ internal fun HealthConnectStep(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = "💚", fontSize = 42.sp)
-        Text(text = "Health Connect Status", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ThemeTextPrimary)
+        Text(text = "Health Connect", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ThemeTextPrimary)
 
         val badgeColor = if (isHcSynced) NeonGreen else Color.Gray
         Box(
@@ -267,8 +267,8 @@ internal fun OnboardingSummaryStep(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ChecklistRow(label = "💚 Health Connect Integration", value = if (uiState.hasHealthConnectPermissions) "Active Sync" else "Not Configured", isOk = uiState.hasHealthConnectPermissions)
-            ChecklistRow(label = "✨ AI meal logging & coach", value = "Ready", isOk = true)
+            ChecklistRow(label = "Health Connect", value = if (uiState.hasHealthConnectPermissions) "Active Sync" else "Not Configured", isOk = uiState.hasHealthConnectPermissions)
+            ChecklistRow(label = "AI meal logging and coach", value = "Ready", isOk = true)
         }
     }
 

@@ -212,7 +212,7 @@ fun GoalProgressCard(
                 val paceStr = String.format("%.2f", metrics.weeklyPaceKg)
                 val paceLabel = if (metrics.weeklyPaceKg < 0) "$paceStr kg/week" else "+$paceStr kg/week"
                 Text(
-                    text = "⚡ Current Pace: $paceLabel",
+                    text = "Current pace: $paceLabel",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.secondary

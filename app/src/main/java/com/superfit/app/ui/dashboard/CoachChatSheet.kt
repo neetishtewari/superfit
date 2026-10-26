@@ -496,7 +496,7 @@ private fun ChatMessageRow(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp)
             ) {
-                Text("🔥 Share as a card", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Share as a card", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 
