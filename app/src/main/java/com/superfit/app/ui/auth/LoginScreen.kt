@@ -153,7 +153,7 @@ fun LoginScreen(
                 letterSpacing = 3.sp
             )
             Text(
-                text = "Cinematic Caloric & Biometric Ledger",
+                text = "Your AI coach for food and fitness",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = ElectricCyan,

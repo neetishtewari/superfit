@@ -88,8 +88,20 @@ data class MealItems(
     val itemsToCheck: Int get() = if (checked) 0 else items.count { it.isUnsure }
 
     /** The meal with item [index] swapped for a different food, keeping the rest as it is. */
-    fun replace(index: Int, item: MealItem): MealItems =
-        if (index !in items.indices) this else copy(items = items.toMutableList().also { it[index] = item.copy(choices = emptyList()) })
+    fun replace(index: Int, item: MealItem): MealItems = replace(index, listOf(item))
+
+    /** The meal with item [index] swapped for one or more foods ("chilla with chutney"). */
+    fun replace(index: Int, with: List<MealItem>): MealItems =
+        if (index !in items.indices || with.isEmpty()) {
+            this
+        } else {
+            copy(
+                items = items.toMutableList().also {
+                    it.removeAt(index)
+                    it.addAll(index, with.map { w -> w.copy(choices = emptyList()) })
+                }
+            )
+        }
 
     private val oilGrams: Double get() = items.sumOf { it.oilG * it.qty }
     private val sugarGrams: Double get() = items.sumOf { it.sugarG * it.qty }

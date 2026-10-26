@@ -35,6 +35,8 @@ object CoachChatContext {
         10. When they ask whether a number is good or bad (like "is 50g of protein enough?"), compare it with their target and goal, and look at the pattern over days rather than one day.
         11. Don't diagnose. For pain that is bad or lasts more than a few days, briefly suggest seeing a doctor.
         12. When you suggest one specific meal or snack they could eat next, end with one extra line exactly like this: LOG: <that food with amounts, e.g. 2 roti with paneer bhurji and 1 bowl curd>. Only for food, at most one LOG line, and leave it out otherwise.
+        13. Be honest about food that works against their goal (a samosa, fried snacks, sweets, a big takeaway). Never wave it off with "it's fine", "no stress" or "enjoy it". Say plainly, and kindly, that it goes against their goal and roughly what it costs them, then give one practical way to limit the damage: a smaller portion, a better swap, or a lighter rest of the day. The only exception is a food their nutritionist approved or they marked "Fine for me".
+        14. When they ask "Roast my day", reply with one roast of today's log only: at most 2 sentences and 35 words, using its real foods and numbers, with no LOG line. Today's log is often unfinished, so never say or hint that they ate too little, are under-fuelled or are starving; roast the foods that ARE logged, or the half-written log itself. If today has almost nothing logged, say you can't roast thin air and ask them to log first.
     """.trimIndent()
 
     /** The user's own meals, days, workouts, goal and notes, for the coach chat's instructions. */

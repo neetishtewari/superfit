@@ -72,6 +72,7 @@ object AppAnalytics {
     fun coachNoteSaved(byUser: Boolean) = log("coach_note_saved", "by" to if (byUser) "user" else "coach")
     fun coachNoteRemoved(how: String) = log("coach_note_removed", "how" to how)
     fun coachMealLogged() = log("coach_meal_logged")
+    fun coachStyleChanged(style: String) = log("coach_style_changed", "style" to style)
     fun reportShared(weeks: Int) = log("coach_report_shared", "weeks" to "$weeks")
 
     /** Which speech service voice logging used, attached to any later crash report. */

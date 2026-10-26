@@ -637,8 +637,8 @@ object CoachPatternEngine {
                     kind = FindingKind.CONCERN,
                     priority = 55,
                     fact = "${everyWeek.replaceFirstChar { it.uppercase() }} came up every week for the last 3 weeks.",
-                    meaning = "Once a week is fine on its own, but it's worth noticing that it has become a fixed part of your week.",
-                    suggestion = "If it's a planned weekly treat, enjoy it. If it's a default, try a swap one week."
+                    meaning = "It has become a fixed part of your week, and every week it slows your progress towards your goal.",
+                    suggestion = "Try a smaller portion or a lighter swap one week, and see how much you miss it."
                 )
             }
         }

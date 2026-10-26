@@ -29,7 +29,9 @@ sealed interface ShareCard {
         override val dateLine: String,
         val streakDays: Int,
         val tiles: List<CardStat>,
-        val coachLine: String?
+        val coachLine: String?,
+        // "Roast my day": the coach line is the AI coach's roast of the day.
+        val roast: Boolean = false
     ) : ShareCard
 
     data class Activity(
@@ -207,5 +209,27 @@ object ShareCards {
     private fun pace(secondsPerKm: Long): String = String.format(Locale.US, "%d:%02d", secondsPerKm / 60, secondsPerKm % 60)
 
     /** The coach writes **bold**; a picture shows plain text. */
+
+    /** The daily card with the AI coach's "Roast my day" line in place of the coach line. */
+    fun roast(daily: ShareCard.Daily, line: String): ShareCard.Daily =
+        daily.copy(coachLine = fitRoast(plain(line)).takeIf { it.isNotBlank() }, roast = true)
+
+    /** About six lines on the card. */
+    const val ROAST_MAX = 180
+
+    /** Whole sentences that fit in [ROAST_MAX]; a first sentence that's too long is cut at a word. */
+    fun fitRoast(text: String): String {
+        if (text.length <= ROAST_MAX) return text
+        val sentences = Regex("""(?<=[.!?])\s+""").split(text)
+        val kept = StringBuilder()
+        for (s in sentences) {
+            val next = if (kept.isEmpty()) s else "$kept $s"
+            if (next.length > ROAST_MAX) break
+            kept.clear().append(next)
+        }
+        if (kept.isNotEmpty()) return kept.toString()
+        return text.take(ROAST_MAX - 1).substringBeforeLast(' ').trimEnd(',', ';', ':', '-', '—') + "…"
+    }
+
     private fun plain(text: String): String = text.replace("**", "").trim()
 }

@@ -38,6 +38,31 @@ class ShareCardsTest {
     }
 
     @Test
+    fun roastMyDayReplacesTheCoachLineAndKeepsTheTiles() {
+        val day = ShareCards.daily(
+            today, streakDays = 3, mealsToday = 2, proteinEatenG = 48.0, proteinGoalG = 105.0,
+            dietScore = null, steps = 3100, workout = null, coachLine = "Protein is short."
+        )
+        val card = ShareCards.roast(day, "Two samosas **and** a gulab jamun. Bold.")
+        assertTrue(card.roast)
+        assertEquals("Two samosas and a gulab jamun. Bold.", card.coachLine)
+        assertEquals(day.tiles, card.tiles)
+        val long = ShareCards.roast(day, "word ".repeat(80)).coachLine.orEmpty()
+        assertTrue(long.length <= ShareCards.ROAST_MAX && long.endsWith("…"))
+        assertTrue(!day.roast)
+    }
+
+    @Test
+    fun aLongRoastKeepsWholeSentences() {
+        val first = "I can't roast thin air, and your food log is currently an empty void."
+        val second = "You've managed to burn over 300 active calories today, but the one lonely puri you logged at lunch is doing all of the heavy lifting."
+        val third = "Bold."
+        val fitted = ShareCards.fitRoast("$first $second $third")
+        assertEquals(first, fitted)
+        assertEquals("$first $third", ShareCards.fitRoast("$first $third"))
+    }
+
+    @Test
     fun blankRestDayLeavesTilesOutInsteadOfZeros() {
         val card = ShareCards.daily(
             today, streakDays = 4, mealsToday = 0, proteinEatenG = 0.0, proteinGoalG = 140.0,

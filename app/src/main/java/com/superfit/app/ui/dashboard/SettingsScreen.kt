@@ -564,7 +564,9 @@ fun SettingsScreen(
                         RoundedCornerShape(20.dp)
                     )
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    CoachStyleSettings(viewModel)
+                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
                     CoachMemorySettings(viewModel)
                 }
             }

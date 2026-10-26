@@ -129,6 +129,7 @@ class DashboardViewModel(
     init {
         com.superfit.app.data.BodyImporter.load(appContext)
         com.superfit.app.data.NutritionAdviceStore.load(appContext)
+        com.superfit.app.data.CoachStyleStore.load(appContext)
         _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
         checkPermissions()
         loadCachedCoachingInsight()
@@ -234,7 +235,7 @@ class DashboardViewModel(
             proteinStillNeeded = state?.let { (it.macroTargets.proteinG - it.proteinEaten).toInt() } ?: 0,
             workedOutToday = state != null && (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()),
             hasTodayTip = _coachingState.value is CoachingInsightState.Success
-        )
+        ).let { if (_coachStyle.value == com.superfit.app.domain.CoachStyle.ROAST) listOf(ROAST_MY_DAY) + it else it }
     }
 
     /**
@@ -340,6 +341,18 @@ class DashboardViewModel(
         saveCoachNotes(restored)
         AppAnalytics.coachNoteRemoved("undo")
         updateChatEntry(entryId) { it.copy(rememberedIds = emptyList(), forgotten = emptyList()) }
+    }
+
+    private val _coachStyle = MutableStateFlow(com.superfit.app.domain.CoachStyle.current)
+    val coachStyle: StateFlow<com.superfit.app.domain.CoachStyle> = _coachStyle.asStateFlow()
+
+    /** Saves the AI coach style and rewrites today's tip in it, if there is one. */
+    fun setCoachStyle(style: com.superfit.app.domain.CoachStyle) {
+        if (style == _coachStyle.value) return
+        com.superfit.app.data.CoachStyleStore.save(appContext, style)
+        _coachStyle.value = style
+        AppAnalytics.coachStyleChanged(style.name)
+        if (_coachingState.value is CoachingInsightState.Success) refreshCoachingInsight()
     }
 
     fun deleteCoachNote(id: String) {
@@ -455,7 +468,7 @@ class DashboardViewModel(
             earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
         )
 
-        return listOf(live, personal, CoachingEngine.chatContext(report).trim(), com.superfit.app.domain.CoachChatContext.RULES)
+        return listOf(live, personal, CoachingEngine.chatContext(report).trim(), com.superfit.app.domain.CoachChatContext.RULES + com.superfit.app.domain.CoachStyle.current.instruction())
             .joinToString("\n\n")
     }
 
@@ -1217,6 +1230,9 @@ class DashboardViewModel(
     }
 
     companion object {
+        /** First chat chip in Roast me style. */
+        const val ROAST_MY_DAY = "Roast my day"
+
         /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
         private const val BACKFILL_KEY = "meal_tag_backfill_date_v3"
         private const val RERATE_DAYS = 14L

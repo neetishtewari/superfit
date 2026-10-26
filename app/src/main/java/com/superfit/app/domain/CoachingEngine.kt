@@ -97,7 +97,7 @@ class CoachingEngine {
         return try {
             val response = GeminiClient.generateContent(
                 prompt = prompt,
-                systemInstructionText = SYSTEM_INSTRUCTION,
+                systemInstructionText = SYSTEM_INSTRUCTION + CoachStyle.current.instruction(),
                 isJson = true
             )
             parseResponse(response, focus, why)
@@ -123,6 +123,7 @@ class CoachingEngine {
             7. Avoid jargon such as bioavailable, thermic, macronutrients, glycemic, telemetry.
             8. The action is one concrete thing for the rest of today, or for tomorrow if it's after 9 PM. Prefer foods the user already eats.
             9. Respect what you know about the user: never suggest something an injury, dislike or diet day rules out, and adapt the action instead (a walk instead of a run for a sore knee).
+            10. Be kind but honest. Never tell the user a treat or fried food is fine or nothing to worry about when it works against their goal; say so gently and give the better option.
 
             Reply with JSON only, in this exact shape:
             {"headline": "1 or 2 sentences, at most 40 words, may put one key phrase in **bold**", "action": "one sentence, at most 25 words, no bold"}

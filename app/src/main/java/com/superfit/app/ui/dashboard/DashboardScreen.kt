@@ -633,9 +633,15 @@ fun DashboardScreen(
         }
 
         if (showChatBottomSheet && dashboardState is DashboardUiState.Success) {
+            val dayState = dashboardState as DashboardUiState.Success
             CoachChatSheet(
                 viewModel = viewModel,
-                onDismiss = { showChatBottomSheet = false }
+                onDismiss = { showChatBottomSheet = false },
+                // Only a day with meals logged can be roasted on a card.
+                onShareRoast = { line: String ->
+                    showChatBottomSheet = false
+                    shareCard = com.superfit.app.domain.ShareCards.roast(dailyShareCard(dayState, coachingState), line)
+                }.takeIf { dayState.nutritionList.isNotEmpty() }
             )
         }
     }
