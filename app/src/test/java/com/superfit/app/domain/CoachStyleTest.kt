@@ -25,4 +25,11 @@ class CoachStyleTest {
         assertTrue(roast.contains("disordered eating"))
         assertTrue(roast.contains("accurate, safe and useful"))
     }
+
+    @Test
+    fun roastReminderRotatesAndShowsTheNumbers() {
+        val lines = (0..2).map { CoachStyle.ROAST.logReminder(800, 2000, it) }
+        assertEquals(3, lines.toSet().size)
+        lines.forEach { (_, text) -> assertTrue(text.contains("800") && text.contains("2000")) }
+    }
 }

@@ -34,6 +34,40 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
         """
     );
 
+    /** Title of the evening notification that carries the AI coach's daily tip. */
+    fun tipTitle(): String = when (this) {
+        ROAST -> "🔥 Your AI coach has notes"
+        else -> "⚡ Your AI coach"
+    }
+
+    /** The evening reminder when today's log looks unfinished. [day] picks one of a few lines so it doesn't repeat. */
+    fun logReminder(logged: Int, target: Int, day: Int): Pair<String, String> = when (this) {
+        SUPPORTIVE ->
+            "📝 Complete your food log?" to
+                "You've logged $logged / $target kcal today. Did you forget to log a meal?"
+        STRAIGHT ->
+            "📝 Your log is unfinished" to
+                "$logged / $target kcal logged. Log the rest of today's meals now, it takes a minute."
+        ROAST -> listOf(
+            "🔥 Your food log is half-written" to
+                "$logged / $target kcal logged. I'm a coach, not a mind reader. The rest of today's meals, please.",
+            "🔥 Your food log called" to
+                "It says it's been ghosted at $logged / $target kcal. Those snacks don't log themselves, sadly.",
+            "🔥 Plot hole in your log" to
+                "Your log stops at $logged / $target kcal, like a series cancelled mid-season. Finish the story, champ."
+        )[Math.floorMod(day, 3)]
+    }
+
+    /** Shown when the day's log is complete but the AI tip couldn't be written. */
+    fun completeDayFallback(logged: Int): Pair<String, String> = when (this) {
+        ROAST ->
+            "🔥 Look who logged everything" to
+                "All $logged kcal accounted for. I'm almost proud. Now go to bed on time and really shock me."
+        else ->
+            "⚡ Daily log complete" to
+                "You've logged your whole day ($logged kcal). Prioritise sleep tonight for recovery."
+    }
+
     /** Lines added to an AI coach instruction; empty for the default style. */
     fun instruction(): String = voice.trimIndent().takeIf { it.isNotEmpty() }
         ?.let { "\nTONE (this overrides any other tone described above):\n$it" }

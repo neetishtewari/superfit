@@ -8,6 +8,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerParameters
+import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.MacroTargets
 import com.superfit.app.domain.PhysiologyEngine
@@ -24,6 +25,7 @@ class DailyReminderWorker(
 
     override suspend fun doWork(): Result {
         val sharedPrefs = getUserSharedPrefs(applicationContext)
+        CoachStyleStore.load(applicationContext)
         try {
             remind(sharedPrefs)
         } catch (e: CancellationException) {
@@ -88,10 +90,8 @@ class DailyReminderWorker(
         // 3. Decide notification style:
         // Under-logged if total calories is less than 75% of target
         if (totalCalories < 0.75 * targetCalories) {
-            sendNotification(
-                title = "📝 Complete your food log?",
-                text = "You've logged ${totalCalories.toInt()} / ${targetCalories.toInt()} kcal today. Did you forget to log a meal?"
-            )
+            val (title, text) = CoachStyle.current.logReminder(totalCalories.toInt(), targetCalories.toInt(), today.dayOfYear)
+            sendNotification(title = title, text = text)
         } else {
             // Log is complete -> Send Daily AI Coaching Summary
             try {
@@ -132,15 +132,13 @@ class DailyReminderWorker(
                 CoachInsightStore.save(sharedPrefs, today, insight)
 
                 sendNotification(
-                    title = "⚡ Your coach",
+                    title = CoachStyle.current.tipTitle(),
                     text = insight.asText().replace("**", "")
                 )
             } catch (e: Exception) {
                 android.util.Log.e("DailyReminderWorker", "AI Coaching notification generation failed", e)
-                sendNotification(
-                    title = "⚡ Daily Focus Complete",
-                    text = "You've successfully hit your calorie targets today (${totalCalories.toInt()} kcal)! Prioritize sleep tonight for recovery."
-                )
+                val (title, text) = CoachStyle.current.completeDayFallback(totalCalories.toInt())
+                sendNotification(title = title, text = text)
             }
         }
     }
