@@ -429,7 +429,7 @@ fun JourneyTab(
         if (j.slowing.isNotEmpty()) {
             SectionCard {
                 SectionLabel("What's slowing you down", SolarAmber)
-                j.slowing.forEach { InsightRow(it) }
+                j.slowing.forEach { InsightRow(it, SolarAmber) }
             }
         }
 
