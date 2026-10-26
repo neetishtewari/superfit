@@ -99,6 +99,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
     var accent by remember(card) { mutableStateOf(defaultAccent(card)) }
+    var light by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     // The user's photo lives only in memory while the sheet is open; it is never saved or uploaded.
     var photo by remember(card) { mutableStateOf<ImageBitmap?>(null) }
@@ -132,7 +133,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CapturableCard(card, accent, photo, layer, Modifier.fillMaxWidth(0.7f))
+            CapturableCard(card, accent, photo, light, layer, Modifier.fillMaxWidth(0.7f))
             if (card !is ShareCard.Daily) {
                 if (photo == null) {
                     OutlinedButton(
@@ -148,6 +149,29 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                         Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Remove photo")
+                    }
+                }
+            }
+            if (photo == null) {
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(50))
+                ) {
+                    listOf(false to "Dark", true to "Light").forEach { (isLight, label) ->
+                        val picked = light == isLight
+                        Text(
+                            label,
+                            color = if (picked) Color.Black else SuperfitTheme.colors.textPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(if (picked) accent else Color.Transparent)
+                                .clickable { light = isLight }
+                                .semantics { contentDescription = "$label background${if (picked) ", chosen" else ""}" }
+                                .padding(horizontal = 18.dp, vertical = 8.dp)
+                        )
                     }
                 }
             }
@@ -205,7 +229,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
  * picture is always 1080 x 1920 whatever the phone's screen.
  */
 @Composable
-private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, layer: GraphicsLayer, modifier: Modifier) {
+private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, light: Boolean, layer: GraphicsLayer, modifier: Modifier) {
     BoxWithConstraints(modifier) {
         val widthPx = constraints.maxWidth
         val scale = widthPx / CARD_WIDTH_PX.toFloat()
@@ -231,7 +255,7 @@ private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, 
                 }
         ) {
             CompositionLocalProvider(LocalDensity provides CardDensity) {
-                ShareCardView(card, accent, photo = photo)
+                ShareCardView(card, accent, photo = photo, light = light)
             }
         }
     }

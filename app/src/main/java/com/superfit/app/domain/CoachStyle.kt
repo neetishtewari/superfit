@@ -28,6 +28,7 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
             Hard limits, never broken:
             - Roast choices and habits, never the person. Never joke about their body, shape, weight, looks or identity.
             - No swearing, slurs or genuinely hurtful insults.
+            - Never joke that they eat too little or skip meals. A short log means they haven't finished logging.
             - If they mention an injury, pain, illness, low mood, stress, or anything that sounds like disordered eating,
               drop the act completely for that and answer kindly and seriously.
             - The numbers and the advice must stay accurate, safe and useful. The joke is the wrapping, not the content.

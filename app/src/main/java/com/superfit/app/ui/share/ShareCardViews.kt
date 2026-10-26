@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,14 +54,50 @@ import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
 
 // The share cards always use their own dark look, whatever theme the app is in.
-private val CardBackground = Color(0xFF0D0D14)
-private val TileBackground = Color(0xFF181824)
-private val Divider = Color(0xFF2A2A3A)
-private val TextMain = Color(0xFFF4F4F8)
-private val TextSoft = Color(0xFFA8A8BC)
-private val TextDate = Color(0xFFC8C8D8)
-private val BadgeBackground = Color(0xFF1E1E2C)
-private val BadgeBorder = Color(0xFF34344A)
+/** The card's own colours: dark (the default) or light, picked on the share sheet. */
+private class CardPalette(
+    val background: Color,
+    val tile: Color,
+    val divider: Color,
+    val textMain: Color,
+    val textSoft: Color,
+    val textDate: Color,
+    val badgeBackground: Color,
+    val badgeBorder: Color
+)
+
+private val DarkCard = CardPalette(
+    background = Color(0xFF0D0D14),
+    tile = Color(0xFF181824),
+    divider = Color(0xFF2A2A3A),
+    textMain = Color(0xFFF4F4F8),
+    textSoft = Color(0xFFA8A8BC),
+    textDate = Color(0xFFC8C8D8),
+    badgeBackground = Color(0xFF1E1E2C),
+    badgeBorder = Color(0xFF34344A)
+)
+
+private val LightCard = CardPalette(
+    background = Color(0xFFF6F6F9),
+    tile = Color(0xFFFFFFFF),
+    divider = Color(0xFFDDDDE6),
+    textMain = Color(0xFF14141C),
+    textSoft = Color(0xFF5E5E70),
+    textDate = Color(0xFF3F3F50),
+    badgeBackground = Color(0xFFFFFFFF),
+    badgeBorder = Color(0xFFDDDDE6)
+)
+
+private val LocalCardPalette = staticCompositionLocalOf { DarkCard }
+
+private val CardBackground: Color @Composable get() = LocalCardPalette.current.background
+private val TileBackground: Color @Composable get() = LocalCardPalette.current.tile
+private val Divider: Color @Composable get() = LocalCardPalette.current.divider
+private val TextMain: Color @Composable get() = LocalCardPalette.current.textMain
+private val TextSoft: Color @Composable get() = LocalCardPalette.current.textSoft
+private val TextDate: Color @Composable get() = LocalCardPalette.current.textDate
+private val BadgeBackground: Color @Composable get() = LocalCardPalette.current.badgeBackground
+private val BadgeBorder: Color @Composable get() = LocalCardPalette.current.badgeBorder
 
 /** The colours the user can pick in the preview. */
 val CardAccents = listOf(NeonMint, ElectricCyan, HyperViolet, SolarAmber)
@@ -69,12 +107,19 @@ fun defaultAccent(card: ShareCard): Color = if (card is ShareCard.Best) HyperVio
 
 /** A share card, laid out at 360 x 640 dp (Story size, 9:16). */
 @Composable
-fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier, photo: ImageBitmap? = null) {
+fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier, photo: ImageBitmap? = null, light: Boolean = false) {
     // The daily card has no photo option; workout and personal-best cards can sit on the user's photo.
     if (photo != null && card !is ShareCard.Daily) {
         PhotoCardView(card, accent, photo, modifier)
         return
     }
+    CompositionLocalProvider(LocalCardPalette provides if (light) LightCard else DarkCard) {
+        PlainCardView(card, accent, modifier)
+    }
+}
+
+@Composable
+private fun PlainCardView(card: ShareCard, accent: Color, modifier: Modifier) {
     Box(
         modifier = modifier
             .size(360.dp, 640.dp)
@@ -186,7 +231,8 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
     }
     Spacer(Modifier.height(16.dp))
     // Tiles left out (no meals, rest day) close up, so there are never empty boxes.
-    card.tiles.chunked(2).forEach { row ->
+    // A roast needs the room: one row of tiles, then the roast.
+    (if (card.roast && card.coachLine != null) card.tiles.take(2) else card.tiles).chunked(2).forEach { row ->
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             row.forEach { stat ->
                 DailyTile(stat, barColor = if (stat.label == "PROTEIN") accent else secondBar(accent), modifier = Modifier.weight(1f))
@@ -207,7 +253,11 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
         if (card.roast) {
             Text("🔥 ROAST MY DAY", color = SolarAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
-            Text(line, color = TextMain, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, maxLines = 6, overflow = TextOverflow.Ellipsis)
+            // Takes the space left above the footer, so a long roast is shortened instead of pushing the footer off.
+            Box(Modifier.weight(1f)) {
+                Text(line, color = TextMain, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, maxLines = 7, overflow = TextOverflow.Ellipsis)
+            }
+            return
         } else {
             Text("COACH", color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
