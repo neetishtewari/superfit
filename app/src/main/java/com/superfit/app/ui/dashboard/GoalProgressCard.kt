@@ -124,7 +124,7 @@ fun GoalProgressCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         text = "${String.format("%.1f", metrics.currentWeightKg)} kg",
                         fontSize = 28.sp,
@@ -134,7 +134,7 @@ fun GoalProgressCard(
                     val changePrefix = if (metrics.totalWeightChangeKg <= 0) "" else "+"
                     val changeLabel = "${changePrefix}${String.format("%.1f", metrics.totalWeightChangeKg)} kg total"
                     Text(
-                        text = "Last Known Weight ($changeLabel)",
+                        text = "Last weight ($changeLabel)",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -145,7 +145,7 @@ fun GoalProgressCard(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "${metrics.progressPercentage}% Goal",
+                        text = "${metrics.progressPercentage}% of goal",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,

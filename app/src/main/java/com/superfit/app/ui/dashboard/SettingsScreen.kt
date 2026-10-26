@@ -287,7 +287,7 @@ fun SettingsScreen(
                                 containerColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f) else NeonMint,
                                 contentColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary else Color.White
                             ),
-                            modifier = Modifier.weight(1f).height(36.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
@@ -303,7 +303,7 @@ fun SettingsScreen(
                                 containerColor = ElectricCyan.copy(alpha = 0.15f),
                                 contentColor = ElectricCyan
                             ),
-                            modifier = Modifier.weight(1f).height(36.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
@@ -792,7 +792,7 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(40.dp),
+                                .heightIn(min = 40.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
@@ -865,7 +865,7 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
+                            .heightIn(min = 40.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
@@ -883,7 +883,7 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
+                            .heightIn(min = 40.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(

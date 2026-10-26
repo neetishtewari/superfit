@@ -93,8 +93,8 @@ fun ConcentricActivityRings(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = this.center
-            val strokeWidth = 12.dp.toPx()
-            val spacing = 12.dp.toPx()
+            val strokeWidth = 10.dp.toPx()
+            val spacing = 6.dp.toPx()
 
             val radius1 = (size.minDimension / 2) - strokeWidth
             val radius2 = radius1 - strokeWidth - spacing
@@ -159,16 +159,23 @@ fun ConcentricActivityRings(
 
         // Over the target reads as "230 kcal over" in amber, never "-230 kcal left".
         val over = caloriesRemaining < 0
+        // Sized to the ring, not the phone's font size, so the number always sits inside it.
+        val density = androidx.compose.ui.platform.LocalDensity.current
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = java.text.NumberFormat.getIntegerInstance().format(kotlin.math.abs(caloriesRemaining)),
                 color = if (over) ThemeErrorColor else ThemeTextPrimary,
-                style = MaterialTheme.typography.displaySmall
+                style = MaterialTheme.typography.headlineSmall,
+                fontSize = with(density) { 24.dp.toSp() },
+                lineHeight = with(density) { 28.dp.toSp() },
+                maxLines = 1
             )
             Text(
                 text = if (over) "kcal over" else "kcal left",
                 color = if (over) ThemeErrorColor else ThemeTextSecondary,
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = with(density) { 12.dp.toSp() },
+                maxLines = 1
             )
         }
     }
@@ -200,7 +207,8 @@ fun RingLegendItem(
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleSmall,
-                color = ThemeTextPrimary
+                color = ThemeTextPrimary,
+                maxLines = 1
             )
         }
     }

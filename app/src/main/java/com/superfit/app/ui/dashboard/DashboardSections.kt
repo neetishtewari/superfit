@@ -98,27 +98,21 @@ internal fun DashboardHeader(
     // Only point at Settings when Health Connect needs attention.
     val needsHealthConnect = grantedPermissions.isNotEmpty() && !hasHealthConnectPermissions
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+    // Date and the two buttons share the top line, so the greeting gets the full width under them.
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text(
                 text = dateText,
                 style = MaterialTheme.typography.labelLarge,
-                color = ThemeTextSecondary
+                color = ThemeTextSecondary,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
-            Text(
-                text = greeting,
-                style = MaterialTheme.typography.headlineMedium,
-                color = ThemeTextPrimary
-            )
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HeaderNavButton(icon = Icons.Default.Insights, label = "Insights", onClick = onNavigateToHistory)
             Box {
                 HeaderNavButton(icon = Icons.Default.Settings, label = "Settings", onClick = onNavigateToSettings)
@@ -126,7 +120,7 @@ internal fun DashboardHeader(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(6.dp)
+                            .padding(4.dp)
                             .size(10.dp)
                             .clip(CircleShape)
                             .background(ThemeErrorColor)
@@ -134,23 +128,29 @@ internal fun DashboardHeader(
                 }
             }
         }
+        Text(
+            text = greeting,
+            style = MaterialTheme.typography.headlineMedium,
+            color = ThemeTextPrimary,
+            maxLines = 1
+        )
     }
 }
 
 @Composable
 private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Column(
+    Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(50))
             .background(ThemeCardBg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .widthIn(min = 56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .heightIn(min = 40.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = ThemeTextPrimary, modifier = Modifier.size(22.dp))
-        Text(text = label, style = MaterialTheme.typography.labelMedium, color = ThemeTextSecondary)
+        Icon(imageVector = icon, contentDescription = null, tint = ThemeTextPrimary, modifier = Modifier.size(18.dp))
+        Text(text = label, style = MaterialTheme.typography.labelLarge, color = ThemeTextPrimary, maxLines = 1)
     }
 }
 
@@ -177,7 +177,7 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                 .fillMaxWidth()
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             val stepsTarget = 10000.0
             val caloriesTarget = state.macroTargets.calories
@@ -190,7 +190,7 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                 caloriesEatenProgress = caloriesProgress,
                 stepsProgress = stepsProgress,
                 caloriesRemaining = caloriesRemaining,
-                modifier = Modifier.size(160.dp)
+                modifier = Modifier.size(150.dp)
             )
 
             Column(
@@ -199,8 +199,8 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
             ) {
                 val fmt = java.text.NumberFormat.getIntegerInstance()
                 RingLegendItem(
-                    label = "Eaten",
-                    value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())} kcal",
+                    label = "Eaten, kcal",
+                    value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
                     color = NeonGreen
                 )
                 RingLegendItem(
@@ -487,7 +487,7 @@ internal fun CoachInsightsCard(
                             contentColor = EnergeticCoral
                         ),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.heightIn(min = 32.dp)
                     ) {
                         Text(
                             text = "Try again",
@@ -680,7 +680,7 @@ internal fun TrackMealsCard(
                             contentColor = EnergeticCoral
                         ),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.heightIn(min = 32.dp)
                     ) {
                         Text(
                             text = "Try again",

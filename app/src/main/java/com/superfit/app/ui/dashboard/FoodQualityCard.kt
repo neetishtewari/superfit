@@ -335,7 +335,7 @@ fun DietQualityDetailBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     val sheetTitle = when {
                         metrics.distinctDaysLogged <= 1 -> "Today's diet quality"
                         metrics.distinctDaysLogged < 7 -> "Diet quality, last ${metrics.distinctDaysLogged} days"
