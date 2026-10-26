@@ -518,11 +518,11 @@ internal fun CoachInsightsCard(
                     onClick = onRoast,
                     colors = ButtonDefaults.buttonColors(containerColor = SolarAmber, contentColor = Color.White),
                     shape = RoundedCornerShape(50),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Icon(Icons.Default.LocalFireDepartment, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Roast my day", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                    Icon(Icons.Default.LocalFireDepartment, contentDescription = "Roast my day", modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Roast", style = MaterialTheme.typography.labelLarge, maxLines = 1)
                 }
             }
         }
