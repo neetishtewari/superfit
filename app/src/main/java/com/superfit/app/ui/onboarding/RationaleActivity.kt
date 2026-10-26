@@ -131,7 +131,7 @@ fun RationaleScreen(
                         color = textPrimary
                     )
                     Text(
-                        text = "To build a complete physiological ledger, Superfit reads specific health statistics. This allows Superfit's AI coach (powered by Google Gemini) to adjust your daily target macronutrients based on real-time activity and sleep telemetry.",
+                        text = "To see the full picture of your day, Superfit reads specific health statistics. This allows Superfit's AI coach (powered by Google Gemini) to adjust your daily target macronutrients based on real-time activity and sleep telemetry.",
                         fontSize = 14.sp,
                         color = textSecondary,
                         lineHeight = 20.sp

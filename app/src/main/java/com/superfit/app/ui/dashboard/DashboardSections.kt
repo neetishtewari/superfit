@@ -262,7 +262,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Daily Nutrient Ledger",
+            text = "Today's Nutrients",
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
             color = ThemeTextPrimary
@@ -735,7 +735,7 @@ internal fun TrackMealsCard(
 
         // Meals logged today list
         Text(
-            text = "Today's Ledger Entries",
+            text = "Today's Meals",
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
             color = ThemeTextPrimary

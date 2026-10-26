@@ -117,6 +117,24 @@ class SpeechRecognizerHelper(
 
     private fun fullText(): String = (heardSegments + listOfNotNull(partial)).joinToString(" ").trim()
 
+    /**
+     * Finishes [FINISH_SILENCE_MS] after the last word. Without this the session waited for the
+     * speech service's own "no speech" timeout after each pause, which took 5 to 10 seconds.
+     */
+    private val silenceCheck = object : Runnable {
+        override fun run() {
+            if (!active || stopRequested || fullText().isBlank()) return
+            val quietFor = SystemClock.elapsedRealtime() - lastSpeechAt
+            if (quietFor >= FINISH_SILENCE_MS) finishWithText() else handler.postDelayed(this, FINISH_SILENCE_MS - quietFor)
+        }
+    }
+
+    private fun heardSpeech() {
+        lastSpeechAt = SystemClock.elapsedRealtime()
+        handler.removeCallbacks(silenceCheck)
+        handler.postDelayed(silenceCheck, FINISH_SILENCE_MS)
+    }
+
     private fun createRecognizer(): SpeechRecognizer {
         val app = context.applicationContext
         val google = if (useGoogleService) googleRecognitionService(app) else null
@@ -132,7 +150,7 @@ class SpeechRecognizerHelper(
             }
 
             override fun onBeginningOfSpeech() {
-                lastSpeechAt = SystemClock.elapsedRealtime()
+                heardSpeech()
             }
 
             override fun onRmsChanged(rmsdB: Float) {}
@@ -192,10 +210,12 @@ class SpeechRecognizerHelper(
                     ?.firstOrNull()
                     ?.takeIf { it.isNotBlank() }
                     ?: partial
+                // Services that send live words already timed the silence from the last one.
+                val hadLiveWords = partial != null
                 partial = null
                 if (!text.isNullOrBlank()) {
                     heardSegments += text
-                    lastSpeechAt = SystemClock.elapsedRealtime()
+                    if (!hadLiveWords) heardSpeech()
                     onLiveText(fullText())
                 }
                 if (!stopRequested && withinLimits()) {
@@ -216,7 +236,7 @@ class SpeechRecognizerHelper(
                     ?.takeIf { it.isNotBlank() }
                     ?.let {
                         partial = it
-                        lastSpeechAt = SystemClock.elapsedRealtime()
+                        heardSpeech()
                         onLiveText(fullText())
                     }
             }
@@ -242,8 +262,8 @@ class SpeechRecognizerHelper(
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 // Allow natural pauses before a stretch ends. Many services ignore these, which is
                 // why the session restarts listening after each stretch anyway.
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, FINISH_SILENCE_MS)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
             }
             recognizer.startListening(intent)
         } catch (e: Exception) {
@@ -323,13 +343,13 @@ class SpeechRecognizerHelper(
 
     companion object {
         /** Finish by itself after this long without hearing anything new. */
-        private const val FINISH_SILENCE_MS = 2_500L
+        private const val FINISH_SILENCE_MS = 2_000L
 
         /** Safety net for a session left running. */
         private const val MAX_SESSION_MS = 60_000L
 
         /** How long to wait for final words after Stop before logging what we have. */
-        private const val STOP_GRACE_MS = 2_500L
+        private const val STOP_GRACE_MS = 1_500L
 
         /** Ordinary silence outcomes, not worth a crash report. */
         private val SILENCE_ERRORS = setOf(
