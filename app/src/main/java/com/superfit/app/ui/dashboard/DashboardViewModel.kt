@@ -347,18 +347,12 @@ class DashboardViewModel(
         AppAnalytics.coachNoteRemoved("settings")
     }
 
+    /** Adds what the user typed or pasted in Settings; each line becomes its own note. */
     fun addCoachNote(text: String) {
-        val clean = text.trim().take(com.superfit.app.domain.CoachNotes.MAX_TEXT)
-        if (clean.isEmpty()) return
-        val note = com.superfit.app.domain.CoachNote(
-            id = com.superfit.app.domain.CoachNotes.newId(System.currentTimeMillis(), 0),
-            text = clean,
-            kind = com.superfit.app.domain.NoteKind.LASTING,
-            added = LocalDate.now(),
-            byUser = true
-        )
-        saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(listOf(note), emptyList())))
-        AppAnalytics.coachNoteSaved(byUser = true)
+        val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now(), System.currentTimeMillis())
+        if (notes.isEmpty()) return
+        saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(notes, emptyList())))
+        notes.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = true) }
     }
 
     /** "Log this" under a coach reply: the suggested meal goes through the normal meal log. */

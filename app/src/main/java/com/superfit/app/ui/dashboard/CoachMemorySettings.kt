@@ -72,16 +72,21 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
         active.forEach { note ->
             NoteRow(note = note, today = today, onRemove = { viewModel.deleteCoachNote(note.id) })
         }
+        Text(
+            text = "Add things yourself, one per line. You can paste a list.",
+            color = SuperfitTheme.colors.textSecondary,
+            fontSize = 11.sp
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
                 value = newNote,
-                onValueChange = { newNote = it.take(com.superfit.app.domain.CoachNotes.MAX_TEXT) },
-                placeholder = { Text("e.g. Vegetarian on Tuesdays", fontSize = 12.sp) },
-                singleLine = true,
+                onValueChange = { newNote = it.take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE) },
+                placeholder = { Text("e.g. Vegetarian on Tuesdays\nNight shifts Mon to Thu", fontSize = 12.sp) },
+                maxLines = 6,
                 modifier = Modifier.weight(1f),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = SuperfitTheme.colors.textPrimary)
             )

@@ -69,12 +69,13 @@ class CoachNotesTest {
               {"text": "Cousin's wedding on 15 Nov, wants to be 2 kg lighter", "kind": "lasting"},
               {"text": "add eggs to breakfast.", "kind": "plan", "look_for": ["Egg", "eg"], "log": "meal"},
               {"text": "vegetarian on tuesdays", "kind": "lasting"},
-              {"text": "One too many", "kind": "short"}
+              {"text": "Has a cold this week", "kind": "short"}
             ],
             "outdated": ["knee", "made-up-id"]}
         """.trimIndent()
         val update = CoachNotes.parseUpdate(response, existing, today, now = 1000L)
-        assertEquals(listOf("Cousin's wedding on 15 Nov, wants to be 2 kg lighter", "Add eggs to breakfast"), update.add.map { it.text })
+        assertEquals(listOf("Cousin's wedding on 15 Nov, wants to be 2 kg lighter", "Add eggs to breakfast", "Has a cold this week"), update.add.map { it.text })
+        assertEquals(NoteKind.SHORT, update.add[2].kind)
         val plan = update.add[1]
         assertEquals(NoteKind.PLAN, plan.kind)
         assertEquals(listOf("egg"), plan.lookFor)
@@ -82,7 +83,7 @@ class CoachNotesTest {
         assertEquals(listOf("knee"), update.outdatedIds)
 
         val after = CoachNotes.apply(existing, update)
-        assertEquals(listOf("veg", update.add[0].id, update.add[1].id), after.map { it.id })
+        assertEquals(listOf("veg") + update.add.map { it.id }, after.map { it.id })
     }
 
     @Test
@@ -142,6 +143,24 @@ class CoachNotesTest {
             targetMeanings = listOf("meaning")
         )
         assertEquals("plan_w", CoachingEngine.chooseFocus(report, emptyList(), today, plans).id)
+    }
+
+    @Test
+    fun aPastedListBecomesOneNotePerLine() {
+        val pasted = "Type 2 diabetes, on metformin\n\n- Night shifts Mon to Thu\n• No onions or garlic\nnight shifts mon to thu\n" + "x".repeat(700)
+        val notes = CoachNotes.fromUserText(pasted, today, now = 5L)
+        assertEquals(listOf("Type 2 diabetes, on metformin", "Night shifts Mon to Thu", "No onions or garlic"), notes.take(3).map { it.text })
+        assertEquals(4, notes.size)
+        assertEquals(CoachNotes.MAX_USER_TEXT, notes[3].text.length)
+        assertTrue(notes.all { it.byUser && it.kind == NoteKind.LASTING })
+        assertEquals(notes.size, notes.map { it.id }.distinct().size)
+    }
+
+    @Test
+    fun aLongChatMessageCanGiveSeveralNotes() {
+        val items = (1..8).joinToString(",") { "{\"text\": \"Fact number $it\", \"kind\": \"lasting\"}" }
+        val update = CoachNotes.parseUpdate("{\"remember\": [$items]}", emptyList(), today, 1L)
+        assertEquals(CoachNotes.MAX_NEW_LONG, update.add.size)
     }
 
     @Test

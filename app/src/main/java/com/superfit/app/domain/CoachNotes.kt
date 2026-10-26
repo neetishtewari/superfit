@@ -56,7 +56,15 @@ object CoachNotes {
     const val SHORT_DAYS = 7L
     const val PLAN_DAYS = 14L
     const val MAX_NOTES = 40
-    const val MAX_TEXT = 120
+    const val MAX_TEXT = 160
+
+    /** Notes the user types in Settings can be longer, and one paste can hold several. */
+    const val MAX_USER_TEXT = 600
+    const val MAX_USER_PASTE = 3000
+
+    /** Most chat messages give at most [MAX_NEW]; a message that tells a lot about the user at once can give more. */
+    const val MAX_NEW = 2
+    const val MAX_NEW_LONG = 6
 
     fun encode(notes: List<CoachNote>): String = JSONArray().apply {
         notes.forEach { n ->
@@ -110,6 +118,20 @@ object CoachNotes {
 
     fun newId(now: Long, index: Int): String = "n${now}_$index"
 
+    /**
+     * Notes the user typed or pasted in Settings: each line (or bullet) becomes its own note, so a
+     * pasted list stays readable and each item can be removed on its own.
+     */
+    fun fromUserText(text: String, today: LocalDate, now: Long): List<CoachNote> =
+        text.take(MAX_USER_PASTE)
+            .lines()
+            .map { it.trim().trimStart('-', '*', '•', '·').trim().take(MAX_USER_TEXT) }
+            .filter { it.isNotEmpty() }
+            .distinctBy { line -> line.lowercase().filter { it.isLetterOrDigit() } }
+            .mapIndexed { i, line ->
+                CoachNote(id = newId(now, i), text = line, kind = NoteKind.LASTING, added = today, byUser = true)
+            }
+
     /** One line per note for the AI, with its id so it can say which ones are out of date. */
     fun promptLines(notes: List<CoachNote>, today: LocalDate): String {
         val dayFormat = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
@@ -136,11 +158,11 @@ object CoachNotes {
 
         Not worth remembering: questions, small talk, how they feel today, numbers the app already logs (weight, meals, steps), and anything the coach said rather than the user.
 
-        Each note is a short phrase in plain words, at most 12 words, about the user, without "the user" (for example "Vegetarian on Tuesdays", "Left knee hurts after running").
+        Each note is a short phrase in plain words, at most 20 words, about the user, without "the user" (for example "Vegetarian on Tuesdays", "Left knee hurts after running").
         kind is "lasting" for things that stay true, "short" for things true for about a week (a cold, travelling this week), "plan" for something they said they'll do.
         For a plan, look_for lists 1 to 3 short words from the user's own message that would appear in their meal or workout log when they do it (for example ["egg"] or ["walk"]), and log is "meal" or "workout".
         If the message shows an existing note is no longer true, put its id in outdated.
-        Most messages need nothing. Never repeat a note that already exists. At most 2 new notes.
+        Most messages need nothing. Never repeat a note that already exists. At most 2 new notes, or up to 6 when the user shares a lot about themselves in one message (for example a pasted list of their health conditions and routine).
 
         Reply with JSON only: {"remember": [{"text": "...", "kind": "lasting|short|plan", "look_for": [], "log": "meal|workout"}], "outdated": ["id"]}
     """.trimIndent()
@@ -187,7 +209,7 @@ object CoachNotes {
                     planLog = if (kind == NoteKind.PLAN && lookFor.isNotEmpty()) log else null
                 )
             }
-        }.orEmpty().filter { new -> notes.none { same(it.text, new.text) } }.take(2)
+        }.orEmpty().filter { new -> notes.none { same(it.text, new.text) } }.take(MAX_NEW_LONG)
         val outdated = json.optJSONArray("outdated")?.let { a -> (0 until a.length()).map { a.optString(it) } }
             .orEmpty().filter { it in existingIds }
         return NoteUpdate(add, outdated)
