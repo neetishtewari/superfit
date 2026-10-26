@@ -7,36 +7,46 @@ import org.json.JSONTokener
 /** Asks the AI for the numbers of one food the user says an item really was. */
 class MealItemReplacer {
 
-    /** [item] as [newName], at the same amount unless the user's words give one. */
-    suspend fun replace(item: MealItem, newName: String, rest: List<MealItem>): MealItem {
+    /**
+     * [item] as [newName], at the same amount unless the user's words give one. Sent through the
+     * same meal reader as voice and photo logs, so "2 chilla with chutney" can become two items.
+     */
+    suspend fun replace(item: MealItem, newName: String, rest: List<MealItem>): List<MealItem> {
         val others = rest.joinToString(", ") { it.label() }.ifEmpty { "nothing else" }
         val response = GeminiClient.generateContent(
             prompt = PersonalNutrition.promptContext() +
-                "The user corrected one food in their meal. It is: \"${newName.trim()}\". " +
-                "Amount so far: ${item.qty} ${item.unit}. The rest of the meal: $others.",
-            systemInstructionText = SYSTEM_INSTRUCTION,
+                "The user is correcting one food in a meal. If they don't say an amount, it is " +
+                "${item.qty} ${item.unit}. The rest of the meal ($others) is already logged; don't include it.\n" +
+                "Meal input: \"${newName.trim()}\"",
+            systemInstructionText = NutritionParser().systemInstructionText,
             isJson = true
         )
-        return parse(response, item) ?: throw IllegalStateException("No usable item in the AI's answer")
+        return parse(response, item) ?: run {
+            android.util.Log.w("MealItemReplacer", "Unreadable answer for '$newName': ${response.take(500)}")
+            throw UnreadableAnswer()
+        }
     }
 
-    companion object {
-        val SYSTEM_INSTRUCTION =
-            "You are an expert clinical nutrition AI. Estimate the nutrition of ONE food the user names.\n" +
-                "If the user's words include an amount, use it; otherwise keep the amount you are given.\n" +
-                "Return a raw JSON object with: \"name\": String (short English name), \"quantity\": Double, " +
-                "\"unit\": String (one of piece, katori, bowl, cup, glass, slice, tbsp, tsp, g, ml, serving), " +
-                "\"calories\", \"protein\", \"carbs\", \"fat\", \"fiber\": Double (for that whole quantity), " +
-                "\"oilG\": Double (grams of oil, ghee or butter added in cooking or serving it, 0 if none), " +
-                "\"sugarG\": Double (grams of added sugar, 0 if none)."
+    /** The AI answered, but not with a food the app could read. */
+    class UnreadableAnswer : IllegalStateException("No usable item in the AI's answer")
 
+    companion object {
         /**
-         * The new item, or null when the answer has no food in it. The AI sometimes wraps the
-         * food in a list or under a key such as "item", and leaves out or blanks the amount.
+         * The new foods, or null when the answer has none. A normal meal answer (with `items`) is
+         * read the same way as any logged meal; otherwise the first object with a name is taken,
+         * since the AI sometimes wraps one food in a list or under a key such as "item".
          */
-        fun parse(response: String, old: MealItem): MealItem? {
+        fun parse(response: String, old: MealItem): List<MealItem>? {
             val cleaned = response.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-            val json = findFood(runCatching { JSONTokener(cleaned).nextValue() }.getOrNull()) ?: return null
+            val value = runCatching { JSONTokener(cleaned).nextValue() }.getOrNull()
+            (value as? JSONObject)?.optJSONArray("items")?.let { arr ->
+                MealItems.fromGemini(arr)?.let { return it.items.map { item -> item.copy(choices = emptyList()) } }
+            }
+            return parseOne(value, old)?.let { listOf(it) }
+        }
+
+        private fun parseOne(value: Any?, old: MealItem): MealItem? {
+            val json = findFood(value) ?: return null
             val qty = json.optDouble("quantity", Double.NaN)
             if (qty.isNaN() || qty <= 0.0) json.put("quantity", old.qty)
             if (json.optString("unit", "").isBlank()) json.put("unit", old.unit)

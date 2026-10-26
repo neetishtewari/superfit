@@ -285,14 +285,14 @@ class MealItemsTest {
     @Test
     fun `a replacement keeps the old amount unless the ai gives one`() {
         val momos = MealItem("veg momos", 6.0, "piece", 35.0, 1.0, 5.0, 1.0, 0.5, 0.5, 0.0)
-        val kept = MealItemReplacer.parse("""{"name":"chicken momos","calories":270,"protein":18}""", momos)!!
+        val kept = MealItemReplacer.parse("""{"name":"chicken momos","calories":270,"protein":18}""", momos)!!.single()
         assertEquals("chicken momos", kept.name)
         assertEquals(6.0, kept.qty, 0.0)
         assertEquals("piece", kept.unit)
         assertEquals(45.0, kept.kcal, 0.01)
         assertEquals(3.0, kept.protein, 0.01)
 
-        val given = MealItemReplacer.parse("```json\n{\"name\":\"chicken momos\",\"quantity\":8,\"unit\":\"piece\",\"calories\":360}\n```", momos)!!
+        val given = MealItemReplacer.parse("```json\n{\"name\":\"chicken momos\",\"quantity\":8,\"unit\":\"piece\",\"calories\":360}\n```", momos)!!.single()
         assertEquals(8.0, given.qty, 0.0)
         assertEquals(45.0, given.kcal, 0.01)
 
@@ -301,15 +301,36 @@ class MealItemsTest {
     }
 
     @Test
+    fun `a replacement is read like any meal answer`() {
+        val poori = MealItem("poori", 1.0, "piece", 100.0, 2.0, 12.0, 5.0, 0.5, 4.0, 0.0)
+        val answer = """{"foodText":"1 oats cheela with chutney","calories":190,"items":[
+            {"name":"oats cheela","quantity":1,"unit":"piece","calories":150,"protein":6,"oilG":5,
+             "alternatives":[{"name":"besan cheela","calories":170}]},
+            {"name":"green chutney","quantity":1,"unit":"tbsp","calories":40}]}"""
+        val foods = MealItemReplacer.parse(answer, poori)!!
+        assertEquals(listOf("oats cheela", "green chutney"), foods.map { it.name })
+        assertEquals(150.0, foods[0].kcal, 0.01)
+        assertTrue(foods[0].choices.isEmpty())
+    }
+
+    @Test
     fun `a replacement is found inside a list or a wrapper`() {
         val poori = MealItem("poori", 1.0, "piece", 100.0, 2.0, 12.0, 5.0, 0.5, 4.0, 0.0)
-        val inList = MealItemReplacer.parse("""[{"name":"oats cheela","quantity":1,"unit":"piece","calories":150}]""", poori)!!
+        val inList = MealItemReplacer.parse("""[{"name":"oats cheela","quantity":1,"unit":"piece","calories":150}]""", poori)!!.single()
         assertEquals("oats cheela", inList.name)
         assertEquals(150.0, inList.kcal, 0.01)
 
-        val wrapped = MealItemReplacer.parse("""{"item":{"name":"oats cheela","quantity":null,"unit":"","calories":300}}""", poori)!!
+        val wrapped = MealItemReplacer.parse("""{"item":{"name":"oats cheela","quantity":null,"unit":"","calories":300}}""", poori)!!.single()
         assertEquals(1.0, wrapped.qty, 0.0)
         assertEquals("piece", wrapped.unit)
         assertEquals(300.0, wrapped.kcal, 0.01)
+    }
+
+    @Test
+    fun `one item can become several`() {
+        val meal = MealItems(listOf(roti, dal, chai))
+        val replaced = meal.replace(1, listOf(dal.copy(name = "chana"), dal.copy(name = "raita")))
+        assertEquals(listOf("roti", "chana", "raita", "chai"), replaced.items.map { it.name })
+        assertEquals(meal, meal.replace(1, emptyList<MealItem>()))
     }
 }

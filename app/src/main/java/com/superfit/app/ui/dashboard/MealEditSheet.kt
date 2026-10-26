@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.Level
 import com.superfit.app.domain.MealItem
 import com.superfit.app.domain.MealItemReplacer
@@ -114,14 +115,15 @@ fun MealEditSheet(
 internal fun MealItemsEditor(
     meal: MealItems,
     onChange: (MealItems) -> Unit,
-    replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> MealItem = MealItemReplacer()::replace
+    replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> List<MealItem> = MealItemReplacer()::replace
 ) {
     val totals = meal.totals()
     val scope = rememberCoroutineScope()
     // The item being renamed, and whether the AI is working on it.
     var changing by remember { mutableStateOf<Int?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
+    // Why the last change failed, in words the user can act on; null when it didn't.
+    var failed by remember { mutableStateOf<String?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         meal.items.forEachIndexed { index, item ->
@@ -132,11 +134,11 @@ internal fun MealItemsEditor(
                     failed = failed,
                     onCancel = {
                         changing = null
-                        failed = false
+                        failed = null
                     },
                     onChange = { newName ->
                         busy = true
-                        failed = false
+                        failed = null
                         scope.launch {
                             try {
                                 val replaced = replaceItem(item, newName, meal.items.filterIndexed { i, _ -> i != index })
@@ -147,7 +149,11 @@ internal fun MealItemsEditor(
                                 throw e
                             } catch (e: Exception) {
                                 android.util.Log.w("MealItemsEditor", "Changing item failed", e)
-                                failed = true
+                                failed = if (e is MealItemReplacer.UnreadableAnswer) {
+                                    "Couldn't work out that food. Try saying it a bit differently, like \"1 oats chilla\"."
+                                } else {
+                                    GeminiClient.sanitizeError(e)
+                                }
                             } finally {
                                 busy = false
                             }
@@ -169,7 +175,7 @@ internal fun MealItemsEditor(
                     },
                     onChangeName = {
                         changing = index
-                        failed = false
+                        failed = null
                     },
                     onRemove = {
                         onChange(meal.copy(items = meal.items.toMutableList().also { it.removeAt(index) }))
@@ -309,7 +315,7 @@ private fun MealItemEditRow(
 private fun ChangeItemBox(
     item: MealItem,
     busy: Boolean,
-    failed: Boolean,
+    failed: String?,
     onCancel: () -> Unit,
     onChange: (String) -> Unit
 ) {
@@ -364,8 +370,8 @@ private fun ChangeItemBox(
             keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onChange(text) }),
             modifier = Modifier.fillMaxWidth()
         )
-        if (failed) {
-            Text("Couldn't change it. Check your internet and try again.", color = ThemeErrorColor, fontSize = 12.sp)
+        if (failed != null) {
+            Text(failed, color = ThemeErrorColor, fontSize = 12.sp)
         }
         Text(
             "Amount stays ${formatAmount(item.qty)} ${unitLabel(item.unit)} unless you say a different one.",
