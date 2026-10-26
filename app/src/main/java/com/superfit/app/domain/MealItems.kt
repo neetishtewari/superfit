@@ -26,8 +26,32 @@ data class MealItem(
     /** Grams of added oil, ghee or butter per unit. */
     val oilG: Double,
     /** Grams of added sugar per unit. */
-    val sugarG: Double
+    val sugarG: Double,
+    /**
+     * When the AI couldn't tell this food from look-alikes or sound-alikes (milk or buttermilk,
+     * veg or chicken momos), every option it considered, its best guess first, each with its own
+     * per-unit numbers. Empty when it was sure. The options' qty, unit and choices are unused.
+     */
+    val choices: List<MealItem> = emptyList()
 ) {
+    /** True when the AI offered other foods this might be. */
+    val isUnsure: Boolean get() = choices.size > 1
+
+    /** This item as choice [index] instead: same amount, that food's numbers. */
+    fun choose(index: Int): MealItem {
+        val c = choices.getOrNull(index) ?: return this
+        return copy(
+            name = c.name,
+            kcal = c.kcal,
+            protein = c.protein,
+            carbs = c.carbs,
+            fat = c.fat,
+            fiber = c.fiber,
+            oilG = c.oilG,
+            sugarG = c.sugarG
+        )
+    }
+
     /** How much one tap of − or + changes the amount. */
     val step: Double get() = if (unit == "g" || unit == "ml") 25.0 else 0.5
 
@@ -54,8 +78,19 @@ data class MealItems(
     val oil: Level = Level.NORMAL,
     val sugar: Level = Level.NORMAL,
     /** False for older meals, which have no oil or sugar estimates to adjust. */
-    val hasEstimates: Boolean = true
+    val hasEstimates: Boolean = true,
+    /** True once the user has looked at the meal in a sheet and logged or saved it. */
+    val checked: Boolean = false,
+    /** What the user typed or said, so saying it again reuses this meal and its corrections. */
+    val said: String? = null
 ) {
+    /** How many items the AI wasn't sure about, while the user hasn't looked at the meal yet. */
+    val itemsToCheck: Int get() = if (checked) 0 else items.count { it.isUnsure }
+
+    /** The meal with item [index] swapped for a different food, keeping the rest as it is. */
+    fun replace(index: Int, item: MealItem): MealItems =
+        if (index !in items.indices) this else copy(items = items.toMutableList().also { it[index] = item.copy(choices = emptyList()) })
+
     private val oilGrams: Double get() = items.sumOf { it.oilG * it.qty }
     private val sugarGrams: Double get() = items.sumOf { it.sugarG * it.qty }
 
@@ -85,20 +120,26 @@ data class MealItems(
         .put("oil", oil.name)
         .put("sugar", sugar.name)
         .put("est", hasEstimates)
+        .put("chk", checked)
+        .apply { if (said != null) put("said", said) }
         .put(
             "items",
             JSONArray().apply {
-                items.forEach {
+                items.forEach { item ->
                     put(
-                        JSONObject()
-                            .put("name", it.name).put("qty", it.qty).put("unit", it.unit)
-                            .put("kcal", it.kcal).put("p", it.protein).put("c", it.carbs).put("f", it.fat)
-                            .put("fib", it.fiber).put("oil", it.oilG).put("sug", it.sugarG)
+                        nutrientsJson(item).put("qty", item.qty).put("unit", item.unit).apply {
+                            if (item.choices.isNotEmpty()) put("alt", JSONArray().apply { item.choices.forEach { put(nutrientsJson(it)) } })
+                        }
                     )
                 }
             }
         )
         .toString()
+
+    private fun nutrientsJson(item: MealItem): JSONObject = JSONObject()
+        .put("name", item.name)
+        .put("kcal", item.kcal).put("p", item.protein).put("c", item.carbs).put("f", item.fat)
+        .put("fib", item.fiber).put("oil", item.oilG).put("sug", item.sugarG)
 
     companion object {
         fun decode(raw: String?): MealItems? {
@@ -106,21 +147,28 @@ data class MealItems(
             return runCatching {
                 val json = JSONObject(raw)
                 val arr = json.getJSONArray("items")
+                fun read(o: JSONObject, qty: Double, unit: String) = MealItem(
+                    name = o.getString("name"), qty = qty, unit = unit,
+                    kcal = o.getDouble("kcal"), protein = o.getDouble("p"), carbs = o.getDouble("c"),
+                    fat = o.getDouble("f"), fiber = o.optDouble("fib", 0.0),
+                    oilG = o.optDouble("oil", 0.0), sugarG = o.optDouble("sug", 0.0)
+                )
                 val items = (0 until arr.length()).map { i ->
                     val o = arr.getJSONObject(i)
-                    MealItem(
-                        name = o.getString("name"), qty = o.getDouble("qty"), unit = o.getString("unit"),
-                        kcal = o.getDouble("kcal"), protein = o.getDouble("p"), carbs = o.getDouble("c"),
-                        fat = o.getDouble("f"), fiber = o.optDouble("fib", 0.0),
-                        oilG = o.optDouble("oil", 0.0), sugarG = o.optDouble("sug", 0.0)
-                    )
+                    val qty = o.getDouble("qty")
+                    val unit = o.getString("unit")
+                    val alt = o.optJSONArray("alt")
+                    val choices = if (alt == null) emptyList() else (0 until alt.length()).map { read(alt.getJSONObject(it), qty, unit) }
+                    read(o, qty, unit).copy(choices = choices)
                 }
                 if (items.isEmpty()) return null
                 MealItems(
                     items = items,
                     oil = levelOf(json.optString("oil")),
                     sugar = levelOf(json.optString("sugar")),
-                    hasEstimates = json.optBoolean("est", true)
+                    hasEstimates = json.optBoolean("est", true),
+                    checked = json.optBoolean("chk", false),
+                    said = json.optString("said", "").ifBlank { null }
                 )
             }.getOrNull()
         }
@@ -146,19 +194,43 @@ data class MealItems(
             if (arr == null || arr.length() == 0) return null
             val items = (0 until arr.length()).map { i ->
                 val o = arr.optJSONObject(i) ?: return null
-                val name = o.optString("name", "").trim()
-                val qty = o.optDouble("quantity", 0.0)
-                if (name.isEmpty() || qty.isNaN() || qty <= 0.0) return null
-                fun perUnit(key: String) = o.optDouble(key, 0.0).let { if (it.isNaN() || it < 0.0) 0.0 else it / qty }
-                MealItem(
-                    name = name, qty = qty, unit = o.optString("unit", "serving").trim().lowercase().ifEmpty { "serving" },
-                    kcal = perUnit("calories"), protein = perUnit("protein"), carbs = perUnit("carbs"),
-                    fat = perUnit("fat"), fiber = perUnit("fiber"), oilG = perUnit("oilG"), sugarG = perUnit("sugarG")
-                )
+                itemFromGemini(o) ?: return null
             }
             if (items.sumOf { it.kcal * it.qty } <= 0.0) return null
             return MealItems(items)
         }
+
+        /**
+         * One food from the AI, numbers for its whole quantity, stored per unit. Its
+         * `alternatives` (other foods it might be, for the same amount) become [MealItem.choices],
+         * at most three of them after the AI's own guess. Null without a name or an amount.
+         */
+        fun itemFromGemini(o: JSONObject): MealItem? {
+            val name = o.optString("name", "").trim()
+            val qty = o.optDouble("quantity", 0.0)
+            if (name.isEmpty() || qty.isNaN() || qty <= 0.0) return null
+            val unit = o.optString("unit", "serving").trim().lowercase().ifEmpty { "serving" }
+            fun nutrients(src: JSONObject, label: String): MealItem {
+                fun perUnit(key: String) = src.optDouble(key, 0.0).let { if (it.isNaN() || it < 0.0) 0.0 else it / qty }
+                return MealItem(
+                    name = label, qty = qty, unit = unit,
+                    kcal = perUnit("calories"), protein = perUnit("protein"), carbs = perUnit("carbs"),
+                    fat = perUnit("fat"), fiber = perUnit("fiber"), oilG = perUnit("oilG"), sugarG = perUnit("sugarG")
+                )
+            }
+            val item = nutrients(o, name)
+            val seen = mutableSetOf(name.lowercase())
+            val alternatives = o.optJSONArray("alternatives")?.let { arr ->
+                (0 until arr.length()).mapNotNull { i ->
+                    val alt = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val altName = alt.optString("name", "").trim()
+                    if (altName.isEmpty() || !seen.add(altName.lowercase())) null else nutrients(alt, altName)
+                }
+            }.orEmpty().take(MAX_ALTERNATIVES)
+            return if (alternatives.isEmpty()) item else item.copy(choices = listOf(item) + alternatives)
+        }
+
+        private const val MAX_ALTERNATIVES = 3
 
         private fun levelOf(name: String): Level = Level.entries.firstOrNull { it.name == name } ?: Level.NORMAL
     }
@@ -171,6 +243,19 @@ data class MealItems(
  */
 fun NutritionEntryEntity.withItems(items: MealItems): NutritionEntryEntity {
     val totals = items.totals()
+    // A different food (chicken momos for veg) makes the AI's judgements wrong, so the tags are
+    // dropped and the meal is tagged again after saving.
+    if (hasNewFood(items)) {
+        return copy(
+            foodText = items.foodText(),
+            calories = totals.kcal,
+            proteinG = totals.protein,
+            carbsG = totals.carbs,
+            fatG = totals.fat,
+            qualityTags = null,
+            items = items.copy(checked = true).encode()
+        )
+    }
     val tags = MealTags.decode(qualityTags)?.let { tags ->
         val scaled = if (calories > 0.0) tags.scaled(totals.kcal / calories) else tags
         scaled.copy(fiberG = totals.fiber)
@@ -182,8 +267,14 @@ fun NutritionEntryEntity.withItems(items: MealItems): NutritionEntryEntity {
         carbsG = totals.carbs,
         fatG = totals.fat,
         qualityTags = tags?.encode() ?: qualityTags,
-        items = items.encode()
+        items = items.copy(checked = true).encode()
     )
+}
+
+/** True when [items] names a food this meal didn't have. Removing a food doesn't count. */
+fun NutritionEntryEntity.hasNewFood(items: MealItems): Boolean {
+    val before = (MealItems.decode(this.items) ?: MealItems.legacy(this)).items.map { it.name.trim().lowercase() }.toSet()
+    return items.items.any { it.name.trim().lowercase() !in before }
 }
 
 private fun round1(value: Double): Double = (value * 10.0).roundToLong() / 10.0

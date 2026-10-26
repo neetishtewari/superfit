@@ -425,7 +425,21 @@ fun MealItemRow(
                     fontSize = 11.sp
                 )
             }
-            if (onClick != null) {
+            // A voice or typed meal with a food the AI wasn't sure about, not yet looked at.
+            val toCheck = remember(entry.items) { com.superfit.app.domain.MealItems.decode(entry.items)?.itemsToCheck ?: 0 }
+            if (toCheck > 0 && onClick != null) {
+                Text(
+                    text = if (toCheck == 1) "1 item to check" else "$toCheck items to check",
+                    color = ThemeErrorColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(ThemeErrorColor.copy(alpha = 0.14f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            } else if (onClick != null) {
                 Text(
                     text = "Tap to edit",
                     color = ThemeTextTertiary,

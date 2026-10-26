@@ -20,7 +20,12 @@ class NutritionParser {
             "\"unit\": String (one of piece, katori, bowl, cup, glass, slice, tbsp, tsp, g, ml, serving), " +
             "\"calories\", \"protein\", \"carbs\", \"fat\", \"fiber\": Double (for that whole quantity), " +
             "\"oilG\": Double (grams of oil, ghee or butter added in cooking or serving it, 0 if none), " +
-            "\"sugarG\": Double (grams of added sugar, 0 if none). The items' numbers must add up to the meal's totals.\n" +
+            "\"sugarG\": Double (grams of added sugar, 0 if none), " +
+            "\"alternatives\": Array (ONLY when you genuinely can't tell this food apart from similar-looking or " +
+            "similar-sounding foods, e.g. milk or buttermilk in a glass, veg or chicken momos, chana or chaas; otherwise " +
+            "leave it out). Up to 3 other foods it most likely is, most likely first, each an object with \"name\" and " +
+            "\"calories\", \"protein\", \"carbs\", \"fat\", \"fiber\", \"oilG\", \"sugarG\" for the same quantity and unit. " +
+            "The item itself is your best guess. The items' numbers must add up to the meal's totals.\n" +
             MealTags.PROMPT_FIELDS +
             "Provide reasonable estimations if quantities or specific types are not detailed by the user.\n" +
             "CRITICAL: If the user's input is gibberish, background noise, or completely unrelated to food, meals, or beverages, set the \"foodText\" field to exactly \"invalid\" and set \"calories\", \"protein\", \"carbs\", and \"fat\" all to 0.0."
@@ -34,7 +39,8 @@ class NutritionParser {
         }
 
         // 1. Instant 0ms cache check for repeated foods from history
-        val cached = RepeatMealCache.findRepeatMeal(input, history)
+        // Newest first, so a meal the user corrected wins over older logs of the same words.
+        val cached = RepeatMealCache.findRepeatMeal(input, history.sortedByDescending { it.timestamp })
         if (cached != null) {
             android.util.Log.d("NutritionParser", "Instant local repeat cache hit for '$input' -> ${cached.foodText} (${cached.calories} kcal)")
             return cached

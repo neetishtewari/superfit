@@ -109,7 +109,8 @@ object RepeatMealCache {
         val inputKeywords = extractKeywords(normInput)
 
         // 1. Direct exact match against user's previously logged meals
-        val exactMatch = history.firstOrNull { normalize(it.foodText) == normInput }
+        // (or against what the user said for it, so a meal they corrected comes back corrected)
+        val exactMatch = history.firstOrNull { normalize(it.foodText) == normInput || saidFor(it) == normInput }
         if (exactMatch != null && exactMatch.calories > 0) {
             return ParsedNutritionResult(
                 foodText = exactMatch.foodText,
@@ -140,7 +141,7 @@ object RepeatMealCache {
                         carbsG = roundOneDecimal(pastEntry.carbsG * scaleFactor),
                         fatG = roundOneDecimal(pastEntry.fatG * scaleFactor),
                         tags = MealTags.decode(pastEntry.qualityTags)?.scaled(scaleFactor),
-                        items = MealItems.decode(pastEntry.items)?.scaled(scaleFactor)
+                        items = MealItems.decode(pastEntry.items)?.scaled(scaleFactor)?.copy(said = input.trim())
                     )
                 }
             }
@@ -148,6 +149,9 @@ object RepeatMealCache {
 
         return null
     }
+
+    private fun saidFor(entry: NutritionEntryEntity): String? =
+        if (entry.items?.contains("\"said\"") == true) MealItems.decode(entry.items)?.said?.let(::normalize) else null
 
     // Both meals must name the same foods. A looser "one contains the other" match let
     // "tandoori roti" borrow plain roti's numbers, or "2 rotis" copy a whole past meal of

@@ -20,7 +20,11 @@ data class ParsedNutritionResult(
         fun fromJson(json: JSONObject, input: String): ParsedNutritionResult {
             val foodText = json.optString("foodText", input)
             val tags = runCatching { MealTags.fromJson(json) }.getOrNull()
-            val items = if (foodText == "invalid") null else MealItems.fromGemini(json.optJSONArray("items"))
+            val items = if (foodText == "invalid") {
+                null
+            } else {
+                MealItems.fromGemini(json.optJSONArray("items"))?.let { if (input == "photo") it else it.copy(said = input.trim()) }
+            }
             val totals = items?.totals()
             return ParsedNutritionResult(
                 foodText = foodText,

@@ -910,17 +910,10 @@ class DashboardViewModel(
                 val id = repository.addNutritionEntry(entry)
                 loadFrequentMeals()
                 _parsingState.value = ParsingState.Success(entry.foodText)
-                if (isPackaged) {
+                // Packaged foods, and photo meals where the user picked a different food, have no tags yet.
+                if (isPackaged || entry.qualityTags == null) {
                     val saved = entry.copy(id = id)
-                    try {
-                        com.superfit.app.domain.MealTagger().tag(listOf(saved))[id]
-                            ?.let { repository.saveMealTags(saved, it.encode()) }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        // The daily backfill tags it later.
-                        android.util.Log.w("DashboardViewModel", "Tagging packaged food failed", e)
-                    }
+                    com.superfit.app.domain.MealTagger().tagOne(saved)?.let { repository.saveMealTags(saved, it.encode()) }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -936,6 +929,10 @@ class DashboardViewModel(
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
             AppAnalytics.mealEdited()
+            // A changed food drops the old tags (see withItems), so the meal is judged again.
+            if (entry.qualityTags == null) {
+                com.superfit.app.domain.MealTagger().tagOne(entry)?.let { repository.saveMealTags(entry, it.encode()) }
+            }
         }
     }
 
