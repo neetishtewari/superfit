@@ -139,18 +139,25 @@ internal fun DashboardHeader(
 
 @Composable
 private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Row(
+    // Compact: icon over a small label, so the date beside it keeps its room.
+    Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(ThemeCardBg)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .heightIn(min = 40.dp)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .widthIn(min = 52.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = ThemeTextPrimary, modifier = Modifier.size(18.dp))
-        Text(text = label, style = MaterialTheme.typography.labelLarge, color = ThemeTextPrimary, maxLines = 1)
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(ThemeCardBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = ThemeTextPrimary, modifier = Modifier.size(20.dp))
+        }
+        Text(text = label, fontSize = 11.sp, color = ThemeTextSecondary, maxLines = 1)
     }
 }
 
