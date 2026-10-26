@@ -100,7 +100,7 @@ private fun chatRows(entries: List<ChatEntry>, today: LocalDate, zone: ZoneId): 
         rows += ChatRow.Message(
             entry,
             isLast = index == entries.lastIndex,
-            isRoast = CoachChat.questionFor(entries, index) == DashboardViewModel.ROAST_MY_DAY
+            isRoast = CoachChat.isRoastRequest(CoachChat.questionFor(entries, index))
         )
     }
     return rows

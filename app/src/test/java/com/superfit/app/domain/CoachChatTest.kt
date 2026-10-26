@@ -130,4 +130,13 @@ class CoachChatTest {
         val morning = CoachQuestions.forNow(8, DayOfWeek.SUNDAY, 0, 120, workedOutToday = false, hasTodayTip = false)
         assertEquals(listOf("What's a good breakfast for my goal?", "How did my week go?", "Is my diet okay?"), morning)
     }
+
+    @Test
+    fun roastRequestIsFoundTypedOrSpoken() {
+        assertTrue(CoachChat.isRoastRequest("Roast my day"))
+        assertTrue(CoachChat.isRoastRequest("roast my day!"))
+        assertTrue(CoachChat.isRoastRequest("Can you roast my day please"))
+        assertTrue(!CoachChat.isRoastRequest("How did my day go?"))
+        assertTrue(!CoachChat.isRoastRequest(null))
+    }
 }
