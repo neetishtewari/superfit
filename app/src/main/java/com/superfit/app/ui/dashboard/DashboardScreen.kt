@@ -638,7 +638,7 @@ fun DashboardScreen(
                 viewModel = viewModel,
                 onDismiss = { showChatBottomSheet = false },
                 // Only a day with meals logged can be roasted on a card.
-                onShareRoast = { line ->
+                onShareRoast = { line: String ->
                     showChatBottomSheet = false
                     shareCard = com.superfit.app.domain.ShareCards.roast(dailyShareCard(dayState, coachingState), line)
                 }.takeIf { dayState.nutritionList.isNotEmpty() }
