@@ -24,6 +24,11 @@ private val DarkColorScheme = darkColorScheme(
     onPrimaryContainer = Color(0xFFB9F2DC),
     secondary = Color(0xFF4CC9E8),
     onSecondary = Color(0xFF003543),
+    // Tonal buttons and chips use these, so keep them green rather than Material's default lilac
+    secondaryContainer = Color(0xFF143A2E),
+    onSecondaryContainer = Color(0xFFB9F2DC),
+    tertiaryContainer = Color(0xFF241E3D),
+    onTertiaryContainer = Color(0xFFD9CFFF),
     tertiary = Color(0xFFA993FF),
     onTertiary = Color(0xFF241466),
     background = DarkBgStart,
@@ -49,6 +54,11 @@ private val LightColorScheme = lightColorScheme(
     onPrimaryContainer = BrandGreenDeep,
     secondary = ElectricCyan,
     onSecondary = Color.White,
+    // Tonal buttons and chips use these, so keep them green rather than Material's default lilac
+    secondaryContainer = BrandGreenSoft,
+    onSecondaryContainer = BrandGreenDeep,
+    tertiaryContainer = CoachPurpleSoft,
+    onTertiaryContainer = Color(0xFF3B2A8C),
     tertiary = HyperViolet,
     onTertiary = Color.White,
     background = LightBgStart,

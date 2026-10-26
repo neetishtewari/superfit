@@ -19,9 +19,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +44,9 @@ import com.superfit.app.domain.MealItems
 import com.superfit.app.domain.withItems
 import com.superfit.app.theme.DeleteRed
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.theme.ThemeBrandSoft
 import com.superfit.app.theme.ThemeErrorColor
+import com.superfit.app.theme.ThemeFieldBg
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
@@ -192,12 +195,25 @@ internal fun MealItemsEditor(
             LevelPicker(label = "Sugar", selected = meal.sugar, onSelect = { onChange(meal.copy(sugar = it)) })
         }
 
-        Text(
-            text = "${totals.kcal.toInt()} kcal  ·  P ${totals.protein.toInt()}g  ·  C ${totals.carbs.toInt()}g  ·  F ${totals.fat.toInt()}g",
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = NeonGreen
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(ThemeBrandSoft)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = "Total ${totals.kcal.toInt()} kcal",
+                style = MaterialTheme.typography.titleMedium,
+                color = ThemeTextPrimary
+            )
+            Text(
+                text = "Protein ${totals.protein.toInt()}g  ·  Carbs ${totals.carbs.toInt()}g  ·  Fat ${totals.fat.toInt()}g  ·  Fibre ${totals.fiber.toInt()}g",
+                fontSize = 13.sp,
+                color = ThemeTextSecondary
+            )
+        }
     }
 }
 
@@ -357,15 +373,17 @@ private fun ChangeItemBox(
             singleLine = true,
             placeholder = { Text("e.g. the right name of the food") },
             trailingIcon = {
-                IconButton(onClick = {
-                    try {
-                        voice.launch(SpeechRecognizerHelper.systemDialogIntent().putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what it was"))
-                    } catch (e: ActivityNotFoundException) {
-                        Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
-                    }
-                }) {
-                    Icon(Icons.Default.Mic, contentDescription = "Say it")
-                }
+                com.superfit.app.ui.components.MicButton(
+                    onClick = {
+                        try {
+                            voice.launch(SpeechRecognizerHelper.systemDialogIntent().putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what it was"))
+                        } catch (e: ActivityNotFoundException) {
+                            Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.padding(end = 6.dp),
+                    contentDescription = "Say it"
+                )
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onChange(text) }),
@@ -399,7 +417,11 @@ internal fun StepButton(icon: @Composable () -> Unit, enabled: Boolean, onClick:
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.size(36.dp),
-        shape = CircleShape
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = ThemeBrandSoft,
+            contentColor = NeonGreen
+        )
     ) {
         icon()
     }
@@ -415,9 +437,8 @@ private fun LevelPicker(label: String, selected: Level, onSelect: (Level) -> Uni
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) NeonGreen.copy(alpha = 0.18f) else ThemeTextPrimary.copy(alpha = 0.04f))
-                        .border(1.dp, if (isSelected) NeonGreen else ThemeGlassBorder, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isSelected) NeonGreen else ThemeFieldBg)
                         .clickable { onSelect(level) }
                         .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center
@@ -428,8 +449,8 @@ private fun LevelPicker(label: String, selected: Level, onSelect: (Level) -> Uni
                             Level.NORMAL -> "Normal"
                             Level.HIGH -> "High"
                         },
-                        color = if (isSelected) NeonGreen else ThemeTextPrimary,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) Color.White else ThemeTextPrimary,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         fontSize = 14.sp
                     )
                 }

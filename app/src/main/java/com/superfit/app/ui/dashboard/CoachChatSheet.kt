@@ -32,6 +32,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
@@ -41,8 +43,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -228,33 +228,37 @@ internal fun CoachChatSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = "💬 Your AI coach",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = ThemeTextPrimary
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                com.superfit.app.ui.components.IconBadge(
+                    icon = Icons.Default.AutoAwesome,
+                    background = HyperVioletAccent,
+                    tint = Color.White,
+                    size = 36
                 )
-                val activeNotes = notes.count { it.isActive(LocalDate.now()) }
-                Text(
-                    text = if (activeNotes > 0) {
-                        "Knows your meals, workouts and goal. Remembering $activeNotes ${if (activeNotes == 1) "note" else "notes"} so far (Settings → What my AI coach knows)"
-                    } else {
-                        "Knows your meals, workouts and goal, and remembers what you tell it"
-                    },
-                    fontSize = 12.sp,
-                    color = NeonGreen
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "AI coach",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = ThemeTextPrimary
+                    )
+                    val activeNotes = notes.count { it.isActive(LocalDate.now()) }
+                    Text(
+                        text = if (activeNotes > 0) {
+                            "Knows your meals, workouts and goal. Remembering $activeNotes ${if (activeNotes == 1) "note" else "notes"} so far (Settings → What my AI coach knows)"
+                        } else {
+                            "Knows your meals, workouts and goal, and remembers what you tell it"
+                        },
+                        fontSize = 12.sp,
+                        color = ThemeTextSecondary
+                    )
+                }
             }
 
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
-                    .padding(12.dp)
+                    .padding(vertical = 4.dp)
             ) {
                 val zone = remember { ZoneId.systemDefault() }
                 val rows = remember(chatMessages) { chatRows(chatMessages, LocalDate.now(), zone) }
@@ -309,7 +313,7 @@ internal fun CoachChatSheet(
             }
 
             voiceProblem?.let {
-                Text(text = it, color = EnergeticCoral, fontSize = 12.sp)
+                Text(text = it, color = ThemeErrorColor, fontSize = 12.sp)
             }
 
             if (!chatLoading && !isListening) {
@@ -341,42 +345,45 @@ internal fun CoachChatSheet(
                     value = if (isListening) liveText else chatInputText,
                     onValueChange = { if (!isListening) chatInputText = it.take(CoachChat.MAX_TEXT) },
                     placeholder = {
-                        Text(if (isListening) "Listening… speak your question" else "Ask your AI coach…", fontSize = 13.sp)
+                        Text(if (isListening) "Listening… speak your question" else "Ask your coach…")
                     },
                     readOnly = isListening,
                     modifier = Modifier.weight(1f),
-                    maxLines = 4
+                    maxLines = 4,
+                    trailingIcon = {
+                        Row(
+                            modifier = Modifier.padding(end = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // The same mic as everywhere else; while listening it becomes Stop and send.
+                            if (isListening) {
+                                com.superfit.app.ui.components.FieldActionButton(
+                                    icon = Icons.Default.Stop,
+                                    contentDescription = "Stop and send",
+                                    enabled = true,
+                                    onClick = { speechHelper.stopListening() }
+                                )
+                            } else {
+                                if (chatInputText.isBlank()) {
+                                    com.superfit.app.ui.components.MicButton(
+                                        onClick = { if (!chatLoading) startMic() },
+                                        contentDescription = "Ask by voice"
+                                    )
+                                }
+                                com.superfit.app.ui.components.FieldActionButton(
+                                    icon = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send",
+                                    enabled = chatInputText.isNotBlank() && !chatLoading,
+                                    onClick = {
+                                        viewModel.sendChatMessage(chatInputText)
+                                        chatInputText = ""
+                                    }
+                                )
+                            }
+                        }
+                    }
                 )
-
-                if (chatInputText.isBlank() || isListening) {
-                    IconButton(
-                        onClick = { if (isListening) speechHelper.stopListening() else startMic() },
-                        enabled = !chatLoading,
-                        modifier = Modifier.size(52.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isListening) EnergeticCoral else NeonGreen,
-                            contentColor = Color.Black,
-                            disabledContainerColor = NeonGreen.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
-                            contentDescription = if (isListening) "Stop and send" else "Ask by voice"
-                        )
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            viewModel.sendChatMessage(chatInputText)
-                            chatInputText = ""
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                        enabled = !chatLoading,
-                        modifier = Modifier.height(56.dp)
-                    ) {
-                        Text("Send", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
     }
@@ -387,20 +394,15 @@ private fun CoachBubble(text: String, isError: Boolean = false) {
     Box(
         modifier = Modifier
             .widthIn(max = 300.dp)
-            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 2.dp, bottomEnd = 12.dp))
-            .background(if (isError) EnergeticCoral.copy(alpha = 0.10f) else ThemeTextPrimary.copy(alpha = 0.05f))
-            .border(
-                1.dp,
-                if (isError) EnergeticCoral else ThemeGlassBorder,
-                RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 2.dp, bottomEnd = 12.dp)
-            )
-            .padding(12.dp)
+            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp))
+            .background(if (isError) ThemeAmberSoft else ThemeCoachSoft)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
             text = if (isError) AnnotatedString(text) else chatMarkdown(text),
             color = ThemeTextPrimary,
-            fontSize = 13.sp,
-            lineHeight = 18.sp
+            fontSize = 14.sp,
+            lineHeight = 20.sp
         )
     }
 }
@@ -420,19 +422,17 @@ private fun ChatMessageRow(
             Column(
                 modifier = Modifier
                     .widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 2.dp))
-                    .background(HyperVioletAccent.copy(alpha = 0.25f))
-                    .border(
-                        1.dp,
-                        HyperVioletAccent,
-                        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 2.dp)
-                    )
-                    .padding(12.dp)
+                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp))
+                    .background(NeonGreen)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 if (entry.spoken) {
-                    Text(text = "🎙 Spoken", color = ThemeTextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(14.dp))
+                        Text(text = "Spoken", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Text(text = entry.text, color = ThemeTextPrimary, fontSize = 13.sp, lineHeight = 18.sp)
+                Text(text = entry.text, color = Color.White, fontSize = 14.sp, lineHeight = 20.sp)
             }
         }
         return
