@@ -504,7 +504,7 @@ internal fun CoachInsightsCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Ask coach about this 💬", fontWeight = FontWeight.Bold)
+                        Text("Ask AI coach about this 💬", fontWeight = FontWeight.Bold)
                     }
                 }
             }

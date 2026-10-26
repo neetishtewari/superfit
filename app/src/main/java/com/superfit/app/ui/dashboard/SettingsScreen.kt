@@ -416,10 +416,6 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
 
-                    CoachMemorySettings(viewModel)
-
-                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -553,6 +549,23 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // AI coach: kept apart from "My nutritionist's advice", which comes from a real person.
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        1.dp,
+                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
+                        RoundedCornerShape(20.dp)
+                    )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    CoachMemorySettings(viewModel)
                 }
             }
 

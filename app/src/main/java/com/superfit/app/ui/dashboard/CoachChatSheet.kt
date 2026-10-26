@@ -226,7 +226,7 @@ internal fun CoachChatSheet(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = "💬 Your coach",
+                    text = "💬 Your AI coach",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = ThemeTextPrimary
@@ -266,7 +266,7 @@ internal fun CoachChatSheet(
                     if (rows.isEmpty()) {
                         item(key = "hello") {
                             CoachBubble(
-                                text = "Hi! I'm your coach. I can see your meals, workouts and goal, and I remember what you tell me, " +
+                                text = "Hi! I'm Superfit's AI coach. I can see your meals, workouts and goal, and I remember what you tell me, " +
                                     "like an injury or a food you don't eat. Ask me anything, or tap the mic and just talk."
                             )
                         }
@@ -296,7 +296,7 @@ internal fun CoachChatSheet(
                         item(key = "thinking") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), color = NeonGreen, strokeWidth = 2.dp)
-                                Text(text = "Coach is thinking...", color = ThemeTextSecondary, fontSize = 12.sp)
+                                Text(text = "AI coach is thinking...", color = ThemeTextSecondary, fontSize = 12.sp)
                             }
                         }
                     }
@@ -336,7 +336,7 @@ internal fun CoachChatSheet(
                     value = if (isListening) liveText else chatInputText,
                     onValueChange = { if (!isListening) chatInputText = it.take(CoachChat.MAX_TEXT) },
                     placeholder = {
-                        Text(if (isListening) "Listening… speak your question" else "Ask your coach…", fontSize = 13.sp)
+                        Text(if (isListening) "Listening… speak your question" else "Ask your AI coach…", fontSize = 13.sp)
                     },
                     readOnly = isListening,
                     colors = OutlinedTextFieldDefaults.colors(
