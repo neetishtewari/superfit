@@ -124,7 +124,8 @@ class DailyReminderWorker(
                     historyActivity = database.telemetryDao().getAllActivity(),
                     historySleep = database.telemetryDao().getAllSleep(),
                     historyWeights = database.weightDao().getAllWeightEntries(),
-                    memory = CoachInsightStore.memory(sharedPrefs)
+                    memory = CoachInsightStore.memory(sharedPrefs),
+                    notes = CoachChatStore.loadNotes(applicationContext)
                 )
 
                 // Cache for the home screen, and remember what was said

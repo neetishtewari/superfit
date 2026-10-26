@@ -138,7 +138,29 @@ class DataRepository(
     suspend fun clearAllLocalData() {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             database.clearAllTables()
+            CoachChatStore.clearChat(context)
         }
+    }
+
+    // --- Coach chat and notes ---
+
+    suspend fun loadCoachChat(): List<com.superfit.app.domain.ChatEntry> =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CoachChatStore.loadChat(context) }
+
+    suspend fun saveCoachChat(entries: List<com.superfit.app.domain.ChatEntry>) {
+        val json = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CoachChatStore.saveChat(context, entries) }
+        firebaseSyncManager.uploadCoachChat(json)
+    }
+
+    suspend fun clearCoachChat() {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { CoachChatStore.clearChat(context) }
+        firebaseSyncManager.deleteCoachChat()
+    }
+
+    fun loadCoachNotes(): List<com.superfit.app.domain.CoachNote> = CoachChatStore.loadNotes(context)
+
+    suspend fun saveCoachNotes(notes: List<com.superfit.app.domain.CoachNote>) {
+        firebaseSyncManager.uploadCoachNotes(CoachChatStore.saveNotes(context, notes))
     }
 
     suspend fun clearAllCloudData(): Boolean = firebaseSyncManager.clearAllCloudData()

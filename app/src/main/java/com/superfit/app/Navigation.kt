@@ -179,10 +179,11 @@ fun MainNavigation(
                                 ).show()
                                 return@launch
                             }
-                            val deletion = repository.deleteAccount()
+                            // Clear the phone's copy while still signed in: once the account is
+                            // gone, the signed-in user's database, chat and settings can't be found.
                             repository.clearAllLocalData()
-                            val prefs = getUserSharedPrefs(context)
-                            prefs.edit().clear().commit()
+                            getUserSharedPrefs(context).edit().clear().commit()
+                            val deletion = repository.deleteAccount()
                             GeminiKeyStore.forgetOldKeys(context)
                             FirebaseAuth.getInstance().signOut()
                             val message = when (deletion) {

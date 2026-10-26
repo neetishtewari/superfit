@@ -416,6 +416,10 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
 
+                    CoachMemorySettings(viewModel)
+
+                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,

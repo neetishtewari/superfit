@@ -82,6 +82,11 @@ class FirebaseSyncManager(private val context: Context) {
         for (habit in habits) {
             uploadHabitEntry(habit)
         }
+
+        // 9. Coach chat and notes
+        val chat = CoachChatStore.loadChat(context)
+        if (chat.isNotEmpty()) uploadCoachChat(com.superfit.app.domain.CoachChat.encode(chat))
+        if (CoachChatStore.hasNotes(context)) uploadCoachNotes(com.superfit.app.domain.CoachNotes.encode(CoachChatStore.loadNotes(context)))
     }
 
     /**
@@ -164,9 +169,56 @@ class FirebaseSyncManager(private val context: Context) {
                 .collection("settings").document(WORKOUT_IMPORT_DOC).get().await()
             workoutSettingsDoc.data?.let { WorkoutImportPrefs(getUserSharedPrefs(context)).restore(it) }
 
+            // 10. Coach chat and notes. The chat is merged; notes are only restored onto a phone
+            // that has none, so a note the user deleted here doesn't come back.
+            restoreCoach(userId)
+
             Log.d(tag, "Full bi-directional sync down complete.")
         } catch (e: Exception) {
             Log.e(tag, "Error syncing data down: ${e.message}", e)
+        }
+    }
+
+    private suspend fun restoreCoach(userId: String) {
+        val coach = firestore.collection("users").document(userId).collection(COACH_COLLECTION)
+        val chatJson = coach.document(COACH_CHAT_DOC).get().await().getString(COACH_JSON_FIELD)
+        if (!chatJson.isNullOrBlank()) {
+            val merged = com.superfit.app.domain.CoachChat.merge(
+                CoachChatStore.loadChat(context),
+                com.superfit.app.domain.CoachChat.decode(chatJson)
+            )
+            CoachChatStore.saveChat(context, merged)
+        }
+        if (!CoachChatStore.hasNotes(context)) {
+            val notesJson = coach.document(COACH_NOTES_DOC).get().await().getString(COACH_JSON_FIELD)
+            if (!notesJson.isNullOrBlank()) {
+                CoachChatStore.saveNotes(context, com.superfit.app.domain.CoachNotes.decode(notesJson))
+            }
+        }
+    }
+
+    /** Backs up the coach chat ([json] from [CoachChatStore.saveChat]). */
+    suspend fun uploadCoachChat(json: String) = uploadCoachDoc(COACH_CHAT_DOC, json)
+
+    /** Backs up the coach's notes ([json] from [CoachChatStore.saveNotes]). */
+    suspend fun uploadCoachNotes(json: String) = uploadCoachDoc(COACH_NOTES_DOC, json)
+
+    private suspend fun uploadCoachDoc(doc: String, json: String) {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId).collection(COACH_COLLECTION).document(doc)
+                .set(mapOf(COACH_JSON_FIELD to json, "updatedAt" to System.currentTimeMillis())).await()
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading coach $doc: ${e.message}")
+        }
+    }
+
+    suspend fun deleteCoachChat() {
+        val userId = auth.currentUser?.uid ?: return
+        try {
+            firestore.collection("users").document(userId).collection(COACH_COLLECTION).document(COACH_CHAT_DOC).delete().await()
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting coach chat: ${e.message}")
         }
     }
 
@@ -400,6 +452,12 @@ class FirebaseSyncManager(private val context: Context) {
                 doc.reference.delete().await()
             }
 
+            // 10. Delete the coach chat and notes
+            val coachSnap = firestore.collection("users").document(userId).collection(COACH_COLLECTION).get().await()
+            for (doc in coachSnap.documents) {
+                doc.reference.delete().await()
+            }
+
             // Wait for all deletes to sync to the server (up to 5 seconds)
             try {
                 kotlinx.coroutines.withTimeoutOrNull(5000) {
@@ -593,6 +651,10 @@ class FirebaseSyncManager(private val context: Context) {
     companion object {
         private const val PREF_ENTRY_BACKUP_REPAIRED = "entry_backup_repaired_v1"
         private const val WORKOUT_IMPORT_DOC = "workoutImport"
+        private const val COACH_COLLECTION = "coach"
+        private const val COACH_CHAT_DOC = "chat"
+        private const val COACH_NOTES_DOC = "notes"
+        private const val COACH_JSON_FIELD = "json"
     }
 }
 

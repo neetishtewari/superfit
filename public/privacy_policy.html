@@ -65,7 +65,7 @@
 <body>
     <div class="container">
         <h1>Privacy Policy</h1>
-        <p><strong>Last Updated: October 20, 2026</strong></p>
+        <p><strong>Last Updated: October 26, 2026</strong></p>
         <p>Superfit is built to empower users with personalized physiological feedback. We are committed to protecting your privacy. This policy describes how Superfit handles data, specifically relating to local execution, Google Health Connect integration, and Gemini AI queries.</p>
 
         <h2>1. Data Collection & Usage</h2>
@@ -80,7 +80,7 @@
 
         <h2>2. Local Storage & Processing</h2>
         <p class="highlight">All data processed by Superfit is stored locally on your device.</p>
-        <p>Superfit runs all calculation logic locally using an on-device SQLite database (Room). Your raw biometric data, steps record, sleep tracking, and calorie ledger are stored on your device and are not uploaded to any remote server or third-party service. The exception is your backup: when you sign in, your logs (meals, workouts, weigh-ins) and daily summaries (steps, sleep) are backed up to your own Superfit account in Google Firebase, so you can restore them on a new phone.</p>
+        <p>Superfit runs all calculation logic locally using an on-device SQLite database (Room). Your raw biometric data, steps record, sleep tracking, and calorie ledger are stored on your device and are not uploaded to any remote server or third-party service. The exception is your backup: when you sign in, your logs (meals, workouts, weigh-ins), daily summaries (steps, sleep), your chats with the coach and the coach's notes about you are backed up to your own Superfit account in Google Firebase, so you can restore them on a new phone.</p>
 
         <h2>3. Google Health Connect Policy Compliance</h2>
         <p>Superfit strictly complies with the <span class="highlight">Google Play Health Connect Developer Policies</span>, including the Additional Requirements:</p>
@@ -91,7 +91,8 @@
         </ul>
 
         <h2>4. Generative AI & API Queries</h2>
-        <p>To turn spoken or typed meal and workout logs into calories and nutrients, Superfit sends what you said or typed to Google's Gemini AI, through Google Firebase AI Logic. If you add your own Gemini API key in Settings, requests go directly to Google using that key instead; the key is stored only on your device.</p>
+        <p>To turn spoken or typed meal and workout logs into calories and nutrients, Superfit sends what you said or typed to Google's Gemini AI, through Google Firebase AI Logic.</p>
+        <p><strong>Coach chat.</strong> When you ask the coach a question, typed or spoken, Superfit sends your question, your recent conversation, your logs and goal, and the coach's notes about you to Google's Gemini AI to write the answer. Spoken questions are turned into text by your phone's speech service, and no audio is kept. The coach may save short notes from your chats, such as an injury or a food you don't eat, to give better advice later. You can see and remove them in Settings under "What my coach knows", and clear your chat history there at any time. Deleting your account deletes them.</p>
         <p><strong>Photos and barcodes.</strong> If you log food with the camera, the photo of your meal or of a nutrition label is sent to Google's Gemini AI to estimate nutrition. Photos are held in memory only while they are read and are never saved on your device or by Superfit. When you scan a barcode, only the barcode number is sent to Open Food Facts (openfoodfacts.org), a free public food database, to look up the product's nutrition.</p>
 
         <h2>5. Usage and Crash Reports</h2>
