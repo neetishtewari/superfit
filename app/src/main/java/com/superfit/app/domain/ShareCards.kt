@@ -212,9 +212,24 @@ object ShareCards {
 
     /** The daily card with the AI coach's "Roast my day" line in place of the coach line. */
     fun roast(daily: ShareCard.Daily, line: String): ShareCard.Daily =
-        daily.copy(coachLine = plain(line).take(ROAST_MAX).takeIf { it.isNotBlank() }, roast = true)
+        daily.copy(coachLine = fitRoast(plain(line)).takeIf { it.isNotBlank() }, roast = true)
 
-    const val ROAST_MAX = 220
+    /** About six lines on the card. */
+    const val ROAST_MAX = 180
+
+    /** Whole sentences that fit in [ROAST_MAX]; a first sentence that's too long is cut at a word. */
+    fun fitRoast(text: String): String {
+        if (text.length <= ROAST_MAX) return text
+        val sentences = Regex("""(?<=[.!?])\s+""").split(text)
+        val kept = StringBuilder()
+        for (s in sentences) {
+            val next = if (kept.isEmpty()) s else "$kept $s"
+            if (next.length > ROAST_MAX) break
+            kept.clear().append(next)
+        }
+        if (kept.isNotEmpty()) return kept.toString()
+        return text.take(ROAST_MAX - 1).substringBeforeLast(' ').trimEnd(',', ';', ':', '-', '—') + "…"
+    }
 
     private fun plain(text: String): String = text.replace("**", "").trim()
 }

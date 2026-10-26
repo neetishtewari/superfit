@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +34,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -51,15 +54,50 @@ import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
 
-// The share cards always use their own dark look, whatever theme the app is in.
-private val CardBackground = Color(0xFF0D0D14)
-private val TileBackground = Color(0xFF181824)
-private val Divider = Color(0xFF2A2A3A)
-private val TextMain = Color(0xFFF4F4F8)
-private val TextSoft = Color(0xFFA8A8BC)
-private val TextDate = Color(0xFFC8C8D8)
-private val BadgeBackground = Color(0xFF1E1E2C)
-private val BadgeBorder = Color(0xFF34344A)
+/** A share card's own colours, whatever theme the app is in: dark by default, or light if the user picks it. */
+private data class CardPalette(
+    val background: Color,
+    val tile: Color,
+    val divider: Color,
+    val textMain: Color,
+    val textSoft: Color,
+    val textDate: Color,
+    val badgeBackground: Color,
+    val badgeBorder: Color
+)
+
+private val DarkCard = CardPalette(
+    background = Color(0xFF0D0D14),
+    tile = Color(0xFF181824),
+    divider = Color(0xFF2A2A3A),
+    textMain = Color(0xFFF4F4F8),
+    textSoft = Color(0xFFA8A8BC),
+    textDate = Color(0xFFC8C8D8),
+    badgeBackground = Color(0xFF1E1E2C),
+    badgeBorder = Color(0xFF34344A)
+)
+
+private val LightCard = CardPalette(
+    background = Color(0xFFF6F6F9),
+    tile = Color(0xFFFFFFFF),
+    divider = Color(0xFFDCDCE5),
+    textMain = Color(0xFF15151C),
+    textSoft = Color(0xFF5E5E70),
+    textDate = Color(0xFF45455A),
+    badgeBackground = Color(0xFFFFFFFF),
+    badgeBorder = Color(0xFFD5D5DF)
+)
+
+private val LocalCardPalette = staticCompositionLocalOf { DarkCard }
+
+private val CardBackground: Color @Composable get() = LocalCardPalette.current.background
+private val TileBackground: Color @Composable get() = LocalCardPalette.current.tile
+private val Divider: Color @Composable get() = LocalCardPalette.current.divider
+private val TextMain: Color @Composable get() = LocalCardPalette.current.textMain
+private val TextSoft: Color @Composable get() = LocalCardPalette.current.textSoft
+private val TextDate: Color @Composable get() = LocalCardPalette.current.textDate
+private val BadgeBackground: Color @Composable get() = LocalCardPalette.current.badgeBackground
+private val BadgeBorder: Color @Composable get() = LocalCardPalette.current.badgeBorder
 
 /** The colours the user can pick in the preview. */
 val CardAccents = listOf(NeonMint, ElectricCyan, HyperViolet, SolarAmber)
@@ -69,12 +107,22 @@ fun defaultAccent(card: ShareCard): Color = if (card is ShareCard.Best) HyperVio
 
 /** A share card, laid out at 360 x 640 dp (Story size, 9:16). */
 @Composable
-fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier, photo: ImageBitmap? = null) {
+fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier, photo: ImageBitmap? = null, light: Boolean = false) {
     // The daily card has no photo option; workout and personal-best cards can sit on the user's photo.
     if (photo != null && card !is ShareCard.Daily) {
-        PhotoCardView(card, accent, photo, modifier)
+        CompositionLocalProvider(LocalCardPalette provides DarkCard) {
+            PhotoCardView(card, accent, photo, modifier)
+        }
         return
     }
+    CompositionLocalProvider(LocalCardPalette provides if (light) LightCard else DarkCard) {
+        // The bright accents are hard to read on white, so the light card uses a deeper shade.
+        CardOnBackground(card, if (light) lerp(accent, Color.Black, 0.3f) else accent, modifier)
+    }
+}
+
+@Composable
+private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier) {
     Box(
         modifier = modifier
             .size(360.dp, 640.dp)
@@ -93,7 +141,7 @@ fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier,
         ) {
             CardHeader(card.dateLine)
             when (card) {
-                is ShareCard.Daily -> DailyBody(card, accent)
+                is ShareCard.Daily -> if (card.roast) RoastBody(card, accent) else DailyBody(card, accent)
                 is ShareCard.Activity -> ActivityBody(card, accent)
                 is ShareCard.Best -> BestBody(card, accent)
             }
@@ -215,6 +263,34 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
         }
     }
     Spacer(Modifier.weight(1f))
+}
+
+/** "Roast my day": the roast is the headline, with one row of the day's numbers under it. */
+@Composable
+private fun ColumnScope.RoastBody(card: ShareCard.Daily, accent: Color) {
+    Spacer(Modifier.height(24.dp))
+    Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+    Spacer(Modifier.height(12.dp))
+    Text(
+        card.coachLine.orEmpty(),
+        color = TextMain,
+        fontSize = 19.sp,
+        lineHeight = 26.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 6,
+        overflow = TextOverflow.Ellipsis
+    )
+    Spacer(Modifier.weight(1f))
+    val tiles = card.tiles.take(2)
+    if (tiles.isNotEmpty()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            tiles.forEach { stat ->
+                DailyTile(stat, barColor = if (stat.label == "PROTEIN") accent else secondBar(accent), modifier = Modifier.weight(1f))
+            }
+            if (tiles.size == 1) Spacer(Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(16.dp))
+    }
 }
 
 private fun secondBar(accent: Color): Color = if (accent == ElectricCyan) NeonMint else ElectricCyan
