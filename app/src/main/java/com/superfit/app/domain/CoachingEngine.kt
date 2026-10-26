@@ -70,6 +70,7 @@ class CoachingEngine {
         historySleep: List<SleepTelemetryEntity>,
         historyWeights: List<WeightEntryEntity>,
         memory: List<CoachMemoryEntry>,
+        notes: List<CoachNote> = emptyList(),
         today: LocalDate = LocalDate.now(),
         now: LocalTime = LocalTime.now()
     ): CoachInsight {
@@ -87,11 +88,12 @@ class CoachingEngine {
             weights = historyWeights,
             targetWeightKg = profile.targetWeightKg
         )
-        val focus = chooseFocus(report, memory, today)
+        val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today)
+        val focus = chooseFocus(report, memory, today, plans)
         val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
         val why = whyLines(focus, report)
 
-        val prompt = PersonalNutrition.adviceLine() + buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition)
+        val prompt = PersonalNutrition.adviceLine() + buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition, notes)
         return try {
             val response = GeminiClient.generateContent(
                 prompt = prompt,
@@ -120,6 +122,7 @@ class CoachingEngine {
             6. Don't repeat your recent messages. If THE FOCUS was also a recent topic, say it's still going on and give a different, more concrete tip than before.
             7. Avoid jargon such as bioavailable, thermic, macronutrients, glycemic, telemetry.
             8. The action is one concrete thing for the rest of today, or for tomorrow if it's after 9 PM. Prefer foods the user already eats.
+            9. Respect what you know about the user: never suggest something an injury, dislike or diet day rules out, and adapt the action instead (a walk instead of a run for a sore knee).
 
             Reply with JSON only, in this exact shape:
             {"headline": "1 or 2 sentences, at most 40 words, may put one key phrase in **bold**", "action": "one sentence, at most 25 words, no bold"}
@@ -144,12 +147,17 @@ class CoachingEngine {
          * the focus yesterday is marked down so the coach doesn't nag about the same thing every
          * day, and a concern that has since cleared up becomes a follow-up win.
          */
-        fun chooseFocus(report: CoachReport, memory: List<CoachMemoryEntry>, today: LocalDate): CoachFinding {
+        fun chooseFocus(
+            report: CoachReport,
+            memory: List<CoachMemoryEntry>,
+            today: LocalDate,
+            plans: List<CoachFinding> = emptyList()
+        ): CoachFinding {
             val past = memory.filter { it.date < today }.sortedByDescending { it.date }
             val yesterday = past.firstOrNull { it.date == today.minusDays(1) }?.focusId
             val dayBefore = past.firstOrNull { it.date == today.minusDays(2) }?.focusId
 
-            val candidates = report.findings + followUps(report, past, today)
+            val candidates = report.findings + followUps(report, past, today) + plans
             if (candidates.isEmpty()) return gettingStarted(report)
 
             return candidates.maxBy { f ->
@@ -255,7 +263,8 @@ class CoachingEngine {
             memory: List<CoachMemoryEntry>,
             today: LocalDate,
             now: LocalTime,
-            nutrition: List<NutritionEntryEntity>
+            nutrition: List<NutritionEntryEntity>,
+            notes: List<CoachNote> = emptyList()
         ): String {
             val t = report.today
             val goalText = when (profile.goal) {
@@ -289,6 +298,9 @@ class CoachingEngine {
                 report.targetMeanings.forEach { appendLine("- $it") }
                 appendLine()
                 appendLine("Foods they often eat: ${commonFoods(nutrition, today).ifBlank { "not enough logs yet" }}")
+                appendLine()
+                appendLine("What you know about them from your chats (respect these):")
+                appendLine(CoachNotes.promptLines(notes, today).ifBlank { "- nothing yet" })
                 appendLine()
                 appendLine("Your recent messages (newest first):")
                 appendLine(recentMessages)

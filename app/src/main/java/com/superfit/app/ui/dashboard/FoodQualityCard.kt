@@ -238,7 +238,7 @@ fun FoodQualityCard(
     }
 }
 
-/** The nutritionist's note: what's going well and up to two things to change. */
+/** The AI nutrition note (not the user's own nutritionist): what's going well and up to two things to change. */
 @Composable
 private fun DietNoteBlock(note: DietNote) {
     Surface(
@@ -248,7 +248,7 @@ private fun DietNoteBlock(note: DietNote) {
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = "YOUR NUTRITIONIST'S NOTE",
+                text = "AI NUTRITION NOTE",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.8.sp,

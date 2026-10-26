@@ -72,15 +72,18 @@ class DashboardViewModel(
     private val _coachingState = MutableStateFlow<CoachingInsightState>(CoachingInsightState.Idle)
     val coachingState: StateFlow<CoachingInsightState> = _coachingState.asStateFlow()
 
-    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(
-        listOf(
-            ChatMessage(MessageSender.Coach, "Hi! I'm your Superfit AI Coach. Ask me anything about your metrics, meal logging, or workout plans!")
-        )
-    )
-    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
+    /** The coach chat, oldest first. Loaded from the phone when the dashboard opens. */
+    private val _chatMessages = MutableStateFlow<List<com.superfit.app.domain.ChatEntry>>(emptyList())
+    val chatMessages: StateFlow<List<com.superfit.app.domain.ChatEntry>> = _chatMessages.asStateFlow()
+    private var chatLoaded = false
+    private var lastChatId = 0L
 
     private val _chatLoading = MutableStateFlow(false)
     val chatLoading: StateFlow<Boolean> = _chatLoading.asStateFlow()
+
+    /** What the coach knows about the user, from chats and from Settings. */
+    private val _coachNotes = MutableStateFlow(repository.loadCoachNotes())
+    val coachNotes: StateFlow<List<com.superfit.app.domain.CoachNote>> = _coachNotes.asStateFlow()
 
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
@@ -129,6 +132,7 @@ class DashboardViewModel(
         _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
         checkPermissions()
         loadCachedCoachingInsight()
+        loadChat()
         loadFrequentMeals()
         tagOlderMeals()
         sharedPrefs.registerOnSharedPreferenceChangeListener(preferenceListener)
@@ -178,153 +182,281 @@ class DashboardViewModel(
         }
     }
 
-    fun clearChat() {
-        _chatMessages.value = listOf(
-            ChatMessage(MessageSender.Coach, "Hi! I'm your Superfit AI Coach. Ask me anything about your metrics, meal logging, or workout plans!")
+    private fun loadChat() {
+        viewModelScope.launch {
+            val saved = repository.loadCoachChat()
+            val sentMeanwhile = _chatMessages.value
+            _chatMessages.value = com.superfit.app.domain.CoachChat.merge(saved, sentMeanwhile)
+            lastChatId = maxOf(lastChatId, _chatMessages.value.maxOfOrNull { it.id } ?: 0L)
+            chatLoaded = true
+            if (sentMeanwhile.any { !it.isError }) persistChat()
+        }
+    }
+
+    /** Saves the chat on the phone and backs it up. Waits for the saved chat to load, so it is never overwritten. */
+    private fun persistChat() {
+        if (!chatLoaded) return
+        val entries = _chatMessages.value
+        viewModelScope.launch { repository.saveCoachChat(entries) }
+    }
+
+    private fun newChatId(): Long = maxOf(System.currentTimeMillis(), lastChatId + 1).also { lastChatId = it }
+
+    private fun updateChatEntry(id: Long, change: (com.superfit.app.domain.ChatEntry) -> com.superfit.app.domain.ChatEntry) {
+        _chatMessages.value = _chatMessages.value.map { if (it.id == id) change(it) else it }
+        persistChat()
+    }
+
+    private fun addChatError(message: String) {
+        _chatMessages.value = _chatMessages.value + com.superfit.app.domain.ChatEntry(
+            id = newChatId(),
+            fromUser = false,
+            text = message,
+            time = System.currentTimeMillis(),
+            isError = true
         )
     }
 
-    fun sendChatMessage(text: String) {
-        if (text.isBlank()) return
-        val userMsg = ChatMessage(MessageSender.User, text)
-        AppAnalytics.coachMessageSent()
-        _chatMessages.value = _chatMessages.value + userMsg
+    /** Clears the conversation on the phone and in the backup. The coach's notes stay. */
+    fun clearChatHistory() {
+        _chatMessages.value = emptyList()
+        viewModelScope.launch { repository.clearCoachChat() }
+    }
+
+    /** Ready-made questions for the chat, picked for the time of day and what's logged. */
+    fun coachQuestions(): List<String> {
+        val state = dashboardState.value as? DashboardUiState.Success
+        val now = java.time.LocalDateTime.now()
+        return com.superfit.app.domain.CoachQuestions.forNow(
+            hour = now.hour,
+            day = now.dayOfWeek,
+            mealsToday = state?.nutritionList?.size ?: 0,
+            proteinStillNeeded = state?.let { (it.macroTargets.proteinG - it.proteinEaten).toInt() } ?: 0,
+            workedOutToday = state != null && (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()),
+            hasTodayTip = _coachingState.value is CoachingInsightState.Success
+        )
+    }
+
+    /**
+     * Asks the coach [text]. [how] is "typed", "voice" or "chip", for the usage counts. The answer
+     * uses the user's own logs, notes and recent conversation; afterwards the coach picks out
+     * anything worth remembering.
+     */
+    fun sendChatMessage(text: String, how: String = "typed") {
+        val question = text.trim().take(com.superfit.app.domain.CoachChat.MAX_TEXT)
+        if (question.isBlank() || _chatLoading.value) return
+        AppAnalytics.coachMessageSent(how)
+        val before = _chatMessages.value.filterNot { it.isError }
+        _chatMessages.value = _chatMessages.value + com.superfit.app.domain.ChatEntry(
+            id = newChatId(),
+            fromUser = true,
+            text = question,
+            time = System.currentTimeMillis(),
+            spoken = how == "voice"
+        )
+        persistChat()
 
         val currentState = dashboardState.value
         if (currentState !is DashboardUiState.Success) {
-            _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, "Error: Daily metrics are not loaded yet.")
+            addChatError("Your day is still loading. Try again in a moment.")
             return
         }
 
         viewModelScope.launch {
             _chatLoading.value = true
             try {
-                val profile = currentState.profile
-                val activity = currentState.activity
-                val sleep = currentState.sleep
-                val nutrition = currentState.nutritionList
-                val macroTargets = currentState.macroTargets
-                val caloriesEaten = currentState.caloriesEaten
-                val proteinEaten = currentState.proteinEaten
-                val carbsEaten = currentState.carbsEaten
-                val fatEaten = currentState.fatEaten
-
-                val sleepText = if (sleep != null) {
-                    "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h, Readiness Score: ${sleep.readinessScore}%"
-                } else {
-                    "No sleep telemetry logged today."
+                val history = com.superfit.app.domain.CoachChat.historyForAi(before, System.currentTimeMillis()).map {
+                    GeminiClient.ChatTurn(fromUser = it.fromUser, text = it.text)
                 }
-
-                val nutritionText = "Calories Eaten: ${caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
-                    "Protein: ${proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
-                    "Carbs: ${carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
-                    "Fat: ${fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
-                    "Fibre (estimated): ${nutrition.sumOf { MealTags.of(it).fiberG }.toInt()} / ${CoachPatternEngine.fibreTargetG(macroTargets.calories).toInt()}g."
-
-                val workoutsText = if (currentState.workoutList.isEmpty() && currentState.importedWorkouts.isEmpty()) {
-                    "No workouts logged today."
-                } else {
-                    (
-                        currentState.workoutList.map {
-                            if (it.workoutType == "Strength") {
-                                "${it.description} (Strength, ${it.setsCount} sets x ${it.repsCount} reps, ~${it.caloriesBurned.toInt()} kcal)"
-                            } else {
-                                "${it.description} (Cardio, ~${it.caloriesBurned.toInt()} kcal)"
-                            }
-                        } + currentState.importedWorkouts.map {
-                            ImportedWorkouts.coachEntry(it).let { e -> "${e.description}, ~${e.caloriesBurned.toInt()} exercise kcal" }
-                        }
-                        ).joinToString()
-                }
-
-                val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
-                val vsUsualText = todayVsUsual(currentState, usualDay.value).chatLine()
-
-                val weekAgo = System.currentTimeMillis() - 7L * 24 * 3600 * 1000
-                val weekWorkoutsText = repository.getImportedWorkoutViews(currentState.bmr)
-                    .filter { it.startTime >= weekAgo }
-                    .groupBy { it.title }
-                    .map { (title, list) ->
-                        val km = list.sumOf { it.distanceKm ?: 0.0 }
-                        "${list.size} x $title" + if (km > 0) String.format(java.util.Locale.US, " (%.1f km)", km) else ""
-                    }
-                    .joinToString()
-                    .ifEmpty { "none recorded" }
-
-                val body = com.superfit.app.domain.BodyReadings.summary(
-                    com.superfit.app.data.BodyImporter.mine(appContext),
-                    profile.weightKg,
-                    profile.heightCm,
-                    LocalDate.now()
-                )
-                val bodyText = if (body.hasScaleData) {
-                    listOfNotNull(
-                        body.bodyFatPct?.let { "body fat ${com.superfit.app.domain.BodyReadings.fmt(it)}%" + (body.bodyFatChange?.let { c -> " (${if (c > 0) "+" else ""}${com.superfit.app.domain.BodyReadings.fmt(c)} pts over 4 weeks)" } ?: "") },
-                        body.leanKg?.let { "lean mass ${com.superfit.app.domain.BodyReadings.fmt(it)} kg" },
-                        body.insight
-                    ).joinToString(", ")
-                } else {
-                    "no smart scale data"
-                }
-
-                val systemInstructionText = """
-                    You are Superfit AI Coach, a premium, friendly, highly analytical personal trainer and health scientist.
-                    Answer the user's questions about their fitness, diet, sleep, or daily telemetry.
-                    Use the user's live daily metrics below for context:
-                    - User Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
-                    - Body (smart scale): $bodyText
-                    - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
-                    - Their own nutritionist's advice (follow it, never contradict it): ${com.superfit.app.domain.PersonalNutrition.advice ?: "none given"}
-                    - Macro Targets: Protein: ${macroTargets.proteinG.toInt()}g, Carbs: ${macroTargets.carbsG.toInt()}g, Fat: ${macroTargets.fatG.toInt()}g, Calories: ${macroTargets.calories.toInt()} kcal
-                    - Daily Nutrition: $nutritionText
-                    - Daily Activity: $activityText
-                    - $vsUsualText
-                    - Daily Workouts: $workoutsText
-                    - Workouts from other apps, last 7 days: $weekWorkoutsText
-                    - Daily Sleep: $sleepText
-                    
-                    Rules:
-                    1. CRITICAL: Distinguish between incomplete logging vs actual low calorie intake. If daily logged calories are low or missing, assume the user did not finish logging their meals, rather than assuming starvation, extreme dieting, or 'feast or famine' behavior.
-                    2. Keep answers extremely concise, short, and to the point. Do not write long essays or multiple paragraphs.
-                    3. Limit responses to exactly 2 to 3 sentences maximum (under 75 words).
-                    4. Do not include unnecessary pleasantries, greetings, or signature sign-offs.
-                    5. Use clean markdown formatting (bold, bullet points) sparingly where it adds clarity.
-                    6. When the user asks whether a number is good or bad (like "is 50g of protein enough?"), answer for them specifically: compare it with their target and goal using the notes below, and look at the pattern over days rather than one day.
-                """.trimIndent() + "\n\n" + CoachingEngine.chatContext(
-                    CoachPatternEngine.analyze(
-                        today = LocalDate.now(),
-                        now = java.time.LocalTime.now(),
-                        weightKg = profile.weightKg,
-                        goal = profile.goal,
-                        targets = macroTargets,
-                        maintenanceCalories = if (sharedPrefs.getBoolean("custom_macro_enabled", false)) null else currentState.tdee,
-                        nutrition = repository.getAllNutritionEntries(),
-                        workouts = repository.getAllWorkoutsForCoach(currentState.bmr),
-                        activity = repository.getAllActivityTelemetry(),
-                        sleep = repository.getAllSleepTelemetry(),
-                        weights = repository.getAllWeightEntries(),
-                        targetWeightKg = profile.targetWeightKg
-                    )
-                )
-
-                val history = _chatMessages.value.dropLast(1).map { msg ->
-                    GeminiClient.ChatTurn(fromUser = msg.sender == MessageSender.User, text = msg.text)
-                }
-
-                val coachResponseText = GeminiClient.chat(
-                    systemInstructionText = systemInstructionText,
+                val raw = GeminiClient.chat(
+                    systemInstructionText = coachChatInstruction(currentState, before),
                     history = history,
-                    message = text
+                    message = question
                 )
-                _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, coachResponseText)
+                val reply = com.superfit.app.domain.CoachChat.parseReply(raw)
+                val coachEntry = com.superfit.app.domain.ChatEntry(
+                    id = newChatId(),
+                    fromUser = false,
+                    text = reply.text.ifBlank { raw.trim() },
+                    time = System.currentTimeMillis(),
+                    mealToLog = reply.mealToLog
+                )
+                _chatMessages.value = _chatMessages.value + coachEntry
+                persistChat()
+                rememberFrom(question, coachEntry)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 android.util.Log.e("DashboardViewModel", "Chat message failed", e)
-                val friendlyMsg = GeminiClient.sanitizeError(e)
-                _chatMessages.value = _chatMessages.value + ChatMessage(MessageSender.Coach, friendlyMsg)
+                addChatError(GeminiClient.sanitizeError(e))
             } finally {
                 _chatLoading.value = false
             }
         }
+    }
+
+    /** Picks out anything worth remembering from one exchange and shows it under the reply. */
+    private fun rememberFrom(question: String, reply: com.superfit.app.domain.ChatEntry) {
+        if (question.length < 12 || question == com.superfit.app.domain.CoachChat.TELL_ME_MORE) return
+        viewModelScope.launch {
+            try {
+                val today = LocalDate.now()
+                val notes = _coachNotes.value
+                val response = GeminiClient.generateContent(
+                    prompt = com.superfit.app.domain.CoachNotes.extractPrompt(notes, today, question, reply.text),
+                    systemInstructionText = com.superfit.app.domain.CoachNotes.EXTRACT_INSTRUCTION,
+                    isJson = true
+                )
+                val update = com.superfit.app.domain.CoachNotes.parseUpdate(response, _coachNotes.value, today, System.currentTimeMillis())
+                if (update.isEmpty) return@launch
+                val current = _coachNotes.value
+                saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(current, update))
+                update.add.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = false) }
+                updateChatEntry(reply.id) {
+                    it.copy(
+                        rememberedIds = update.add.map { n -> n.id },
+                        forgotten = current.filter { n -> n.id in update.outdatedIds }
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("DashboardViewModel", "Picking out coach notes failed", e)
+            }
+        }
+    }
+
+    private fun saveCoachNotes(notes: List<com.superfit.app.domain.CoachNote>) {
+        _coachNotes.value = notes
+        viewModelScope.launch { repository.saveCoachNotes(notes) }
+    }
+
+    /** Undo on "Remembered: …": takes back the notes that reply saved and brings back any it retired. */
+    fun undoChatNotes(entryId: Long) {
+        val entry = _chatMessages.value.firstOrNull { it.id == entryId } ?: return
+        val current = _coachNotes.value
+        val restored = current.filterNot { it.id in entry.rememberedIds } +
+            entry.forgotten.filter { old -> current.none { it.id == old.id } }
+        saveCoachNotes(restored)
+        AppAnalytics.coachNoteRemoved("undo")
+        updateChatEntry(entryId) { it.copy(rememberedIds = emptyList(), forgotten = emptyList()) }
+    }
+
+    fun deleteCoachNote(id: String) {
+        saveCoachNotes(_coachNotes.value.filterNot { it.id == id })
+        AppAnalytics.coachNoteRemoved("settings")
+    }
+
+    /** Adds what the user typed or pasted in Settings; each line becomes its own note. */
+    fun addCoachNote(text: String) {
+        val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now(), System.currentTimeMillis())
+        if (notes.isEmpty()) return
+        saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(notes, emptyList())))
+        notes.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = true) }
+    }
+
+    /** "Log this" under a coach reply: the suggested meal goes through the normal meal log. */
+    fun logSuggestedMeal(entryId: Long) {
+        val entry = _chatMessages.value.firstOrNull { it.id == entryId } ?: return
+        val meal = entry.mealToLog ?: return
+        if (entry.mealLogged) return
+        parseAndAddMeal(meal)
+        AppAnalytics.coachMealLogged()
+        updateChatEntry(entryId) { it.copy(mealLogged = true) }
+    }
+
+    /** The coach chat's instructions: the user's live numbers, their own logs and notes, and the rules. */
+    private suspend fun coachChatInstruction(
+        currentState: DashboardUiState.Success,
+        conversation: List<com.superfit.app.domain.ChatEntry>
+    ): String {
+        val profile = currentState.profile
+        val activity = currentState.activity
+        val sleep = currentState.sleep
+        val nutrition = currentState.nutritionList
+        val macroTargets = currentState.macroTargets
+        val today = LocalDate.now()
+        val now = java.time.LocalTime.now()
+
+        val sleepText = if (sleep != null) {
+            "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h, Readiness Score: ${sleep.readinessScore}%"
+        } else {
+            "No sleep data today."
+        }
+
+        val nutritionText = "Calories Eaten: ${currentState.caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
+            "Protein: ${currentState.proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
+            "Carbs: ${currentState.carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
+            "Fat: ${currentState.fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
+            "Fibre (estimated): ${nutrition.sumOf { MealTags.of(it).fiberG }.toInt()} / ${CoachPatternEngine.fibreTargetG(macroTargets.calories).toInt()}g."
+
+        val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
+        val vsUsualText = todayVsUsual(currentState, usualDay.value).chatLine()
+
+        val body = com.superfit.app.domain.BodyReadings.summary(
+            com.superfit.app.data.BodyImporter.mine(appContext),
+            profile.weightKg,
+            profile.heightCm,
+            today
+        )
+        val bodyText = if (body.hasScaleData) {
+            listOfNotNull(
+                body.bodyFatPct?.let { "body fat ${com.superfit.app.domain.BodyReadings.fmt(it)}%" + (body.bodyFatChange?.let { c -> " (${if (c > 0) "+" else ""}${com.superfit.app.domain.BodyReadings.fmt(c)} pts over 4 weeks)" } ?: "") },
+                body.leanKg?.let { "lean mass ${com.superfit.app.domain.BodyReadings.fmt(it)} kg" },
+                body.insight
+            ).joinToString(", ")
+        } else {
+            "no smart scale data"
+        }
+
+        val allNutrition = repository.getAllNutritionEntries()
+        val coachWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr)
+        val report = CoachPatternEngine.analyze(
+            today = today,
+            now = now,
+            weightKg = profile.weightKg,
+            goal = profile.goal,
+            targets = macroTargets,
+            maintenanceCalories = if (sharedPrefs.getBoolean("custom_macro_enabled", false)) null else currentState.tdee,
+            nutrition = allNutrition,
+            workouts = coachWorkouts,
+            activity = repository.getAllActivityTelemetry(),
+            sleep = repository.getAllSleepTelemetry(),
+            weights = repository.getAllWeightEntries(),
+            targetWeightKg = profile.targetWeightKg
+        )
+
+        val live = """
+            You are Superfit AI Coach, a friendly, knowledgeable personal trainer and nutrition coach who knows this user well.
+            Answer the user's questions about their fitness, food, sleep and progress.
+            Their numbers today:
+            - Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
+            - Body (smart scale): $bodyText
+            - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
+            - Their own nutritionist's advice (follow it, never contradict it): ${com.superfit.app.domain.PersonalNutrition.advice ?: "none given"}
+            - Targets: Protein ${macroTargets.proteinG.toInt()}g, Carbs ${macroTargets.carbsG.toInt()}g, Fat ${macroTargets.fatG.toInt()}g, Calories ${macroTargets.calories.toInt()} kcal
+            - Today's nutrition: $nutritionText
+            - Today's activity: $activityText
+            - $vsUsualText
+            - Today's sleep: $sleepText
+        """.trimIndent()
+
+        val personal = com.superfit.app.domain.CoachChatContext.personal(
+            today = today,
+            now = now,
+            todayMeals = nutrition,
+            report = report,
+            workouts = coachWorkouts,
+            targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(sharedPrefs) },
+            goalDate = GoalDatePref.get(sharedPrefs),
+            commonFoods = CoachingEngine.commonFoods(allNutrition, today),
+            notes = _coachNotes.value,
+            todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(sharedPrefs, today),
+            earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
+        )
+
+        return listOf(live, personal, CoachingEngine.chatContext(report).trim(), com.superfit.app.domain.CoachChatContext.RULES)
+            .joinToString("\n\n")
     }
 
     /** Today's steps and workouts next to the usual for this weekday. */
@@ -1015,7 +1147,8 @@ class DashboardViewModel(
                     historyActivity = repository.getAllActivityTelemetry(),
                     historySleep = repository.getAllSleepTelemetry(),
                     historyWeights = repository.getAllWeightEntries(),
-                    memory = CoachInsightStore.memory(sharedPrefs)
+                    memory = CoachInsightStore.memory(sharedPrefs),
+                    notes = _coachNotes.value
                 )
 
                 CoachInsightStore.save(sharedPrefs, LocalDate.now(), insight)
@@ -1154,14 +1287,3 @@ sealed interface CoachingInsightState {
     data class Success(val insight: CoachInsight) : CoachingInsightState
     data class Error(val message: String) : CoachingInsightState
 }
-
-enum class MessageSender {
-    User,
-    Coach
-}
-
-data class ChatMessage(
-    val sender: MessageSender,
-    val text: String,
-    val timestamp: Long = System.currentTimeMillis()
-)
