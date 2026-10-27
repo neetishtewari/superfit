@@ -102,12 +102,17 @@ object CoachExportPdf {
         pen.finish()
         file.outputStream().use { doc.writeTo(it) }
         doc.close()
-        // Make the footer's store address a real tappable link (PdfDocument can't draw links itself).
+        // Make the footer's "Get it on Google Play" a real tappable link (PdfDocument can't draw links itself).
         runCatching {
             PdfLinks.addLinkToEveryPage(
                 file,
                 PLAY_URL,
-                floatArrayOf(MARGIN, PAGE_H - (FOOTER_TOP + 34f), PAGE_W - MARGIN, PAGE_H - (FOOTER_TOP + 20f))
+                floatArrayOf(
+                    MARGIN - 2f,
+                    PAGE_H - (FOOTER_TOP + 36f),
+                    MARGIN + pen.playLinkWidth + 2f,
+                    PAGE_H - (FOOTER_TOP + 19f)
+                )
             )
         }
     }
@@ -246,6 +251,7 @@ object CoachExportPdf {
     /** Writes down the page, starting a new branded page when one fills up. */
     private class Pen(private val doc: PdfDocument, private val brand: Brand, private val range: String) {
         private var pageNo = 0
+        var playLinkWidth = 0f
         private var page: PdfDocument.Page? = null
         private lateinit var canvas: Canvas
         private var y = 0f
@@ -356,16 +362,13 @@ object CoachExportPdf {
             canvas.drawText(" · Clients log meals by photo or voice", MARGIN + bw, FOOTER_TOP + 16f, paint)
             val num = "$pageNo"
             canvas.drawText(num, PAGE_W - MARGIN - paint.measureText(num), FOOTER_TOP + 16f, paint)
-            // The full address as text: PDF viewers turn it into a tappable link.
-            style(8.5f, Font.MEDIUM, MUTED)
-            canvas.drawText("Get it on Google Play: ", MARGIN, FOOTER_TOP + 29f, paint)
-            val lw = paint.measureText("Get it on Google Play: ")
-            // Plain font with no joined letters, so the address copies and reads back exactly.
-            style(8.5f, Font.MEDIUM, GREEN_DEEP)
-            paint.typeface = Typeface.SANS_SERIF
-            paint.fontFeatureSettings = "'liga' 0, 'clig' 0"
-            canvas.drawText(PLAY_URL, MARGIN + lw, FOOTER_TOP + 29f, paint)
-            paint.fontFeatureSettings = null
+            // A short green link label; write() puts the tappable Play Store link over it.
+            style(9f, Font.BOLD, GREEN)
+            val label = "Get it on Google Play \u203A"
+            canvas.drawText(label, MARGIN, FOOTER_TOP + 30f, paint)
+            playLinkWidth = paint.measureText(label)
+            fill.color = GREEN
+            canvas.drawRect(MARGIN, FOOTER_TOP + 32f, MARGIN + playLinkWidth, FOOTER_TOP + 32.8f, fill)
             doc.finishPage(p)
         }
 
