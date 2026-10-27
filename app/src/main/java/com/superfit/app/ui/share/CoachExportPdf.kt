@@ -359,7 +359,7 @@ object CoachExportPdf {
             canvas.drawText("Made with Superfit", MARGIN, FOOTER_TOP + 16f, paint)
             val bw = paint.measureText("Made with Superfit")
             style(8.5f, Font.REGULAR, MUTED)
-            canvas.drawText(" · Clients log meals by photo or voice", MARGIN + bw, FOOTER_TOP + 16f, paint)
+            canvas.drawText(" · Effortless one-tap logging of meals and workouts", MARGIN + bw, FOOTER_TOP + 16f, paint)
             val num = "$pageNo"
             canvas.drawText(num, PAGE_W - MARGIN - paint.measureText(num), FOOTER_TOP + 16f, paint)
             // A short green link label; write() puts the tappable Play Store link over it.
