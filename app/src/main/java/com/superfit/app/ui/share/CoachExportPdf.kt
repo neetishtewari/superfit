@@ -102,6 +102,14 @@ object CoachExportPdf {
         pen.finish()
         file.outputStream().use { doc.writeTo(it) }
         doc.close()
+        // Make the footer's store address a real tappable link (PdfDocument can't draw links itself).
+        runCatching {
+            PdfLinks.addLinkToEveryPage(
+                file,
+                PLAY_URL,
+                floatArrayOf(MARGIN, PAGE_H - (FOOTER_TOP + 34f), PAGE_W - MARGIN, PAGE_H - (FOOTER_TOP + 20f))
+            )
+        }
     }
 
     private fun summary(pen: Pen, r: CoachExport) {
@@ -352,8 +360,12 @@ object CoachExportPdf {
             style(8.5f, Font.MEDIUM, MUTED)
             canvas.drawText("Get it on Google Play: ", MARGIN, FOOTER_TOP + 29f, paint)
             val lw = paint.measureText("Get it on Google Play: ")
+            // Plain font with no joined letters, so the address copies and reads back exactly.
             style(8.5f, Font.MEDIUM, GREEN_DEEP)
+            paint.typeface = Typeface.SANS_SERIF
+            paint.fontFeatureSettings = "'liga' 0, 'clig' 0"
             canvas.drawText(PLAY_URL, MARGIN + lw, FOOTER_TOP + 29f, paint)
+            paint.fontFeatureSettings = null
             doc.finishPage(p)
         }
 
