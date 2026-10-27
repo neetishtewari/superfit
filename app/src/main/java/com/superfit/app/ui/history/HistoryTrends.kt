@@ -370,30 +370,22 @@ fun CalorieTrendChart(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Eaten vs what you burn",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ThemeTextTertiary,
-                    letterSpacing = 0.sp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(NeonMint))
-                        Text("Eaten", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ElectricCyan))
-                        Text("What you burn", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
-                    }
+            // Title on its own line with the legend under it, so neither wraps.
+            Text(
+                text = "Eaten vs what you burn",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(NeonMint))
+                    Text("Eaten", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ElectricCyan))
+                    Text("What you burn", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
                 }
             }
 

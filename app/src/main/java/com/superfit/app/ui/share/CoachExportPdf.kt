@@ -67,6 +67,7 @@ object CoachExportPdf {
             bold = font(R.font.manrope_bold, Typeface.DEFAULT_BOLD),
             extraBold = font(R.font.manrope_extrabold, Typeface.DEFAULT_BOLD),
             logo = context?.let { runCatching { BitmapFactory.decodeResource(it.resources, R.drawable.ic_superfit_launcher) }.getOrNull() }
+                ?.let { Bitmap.createScaledBitmap(it, 96, 96, true) } // the full-size icon made each PDF about 9 MB
         )
     }
 
@@ -118,9 +119,9 @@ object CoachExportPdf {
         val change = r.weightStart?.let { s -> r.weightEnd?.let { e -> e.second - s.second } }
         pen.tiles(
             listOf(
-                Tile("Calories a day", r.avgKcal?.let { "%,d".format(Locale.US, it) } ?: "–", r.avgKcalTarget?.let { "target about %,d".format(Locale.US, it) } ?: "not enough logged"),
+                Tile("Calories a day", r.avgKcal?.let { num(it) } ?: "–", if (r.daysLogged > 0) "from ${r.daysLogged} logged ${if (r.daysLogged == 1) "day" else "days"}" else "not enough logged"),
                 Tile("Protein goal", r.proteinPct?.let { "$it%" } ?: "–", r.avgProteinG?.let { "$it g of ${r.proteinTargetG} g a day" } ?: "not enough logged"),
-                Tile("Workouts", "${r.workoutCount}", if (r.workoutMinutes > 0) "${r.workoutMinutes} min in total" else "in this period"),
+                Tile("Workouts", "${r.workoutCount}", if (r.walkCount > 0) "plus ${r.walkCount} walks" else "in this period"),
                 Tile("Weight change", change?.let { signedKg(it) } ?: r.weightStart?.let { kg(it.second) } ?: "–", if (change != null) "${kg(r.weightStart!!.second)} → ${kg(r.weightEnd!!.second)}" else "too few weigh-ins")
             )
         )
@@ -136,7 +137,7 @@ object CoachExportPdf {
         if (r.daysLogged == 0) {
             pen.text("No fully logged days in this period.", 11f, color = MUTED)
         } else {
-            pen.row("Calories", "${r.avgKcal} kcal a day (target about ${r.avgKcalTarget})")
+            pen.row("Calories", "${num(r.avgKcal ?: 0)} kcal a day (target about ${num(r.avgKcalTarget ?: 0)})")
             pen.row("Protein", "${r.avgProteinG} g a day, ${r.proteinPct ?: 0}% of the ${r.proteinTargetG} g goal")
             pen.row("Carbs / fat", "${r.avgCarbsG} g / ${r.avgFatG} g a day")
         }
@@ -147,7 +148,8 @@ object CoachExportPdf {
         pen.gap(12f)
 
         pen.heading("Activity")
-        pen.row("Workouts", "${r.workoutCount}${if (r.workoutMinutes > 0) ", ${r.workoutMinutes} min in total" else ""}")
+        pen.row("Workouts", "${r.workoutCount}" + if (r.walkCount > 0) ", plus ${r.walkCount} walks" else "")
+        if (r.workoutMinutes > 0) pen.row("Time moving", duration(r.workoutMinutes) + " in total")
         r.avgSteps?.let { pen.row("Steps", "%,d a day on average".format(Locale.US, it)) }
         pen.gap(12f)
 
@@ -158,8 +160,8 @@ object CoachExportPdf {
             start == null -> pen.text("No weigh-ins in this period.", 11f, color = MUTED)
             end == null -> pen.row("Weigh-in", "${kg(start.second)} on ${start.first.format(dayFormat)}")
             else -> {
-                pen.row("Start", "${kg(start.second)} on ${start.first.format(dayFormat)}")
-                pen.row("End", "${kg(end.second)} on ${end.first.format(dayFormat)}")
+                pen.row("First weigh-in", "${kg(start.second)} on ${start.first.format(dayFormat)}")
+                pen.row("Latest weigh-in", "${kg(end.second)} on ${end.first.format(dayFormat)}")
                 pen.row("Change", signedKg(end.second - start.second))
             }
         }
@@ -179,9 +181,9 @@ object CoachExportPdf {
         pen.tableHeader(columns.map { it.first })
         r.days.forEachIndexed { i, d ->
             val values = if (d.logged || d.meals.isNotEmpty()) {
-                listOf("%,d".format(Locale.US, d.kcal), "${d.proteinG} g", "${d.carbsG} g", "${d.fatG} g")
+                listOf(num(d.kcal), "${d.proteinG} g", "${d.carbsG} g", "${d.fatG} g")
             } else {
-                listOf("not logged", "", "", "")
+                listOf(NOT_LOGGED, "", "", "")
             }
             val firstWorkout = d.workouts.firstOrNull() ?: ""
             val over = d.logged && d.kcalTarget > 0 && d.kcal > d.kcalTarget * 1.1
@@ -192,10 +194,10 @@ object CoachExportPdf {
                 muted = !d.logged,
                 highlightKcal = over
             )
-            d.workouts.drop(1).forEach { w -> pen.tableRow(List(columns.size - 1) { "" } + w, striped = i % 2 == 1, muted = false) }
+            d.workouts.drop(1).forEach { w -> pen.tableRow(List(columns.size - 1) { "" } + w, striped = i % 2 == 1, muted = !d.logged) }
         }
         pen.gap(8f)
-        pen.wrapped("Grey days had fewer than two meals logged and aren't counted in averages. Amber calories are more than 10% over that day's target.", 9f, color = MUTED)
+        pen.wrapped("Days with grey food numbers had fewer than two meals logged and aren't counted in averages. Amber calories are more than 10% over that day's target.", 9f, color = MUTED)
     }
 
     private fun mealPages(pen: Pen, r: CoachExport) {
@@ -210,6 +212,12 @@ object CoachExportPdf {
             pen.gap(8f)
         }
     }
+
+    private const val NOT_LOGGED = "Food not logged"
+
+    private fun num(value: Int) = "%,d".format(Locale.US, value)
+
+    private fun duration(minutes: Long) = if (minutes < 120) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"
 
     private fun kg(value: Double) = String.format(Locale.US, "%.1f kg", value)
     private fun signedKg(value: Double) = (if (value > 0) "+" else "") + kg(value)
@@ -267,7 +275,17 @@ object CoachExportPdf {
         private fun logo(x: Float, top: Float, size: Float) {
             val bmp = brand.logo
             if (bmp != null) {
-                canvas.drawBitmap(bmp, null, RectF(x, top, x + size, top + size), paint)
+                // App icon on a white tile, so it reads as a light mark on the green band.
+                fill.color = Color.WHITE
+                canvas.drawRoundRect(RectF(x, top, x + size, top + size), size * 0.26f, size * 0.26f, fill)
+                val inset = size * 0.1f
+                val save = canvas.save()
+                val clip = android.graphics.Path().apply {
+                    addRoundRect(RectF(x + inset, top + inset, x + size - inset, top + size - inset), size * 0.18f, size * 0.18f, android.graphics.Path.Direction.CW)
+                }
+                canvas.clipPath(clip)
+                canvas.drawBitmap(bmp, null, RectF(x + inset, top + inset, x + size - inset, top + size - inset), paint)
+                canvas.restoreToCount(save)
             } else {
                 fill.color = Color.WHITE
                 canvas.drawRoundRect(RectF(x, top, x + size, top + size), size * 0.28f, size * 0.28f, fill)
@@ -292,11 +310,13 @@ object CoachExportPdf {
             wordmark(MARGIN + 52f, 57f, 18f)
             style(10f, Font.MEDIUM, Color.argb(230, 255, 255, 255))
             canvas.drawText("Your AI coach for food and fitness", MARGIN + 52f, 72f, paint)
-            style(16f, Font.BOLD, Color.WHITE)
-            val title = "Progress report"
-            canvas.drawText(title, PAGE_W - MARGIN - paint.measureText(title), 52f, paint)
-            style(10f, Font.MEDIUM, Color.argb(230, 255, 255, 255))
-            canvas.drawText(range, PAGE_W - MARGIN - paint.measureText(range), 70f, paint)
+            style(9f, Font.BOLD, Color.argb(220, 255, 255, 255))
+            paint.letterSpacing = 0.08f
+            val label = "PROGRESS REPORT"
+            canvas.drawText(label, PAGE_W - MARGIN - paint.measureText(label), 50f, paint)
+            paint.letterSpacing = 0f
+            style(13f, Font.BOLD, Color.WHITE)
+            canvas.drawText(range, PAGE_W - MARGIN - paint.measureText(range), 68f, paint)
             y = bandH + 30f
         }
 
@@ -435,13 +455,14 @@ object CoachExportPdf {
             }
             values.forEachIndexed { i, v ->
                 val color = when {
-                    muted -> MUTED
+                    muted && i in 1..4 -> MUTED
                     i == 1 && highlightKcal -> AMBER
                     else -> INK
                 }
                 style(9f, if (i == 0) Font.MEDIUM else Font.REGULAR, color)
                 val x = MARGIN + 6f + columns[i].second
-                val maxWidth = (columns.getOrNull(i + 1)?.second ?: CONTENT_W) - columns[i].second - 8f
+                val end = if (v == NOT_LOGGED) columns[5].second else columns.getOrNull(i + 1)?.second ?: CONTENT_W
+                val maxWidth = end - columns[i].second - 8f
                 canvas.drawText(fit(v, maxWidth), x, y + 12f, paint)
             }
             y += 17f
