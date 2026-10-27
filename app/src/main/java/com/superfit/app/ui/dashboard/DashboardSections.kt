@@ -704,7 +704,7 @@ internal fun TrackMealsCard(
 
         // Meals logged today list
         Text(
-            text = "Today's Meals",
+            text = "Logged so far",
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
             color = ThemeTextPrimary
@@ -806,7 +806,7 @@ internal fun ActivityPerformanceCard(
                     modifier = Modifier.weight(1f)
                 )
                 TodayTile(
-                    label = "Burned in workouts",
+                    label = "Workout burn",
                     value = "${today.workoutKcal.toInt()} kcal",
                     usual = usual?.let { "${it.workoutKcal.toInt()} kcal" },
                     ahead = usual != null && usual.workoutKcal > 0 && today.workoutKcal >= usual.workoutKcal,
@@ -868,7 +868,7 @@ internal fun ActivityPerformanceCard(
                             .background(ThemeTextPrimary.copy(alpha = 0.03f))
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -1023,7 +1023,7 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
                 val deepHours = state.sleep.deepSleepDurationSeconds / 3600
                 val deepMins = (state.sleep.deepSleepDurationSeconds % 3600) / 60
                 SleepMetricPill(
-                    label = "Deep sleep (est.)",
+                    label = "Est. deep sleep",
                     value = "${deepHours}h ${deepMins}m",
                     modifier = Modifier.weight(1.0f)
                 )

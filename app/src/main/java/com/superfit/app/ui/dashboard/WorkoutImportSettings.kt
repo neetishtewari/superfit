@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -25,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,23 +104,15 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
                 color = SuperfitTheme.colors.textPrimary,
                 fontSize = 13.sp
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                WorkoutAddBack.entries.forEach { option ->
-                    FilterChip(
-                        selected = addBack == option,
-                        onClick = {
-                            addBack = option
-                            viewModel.setWorkoutAddBack(option)
-                        },
-                        label = { Text(option.label) },
-                        shape = RoundedCornerShape(8.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = NeonMint,
-                            selectedLabelColor = Color.White
-                        )
-                    )
+            SegmentedPills(
+                options = WorkoutAddBack.entries.map { it.name to it.label },
+                selected = addBack.name,
+                onSelect = { key ->
+                    val option = WorkoutAddBack.valueOf(key)
+                    addBack = option
+                    viewModel.setWorkoutAddBack(option)
                 }
-            }
+            )
             Text(
                 text = when (addBack) {
                     WorkoutAddBack.OFF -> "Your target stays the same every day, from the activity level you chose."
@@ -145,27 +139,27 @@ fun WorkoutImportSettings(viewModel: DashboardViewModel) {
 private fun MainAppPicker(mainApp: String?, apps: List<Pair<String, String>>, onPick: (String?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val current = apps.firstOrNull { it.first == mainApp }?.second ?: "Automatic"
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(
-                text = "Main workout app",
-                fontWeight = FontWeight.Bold,
-                color = SuperfitTheme.colors.textPrimary,
-                fontSize = 13.sp
-            )
-            Text(
-                text = "When two apps record the same workout, this one's copy is kept. Automatic keeps the most detailed one.",
-                color = SuperfitTheme.colors.textSecondary,
-                fontSize = 12.sp
-            )
-        }
+    // Full-width text with the picker below it, so the explanation isn't squeezed into a narrow column.
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "Main workout app",
+            fontWeight = FontWeight.Bold,
+            color = SuperfitTheme.colors.textPrimary,
+            fontSize = 13.sp
+        )
+        Text(
+            text = "When two apps record the same workout, this one's copy is kept. Automatic keeps the most detailed one.",
+            color = SuperfitTheme.colors.textSecondary,
+            fontSize = 12.sp
+        )
         Box {
-            TextButton(onClick = { open = true }) {
-                Text(current, color = NeonMint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            OutlinedButton(
+                onClick = { open = true },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text(current, color = NeonMint, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NeonMint)
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 DropdownMenuItem(text = { Text("Automatic") }, onClick = {

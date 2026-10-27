@@ -293,7 +293,7 @@ fun DayBalanceCard(
                                 .background(ThemeTextPrimary.copy(alpha = 0.03f))
                                 .padding(8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Top
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -452,7 +452,7 @@ fun DayBalanceCard(
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Text(
-                            text = "Frequently Tracked (Tap to fill):",
+                            text = "Your usual foods",
                             fontSize = 12.sp,
                             color = ThemeTextTertiary,
                             fontWeight = FontWeight.Bold

@@ -8,10 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,14 +23,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.NoteKind
 import com.superfit.app.theme.DeleteRed
-import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
@@ -98,31 +95,29 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
                 )
             }
         }
-        Row(
+        // Mic and Add sit inside the field (like the coach chat) so the box gets the full width.
+        SuperfitField(
+            trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 6.dp)) {
+                    com.superfit.app.ui.components.MicButton(onClick = speakNote)
+                    com.superfit.app.ui.components.FieldActionButton(
+                        icon = androidx.compose.material.icons.Icons.Default.Add,
+                        contentDescription = "Add note",
+                        enabled = newNote.isNotBlank(),
+                        onClick = {
+                            viewModel.addCoachNote(newNote)
+                            newNote = ""
+                        }
+                    )
+                }
+            },
+            value = newNote,
+            onValueChange = { newNote = it.take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE) },
+            placeholder = { Text("e.g. Vegetarian on Tuesdays", fontSize = 13.sp) },
+            maxLines = 6,
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SuperfitField(
-                trailingIcon = { com.superfit.app.ui.components.MicButton(onClick = speakNote, modifier = Modifier.padding(end = 6.dp)) },
-                value = newNote,
-                onValueChange = { newNote = it.take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE) },
-                placeholder = { Text("e.g. Vegetarian on Tuesdays\nNight shifts Mon to Thu", fontSize = 12.sp) },
-                maxLines = 6,
-                modifier = Modifier.weight(1f),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = SuperfitTheme.colors.textPrimary)
-            )
-            Button(
-                enabled = newNote.isNotBlank(),
-                onClick = {
-                    viewModel.addCoachNote(newNote)
-                    newNote = ""
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = NeonMint)
-            ) {
-                Text("Add", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        }
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = SuperfitTheme.colors.textPrimary)
+        )
         Text(
             text = "Clear chat history",
             color = DeleteRed,

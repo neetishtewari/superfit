@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.superfit.app.ui.history
 
 import androidx.compose.animation.AnimatedVisibility
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -131,11 +134,14 @@ fun InsightsTab(
             Text(report.verdict, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 24.sp)
             val s = report.thisWeek
             val l = report.lastWeek
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                val moveDiff = s.moveMinutes - l.moveMinutes
+            // 2 x 2 so values like "-1,062" and "vs -1,337" have room.
+            val moveDiff = s.moveMinutes - l.moveMinutes
+            val kmDiff = s.distanceKm - l.distanceKm
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 WeekTile("${hours(s.moveMinutes)}", "moving", delta(moveDiff.toDouble(), hours(abs(moveDiff)), higherIsGood = true), Modifier.weight(1f))
-                val kmDiff = s.distanceKm - l.distanceKm
                 WeekTile(km(s.distanceKm), "km", delta(kmDiff, km(abs(kmDiff)), higherIsGood = true), Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 if (s.loggedDays > 0) {
                     val net = signedKcal(s.netKcal)
                     val vs = if (l.loggedDays > 0) "vs ${signedKcal(l.netKcal)}" else ""
@@ -168,7 +174,7 @@ fun InsightsTab(
                 SectionLabel("Watch out", SolarAmber)
                 report.watch.forEach { InsightRow(it, SolarAmber) }
                 TextButton(onClick = onOpenJourney, modifier = Modifier.heightIn(min = 44.dp)) {
-                    Text("See how this affects your goal date", color = NeonMint, fontWeight = FontWeight.Bold)
+                    Text("See my goal date", color = NeonMint, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -177,7 +183,7 @@ fun InsightsTab(
             SectionCard {
                 SectionLabel("Eating vs target, last 7 days")
                 NetBars(report.dailyNet)
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     LegendDot(NeonMint, "Under target")
                     LegendDot(Orange, "Over target")
                     LegendDot(ThemeGlassBorder, "Not fully logged")
@@ -418,7 +424,7 @@ fun JourneyTab(
             if (j.explanation.isNotEmpty()) Text(j.explanation, fontSize = 14.sp, color = ThemeTextSecondary, lineHeight = 20.sp)
             if (j.weighIns.isNotEmpty()) {
                 JourneyChart(j, statusColor)
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     LegendDot(NeonMint, "Weigh-ins")
                     if (j.forecastDate != null) LegendDot(statusColor, "At current habits")
                     LegendDot(SolarAmber, "Goal")

@@ -287,8 +287,9 @@ fun SettingsScreen(
                                 containerColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f) else NeonMint,
                                 contentColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary else Color.White
                             ),
-                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
                                 text = if (hasHealthConnectPermissions) "Manage access" else "Allow access",
@@ -303,8 +304,9 @@ fun SettingsScreen(
                                 containerColor = ElectricCyan.copy(alpha = 0.15f),
                                 contentColor = ElectricCyan
                             ),
-                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
                                 text = "Sync now",
@@ -865,8 +867,9 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .heightIn(min = 40.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .heightIn(min = 44.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = "Sign out",
@@ -883,8 +886,9 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .heightIn(min = 40.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .heightIn(min = 44.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = "Delete account",

@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
@@ -204,11 +206,13 @@ fun RingLegendItem(
                 style = MaterialTheme.typography.labelMedium,
                 color = ThemeTextSecondary
             )
-            Text(
+            // Shrinks a little rather than cutting "1,777 of 10,000" short beside the ring.
+            val valueStyle = MaterialTheme.typography.titleSmall.copy(color = ThemeTextPrimary)
+            BasicText(
                 text = value,
-                style = MaterialTheme.typography.titleSmall,
-                color = ThemeTextPrimary,
-                maxLines = 1
+                style = valueStyle,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = valueStyle.fontSize)
             )
         }
     }

@@ -250,7 +250,7 @@ internal fun CoachChatSheet(
                     val activeNotes = notes.count { it.isActive(LocalDate.now()) }
                     Text(
                         text = if (activeNotes > 0) {
-                            "Knows your meals, workouts and goal. Remembering $activeNotes ${if (activeNotes == 1) "note" else "notes"} so far (Settings → What my AI coach knows)"
+                            "Knows your meals, workouts and goal, plus $activeNotes ${if (activeNotes == 1) "note" else "notes"} you've shared"
                         } else {
                             "Knows your meals, workouts and goal, and remembers what you tell it"
                         },

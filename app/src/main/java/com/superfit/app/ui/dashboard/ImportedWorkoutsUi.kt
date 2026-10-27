@@ -108,7 +108,7 @@ fun ImportedWorkoutRow(workout: WorkoutView, onHide: () -> Unit, showDay: Boolea
                 .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
                 .padding(8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(

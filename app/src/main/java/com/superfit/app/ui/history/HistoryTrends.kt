@@ -514,14 +514,18 @@ fun CalorieTrendChart(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // One equal slot per bar, never wrapping: a wrapped "0" read like a zero value.
+                val showMonth = days.size <= 7
                 days.forEach { day ->
                     Text(
-                        text = "${day.date.dayOfMonth}/${day.date.monthValue}",
-                        fontSize = 12.sp,
+                        text = if (showMonth) "${day.date.dayOfMonth}/${day.date.monthValue}" else "${day.date.dayOfMonth}",
+                        fontSize = 11.sp,
                         color = ThemeTextTertiary,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.width(36.dp)
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }

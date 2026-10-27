@@ -179,7 +179,7 @@ object InsightsEngine {
         loseGoal: Boolean
     ): List<Insight> = buildList {
         if (s.loggedDays < 3) {
-            add(Insight("logging", "Only ${s.loggedDays} of 7 days fully logged", "Log at least two meals a day so these insights stay accurate.", "only ${s.loggedDays} days were fully logged"))
+            add(Insight("logging", "Only ${s.loggedDays} of 7 days fully logged", "Log at least two meals a day so these insights stay accurate.", if (s.loggedDays == 1) "only 1 day was fully logged" else "only ${s.loggedDays} days were fully logged"))
         }
         if (loseGoal) {
             weekendSplit(week)?.let { (weekendAvg, share) ->

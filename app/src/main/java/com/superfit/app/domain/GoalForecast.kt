@@ -224,7 +224,7 @@ object GoalForecast {
         val now = month.sumOf { it.workouts.size } / 4.0
         val before = prev.sumOf { it.workouts.size } / 4.0
         if (before >= 2 && now <= before * 0.7 && before - now >= 1) {
-            add(Insight("fewer", "Fewer workouts this month", "${now.roundToInt()} a week in the last 4 weeks, down from ${before.roundToInt()}.", "fewer workouts"))
+            add(Insight("fewer", "Fewer workouts this month", "${now.roundToInt()} workouts a week over the last 4 weeks, down from ${before.roundToInt()} a week in the 4 weeks before.", "fewer workouts"))
         }
         if (lose) {
             val logged = month.filter { it.logged }
