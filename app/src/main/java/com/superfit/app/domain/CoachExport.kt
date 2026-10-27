@@ -65,7 +65,7 @@ data class CoachExport(
 }
 
 /**
- * Builds the "Share with my coach" summary from the same day totals Insights uses. Averages
+ * Builds the "Share my report" summary from the same day totals Insights uses. Averages
  * count only logged days, so a forgotten day never reads as under-eating. No AI.
  */
 object CoachExportBuilder {

@@ -206,7 +206,7 @@ fun InsightsTab(
     }
 }
 
-/** "Share with my coach": pick 2 or 4 weeks, then the phone makes a PDF and opens the share sheet. */
+/** "Share my report": pick 2 or 4 weeks, then the phone makes a PDF and opens the share sheet. */
 @Composable
 private fun ShareWithCoachRow(onShare: (weeks: Int) -> Unit) {
     var asking by rememberSaveable { mutableStateOf(false) }
@@ -218,15 +218,18 @@ private fun ShareWithCoachRow(onShare: (weeks: Int) -> Unit) {
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Share with my coach", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = ThemeTextPrimary, modifier = Modifier.weight(1f))
-        Text("PDF", fontSize = 12.sp, color = ThemeTextSecondary)
+        Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Text("Share my report", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = ThemeTextPrimary)
+            Text("A PDF for your coach, a friend or an accountability partner", fontSize = 12.sp, color = ThemeTextSecondary)
+        }
+        Text("PDF", fontSize = 12.sp, color = ThemeTextSecondary, modifier = Modifier.padding(start = 8.dp))
     }
     if (asking) {
         AlertDialog(
             onDismissRequest = { asking = false },
-            title = { Text("Share with my coach") },
+            title = { Text("Share my report") },
             text = {
-                Text("Makes a PDF of your meals, calories, protein, workouts and weight, then lets you send it by WhatsApp, email or any other app. It's made on your phone and only goes where you send it.")
+                Text("Makes a PDF of your meals, calories, protein, workouts and weight. Send it to a coach, a friend or an accountability partner by WhatsApp or email, or save it to your files. It's made on your phone and only goes where you send it.")
             },
             confirmButton = {
                 Row {

@@ -88,7 +88,7 @@ object CoachExportPdf {
             clipData = ClipData.newRawUri(null, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(send, "Share with your coach"))
+        context.startActivity(Intent.createChooser(send, "Share or save my report"))
     }
 
     fun write(report: CoachExport, file: File, context: Context? = null) {
