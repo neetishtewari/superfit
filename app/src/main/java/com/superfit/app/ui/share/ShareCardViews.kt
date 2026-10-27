@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,10 +48,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.superfit.app.R
 import com.superfit.app.domain.CardStat
 import com.superfit.app.domain.ShareCard
+import com.superfit.app.domain.ShareCards
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
@@ -265,33 +270,62 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
     Spacer(Modifier.weight(1f))
 }
 
-/** "Roast my day": the roast is the headline, with one row of the day's numbers under it. */
+/**
+ * "Roast my day": the whole roast, never cut to one line. A short opening line is the headline and the
+ * rest sits under it, shrinking to fit; the day's numbers show only when the roast leaves room for them.
+ */
 @Composable
 private fun ColumnScope.RoastBody(card: ShareCard.Daily, accent: Color) {
-    Spacer(Modifier.height(24.dp))
+    val roast = card.coachLine.orEmpty()
+    val (headline, rest) = ShareCards.splitRoast(roast)
+    val tiles = if (roast.length <= ROAST_WITH_TILES) card.tiles.take(2) else emptyList()
+    val bodySize = if (rest != null) 17.sp else 22.sp
+    Spacer(Modifier.height(20.dp))
     Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
     Spacer(Modifier.height(12.dp))
-    Text(
-        card.coachLine.orEmpty(),
-        color = TextMain,
-        fontSize = 19.sp,
-        lineHeight = 26.sp,
-        fontWeight = FontWeight.SemiBold,
-        maxLines = 6,
-        overflow = TextOverflow.Ellipsis
-    )
-    Spacer(Modifier.weight(1f))
-    val tiles = card.tiles.take(2)
+    if (rest != null) {
+        Text(headline, color = TextMain, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier
+                .width(36.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(accent)
+        )
+        Spacer(Modifier.height(12.dp))
+    }
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxWidth()
+    ) {
+        BasicText(
+            text = rest ?: headline,
+            style = TextStyle(
+                color = TextMain,
+                fontSize = bodySize,
+                lineHeight = 1.4.em,
+                fontWeight = if (rest != null) FontWeight.Medium else FontWeight.Bold
+            ),
+            autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = bodySize, stepSize = 0.5.sp),
+            modifier = Modifier.fillMaxSize()
+        )
+    }
     if (tiles.isNotEmpty()) {
+        Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             tiles.forEach { stat ->
                 DailyTile(stat, barColor = if (stat.label == "PROTEIN") accent else secondBar(accent), modifier = Modifier.weight(1f))
             }
             if (tiles.size == 1) Spacer(Modifier.weight(1f))
         }
-        Spacer(Modifier.height(16.dp))
     }
+    Spacer(Modifier.height(16.dp))
 }
+
+/** A longer roast gets the whole card; the protein and Diet Quality tiles would squeeze it too small. */
+private const val ROAST_WITH_TILES = 260
 
 private fun secondBar(accent: Color): Color = if (accent == ElectricCyan) NeonMint else ElectricCyan
 
