@@ -571,7 +571,8 @@ fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSele
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(50))
-                    .background(if (isOn) ThemeCardBg else Color.Transparent)
+                    // Solid brand green for the chosen option: a card-coloured pill was hard to see in dark mode.
+                    .background(if (isOn) NeonMint else Color.Transparent)
                     .clickable { onSelect(key) }
                     .heightIn(min = 40.dp)
                     .padding(vertical = 8.dp),
@@ -580,7 +581,8 @@ fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSele
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isOn) ThemeTextPrimary else ThemeTextSecondary,
+                    color = if (isOn) Color.White else ThemeTextSecondary,
+                    fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 6.dp)
