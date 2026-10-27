@@ -106,7 +106,7 @@ object CoachExportPdf {
     private fun summary(pen: Pen, r: CoachExport) {
         val h = r.header
         pen.coverHeader()
-        pen.text(h.name?.takeIf { it.isNotBlank() } ?: "Progress report", 24f, font = Font.EXTRA_BOLD)
+        pen.text(h.name?.takeIf { it.isNotBlank() } ?: "${CoachExportBuilder.goalLabel(h.goal)} · ${kg(h.startKg)} → ${kg(h.targetKg)}", 24f, font = Font.EXTRA_BOLD)
         pen.gap(2f)
         pen.text(
             "${CoachExportBuilder.goalLabel(h.goal)} · ${r.daysLogged} of ${r.totalDays} days fully logged",
@@ -122,7 +122,7 @@ object CoachExportPdf {
                 Tile("Calories a day", r.avgKcal?.let { num(it) } ?: "–", if (r.daysLogged > 0) "from ${r.daysLogged} logged ${if (r.daysLogged == 1) "day" else "days"}" else "not enough logged"),
                 Tile("Protein goal", r.proteinPct?.let { "$it%" } ?: "–", r.avgProteinG?.let { "$it g of ${r.proteinTargetG} g a day" } ?: "not enough logged"),
                 Tile("Workouts", "${r.workoutCount}", if (r.walkCount > 0) "plus ${r.walkCount} walks" else "in this period"),
-                Tile("Weight change", change?.let { signedKg(it) } ?: r.weightStart?.let { kg(it.second) } ?: "–", if (change != null) "${kg(r.weightStart!!.second)} → ${kg(r.weightEnd!!.second)}" else "too few weigh-ins")
+                Tile("Weight change", change?.let { signedKg(it) } ?: r.weightStart?.let { kg(it.second) } ?: "–", sinceStart(h.startKg, (r.weightEnd ?: r.weightStart)?.second) ?: if (change != null) "${kg(r.weightStart!!.second)} → ${kg(r.weightEnd!!.second)}" else "too few weigh-ins")
             )
         )
         pen.gap(18f)
@@ -208,7 +208,7 @@ object CoachExportPdf {
         days.forEach { d ->
             pen.keepRoom(48f)
             pen.dayBand(d.date.format(dayFormat), "%,d kcal · %d g protein".format(Locale.US, d.kcal, d.proteinG))
-            d.meals.forEach { m -> pen.mealLine(m.time, m.name, "${m.kcal} kcal · ${m.proteinG} g") }
+            d.meals.forEach { m -> pen.mealLine(m.time, m.name.replaceFirstChar { it.uppercase() }, "${m.kcal} kcal · ${m.proteinG} g") }
             pen.gap(8f)
         }
     }
@@ -218,6 +218,14 @@ object CoachExportPdf {
     private fun num(value: Int) = "%,d".format(Locale.US, value)
 
     private fun duration(minutes: Long) = if (minutes < 120) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"
+
+    /** "4.1 kg down since start": the whole journey, next to this period's change. */
+    private fun sinceStart(startKg: Double, latestKg: Double?): String? {
+        if (latestKg == null || startKg <= 0) return null
+        val diff = latestKg - startKg
+        if (kotlin.math.abs(diff) < 0.1) return "same as at the start"
+        return String.format(Locale.US, "%.1f kg %s since start", kotlin.math.abs(diff), if (diff < 0) "down" else "up")
+    }
 
     private fun kg(value: Double) = String.format(Locale.US, "%.1f kg", value)
     private fun signedKg(value: Double) = (if (value > 0) "+" else "") + kg(value)
@@ -275,10 +283,8 @@ object CoachExportPdf {
         private fun logo(x: Float, top: Float, size: Float) {
             val bmp = brand.logo
             if (bmp != null) {
-                // App icon on a white tile, so it reads as a light mark on the green band.
-                fill.color = Color.WHITE
-                canvas.drawRoundRect(RectF(x, top, x + size, top + size), size * 0.26f, size * 0.26f, fill)
-                val inset = size * 0.1f
+                // The app icon with rounded corners, as it looks on a phone.
+                val inset = 0f
                 val save = canvas.save()
                 val clip = android.graphics.Path().apply {
                     addRoundRect(RectF(x + inset, top + inset, x + size - inset, top + size - inset), size * 0.18f, size * 0.18f, android.graphics.Path.Direction.CW)
