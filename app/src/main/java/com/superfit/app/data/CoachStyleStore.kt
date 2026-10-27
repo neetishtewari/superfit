@@ -17,4 +17,7 @@ object CoachStyleStore {
         CoachStyle.current = style
         getUserSharedPrefs(context).edit().putString(KEY_STYLE, style.name).apply()
     }
+
+    /** True once the user has picked a style, at sign-up, in Settings or in the one-time chooser. */
+    fun hasChosen(context: Context): Boolean = getUserSharedPrefs(context).contains(KEY_STYLE)
 }

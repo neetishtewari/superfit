@@ -105,6 +105,11 @@ class HistoryViewModel(
         private set
 
     /** The Insights view: last 7 full days, what's working and what to watch. */
+
+    /** Earlier months with enough logged for a recap, newest first (up to 12). */
+    var recapMonths by mutableStateOf<List<YearMonth>>(emptyList())
+        private set
+
     var weekReport by mutableStateOf<com.superfit.app.domain.WeekReport?>(null)
         private set
 
@@ -354,6 +359,10 @@ class HistoryViewModel(
             val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
             this@HistoryViewModel.dayTotals = dayTotals
+            recapMonths = (1..12).map { YearMonth.from(today).minusMonths(it.toLong()) }.filter { m ->
+                val inMonth = dayTotals.values.filter { YearMonth.from(it.date) == m }
+                inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
+            }
             allMeals = allNutrition
             val loseGoal = profile.targetWeightKg < profile.startingWeightKg
             weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal)

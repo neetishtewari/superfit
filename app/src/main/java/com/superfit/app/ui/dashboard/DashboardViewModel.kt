@@ -126,6 +126,22 @@ class DashboardViewModel(
     val dietNote: StateFlow<com.superfit.app.domain.DietNote?> = _dietNote.asStateFlow()
     private var dietNoteRunning = false
 
+    /** Last month's recap while Home offers it (from the 1st until just after it's opened), else null. */
+    private val _recapOffer = MutableStateFlow<java.time.YearMonth?>(null)
+    val recapOffer: StateFlow<java.time.YearMonth?> = _recapOffer.asStateFlow()
+
+    fun refreshRecapOffer() {
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            val month = com.superfit.app.data.MonthlyRecapData.offeredMonth(today)
+            _recapOffer.value = month.takeIf {
+                com.superfit.app.data.MonthlyRecapData.showOnHome(appContext, today) &&
+                    com.superfit.app.data.MonthlyRecapData.load(appContext, repository, month)?.cards
+                        ?.any { it !is com.superfit.app.domain.RecapCard.Setup } == true
+            }
+        }
+    }
+
     init {
         com.superfit.app.data.BodyImporter.load(appContext)
         com.superfit.app.data.NutritionAdviceStore.load(appContext)
@@ -348,8 +364,9 @@ class DashboardViewModel(
 
     /** Saves the AI coach style and rewrites today's tip in it, if there is one. */
     fun setCoachStyle(style: com.superfit.app.domain.CoachStyle) {
-        if (style == _coachStyle.value) return
+        // Saved even when unchanged, so the one-time chooser counts "Not now" as an answer.
         com.superfit.app.data.CoachStyleStore.save(appContext, style)
+        if (style == _coachStyle.value) return
         _coachStyle.value = style
         AppAnalytics.coachStyleChanged(style.name)
         if (_coachingState.value is CoachingInsightState.Success) refreshCoachingInsight()

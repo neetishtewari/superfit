@@ -12,3 +12,6 @@ import kotlinx.serialization.Serializable
 @Serializable data object History : NavKey
 
 @Serializable data object Settings : NavKey
+
+/** A month's recap; [month] is "2026-10". */
+@Serializable data class Recap(val month: String) : NavKey

@@ -163,7 +163,47 @@ internal fun HealthConnectStep(
     }
 }
 
-// 5. Onboarding Summary & Targets (Step 4)
+// 4. Pick your coach (Step 3): how the AI coach, reminders and the monthly recap talk.
+@Composable
+internal fun CoachStyleStep(
+    selected: com.superfit.app.domain.CoachStyle,
+    onSelect: (com.superfit.app.domain.CoachStyle) -> Unit,
+    onNext: () -> Unit
+) {
+    Text(
+        text = "Pick your coach",
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        color = ThemeTextPrimary
+    )
+    Text(
+        text = "How should your AI coach talk to you? The advice and numbers are the same, only the voice changes. You can switch any time in Settings.",
+        fontSize = 13.sp,
+        color = ThemeTextTertiary,
+        lineHeight = 18.sp
+    )
+    com.superfit.app.ui.dashboard.CoachStyleOptions(selected = selected, onSelect = onSelect, showSamples = true)
+    Button(
+        onClick = onNext,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(12.dp)),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        contentPadding = PaddingValues()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd))),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+// 6. Onboarding Summary & Targets (Step 5)
 @Composable
 internal fun OnboardingSummaryStep(
     uiState: OnboardingUiState,

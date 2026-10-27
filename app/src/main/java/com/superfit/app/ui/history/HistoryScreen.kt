@@ -56,7 +56,8 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     dashboardViewModel: DashboardViewModel? = null,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenRecap: (java.time.YearMonth) -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -130,6 +131,14 @@ fun HistoryScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // The new monthly recap sits at the top of Progress for the first week of the month.
+                val newRecap = com.superfit.app.data.MonthlyRecapData.offeredMonth(LocalDate.now()).takeIf {
+                    com.superfit.app.data.MonthlyRecapData.showAtTopOfProgress(LocalDate.now()) && it in viewModel.recapMonths
+                }
+                if (selectedTab == 0 && newRecap != null) {
+                    com.superfit.app.ui.recap.RecapReadyCard(newRecap, onOpen = { onOpenRecap(newRecap) })
+                }
+
                 when (selectedTab) {
                     0 -> viewModel.weekReport?.let { report ->
                         InsightsTab(
@@ -183,6 +192,14 @@ fun HistoryScreen(
                                 viewModel.weeklyTrends?.let { trends -> WeeklyTrendsCard(trends = trends) }
                             }
                         )
+                        Spacer(Modifier.height(8.dp))
+                        com.superfit.app.ui.recap.PastMonthsList(viewModel.recapMonths - setOfNotNull(newRecap), onOpenRecap)
+                        if (context.packageName.endsWith(".debug")) {
+                            // Dev app only: see this month's recap so far, to check the cards before the 1st.
+                            androidx.compose.material3.TextButton(onClick = { onOpenRecap(java.time.YearMonth.now()) }) {
+                                Text("Preview this month's recap (dev app)")
+                            }
+                        }
                     }
                     1 -> viewModel.journey?.let { journey ->
                         JourneyTab(

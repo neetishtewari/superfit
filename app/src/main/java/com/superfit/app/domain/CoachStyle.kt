@@ -35,6 +35,14 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
         """
     );
 
+    /** One example line, shown when the user picks a style. */
+    val sample: String
+        get() = when (this) {
+            SUPPORTIVE -> "Protein's been short a few days. Dal and a bowl of curd tonight gets you most of the way."
+            STRAIGHT -> "Protein short 4 of 5 days. Add curd at dinner. Every day."
+            ROAST -> "Your protein has filed a missing person report. Curd at dinner, before it calls the police."
+        }
+
     /** Title of the evening notification that carries the AI coach's daily tip. */
     fun tipTitle(): String = when (this) {
         ROAST -> "🔥 Your AI coach has notes"

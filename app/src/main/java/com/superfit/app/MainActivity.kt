@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
     private val triggerVoiceLog = MutableStateFlow(false)
     private val triggerFavoritesLog = MutableStateFlow(false)
     private val triggerPhotoLog = MutableStateFlow(false)
+    private val openRecap = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
                     val triggerVoice by triggerVoiceLog.collectAsState()
                     val triggerFavs by triggerFavoritesLog.collectAsState()
                     val triggerPhoto by triggerPhotoLog.collectAsState()
+                    val recapMonth by openRecap.collectAsState()
                     MainNavigation(
                         healthConnectManager = healthConnectManager,
                         repository = repository,
@@ -71,7 +73,9 @@ class MainActivity : ComponentActivity() {
                         triggerPhotoLog = triggerPhoto,
                         onVoiceLogTriggeredHandled = { triggerVoiceLog.value = false },
                         onFavoritesLogTriggeredHandled = { triggerFavoritesLog.value = false },
-                        onPhotoLogTriggeredHandled = { triggerPhotoLog.value = false }
+                        onPhotoLogTriggeredHandled = { triggerPhotoLog.value = false },
+                        openRecapMonth = recapMonth,
+                        onOpenRecapHandled = { openRecap.value = null }
                     )
                 }
             }
@@ -90,6 +94,8 @@ class MainActivity : ComponentActivity() {
             triggerFavoritesLog.value = true
         } else if (intent?.action == "com.superfit.app.ACTION_PHOTO_LOG") {
             triggerPhotoLog.value = true
+        } else if (intent?.action == com.superfit.app.data.RecapNotificationWorker.ACTION_OPEN_RECAP) {
+            openRecap.value = intent.getStringExtra(com.superfit.app.data.RecapNotificationWorker.EXTRA_MONTH)
         }
     }
 }

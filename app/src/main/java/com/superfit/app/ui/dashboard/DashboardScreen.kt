@@ -84,6 +84,7 @@ fun DashboardScreen(
     onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenRecap: (java.time.YearMonth) -> Unit = {},
     triggerVoiceLog: Boolean = false,
     triggerFavoritesLog: Boolean = false,
     onVoiceLogTriggeredHandled: () -> Unit = {},
@@ -98,6 +99,12 @@ fun DashboardScreen(
     val grantedPermissions by viewModel.grantedPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val coachingState by viewModel.coachingState.collectAsState()
+    val recapOffer by viewModel.recapOffer.collectAsState()
+    // Back from the recap, or the app left open overnight into the 1st: check the offer again.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        viewModel.refreshRecapOffer()
+        onPauseOrDispose { }
+    }
     val scrollState = rememberScrollState()
 
     var logType by remember { mutableStateOf("MEAL") }
@@ -494,6 +501,10 @@ fun DashboardScreen(
                             }
                         )
 
+                        recapOffer?.let { month ->
+                            com.superfit.app.ui.recap.RecapReadyCard(month, onOpen = { onOpenRecap(month) })
+                        }
+
                         personalBests.toOffer?.let { best ->
                             NewBestCard(
                                 best = best,
@@ -597,6 +608,17 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+
+        // Once, for people who signed up before "Pick your coach" existed.
+        var askCoachStyle by remember { mutableStateOf(!com.superfit.app.data.CoachStyleStore.hasChosen(context)) }
+        if (askCoachStyle) {
+            CoachStyleChooserDialog(
+                onChoose = { style ->
+                    viewModel.setCoachStyle(style)
+                    askCoachStyle = false
+                }
+            )
         }
 
         shareCard?.let { card ->

@@ -33,6 +33,9 @@ import com.superfit.app.ui.history.HistoryScreen
 import com.superfit.app.ui.history.HistoryViewModel
 import com.superfit.app.ui.onboarding.OnboardingScreen
 import com.superfit.app.ui.onboarding.OnboardingViewModel
+import com.superfit.app.ui.recap.RecapScreen
+import com.superfit.app.ui.recap.RecapViewModel
+import java.time.YearMonth
 import kotlinx.coroutines.launch
 
 @Composable
@@ -44,7 +47,9 @@ fun MainNavigation(
     triggerPhotoLog: Boolean = false,
     onVoiceLogTriggeredHandled: () -> Unit = {},
     onFavoritesLogTriggeredHandled: () -> Unit = {},
-    onPhotoLogTriggeredHandled: () -> Unit = {}
+    onPhotoLogTriggeredHandled: () -> Unit = {},
+    openRecapMonth: String? = null,
+    onOpenRecapHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var startDestination by remember { mutableStateOf<NavKey?>(null) }
@@ -84,6 +89,13 @@ fun MainNavigation(
     }
 
     val backStack = rememberNavBackStack(startDest)
+
+    // Tapping the "Your October is ready" notification opens the recap over Home.
+    LaunchedEffect(openRecapMonth) {
+        val month = openRecapMonth ?: return@LaunchedEffect
+        if (backStack.lastOrNull() !in listOf(Login, Onboarding) && runCatching { YearMonth.parse(month) }.isSuccess) backStack.add(Recap(month))
+        onOpenRecapHandled()
+    }
 
     NavDisplay(
         backStack = backStack,
@@ -154,7 +166,19 @@ fun MainNavigation(
                     },
                     onNavigateToSettings = {
                         backStack.add(Settings)
-                    }
+                    },
+                    onOpenRecap = { month -> backStack.add(Recap(month.toString())) }
+                )
+            }
+            entry<Recap> { key ->
+                val month = YearMonth.parse(key.month)
+                val recapViewModel: RecapViewModel = viewModel(key = "recap_${key.month}") {
+                    RecapViewModel(repository, context.applicationContext, month)
+                }
+                RecapScreen(
+                    viewModel = recapViewModel,
+                    onBack = { backStack.removeLastOrNull() },
+                    onOpenSettings = { backStack.add(Settings) }
                 )
             }
             entry<Settings> {
@@ -224,7 +248,8 @@ fun MainNavigation(
                     dashboardViewModel = dashboardViewModel,
                     onBack = {
                         backStack.removeLastOrNull()
-                    }
+                    },
+                    onOpenRecap = { month -> backStack.add(Recap(month.toString())) }
                 )
             }
         }

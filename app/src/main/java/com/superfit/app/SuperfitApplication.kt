@@ -27,6 +27,7 @@ class SuperfitApplication : Application() {
         com.superfit.app.data.ReminderNotifications.ensureChannel(this)
         scheduleTelemetrySync()
         scheduleDailyReminder()
+        com.superfit.app.data.RecapNotificationWorker.schedule(this)
     }
 
     // App Check lets Firebase reject requests that don't come from the real Superfit app, which
