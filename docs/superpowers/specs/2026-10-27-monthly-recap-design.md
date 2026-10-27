@@ -1,6 +1,6 @@
 # Monthly recap: design
 
-Date: 2026-10-27. Draft for Neetish's OK. Plan page: https://claude.ai/artifact/GqEXk8QsWxttmRnBSZ7r9x. Card mock-ups: https://claude.ai/artifact/SMtbuijDx2nz2cs3d2aQ27
+Date: 2026-10-27. Approved by Neetish 2026-10-27 12:28Z (target: first recap on 1 Nov). Plan page: https://claude.ai/artifact/GqEXk8QsWxttmRnBSZ7r9x. Card mock-ups: https://claude.ai/artifact/SMtbuijDx2nz2cs3d2aQ27
 
 ## What the user gets
 On the 1st of each month, a short set of story cards about the month just gone, a bit like Spotify Wrapped. Each card is one highlight, Story size (9:16), with the "S" logo at the top and the Superfit badge with "Get it on Google Play" at the bottom, the same as the other share cards. Each card has its own **Share** button.
@@ -8,7 +8,7 @@ On the 1st of each month, a short set of story cards about the month just gone, 
 Cards are chosen each month from what actually happened. A card with no data is skipped, so there is no fixed template and never an empty card. In order:
 
 **Your goal**
-1. **Your goal.** Kilograms lost or gained this month, where you are on the journey (start, today, goal) and when you reach the goal at this pace.
+1. **Your goal.** Kilograms lost or gained this month, how much is down out of the total (for example "3.1 of 10 kg down") and the date you reach the goal at this pace. Shown on the shared picture too (Neetish, 2026-10-27).
 2. **What moved the needle.** The two or three habits that helped most or held you back, worked out by the app from the logs.
 
 **Your meals** (patterns only, no Diet Quality scores or ratings on the cards)
@@ -36,9 +36,9 @@ The card wording follows the person's coach style (Supportive, Straight talk, Ro
 - It can still be changed in Settings or at the top of the coach chat.
 
 ## Where it lives
-- **Home:** a "Your October is ready" card from the 1st to the 3rd. Home stays about today, so it goes away after that.
+- **Home:** a "Your October is ready" card from the 1st until the person has opened the recap, so someone who skips the app on the 1st and 2nd still sees it. It goes once opened (end of that day), and by the 10th at the latest.
 - **Progress:** at the top for the first week, then under "Past months". The last 12 months are kept.
-- **Notification:** one on the 1st. Can be turned off in Settings.
+- **Notification:** one on the 1st. No extra switch in Settings: people can turn it off from Android's notification settings. With notifications off, the Home card and Progress are the way in. Email reminders come later (not in this release).
 
 ## How it works
 - The app works out every number and pattern on the phone from meals, workouts and Health Connect. The AI only writes the words, in one call per month that is saved, so reopening costs nothing.
@@ -48,13 +48,14 @@ The card wording follows the person's coach style (Supportive, Straight talk, Ro
 
 ## Privacy and cost
 - Roast me jokes about choices, never about the person: no jokes about body, weight, looks or health, and nothing that praises eating too little. Serious topics (injury, low mood, disordered eating) are never joked about.
-- Cards never show body data or coach notes. Other share cards never show weight; whether the goal card may (see the questions below) is still open.
+- Cards never show body data or coach notes. The goal card shows kilograms down out of the total and the goal date (Neetish, 2026-10-27), not the person's actual weight.
 - AI cost: one call per person per month. No new permissions, no Data safety change.
 - Anonymous counts of recaps opened and cards shared, to decide on a yearly recap in mid-December.
 
 ## Not in this release
 - Yearly recap (decide mid-December from open and share counts).
 - Separate Home tips or "Did you know" facts (dropped).
+- Email reminders for people with notifications off (plan later).
 - Animated or video cards.
 
 ## Testing
@@ -62,11 +63,13 @@ The card wording follows the person's coach style (Supportive, Straight talk, Ro
 - A test that a card with no data is skipped and "Get more from Superfit" is skipped when everything is set up.
 - Minified (R8) dev build on the phone, with a fake October month, in all three coach styles.
 
-## Action needed from you
-- Say "go" to build this for 1.0.39. Aim for Play by about 31 Oct so the October recap appears on 1 Nov.
-- Defaults unless you say otherwise: notification on the 1st (can be turned off), 12 months kept, Roast me preselected at sign-up.
+## Decisions (Neetish, 2026-10-27)
+- Goal card: "X of Y kg down" plus the goal date, also on the shared picture.
+- Home card stays until the recap is opened (latest the 10th).
+- No recap switch in Settings; Android notification settings are enough.
+- First recap on 1 Nov; a better version by 1 Dec from October's feedback.
+- Email reminders later.
 
-## Open questions for Neetish
-1. **Weight on the goal card.** Other share cards never show weight. Should the shared goal card show actual weights (start, today, goal) or only "1.4 kg down"? Suggested: in the app show all three, on the shared picture only the kg change and the % of the way to goal.
-2. **Notifications off.** For people who turned notifications off, the Home card on the 1st to 3rd is the only prompt. Suggested: that's enough; don't ask again.
-3. **First recap: 1 Nov or 1 Dec.** 1 Nov needs 1.0.39 live on Play by about 31 Oct. If it slips, the October recap can still appear when people update (until 7 Nov), otherwise start on 1 Dec.
+## Action needed from you (at release)
+- Test the dev app with a sample October recap in all three coach styles.
+- Upload 1.0.39 internal, then production, by about 31 Oct.
