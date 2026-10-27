@@ -35,7 +35,8 @@ object CoachExportPdf {
     private const val MARGIN = 40f
     private const val CONTENT_W = PAGE_W - 2 * MARGIN
     private const val BAND_H = 64f // green header band on later pages
-    private const val FOOTER_TOP = PAGE_H - 46f
+    private const val FOOTER_TOP = PAGE_H - 50f
+    private const val PLAY_URL = "https://play.google.com/store/apps/details?id=com.superfit.aifitness"
 
     // Superfit "Fresh Green" colours, matching the app.
     private val GREEN = Color.rgb(14, 159, 117)
@@ -344,9 +345,15 @@ object CoachExportPdf {
             canvas.drawText("Made with Superfit", MARGIN, FOOTER_TOP + 16f, paint)
             val bw = paint.measureText("Made with Superfit")
             style(8.5f, Font.REGULAR, MUTED)
-            canvas.drawText(" · Clients log meals by photo or voice · Get it on Google Play", MARGIN + bw, FOOTER_TOP + 16f, paint)
+            canvas.drawText(" · Clients log meals by photo or voice", MARGIN + bw, FOOTER_TOP + 16f, paint)
             val num = "$pageNo"
             canvas.drawText(num, PAGE_W - MARGIN - paint.measureText(num), FOOTER_TOP + 16f, paint)
+            // The full address as text: PDF viewers turn it into a tappable link.
+            style(8.5f, Font.MEDIUM, MUTED)
+            canvas.drawText("Get it on Google Play: ", MARGIN, FOOTER_TOP + 29f, paint)
+            val lw = paint.measureText("Get it on Google Play: ")
+            style(8.5f, Font.MEDIUM, GREEN_DEEP)
+            canvas.drawText(PLAY_URL, MARGIN + lw, FOOTER_TOP + 29f, paint)
             doc.finishPage(p)
         }
 
