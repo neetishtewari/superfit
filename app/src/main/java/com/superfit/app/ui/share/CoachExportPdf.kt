@@ -109,7 +109,7 @@ object CoachExportPdf {
         pen.text(h.name?.takeIf { it.isNotBlank() } ?: "${CoachExportBuilder.goalLabel(h.goal)} · ${kg(h.startKg)} → ${kg(h.targetKg)}", 24f, font = Font.EXTRA_BOLD)
         pen.gap(2f)
         pen.text(
-            "${CoachExportBuilder.goalLabel(h.goal)} · ${r.daysLogged} of ${r.totalDays} days fully logged",
+            "${r.daysLogged} of ${r.totalDays} days fully logged",
             11f,
             color = MUTED
         )
@@ -122,7 +122,7 @@ object CoachExportPdf {
                 Tile("Calories a day", r.avgKcal?.let { num(it) } ?: "–", if (r.daysLogged > 0) "from ${r.daysLogged} logged ${if (r.daysLogged == 1) "day" else "days"}" else "not enough logged"),
                 Tile("Protein goal", r.proteinPct?.let { "$it%" } ?: "–", r.avgProteinG?.let { "$it g of ${r.proteinTargetG} g a day" } ?: "not enough logged"),
                 Tile("Workouts", "${r.workoutCount}", if (r.walkCount > 0) "plus ${r.walkCount} walks" else "in this period"),
-                Tile("Weight change", change?.let { signedKg(it) } ?: r.weightStart?.let { kg(it.second) } ?: "–", sinceStart(h.startKg, (r.weightEnd ?: r.weightStart)?.second) ?: if (change != null) "${kg(r.weightStart!!.second)} → ${kg(r.weightEnd!!.second)}" else "too few weigh-ins")
+                Tile("Weight, this period", change?.let { signedKg(it) } ?: r.weightStart?.let { kg(it.second) } ?: "–", sinceStart(h.startKg, (r.weightEnd ?: r.weightStart)?.second) ?: if (change != null) "${kg(r.weightStart!!.second)} → ${kg(r.weightEnd!!.second)}" else "too few weigh-ins")
             )
         )
         pen.gap(18f)
