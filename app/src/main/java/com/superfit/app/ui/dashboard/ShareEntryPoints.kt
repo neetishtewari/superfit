@@ -78,7 +78,7 @@ fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) 
                     color = SuperfitTheme.colors.textPrimary
                 )
                 card.previous?.let {
-                    Text("Previous best $it", fontSize = 11.sp, color = SuperfitTheme.colors.textSecondary)
+                    Text("Previous best $it", fontSize = 12.sp, color = SuperfitTheme.colors.textSecondary)
                 }
             }
             Button(
@@ -113,7 +113,7 @@ fun PersonalBestsList(bests: List<PersonalBest>, onShare: (PersonalBest) -> Unit
                     Text(card.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary)
                     Text(
                         if (best.workout != null) "${card.bigValue} ${card.bigUnit} · ${card.dateLine}" else "${card.bigValue} ${card.bigUnit}",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
                 }

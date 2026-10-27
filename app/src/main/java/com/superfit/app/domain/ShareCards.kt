@@ -210,7 +210,7 @@ object ShareCards {
 
     /** The coach writes **bold**; a picture shows plain text. */
 
-    /** The daily card with the AI coach's "Roast my day" line in place of the coach line. */
+    /** The daily card with the AI coach's roast in place of the coach line. */
     fun roast(daily: ShareCard.Daily, line: String): ShareCard.Daily =
         daily.copy(coachLine = fitRoast(plain(line)).takeIf { it.isNotBlank() }, roast = true)
 

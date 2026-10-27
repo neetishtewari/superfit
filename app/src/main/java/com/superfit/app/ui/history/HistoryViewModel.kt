@@ -360,11 +360,18 @@ class HistoryViewModel(
             goalTargetDate = GoalDatePref.get(sharedPrefs)
             val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
             goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
+            val journeyWeighIns = InsightsData.weighIns(repository.getAllWeightEntries())
+            val journeyStart = com.superfit.app.domain.GoalForecast.startDate(
+                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() },
+                weighIns = journeyWeighIns,
+                firstLogged = allNutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() },
+                today = today
+            )
             journey = com.superfit.app.domain.GoalForecast.compute(
                 startKg = profile.startingWeightKg,
                 targetKg = profile.targetWeightKg,
-                startDate = Instant.ofEpochMilli(profile.startDateTimestamp).atZone(ZoneId.systemDefault()).toLocalDate(),
-                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()),
+                startDate = journeyStart,
+                weighIns = journeyWeighIns,
                 days = dayTotals,
                 calorieOffset = profile.calorieOffset,
                 targetDate = goalTargetDate,

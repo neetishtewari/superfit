@@ -66,6 +66,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
 
 @Composable
@@ -88,7 +89,7 @@ internal fun FoodHistoryDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "MY FOOD HISTORY",
+                text = "My food history",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 1.5.sp,
@@ -103,10 +104,10 @@ internal fun FoodHistoryDialog(
                 Text(
                     text = "Search and select a food from your history to log or fill:",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = ThemeTextTertiary
                 )
 
-                OutlinedTextField(
+                SuperfitField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search meals, e.g. eggs...", color = ThemeTextSecondary.copy(alpha = 0.5f)) },
@@ -118,14 +119,6 @@ internal fun FoodHistoryDialog(
                             }
                         }
                     },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = ThemeGlassBorder,
-                        focusedTextColor = ThemeTextPrimary,
-                        unfocusedTextColor = ThemeTextPrimary,
-                        focusedLabelColor = NeonGreen,
-                        unfocusedLabelColor = ThemeTextSecondary
-                    ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -182,7 +175,7 @@ internal fun FoodHistoryDialog(
                                         Text(
                                             text = "${food.calories.toInt()} kcal • ${food.proteinG.toInt()}g P • ${food.carbsG.toInt()}g C • ${food.fatG.toInt()}g F",
                                             color = ThemeTextSecondary,
-                                            fontSize = 11.sp
+                                            fontSize = 12.sp
                                         )
                                     }
                                     Row(

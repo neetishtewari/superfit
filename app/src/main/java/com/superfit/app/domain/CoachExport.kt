@@ -48,7 +48,9 @@ data class CoachExport(
     val proteinPct: Int?,
     val avgCarbsG: Int?,
     val avgFatG: Int?,
+    /** Workouts other than walks. */
     val workoutCount: Int,
+    val walkCount: Int = 0,
     val workoutMinutes: Long,
     val avgSteps: Int?,
     val weightStart: Pair<LocalDate, Double>?,
@@ -63,7 +65,7 @@ data class CoachExport(
 }
 
 /**
- * Builds the "Share with my coach" summary from the same day totals Insights uses. Averages
+ * Builds the "Share my report" summary from the same day totals Insights uses. Averages
  * count only logged days, so a forgotten day never reads as under-eating. No AI.
  */
 object CoachExportBuilder {
@@ -99,7 +101,7 @@ object CoachExportBuilder {
                 carbsG = dayMeals.sumOf { it.carbsG }.roundToInt(),
                 fatG = dayMeals.sumOf { it.fatG }.roundToInt(),
                 steps = d.steps,
-                workouts = d.workouts.map { describe(it) },
+                workouts = group(d.workouts),
                 weightKg = weightByDate[d.date],
                 meals = dayMeals.map {
                     CoachExportMeal(
@@ -116,6 +118,9 @@ object CoachExportBuilder {
         fun avg(f: (CoachExportDay) -> Int): Int? = if (logged.isEmpty()) null else logged.map(f).average().roundToInt()
         val stats = InsightsEngine.stats(InsightsEngine.range(days, from, to))
         val withSteps = reportDays.filter { it.steps > 0 }
+        // Short walks are counted apart so a coach doesn't read 70 walks as 70 training sessions.
+        val facts = InsightsEngine.range(days, from, to).flatMap { it.workouts }
+        val walks = facts.count { isWalk(it) }
         val inPeriod = weighIns.filter { !it.first.isBefore(from) && !it.first.isAfter(to) }.sortedBy { it.first }
 
         return CoachExport(
@@ -130,7 +135,8 @@ object CoachExportBuilder {
             proteinPct = stats.proteinPct,
             avgCarbsG = avg { it.carbsG },
             avgFatG = avg { it.fatG },
-            workoutCount = stats.workouts,
+            workoutCount = facts.size - walks,
+            walkCount = walks,
             workoutMinutes = stats.moveMinutes,
             avgSteps = if (withSteps.isEmpty()) null else withSteps.map { it.steps }.average().roundToInt(),
             weightStart = inPeriod.firstOrNull(),
@@ -139,6 +145,23 @@ object CoachExportBuilder {
             days = reportDays,
             body = body?.takeIf { it.hasScaleData }
         )
+    }
+
+    private fun isWalk(w: ActivityFact) = !w.isRun && w.title.contains("walk", ignoreCase = true)
+
+    /** One line per kind of workout in a day: "4× Walk · 70 min · 3.6 km" instead of four lines. */
+    fun group(workouts: List<ActivityFact>): List<String> = workouts.groupBy { it.title }.map { (title, list) ->
+        if (list.size == 1) {
+            describe(list.first())
+        } else {
+            val minutes = list.sumOf { it.minutes }
+            val km = list.mapNotNull { it.distanceKm?.takeIf { d -> d > 0 } }.sum()
+            buildList {
+                add("${list.size}× $title")
+                if (minutes > 0) add("$minutes min")
+                if (km > 0) add(String.format(java.util.Locale.US, "%.1f km", km))
+            }.joinToString(" · ")
+        }
     }
 
     /** "Run · 32 min · 5.2 km", or just the name when the length isn't known. */

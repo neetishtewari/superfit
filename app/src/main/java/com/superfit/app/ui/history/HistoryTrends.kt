@@ -77,11 +77,11 @@ fun ConsistencyScoreGauge(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "CONSISTENCY METRICS (ROLLING 30 DAYS)",
+                text = "Last 30 days",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 1.sp
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
             )
 
             Row(
@@ -96,11 +96,11 @@ fun ConsistencyScoreGauge(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "CALORIE DEFICIT",
-                        fontSize = 10.sp,
+                        text = "Days under target",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        letterSpacing = 0.5.sp
+                        color = ThemeTextTertiary,
+                        letterSpacing = 0.sp
                     )
                     Box(
                         modifier = Modifier.size(90.dp),
@@ -141,8 +141,8 @@ fun ConsistencyScoreGauge(
                     }
                     Text(
                         text = "$deficitDays / $loggedDays days",
-                        fontSize = 11.sp,
-                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        color = ThemeTextTertiary,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -154,11 +154,11 @@ fun ConsistencyScoreGauge(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "TRAINING DAYS",
-                        fontSize = 10.sp,
+                        text = "Training days",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        letterSpacing = 0.5.sp
+                        color = ThemeTextTertiary,
+                        letterSpacing = 0.sp
                     )
                     Box(
                         modifier = Modifier.size(90.dp),
@@ -200,8 +200,8 @@ fun ConsistencyScoreGauge(
                     val workoutDays = ((trainingScore / 100f) * 30).toInt()
                     Text(
                         text = "$workoutDays / 30 days",
-                        fontSize = 11.sp,
-                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        color = ThemeTextTertiary,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -216,12 +216,9 @@ fun WeeklyTrendsCard(
     modifier: Modifier = Modifier
 ) {
     val netColor = if (trends.avgNetCalories < 0) NeonMint else SolarAmber
-    val balanceText = if (trends.avgNetCalories < 0) {
-        "${trends.avgNetCalories.toInt()} kcal"
-    } else {
-        "+${trends.avgNetCalories.toInt()} kcal"
-    }
-    val balanceLabel = if (trends.avgNetCalories < 0) "CALORIE DEFICIT" else "CALORIE SURPLUS"
+    // "19 kcal under" reads better than "-19 kcal" under a "deficit" label.
+    val balanceText = "${kotlin.math.abs(trends.avgNetCalories.toInt())} kcal " + if (trends.avgNetCalories < 0) "under" else "over"
+    val balanceLabel = "Eaten vs burned"
 
     val sleepHours = trends.avgSleepDurationSeconds / 3600.0
     // No sleep tracker: say so instead of showing 0.0h and a made-up readiness.
@@ -243,11 +240,11 @@ fun WeeklyTrendsCard(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "WEEKLY PROGRESS (7-DAY ROLLING AVG)",
+                text = "Last 7 days, daily average",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 1.sp
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
             )
 
             // 2x2 grid for averages
@@ -263,7 +260,7 @@ fun WeeklyTrendsCard(
                         modifier = Modifier.weight(1f)
                     )
                     TrendItem(
-                        label = "DAILY STEPS",
+                        label = "Daily steps",
                         value = String.format("%,.0f", trends.avgSteps),
                         valueColor = ElectricCyan,
                         modifier = Modifier.weight(1f)
@@ -274,13 +271,13 @@ fun WeeklyTrendsCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     TrendItem(
-                        label = "SLEEP & READINESS",
+                        label = "Sleep",
                         value = sleepText,
                         valueColor = HyperViolet,
                         modifier = Modifier.weight(1f)
                     )
                     TrendItem(
-                        label = "DAILY PROTEIN",
+                        label = "Daily protein",
                         value = "${trends.avgProteinG.toInt()}g",
                         valueColor = SolarAmber,
                         modifier = Modifier.weight(1f)
@@ -291,13 +288,13 @@ fun WeeklyTrendsCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     TrendItem(
-                        label = "TOTAL WORKOUTS (7D)",
+                        label = "Workouts",
                         value = "${trends.totalWorkouts} sessions",
                         valueColor = ElectricCyan,
                         modifier = Modifier.weight(1f)
                     )
                     TrendItem(
-                        label = "STRENGTH VOLUME (7D)",
+                        label = "Strength volume",
                         value = "${trends.totalStrengthSets} sets",
                         valueColor = SolarAmber,
                         modifier = Modifier.weight(1f)
@@ -311,8 +308,8 @@ fun WeeklyTrendsCard(
                 } else {
                     "No meals logged in the last 7 days. Start logging meals to view your average daily calorie trends!"
                 },
-                fontSize = 11.sp,
-                color = Color.Gray,
+                fontSize = 12.sp,
+                color = ThemeTextTertiary,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -336,10 +333,10 @@ fun TrendItem(
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = label,
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray,
-                letterSpacing = 0.5.sp
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
             )
             Text(
                 text = value,
@@ -373,30 +370,22 @@ fun CalorieTrendChart(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "CALORIE TREND vs TDEE",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(NeonMint))
-                        Text("Eaten", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ElectricCyan))
-                        Text("TDEE", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                    }
+            // Title on its own line with the legend under it, so neither wraps.
+            Text(
+                text = "Eaten vs what you burn",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemeTextTertiary,
+                letterSpacing = 0.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(NeonMint))
+                    Text("Eaten", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(ElectricCyan))
+                    Text("What you burn", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -517,14 +506,18 @@ fun CalorieTrendChart(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // One equal slot per bar, never wrapping: a wrapped "0" read like a zero value.
+                val showMonth = days.size <= 7
                 days.forEach { day ->
                     Text(
-                        text = "${day.date.dayOfMonth}/${day.date.monthValue}",
-                        fontSize = 10.sp,
-                        color = Color.Gray,
+                        text = if (showMonth) "${day.date.dayOfMonth}/${day.date.monthValue}" else "${day.date.dayOfMonth}",
+                        fontSize = 11.sp,
+                        color = ThemeTextTertiary,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.width(36.dp)
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }

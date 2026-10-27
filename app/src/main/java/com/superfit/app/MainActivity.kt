@@ -3,11 +3,15 @@ package com.superfit.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -37,7 +41,20 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
+            val systemDark = isSystemInDarkTheme()
+            LaunchedEffect(systemDark) { ThemeConfig.onSystemDarkChanged(systemDark) }
             val isDark by ThemeConfig.isDarkTheme.collectAsState()
+            // Status and nav bar icons follow the app's Light/Dark choice, not the phone's,
+            // so the clock stays readable when the two differ.
+            DisposableEffect(isDark) {
+                val style = if (isDark) {
+                    SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
             SuperfitTheme(darkTheme = isDark) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

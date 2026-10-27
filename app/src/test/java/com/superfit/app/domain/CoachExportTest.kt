@@ -95,4 +95,15 @@ class CoachExportTest {
         assertEquals(listOf("Run · 32 min · 5.2 km"), r.days.first { it.date == today.minusDays(4) }.workouts)
         assertTrue(r.days.first { it.date == today.minusDays(4) }.meals.isEmpty())
     }
+
+    @Test
+    fun walksAreGroupedAndCountedApart() {
+        val walk = ActivityFact("Walk", 15, 1.0, 60.0, null, false)
+        val run = ActivityFact("Run", 30, 5.0, 350.0, 360, true)
+        val day = today.minusDays(3)
+        val r = build(emptyList(), workouts = mapOf(day to listOf(walk, run, walk.copy(minutes = 20, distanceKm = 1.5))))
+        assertEquals(1, r.workoutCount)
+        assertEquals(2, r.walkCount)
+        assertEquals(listOf("2× Walk · 35 min · 2.5 km", "Run · 30 min · 5.0 km"), r.days.first { it.date == day }.workouts)
+    }
 }

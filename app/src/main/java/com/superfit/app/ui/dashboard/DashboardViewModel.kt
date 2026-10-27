@@ -1231,7 +1231,7 @@ class DashboardViewModel(
 
     companion object {
         /** First chat chip in Roast me style. */
-        const val ROAST_MY_DAY = "Roast my day"
+        const val ROAST_MY_DAY = "Roast"
 
         /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
         private const val BACKFILL_KEY = "meal_tag_backfill_date_v3"

@@ -17,12 +17,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.widget.WidgetPin
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,10 +130,8 @@ fun SettingsScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "SETTINGS",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
+                        text = "Settings",
+                        style = MaterialTheme.typography.titleLarge,
                         color = SuperfitTheme.colors.textPrimary
                     )
                 },
@@ -155,11 +154,7 @@ fun SettingsScreen(
         containerColor = Color.Transparent,
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(SuperfitTheme.colors.bgStart, SuperfitTheme.colors.bgEnd)
-                )
-            )
+            .background(SuperfitTheme.colors.bgStart)
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -167,22 +162,19 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(scrollState)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            SettingsGroupLabel("Account")
             // SECTION 1: Which account is signed in, so people with two accounts can tell them apart.
             val account = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
             if (account != null) {
                 val viaGoogle = account.providerData.any { it.providerId == "google.com" }
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(
-                            1.dp,
-                            Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                            RoundedCornerShape(20.dp)
-                        )
+                        .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -216,17 +208,14 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsGroupLabel("Health data")
             // SECTION 2: Google Health Connect
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -238,7 +227,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Google Health Connect",
+                            text = "Health Connect",
                             fontWeight = FontWeight.Bold,
                             color = SuperfitTheme.colors.textPrimary,
                             fontSize = 14.sp,
@@ -259,9 +248,9 @@ fun SettingsScreen(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = if (hasHealthConnectPermissions) "Connected 🟢" else "Disconnected 🔴",
+                                text = if (hasHealthConnectPermissions) "Connected" else "Not connected",
                                 color = if (hasHealthConnectPermissions) NeonMint else SolarAmber,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -269,11 +258,11 @@ fun SettingsScreen(
 
                     Text(
                         text = if (hasHealthConnectPermissions) {
-                            "Telemetry sync active. Superfit is automatically reading step counts and sleep durations from Google Health Connect."
+                            "Superfit reads your steps, sleep, workouts and body data from Health Connect."
                         } else {
-                            "Telemetry sync paused. Grant permissions to enable automatic step count and sleep duration tracking."
+                            "Allow access so Superfit can read your steps, sleep, workouts and body data."
                         },
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
@@ -296,15 +285,16 @@ fun SettingsScreen(
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f) else NeonMint,
-                                contentColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary else Color.Black
+                                contentColor = if (hasHealthConnectPermissions) SuperfitTheme.colors.textPrimary else Color.White
                             ),
-                            modifier = Modifier.weight(1f).height(36.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = if (hasHealthConnectPermissions) "Manage Permissions" else "Grant Permissions",
+                                text = if (hasHealthConnectPermissions) "Manage access" else "Allow access",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         }
 
@@ -314,13 +304,14 @@ fun SettingsScreen(
                                 containerColor = ElectricCyan.copy(alpha = 0.15f),
                                 contentColor = ElectricCyan
                             ),
-                            modifier = Modifier.weight(1f).height(36.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = "Sync Telemetry Now",
+                                text = "Sync now",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -335,7 +326,7 @@ fun SettingsScreen(
                     }
                     Text(
                         text = syncText,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textTertiary,
                         modifier = Modifier.align(Alignment.End)
                     )
@@ -346,24 +337,21 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsGroupLabel("Your plan")
             // SECTION 3: Fitness Goals and Targets Overrides
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "Fitness Goal Target",
+                        text = "Goal",
                         fontWeight = FontWeight.Bold,
                         color = SuperfitTheme.colors.textPrimary,
                         fontSize = 14.sp
@@ -372,42 +360,16 @@ fun SettingsScreen(
                     if (dashboardState is DashboardUiState.Success) {
                         val state = dashboardState as DashboardUiState.Success
                         val goals = listOf(
-                            Triple("LOSE_WEIGHT", "Deficit", -500),
+                            Triple("LOSE_WEIGHT", "Lose", -500),
                             Triple("MAINTAIN", "Maintain", 0),
-                            Triple("GAIN_MUSCLE", "Surplus", 300)
+                            Triple("GAIN_MUSCLE", "Gain", 300)
                         )
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SuperfitTheme.colors.textPrimary.copy(alpha = 0.03f))
-                                .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(8.dp)),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            goals.forEach { (goalKey, goalLabel, offset) ->
-                                val isSelected = state.profile.goal == goalKey
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) NeonMint else Color.Transparent)
-                                        .clickable {
-                                            viewModel.updateGoal(goalKey, offset)
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = goalLabel,
-                                        color = if (isSelected) Color.Black else SuperfitTheme.colors.textPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-                        }
+                        SegmentedPills(
+                            options = goals.map { it.first to it.second },
+                            selected = state.profile.goal,
+                            onSelect = { key -> goals.first { it.first == key }.let { viewModel.updateGoal(it.first, it.third) } }
+                        )
                     }
 
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
@@ -421,17 +383,17 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(
-                                text = "Custom Macro Targets",
+                                text = "Daily targets",
                                 fontWeight = FontWeight.Bold,
                                 color = SuperfitTheme.colors.textPrimary,
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = "Override computed recommended values",
+                                text = "Set your own calories and macros instead of ours",
                                 color = SuperfitTheme.colors.textSecondary,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         }
                         Switch(
@@ -455,35 +417,19 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customCalories,
                                     onValueChange = { customCalories = it },
                                     label = { Text("Calories (kcal)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
 
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customProtein,
                                     onValueChange = { customProtein = it },
                                     label = { Text("Protein (g)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -492,35 +438,19 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customCarbs,
                                     onValueChange = { customCarbs = it },
-                                    label = { Text("Carbohydrates (g)", color = SuperfitTheme.colors.textSecondary) },
+                                    label = { Text("Carbs (g)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
 
-                                OutlinedTextField(
+                                SuperfitField(
                                     value = customFat,
                                     onValueChange = { customFat = it },
                                     label = { Text("Fat (g)", color = SuperfitTheme.colors.textSecondary) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SuperfitTheme.colors.secondaryAccent,
-                                        unfocusedBorderColor = SuperfitTheme.colors.textTertiary,
-                                        focusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        unfocusedTextColor = SuperfitTheme.colors.textPrimary,
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent
-                                    ),
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -539,30 +469,27 @@ fun SettingsScreen(
                                         .putInt("custom_fat_g", fatVal)
                                         .apply()
 
-                                    Toast.makeText(context, "Custom targets saved successfully!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Targets saved", Toast.LENGTH_SHORT).show()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonMint),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Save Customized Targets", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Text("Save targets", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
 
+            SettingsGroupLabel("AI coach")
             // AI coach: kept apart from "My nutritionist's advice", which comes from a real person.
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     CoachStyleSettings(viewModel)
@@ -572,113 +499,65 @@ fun SettingsScreen(
             }
 
             // SECTION 4: App Appearance Theme Selector
-            val isDark by ThemeConfig.isDarkTheme.collectAsState()
+            val themeMode by ThemeConfig.mode.collectAsState()
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "App Appearance",
+                        text = "Appearance",
                         fontWeight = FontWeight.Bold,
                         color = SuperfitTheme.colors.textPrimary,
                         fontSize = 14.sp
                     )
 
                     Text(
-                        text = "Toggle between Dark Mode and dynamic Glassmorphic Light Mode.",
-                        fontSize = 11.sp,
+                        text = "Auto follows your phone's light or dark setting.",
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(SuperfitTheme.colors.textPrimary.copy(alpha = 0.04f))
-                            .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(12.dp)),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Dark Theme option
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDark) SuperfitTheme.colors.primaryAccent else Color.Transparent)
-                                .clickable {
-                                    ThemeConfig.setThemeMode(context, true)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Dark Mode 🌙",
-                                color = if (isDark) Color.White else SuperfitTheme.colors.textPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        // Light Theme option
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (!isDark) SuperfitTheme.colors.primaryAccent else Color.Transparent)
-                                .clickable {
-                                    ThemeConfig.setThemeMode(context, false)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Light Mode ☀️",
-                                color = if (!isDark) Color.White else SuperfitTheme.colors.textPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
+                    SegmentedPills(
+                        options = listOf(
+                            ThemeConfig.MODE_SYSTEM to "Auto",
+                            ThemeConfig.MODE_LIGHT to "Light",
+                            ThemeConfig.MODE_DARK to "Dark"
+                        ),
+                        selected = themeMode,
+                        onSelect = { ThemeConfig.setMode(context, it) }
+                    )
                 }
             }
 
             // SECTION 4.5: Daily Reminder Notifications Settings
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Daily Reminder Notifications",
+                        text = "Daily reminder",
                         fontWeight = FontWeight.Bold,
                         color = SuperfitTheme.colors.textPrimary,
                         fontSize = 14.sp
                     )
 
                     Text(
-                        text = "Superfit will remind you to log meals at your scheduled time. If your logs are complete, you will receive your dynamic AI Coaching insight instead.",
-                        fontSize = 11.sp,
+                        text = "A nudge to log your meals. If you've already logged, you get a coach tip instead.",
+                        fontSize = 12.sp,
                         color = SuperfitTheme.colors.textSecondary
                     )
 
@@ -688,7 +567,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Enable Reminders",
+                            text = "Remind me",
                             fontWeight = FontWeight.Medium,
                             color = SuperfitTheme.colors.textPrimary,
                             fontSize = 13.sp,
@@ -729,7 +608,7 @@ fun SettingsScreen(
                                 }
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.Black,
+                                checkedThumbColor = Color.White,
                                 checkedTrackColor = NeonMint,
                                 uncheckedThumbColor = SuperfitTheme.colors.textTertiary,
                                 uncheckedTrackColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f)
@@ -769,7 +648,7 @@ fun SettingsScreen(
                                         .putInt("reminder_minute", selectedMinute)
                                         .apply()
                                     com.superfit.app.data.ReminderScheduler.scheduleReminder(context, selectedHour, selectedMinute)
-                                    Toast.makeText(context, "Reminder scheduled for time selection", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Reminder time saved", Toast.LENGTH_SHORT).show()
                                 },
                                 reminderHour,
                                 reminderMinute,
@@ -789,7 +668,7 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Reminder Time",
+                                text = "Time",
                                 color = SuperfitTheme.colors.textPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -808,43 +687,73 @@ fun SettingsScreen(
 
             // Home-screen widget (hidden where the launcher can't add one from an app)
             if (canPinWidget) {
+                // After a tap, wait for the launcher to place it so a second tap doesn't add a second widget.
+                var widgetRequested by remember { mutableStateOf(false) }
+                LaunchedEffect(widgetRequested) {
+                    if (widgetRequested) {
+                        repeat(60) {
+                            kotlinx.coroutines.delay(1000)
+                            if (WidgetPin.isPlaced(context)) {
+                                widgetPlaced = true
+                                widgetRequested = false
+                                return@LaunchedEffect
+                            }
+                        }
+                        widgetRequested = false
+                    }
+                }
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(
-                            1.dp,
-                            Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .clickable { WidgetPin.requestPin(context) }
+                        .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Add home-screen widget",
+                                text = "Home-screen widget",
                                 fontWeight = FontWeight.Bold,
                                 color = SuperfitTheme.colors.textPrimary,
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = if (widgetPlaced) {
-                                    "Already on your home screen. Tap to add another."
-                                } else {
-                                    "Calories left, plus mic and camera buttons to log in seconds."
+                                text = when {
+                                    widgetPlaced -> "On your home screen."
+                                    widgetRequested -> "Tap Add on the box that pops up."
+                                    else -> "Calories left, plus mic and camera buttons to log in seconds."
                                 },
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = SuperfitTheme.colors.textSecondary
                             )
                         }
-                        Text(text = "Add", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                        if (widgetPlaced) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = NeonMint, modifier = Modifier.size(18.dp))
+                                Text(text = "Added", fontWeight = FontWeight.Bold, color = NeonMint, fontSize = 13.sp)
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    widgetRequested = true
+                                    if (!WidgetPin.requestPin(context)) {
+                                        widgetRequested = false
+                                        Toast.makeText(context, "Your phone couldn't add it. Long-press your home screen, tap Widgets, and find Superfit.", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                enabled = !widgetRequested,
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.White),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Add", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -857,28 +766,24 @@ fun SettingsScreen(
                 // SECTION 5: Onboarding Preview & Diagnostics
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(
-                            1.dp,
-                            Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                            RoundedCornerShape(20.dp)
-                        )
+                        .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Diagnostics & User Testing",
+                            text = "Testing (dev app only)",
                             fontWeight = FontWeight.Bold,
                             color = SuperfitTheme.colors.textPrimary,
                             fontSize = 14.sp
                         )
                         Text(
                             text = "Preview and test the onboarding flow (body stats, goals and Health Connect) for new users. Your existing meal and workout history will not be lost.",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = SuperfitTheme.colors.textSecondary
                         )
                         Button(
@@ -889,11 +794,11 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(40.dp),
+                                .heightIn(min = 40.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = "Preview Onboarding Flow",
+                                text = "Preview sign-up steps",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
@@ -902,17 +807,14 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsGroupLabel("Privacy")
             // Anonymous usage and crash reports (see AppAnalytics)
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 var usageReports by remember { mutableStateOf(com.superfit.app.data.AppAnalytics.isEnabled(context)) }
                 Row(
@@ -928,7 +830,7 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Helps fix crashes and see which features people use. Never includes what you eat, your weight, health data, photos, or your name or email.",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = SuperfitTheme.colors.textSecondary
                         )
                     }
@@ -946,14 +848,10 @@ fun SettingsScreen(
             // SECTION 6: Account Actions
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(SuperfitTheme.colors.glassBorder, SuperfitTheme.colors.glassBorderGlow)),
-                        RoundedCornerShape(20.dp)
-                    )
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Row(
                     modifier = Modifier
@@ -969,11 +867,12 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .heightIn(min = 44.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "Sign Out",
+                            text = "Sign out",
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
@@ -987,8 +886,9 @@ fun SettingsScreen(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(8.dp)
+                            .heightIn(min = 44.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = "Delete account",
@@ -1000,4 +900,15 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+/** Small heading above each group of settings. */
+@Composable
+private fun SettingsGroupLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = SuperfitTheme.colors.textSecondary,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+    )
 }

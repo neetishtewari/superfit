@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
@@ -93,8 +95,8 @@ fun ConcentricActivityRings(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = this.center
-            val strokeWidth = 12.dp.toPx()
-            val spacing = 12.dp.toPx()
+            val strokeWidth = 10.dp.toPx()
+            val spacing = 6.dp.toPx()
 
             val radius1 = (size.minDimension / 2) - strokeWidth
             val radius2 = radius1 - strokeWidth - spacing
@@ -157,18 +159,25 @@ fun ConcentricActivityRings(
             )
         }
 
+        // Over the target reads as "230 kcal over" in amber, never "-230 kcal left".
+        val over = caloriesRemaining < 0
+        // Sized to the ring, not the phone's font size, so the number always sits inside it.
+        val density = androidx.compose.ui.platform.LocalDensity.current
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "$caloriesRemaining",
-                color = ThemeTextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Black
+                text = java.text.NumberFormat.getIntegerInstance().format(kotlin.math.abs(caloriesRemaining)),
+                color = if (over) ThemeErrorColor else ThemeTextPrimary,
+                style = MaterialTheme.typography.headlineSmall,
+                fontSize = with(density) { 24.dp.toSp() },
+                lineHeight = with(density) { 28.dp.toSp() },
+                maxLines = 1
             )
             Text(
-                text = "kcal left",
-                color = ThemeTextSecondary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
+                text = if (over) "kcal over" else "kcal left",
+                color = if (over) ThemeErrorColor else ThemeTextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = with(density) { 12.dp.toSp() },
+                maxLines = 1
             )
         }
     }
@@ -188,21 +197,22 @@ fun RingLegendItem(
         Box(
             modifier = Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .clip(CircleShape)
                 .background(color)
         )
         Column {
             Text(
                 text = label,
-                fontSize = 11.sp,
-                color = ThemeTextSecondary,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.labelMedium,
+                color = ThemeTextSecondary
             )
-            Text(
+            // Shrinks a little rather than cutting "1,777 of 10,000" short beside the ring.
+            val valueStyle = MaterialTheme.typography.titleSmall.copy(color = ThemeTextPrimary)
+            BasicText(
                 text = value,
-                fontSize = 13.sp,
-                color = ThemeTextPrimary,
-                fontWeight = FontWeight.Bold
+                style = valueStyle,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = valueStyle.fontSize)
             )
         }
     }
@@ -248,21 +258,19 @@ fun MacroProgressBar(
             ) {
                 Text(
                     text = label,
-                    fontSize = 12.sp,
-                    color = ThemeTextSecondary,
-                    fontWeight = FontWeight.SemiBold
+                    style = MaterialTheme.typography.titleSmall,
+                    color = ThemeTextPrimary
                 )
                 Text(
                     text = if (expanded) "▲" else "▼",
-                    fontSize = 8.sp,
-                    color = Color.Gray.copy(alpha = 0.6f)
+                    fontSize = 11.sp,
+                    color = ThemeTextTertiary.copy(alpha = 0.6f)
                 )
             }
             Text(
-                text = "${eaten.toInt()}$unit / ${target.toInt()}$unit",
-                fontSize = 12.sp,
-                color = color,
-                fontWeight = FontWeight.Bold,
+                text = "${eaten.toInt()} / ${target.toInt()} $unit",
+                style = MaterialTheme.typography.titleSmall,
+                color = ThemeTextSecondary,
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
@@ -272,7 +280,7 @@ fun MacroProgressBar(
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ThemeTextPrimary.copy(alpha = 0.05f))
+                .background(ThemeFieldBg)
         ) {
             if (animatedProgress > 0f) {
                 Box(
@@ -280,11 +288,7 @@ fun MacroProgressBar(
                         .fillMaxHeight()
                         .fillMaxWidth(animatedProgress)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(color, color.copy(alpha = 0.7f))
-                            )
-                        )
+                        .background(color)
                 )
             }
         }
@@ -312,8 +316,8 @@ fun MacroProgressBar(
                 if (contributingEntries.isEmpty()) {
                     Text(
                         text = "No entries logged today containing $label.",
-                        fontSize = 11.sp,
-                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        color = ThemeTextTertiary,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
@@ -359,8 +363,8 @@ fun SleepMetricPill(
         Column {
             Text(
                 text = label,
-                fontSize = 11.sp,
-                color = Color.Gray,
+                fontSize = 12.sp,
+                color = ThemeTextTertiary,
                 fontWeight = FontWeight.Bold
             )
             Text(
@@ -406,23 +410,23 @@ fun MealItemRow(
                 Text(
                     text = "${entry.calories.toInt()} kcal",
                     color = NeonGreen,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "P: ${entry.proteinG.toInt()}g",
-                    color = Color.Gray,
-                    fontSize = 11.sp
+                    color = ThemeTextTertiary,
+                    fontSize = 12.sp
                 )
                 Text(
                     text = "C: ${entry.carbsG.toInt()}g",
-                    color = Color.Gray,
-                    fontSize = 11.sp
+                    color = ThemeTextTertiary,
+                    fontSize = 12.sp
                 )
                 Text(
                     text = "F: ${entry.fatG.toInt()}g",
-                    color = Color.Gray,
-                    fontSize = 11.sp
+                    color = ThemeTextTertiary,
+                    fontSize = 12.sp
                 )
             }
             // A voice or typed meal with a food the AI wasn't sure about, not yet looked at.
@@ -431,7 +435,7 @@ fun MealItemRow(
                 Text(
                     text = if (toCheck == 1) "1 item to check" else "$toCheck items to check",
                     color = ThemeErrorColor,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .padding(top = 4.dp)
@@ -443,7 +447,7 @@ fun MealItemRow(
                 Text(
                     text = "Tap to edit",
                     color = ThemeTextTertiary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -504,7 +508,7 @@ fun ActivityProgressBar(
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(ThemeTextPrimary.copy(alpha = 0.05f))
+                .background(ThemeFieldBg)
         ) {
             if (animatedProgress > 0f) {
                 Box(
@@ -512,11 +516,7 @@ fun ActivityProgressBar(
                         .fillMaxHeight()
                         .fillMaxWidth(animatedProgress)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(color, color.copy(alpha = 0.7f))
-                            )
-                        )
+                        .background(color)
                 )
             }
         }

@@ -44,6 +44,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -194,45 +195,37 @@ fun LoginScreen(
                 Text(
                     text = if (viewModel.isLoginMode) "Sign in to resume tracking and sync history." else "Join Superfit to back up telemetry and log meals securely.",
                     fontSize = 13.sp,
-                    color = Color.Gray,
+                    color = ThemeTextTertiary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
                 // Email field
-                OutlinedTextField(
+                SuperfitField(
                     value = viewModel.email,
                     onValueChange = { viewModel.onEmailChange(it) },
                     label = { Text("Email Address") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = ThemeTextTertiary) },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Next
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = primaryColor,
-                        unfocusedBorderColor = ThemeGlassBorder,
-                        focusedLabelColor = primaryColor,
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = ThemeTextPrimary,
-                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
                 // Password field
-                OutlinedTextField(
+                SuperfitField(
                     value = viewModel.password,
                     onValueChange = { viewModel.onPasswordChange(it) },
                     label = { Text("Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ThemeTextTertiary) },
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                             Icon(
                                 imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                 contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                tint = Color.Gray
+                                tint = ThemeTextTertiary
                             )
                         }
                     },
@@ -248,14 +241,6 @@ fun LoginScreen(
                                 viewModel.authenticate(onLoginSuccess)
                             }
                         }
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = primaryColor,
-                        unfocusedBorderColor = ThemeGlassBorder,
-                        focusedLabelColor = primaryColor,
-                        unfocusedLabelColor = Color.Gray,
-                        focusedTextColor = ThemeTextPrimary,
-                        unfocusedTextColor = ThemeTextPrimary
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -290,11 +275,11 @@ fun LoginScreen(
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
-                    OutlinedTextField(
+                    SuperfitField(
                         value = viewModel.confirmPassword,
                         onValueChange = { viewModel.onConfirmPasswordChange(it) },
                         label = { Text("Confirm Password") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ThemeTextTertiary) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
@@ -305,14 +290,6 @@ fun LoginScreen(
                                 focusManager.clearFocus()
                                 viewModel.authenticate(onLoginSuccess)
                             }
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = primaryColor,
-                            unfocusedBorderColor = ThemeGlassBorder,
-                            focusedLabelColor = primaryColor,
-                            unfocusedLabelColor = Color.Gray,
-                            focusedTextColor = ThemeTextPrimary,
-                            unfocusedTextColor = ThemeTextPrimary
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -385,8 +362,8 @@ fun LoginScreen(
                     )
                     Text(
                         text = "OR",
-                        color = Color.Gray,
-                        fontSize = 11.sp,
+                        color = ThemeTextTertiary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 12.dp)
                     )
@@ -456,7 +433,7 @@ fun LoginScreen(
                 ) {
                     Text(
                         text = if (viewModel.isLoginMode) "New to Superfit? " else "Already have an account? ",
-                        color = Color.Gray,
+                        color = ThemeTextTertiary,
                         fontSize = 13.sp
                     )
                     Text(
@@ -494,18 +471,10 @@ fun LoginScreen(
                             color = ThemeTextSecondary
                         )
 
-                        OutlinedTextField(
+                        SuperfitField(
                             value = resetEmail,
                             onValueChange = { resetEmail = it },
                             label = { Text("Email Address") },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = primaryColor,
-                                unfocusedBorderColor = ThemeGlassBorder,
-                                focusedLabelColor = primaryColor,
-                                unfocusedLabelColor = Color.Gray,
-                                focusedTextColor = ThemeTextPrimary,
-                                unfocusedTextColor = ThemeTextPrimary
-                            ),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -548,7 +517,7 @@ fun LoginScreen(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = primaryColor,
-                            contentColor = Color.Black
+                            contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -563,7 +532,7 @@ fun LoginScreen(
                         TextButton(
                             onClick = { showForgotPasswordDialog = false }
                         ) {
-                            Text("Cancel", color = Color.Gray)
+                            Text("Cancel", color = ThemeTextTertiary)
                         }
                     }
                 }

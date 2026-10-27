@@ -76,7 +76,7 @@ internal fun FeatureItemBullet(icon: String, title: String, desc: String) {
         }
         Column {
             Text(text = title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ThemeTextPrimary)
-            Text(text = desc, fontSize = 11.sp, color = Color.Gray, lineHeight = 14.sp)
+            Text(text = desc, fontSize = 12.sp, color = ThemeTextTertiary, lineHeight = 14.sp)
         }
     }
 }
@@ -95,7 +95,7 @@ internal fun StepGuideItem(number: String, text: String) {
                 .border(1.dp, HyperViolet.copy(alpha = 0.3f), RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = number, color = HyperViolet, fontWeight = FontWeight.Black, fontSize = 10.sp)
+            Text(text = number, color = HyperViolet, fontWeight = FontWeight.Black, fontSize = 12.sp)
         }
         Text(text = text, fontSize = 12.sp, color = ThemeTextSecondary)
     }
@@ -132,7 +132,7 @@ internal fun ChecklistRow(label: String, value: String, isOk: Boolean) {
         Text(
             text = value,
             fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             color = if (isOk) NeonGreen else Color.Gray
         )
     }

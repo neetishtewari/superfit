@@ -274,7 +274,7 @@ fun OnboardingScreen(
                     Text(
                         text = if (voiceGuideEnabled) "Voice: On" else "Voice: Off",
                         color = if (voiceGuideEnabled) ElectricCyan else ThemeTextSecondary,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -383,7 +383,7 @@ fun OnboardingScreen(
                 onDismissRequest = { showHeightHelper = false },
                 title = {
                     Text(
-                        text = "📏 Height Conversion Chart",
+                        text = "Height conversion chart",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = ThemeTextPrimary
@@ -422,7 +422,7 @@ fun OnboardingScreen(
                 confirmButton = {
                     Button(
                         onClick = { showHeightHelper = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
                     ) {
                         Text("Done", fontWeight = FontWeight.Bold)
                     }
@@ -438,7 +438,7 @@ fun OnboardingScreen(
                 onDismissRequest = { showTdeeHelper = false },
                 title = {
                     Text(
-                        text = "📊 What is TDEE?",
+                        text = "What you burn in a day",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = ThemeTextPrimary
@@ -457,7 +457,7 @@ fun OnboardingScreen(
                 confirmButton = {
                     Button(
                         onClick = { showTdeeHelper = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
                     ) {
                         Text("Got it", fontWeight = FontWeight.Bold)
                     }

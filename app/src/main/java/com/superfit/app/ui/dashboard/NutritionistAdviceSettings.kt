@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,6 +30,7 @@ import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.SuperfitField
 import kotlinx.coroutines.launch
 
 /**
@@ -55,12 +59,19 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
         Text(
             text = "Write what your own nutritionist or dietitian told you, in your own words. Meal ratings, Diet Quality and the AI coach will follow it.",
             color = SuperfitTheme.colors.textSecondary,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             lineHeight = 15.sp
         )
-        OutlinedTextField(
+        val speakAdvice = com.superfit.app.ui.components.rememberVoiceTyping("Say what your nutritionist told you") { said ->
+            text = (if (text.isBlank()) said else text.trimEnd() + " " + said).take(2000)
+        }
+        SuperfitField(
             value = text,
             onValueChange = { text = it.take(2000) },
+            trailingIcon = { com.superfit.app.ui.components.MicButton(onClick = speakAdvice, modifier = Modifier.padding(end = 6.dp)) },
+            supportingText = {
+                Text("${text.length} / 2000", fontSize = 12.sp, color = SuperfitTheme.colors.textTertiary)
+            },
             placeholder = { Text("e.g. Protein in every meal: eggs, paneer, dal or curd. 2 squares of 70% dark chocolate are fine.", fontSize = 12.sp) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -72,10 +83,19 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val isSaved = !saving && saved.isNotBlank() && text.trim() == saved.trim()
+            if (isSaved && status == null) {
+                Icon(
+                    androidx.compose.material.icons.Icons.Default.Check,
+                    contentDescription = null,
+                    tint = NeonMint,
+                    modifier = Modifier.padding(end = 4.dp).size(16.dp)
+                )
+            }
             Text(
-                text = status.orEmpty(),
+                text = status ?: if (isSaved) "Saved" else "",
                 color = SuperfitTheme.colors.textSecondary,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.weight(1f)
             )
             Button(
@@ -93,7 +113,7 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = NeonMint)
             ) {
-                Text("Save", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
+                Text("Save", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
             }
         }
         applied?.let { t ->

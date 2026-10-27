@@ -16,14 +16,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -32,7 +35,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -41,11 +48,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -71,6 +75,7 @@ import com.superfit.app.domain.ChatEntry
 import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.SuperfitField
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -100,7 +105,7 @@ private fun chatRows(entries: List<ChatEntry>, today: LocalDate, zone: ZoneId): 
         rows += ChatRow.Message(
             entry,
             isLast = index == entries.lastIndex,
-            isRoast = CoachChat.questionFor(entries, index) == DashboardViewModel.ROAST_MY_DAY
+            isRoast = CoachChat.isRoastRequest(CoachChat.questionFor(entries, index))
         )
     }
     return rows
@@ -217,7 +222,7 @@ internal fun CoachChatSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = ThemeCardBg,
-        scrimColor = Color.Black.copy(alpha = 0.6f),
+        scrimColor = Color.White.copy(alpha = 0.6f),
         dragHandle = { BottomSheetDefaults.DragHandle(color = ThemeTextSecondary) }
     ) {
         Column(
@@ -229,33 +234,37 @@ internal fun CoachChatSheet(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = "💬 Your AI coach",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = ThemeTextPrimary
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                com.superfit.app.ui.components.IconBadge(
+                    icon = Icons.Default.AutoAwesome,
+                    background = HyperVioletAccent,
+                    tint = Color.White,
+                    size = 36
                 )
-                val activeNotes = notes.count { it.isActive(LocalDate.now()) }
-                Text(
-                    text = if (activeNotes > 0) {
-                        "Knows your meals, workouts and goal. Remembering $activeNotes ${if (activeNotes == 1) "note" else "notes"} so far (Settings → What my AI coach knows)"
-                    } else {
-                        "Knows your meals, workouts and goal, and remembers what you tell it"
-                    },
-                    fontSize = 11.sp,
-                    color = NeonGreen
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "AI coach",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = ThemeTextPrimary
+                    )
+                    val activeNotes = notes.count { it.isActive(LocalDate.now()) }
+                    Text(
+                        text = if (activeNotes > 0) {
+                            "Knows your meals, workouts and goal, plus $activeNotes ${if (activeNotes == 1) "note" else "notes"} you've shared"
+                        } else {
+                            "Knows your meals, workouts and goal, and remembers what you tell it"
+                        },
+                        fontSize = 12.sp,
+                        color = ThemeTextSecondary
+                    )
+                }
             }
 
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
-                    .padding(12.dp)
+                    .padding(vertical = 4.dp)
             ) {
                 val zone = remember { ZoneId.systemDefault() }
                 val rows = remember(chatMessages) { chatRows(chatMessages, LocalDate.now(), zone) }
@@ -279,9 +288,9 @@ internal fun CoachChatSheet(
                     items(rows, key = { it.key }) { row ->
                         when (row) {
                             is ChatRow.Day -> Text(
-                                text = row.label.uppercase(),
+                                text = row.label,
                                 color = ThemeTextSecondary,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.6.sp,
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -310,23 +319,39 @@ internal fun CoachChatSheet(
             }
 
             voiceProblem?.let {
-                Text(text = it, color = EnergeticCoral, fontSize = 12.sp)
+                Text(text = it, color = ThemeErrorColor, fontSize = 12.sp)
             }
 
             if (!chatLoading && !isListening) {
                 val questions = remember(chatMessages.size) { viewModel.coachQuestions() }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(questions) { q ->
-                        Text(
-                            text = q,
-                            color = ThemeTextPrimary,
-                            fontSize = 12.sp,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
-                                .clickable { viewModel.sendChatMessage(q, how = "chip") }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
+                        if (q == DashboardViewModel.ROAST_MY_DAY) {
+                            // The roast is the fun bit of Roast me style, so it looks like a button, not a question.
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(com.superfit.app.theme.SolarAmber)
+                                    .clickable { viewModel.sendChatMessage(q, how = "chip") }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Text(text = q, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Text(
+                                text = q,
+                                color = ThemeTextPrimary,
+                                fontSize = 12.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(16.dp))
+                                    .clickable { viewModel.sendChatMessage(q, how = "chip") }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -338,54 +363,49 @@ internal fun CoachChatSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
+                SuperfitField(
                     value = if (isListening) liveText else chatInputText,
                     onValueChange = { if (!isListening) chatInputText = it.take(CoachChat.MAX_TEXT) },
                     placeholder = {
-                        Text(if (isListening) "Listening… speak your question" else "Ask your AI coach…", fontSize = 13.sp)
+                        Text(if (isListening) "Listening… speak your question" else "Ask your coach…")
                     },
                     readOnly = isListening,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = if (isListening) NeonGreen else ThemeGlassBorder,
-                        focusedTextColor = ThemeTextPrimary,
-                        unfocusedTextColor = ThemeTextPrimary,
-                        focusedPlaceholderColor = ThemeTextSecondary,
-                        unfocusedPlaceholderColor = ThemeTextSecondary
-                    ),
                     modifier = Modifier.weight(1f),
-                    maxLines = 4
+                    maxLines = 4,
+                    trailingIcon = {
+                        Row(
+                            modifier = Modifier.padding(end = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // The same mic as everywhere else; while listening it becomes Stop and send.
+                            if (isListening) {
+                                com.superfit.app.ui.components.FieldActionButton(
+                                    icon = Icons.Default.Stop,
+                                    contentDescription = "Stop and send",
+                                    enabled = true,
+                                    onClick = { speechHelper.stopListening() }
+                                )
+                            } else {
+                                if (chatInputText.isBlank()) {
+                                    com.superfit.app.ui.components.MicButton(
+                                        onClick = { if (!chatLoading) startMic() },
+                                        contentDescription = "Ask by voice"
+                                    )
+                                }
+                                com.superfit.app.ui.components.FieldActionButton(
+                                    icon = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send",
+                                    enabled = chatInputText.isNotBlank() && !chatLoading,
+                                    onClick = {
+                                        viewModel.sendChatMessage(chatInputText)
+                                        chatInputText = ""
+                                    }
+                                )
+                            }
+                        }
+                    }
                 )
-
-                if (chatInputText.isBlank() || isListening) {
-                    IconButton(
-                        onClick = { if (isListening) speechHelper.stopListening() else startMic() },
-                        enabled = !chatLoading,
-                        modifier = Modifier.size(52.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isListening) EnergeticCoral else NeonGreen,
-                            contentColor = Color.Black,
-                            disabledContainerColor = NeonGreen.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
-                            contentDescription = if (isListening) "Stop and send" else "Ask by voice"
-                        )
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            viewModel.sendChatMessage(chatInputText)
-                            chatInputText = ""
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                        enabled = !chatLoading,
-                        modifier = Modifier.height(56.dp)
-                    ) {
-                        Text("Send", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
     }
@@ -396,20 +416,15 @@ private fun CoachBubble(text: String, isError: Boolean = false) {
     Box(
         modifier = Modifier
             .widthIn(max = 300.dp)
-            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 2.dp, bottomEnd = 12.dp))
-            .background(if (isError) EnergeticCoral.copy(alpha = 0.10f) else ThemeTextPrimary.copy(alpha = 0.05f))
-            .border(
-                1.dp,
-                if (isError) EnergeticCoral else ThemeGlassBorder,
-                RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 2.dp, bottomEnd = 12.dp)
-            )
-            .padding(12.dp)
+            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp))
+            .background(if (isError) ThemeAmberSoft else ThemeCoachSoft)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
             text = if (isError) AnnotatedString(text) else chatMarkdown(text),
             color = ThemeTextPrimary,
-            fontSize = 13.sp,
-            lineHeight = 18.sp
+            fontSize = 14.sp,
+            lineHeight = 20.sp
         )
     }
 }
@@ -429,19 +444,17 @@ private fun ChatMessageRow(
             Column(
                 modifier = Modifier
                     .widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 2.dp))
-                    .background(HyperVioletAccent.copy(alpha = 0.25f))
-                    .border(
-                        1.dp,
-                        HyperVioletAccent,
-                        RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 2.dp)
-                    )
-                    .padding(12.dp)
+                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp))
+                    .background(NeonGreen)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 if (entry.spoken) {
-                    Text(text = "🎙 Spoken", color = ThemeTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(14.dp))
+                        Text(text = "Spoken", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Text(text = entry.text, color = ThemeTextPrimary, fontSize = 13.sp, lineHeight = 18.sp)
+                Text(text = entry.text, color = Color.White, fontSize = 14.sp, lineHeight = 20.sp)
             }
         }
         return
@@ -468,11 +481,11 @@ private fun ChatMessageRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "✓ $line", color = NeonGreen, fontSize = 11.sp, modifier = Modifier.weight(1f, fill = false))
+                Text(text = "✓ $line", color = NeonGreen, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false))
                 Text(
                     text = "Undo",
                     color = ThemeTextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable(onClick = onUndo)
                 )
@@ -482,16 +495,16 @@ private fun ChatMessageRow(
         val meal = entry.mealToLog
         if (meal != null) {
             if (entry.mealLogged) {
-                Text(text = "✓ Added to today's meals: $meal", color = NeonGreen, fontSize = 11.sp)
+                Text(text = "✓ Added to today's meals: $meal", color = NeonGreen, fontSize = 12.sp)
             } else {
                 Button(
                     onClick = onLogMeal,
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(32.dp)
+                    modifier = Modifier.heightIn(min = 32.dp)
                 ) {
-                    Text("+ Log this: $meal", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("+ Log this: $meal", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
             }
         }
@@ -499,12 +512,14 @@ private fun ChatMessageRow(
         if (onShareRoast != null) {
             Button(
                 onClick = onShareRoast,
-                colors = ButtonDefaults.buttonColors(containerColor = com.superfit.app.theme.SolarAmber, contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = com.superfit.app.theme.SolarAmber, contentColor = Color.White),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
+                modifier = Modifier.heightIn(min = 32.dp)
             ) {
-                Text("🔥 Share as a card", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Share as a card", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 

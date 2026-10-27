@@ -54,6 +54,15 @@ object GoalForecast {
     private const val MIN_RATE = 0.05 // kg a week; slower than this is "not moving"
     private val dayMonth = DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
 
+    /**
+     * When the journey started. Older profiles never saved a start date (it reads as 1 January 1970,
+     * which showed "Day 20753"), so fall back to the first weigh-in, then the first logged meal.
+     */
+    fun startDate(profileStart: LocalDate?, weighIns: List<Pair<LocalDate, Double>>, firstLogged: LocalDate?, today: LocalDate): LocalDate {
+        val saved = profileStart?.takeIf { it.year >= 2020 && !it.isAfter(today) }
+        return saved ?: weighIns.minOfOrNull { it.first } ?: firstLogged ?: today
+    }
+
     fun compute(
         startKg: Double,
         targetKg: Double,
@@ -215,7 +224,7 @@ object GoalForecast {
         val now = month.sumOf { it.workouts.size } / 4.0
         val before = prev.sumOf { it.workouts.size } / 4.0
         if (before >= 2 && now <= before * 0.7 && before - now >= 1) {
-            add(Insight("fewer", "Fewer workouts this month", "${now.roundToInt()} a week in the last 4 weeks, down from ${before.roundToInt()}.", "fewer workouts"))
+            add(Insight("fewer", "Fewer workouts this month", "${now.roundToInt()} workouts a week over the last 4 weeks, down from ${before.roundToInt()} a week in the 4 weeks before.", "fewer workouts"))
         }
         if (lose) {
             val logged = month.filter { it.logged }

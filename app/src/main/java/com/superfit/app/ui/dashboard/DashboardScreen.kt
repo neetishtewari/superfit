@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -73,6 +74,7 @@ import com.superfit.app.ui.camera.FoodCameraController
 import com.superfit.app.ui.camera.FoodCameraScreen
 import com.superfit.app.widget.WidgetPin
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,6 +105,7 @@ fun DashboardScreen(
     var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
 
     var showChatBottomSheet by remember { mutableStateOf(false) }
+    val coachStyle by viewModel.coachStyle.collectAsState()
     var foodInputText by remember { mutableStateOf("") }
 
     var showFavoritesDialog by remember { mutableStateOf(false) }
@@ -332,11 +335,7 @@ fun DashboardScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(ThemeBgStart, ThemeBgEnd)
-                )
-            )
+            .background(ThemeBgStart)
     ) {
         if (showFoodCamera) {
             Dialog(
@@ -419,29 +418,6 @@ fun DashboardScreen(
                 }
             }
         }
-        if (dashboardState is DashboardUiState.Success) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(HyperVioletAccent.copy(alpha = 0.12f), Color.Transparent),
-                        center = Offset(0f, 0f),
-                        radius = size.minDimension * 0.8f
-                    ),
-                    radius = size.minDimension * 0.8f,
-                    center = Offset(0f, 0f)
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(ElectricCyan.copy(alpha = 0.08f), Color.Transparent),
-                        center = Offset(size.width, size.height * 0.5f),
-                        radius = size.minDimension * 0.7f
-                    ),
-                    radius = size.minDimension * 0.7f,
-                    center = Offset(size.width, size.height * 0.5f)
-                )
-            }
-        }
-
         when (val state = dashboardState) {
             DashboardUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -454,152 +430,171 @@ fun DashboardScreen(
                 }
             }
             is DashboardUiState.Success -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .verticalScroll(scrollState)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                // Pull down to sync with Health Connect (it also syncs on its own when Home opens).
+                var refreshing by remember { mutableStateOf(false) }
+                val refreshScope = rememberCoroutineScope()
+                PullToRefreshBox(
+                    isRefreshing = refreshing,
+                    onRefresh = {
+                        refreshing = true
+                        viewModel.syncTelemetry()
+                        refreshScope.launch {
+                            kotlinx.coroutines.delay(1200)
+                            refreshing = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    // Header Bar
-                    DashboardHeader(
-                        grantedPermissions = grantedPermissions,
-                        hasHealthConnectPermissions = hasHealthConnectPermissions,
-                        onSyncClick = { viewModel.syncTelemetry() },
-                        onNavigateToHistory = onNavigateToHistory,
-                        onNavigateToSettings = onNavigateToSettings
-                    )
-
-                    // Voice Quick Log Card (MEAL / WORKOUT tab switcher)
-                    val isProcessing = parsingState is ParsingState.Loading || workoutParsingState is ParsingState.Loading
-                    VoiceQuickLogCard(
-                        logType = logType,
-                        onLogTypeChange = { logType = it },
-                        isListening = isListening,
-                        isProcessing = isProcessing,
-                        liveText = voiceLiveText,
-                        onMicClick = {
-                            val hasPermission = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.RECORD_AUDIO
-                            ) == PackageManager.PERMISSION_GRANTED
-
-                            if (hasPermission) {
-                                speechHelper.startListening()
-                            } else {
-                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            }
-                        },
-                        onStopClick = {
-                            speechHelper.stopListening()
-                        },
-                        onCameraClick = if (hasCamera) {
-                            {
-                                foodCameraController.reset()
-                                showFoodCamera = true
-                            }
-                        } else {
-                            null
-                        }
-                    )
-
-                    personalBests.toOffer?.let { best ->
-                        NewBestCard(
-                            best = best,
-                            onShare = {
-                                shareBest = best
-                                shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now())
-                            },
-                            onDismiss = { viewModel.acknowledgeBest(best) }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .verticalScroll(scrollState)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Header Bar
+                        DashboardHeader(
+                            grantedPermissions = grantedPermissions,
+                            hasHealthConnectPermissions = hasHealthConnectPermissions,
+                            onNavigateToHistory = onNavigateToHistory,
+                            onNavigateToSettings = onNavigateToSettings
                         )
-                    }
 
-                    if (logType == "MEAL") {
-                        // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
-                        // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
-                        CalorieRingsCard(state = state)
+                        // Voice Quick Log Card (MEAL / WORKOUT tab switcher)
+                        val isProcessing = parsingState is ParsingState.Loading || workoutParsingState is ParsingState.Loading
+                        VoiceQuickLogCard(
+                            logType = logType,
+                            onLogTypeChange = { logType = it },
+                            isListening = isListening,
+                            isProcessing = isProcessing,
+                            liveText = voiceLiveText,
+                            onMicClick = {
+                                val hasPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
 
-                        // One-time tip offering the home-screen widget
-                        val widgetTipEligible = remember(state.totalMealsLogged) {
-                            WidgetPin.shouldShowTip(context, state.totalMealsLogged)
-                        }
-                        if (widgetTipEligible && !widgetTipHidden) {
-                            WidgetTipCard(
-                                onAdd = {
-                                    WidgetPin.requestPin(context)
-                                    widgetTipHidden = true
-                                },
-                                onNotNow = {
-                                    WidgetPin.dismissTip(context)
-                                    widgetTipHidden = true
+                                if (hasPermission) {
+                                    speechHelper.startListening()
+                                } else {
+                                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                 }
-                            )
-                        }
-
-                        // 2. Daily Streak Header Card (Narrow Band)
-                        StreakHeaderCard(
-                            streakState = state.streakState,
-                            onShare = { shareCard = dailyShareCard(state, coachingState) }
+                            },
+                            onStopClick = {
+                                speechHelper.stopListening()
+                            },
+                            onCameraClick = if (hasCamera) {
+                                {
+                                    foodCameraController.reset()
+                                    showFoodCamera = true
+                                }
+                            } else {
+                                null
+                            }
                         )
 
-                        // 3. Daily Nutrient Ledger
-                        NutrientLedgerCard(state = state)
-
-                        // Quick weigh-in, so weight logging doesn't need the History tab
-                        WeightQuickRow(
-                            currentWeightKg = state.weightMetrics.currentWeightKg,
-                            weightEntries = state.weightEntries,
-                            onLogWeight = { weight, note -> viewModel.logWeight(weight, note) }
-                        )
-
-                        // 4. AI Daily Coach Insights Card
-                        CoachInsightsCard(
-                            coachingState = coachingState,
-                            onRefresh = { viewModel.refreshCoachingInsight() },
-                            onOpenChat = { showChatBottomSheet = true }
-                        )
-
-                        // Diet Quality (a 7-day score) lives in Insights; Home stays about today.
-
-                        // 5. Track Your Meals Card (With Text Box, Chips, and Logged List)
-                        TrackMealsCard(
-                            state = state,
-                            viewModel = viewModel,
-                            parsingState = parsingState,
-                            foodInputText = foodInputText,
-                            onFoodInputChange = { foodInputText = it },
-                            onViewAllFoods = { showFavoritesDialog = true }
-                        )
-                    } else {
-                        // WORKOUT VIEW: Activity & Performance, Sleep & Recovery
-                        // One-time offer to bring in workouts from other apps
-                        val offerWorkoutConnect = workoutPermissionMissing || (!workoutImportEnabled && !workoutCardDismissed)
-                        if (offerWorkoutConnect && viewModel.healthConnectManager.isAvailable()) {
-                            WorkoutConnectCard(
-                                onConnect = {
-                                    workoutPermissionsLauncher.launch(com.superfit.app.data.WorkoutImporter.permissions)
+                        personalBests.toOffer?.let { best ->
+                            NewBestCard(
+                                best = best,
+                                onShare = {
+                                    shareBest = best
+                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now())
                                 },
-                                onNotNow = { viewModel.dismissWorkoutCard() }
+                                onDismiss = { viewModel.acknowledgeBest(best) }
                             )
                         }
 
-                        // 1. Activity & Performance Card
-                        ActivityPerformanceCard(
-                            state = state,
-                            vsUsual = viewModel.todayVsUsual(state, usualDay),
-                            onDeleteWorkout = { viewModel.deleteWorkout(it) },
-                            onHideImportedWorkout = { viewModel.hideWorkout(it) },
-                            workoutImportEnabled = workoutImportEnabled,
-                            workoutImportRunning = workoutImportRunning,
-                            onShareWorkout = { shareCard = it }
-                        )
+                        if (logType == "MEAL") {
+                            // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
+                            // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
+                            CalorieRingsCard(state = state)
 
-                        // 2. Sleep & Readiness Recovery Dashboard
-                        SleepRecoveryCard(state = state)
+                            // One-time tip offering the home-screen widget
+                            val widgetTipEligible = remember(state.totalMealsLogged) {
+                                WidgetPin.shouldShowTip(context, state.totalMealsLogged)
+                            }
+                            if (widgetTipEligible && !widgetTipHidden) {
+                                WidgetTipCard(
+                                    onAdd = {
+                                        WidgetPin.requestPin(context)
+                                        widgetTipHidden = true
+                                    },
+                                    onNotNow = {
+                                        WidgetPin.dismissTip(context)
+                                        widgetTipHidden = true
+                                    }
+                                )
+                            }
+
+                            // 2. Daily Streak Header Card (Narrow Band)
+                            StreakHeaderCard(
+                                streakState = state.streakState,
+                                onShare = { shareCard = dailyShareCard(state, coachingState) }
+                            )
+
+                            // 3. Daily Nutrient Ledger
+                            NutrientLedgerCard(state = state)
+
+                            // Quick weigh-in, so weight logging doesn't need the History tab
+                            WeightQuickRow(
+                                currentWeightKg = state.weightMetrics.currentWeightKg,
+                                weightEntries = state.weightEntries,
+                                onLogWeight = { weight, note -> viewModel.logWeight(weight, note) }
+                            )
+
+                            // 4. AI Daily Coach Insights Card
+                            CoachInsightsCard(
+                                coachingState = coachingState,
+                                onRefresh = { viewModel.refreshCoachingInsight() },
+                                onOpenChat = { showChatBottomSheet = true },
+                                onRoast = {
+                                    viewModel.sendChatMessage(DashboardViewModel.ROAST_MY_DAY, how = "chip")
+                                    showChatBottomSheet = true
+                                }.takeIf { coachStyle == com.superfit.app.domain.CoachStyle.ROAST }
+                            )
+
+                            // Diet Quality (a 7-day score) lives in Insights; Home stays about today.
+
+                            // 5. Track Your Meals Card (With Text Box, Chips, and Logged List)
+                            TrackMealsCard(
+                                state = state,
+                                viewModel = viewModel,
+                                parsingState = parsingState,
+                                foodInputText = foodInputText,
+                                onFoodInputChange = { foodInputText = it },
+                                onViewAllFoods = { showFavoritesDialog = true }
+                            )
+                        } else {
+                            // WORKOUT VIEW: Activity & Performance, Sleep & Recovery
+                            // One-time offer to bring in workouts from other apps
+                            val offerWorkoutConnect = workoutPermissionMissing || (!workoutImportEnabled && !workoutCardDismissed)
+                            if (offerWorkoutConnect && viewModel.healthConnectManager.isAvailable()) {
+                                WorkoutConnectCard(
+                                    onConnect = {
+                                        workoutPermissionsLauncher.launch(com.superfit.app.data.WorkoutImporter.permissions)
+                                    },
+                                    onNotNow = { viewModel.dismissWorkoutCard() }
+                                )
+                            }
+
+                            // 1. Activity & Performance Card
+                            ActivityPerformanceCard(
+                                state = state,
+                                vsUsual = viewModel.todayVsUsual(state, usualDay),
+                                onDeleteWorkout = { viewModel.deleteWorkout(it) },
+                                onHideImportedWorkout = { viewModel.hideWorkout(it) },
+                                workoutImportEnabled = workoutImportEnabled,
+                                workoutImportRunning = workoutImportRunning,
+                                onShareWorkout = { shareCard = it }
+                            )
+
+                            // 2. Sleep & Readiness Recovery Dashboard
+                            SleepRecoveryCard(state = state)
+                        }
+
+                        Spacer(modifier = Modifier.height(48.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(48.dp))
                 }
             }
         }
@@ -637,11 +632,11 @@ fun DashboardScreen(
             CoachChatSheet(
                 viewModel = viewModel,
                 onDismiss = { showChatBottomSheet = false },
-                // Only a day with meals logged can be roasted on a card.
+                // Any roast can go on a card, even one about an empty log.
                 onShareRoast = { line: String ->
                     showChatBottomSheet = false
                     shareCard = com.superfit.app.domain.ShareCards.roast(dailyShareCard(dayState, coachingState), line)
-                }.takeIf { dayState.nutritionList.isNotEmpty() }
+                }
             )
         }
     }
