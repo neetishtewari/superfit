@@ -214,8 +214,15 @@ object ShareCards {
     fun roast(daily: ShareCard.Daily, line: String): ShareCard.Daily =
         daily.copy(coachLine = fitRoast(plain(line)).takeIf { it.isNotBlank() }, roast = true)
 
-    /** About six lines on the card. */
-    const val ROAST_MAX = 180
+    /** The whole roast fits: the card shrinks the text to fit rather than cutting it. */
+    const val ROAST_MAX = 600
+
+    /** The opening line, when it's short, becomes the card's headline and the rest sits under it. */
+    fun splitRoast(text: String): Pair<String, String?> {
+        val parts = Regex("""(?<=[.!?])\s+""").split(text, limit = 2)
+        val rest = parts.getOrNull(1)?.trim()
+        return if (parts[0].length <= 90 && !rest.isNullOrEmpty()) parts[0] to rest else text to null
+    }
 
     /** Whole sentences that fit in [ROAST_MAX]; a first sentence that's too long is cut at a word. */
     fun fitRoast(text: String): String {

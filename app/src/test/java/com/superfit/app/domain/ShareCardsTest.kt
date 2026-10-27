@@ -47,7 +47,7 @@ class ShareCardsTest {
         assertTrue(card.roast)
         assertEquals("Two samosas and a gulab jamun. Bold.", card.coachLine)
         assertEquals(day.tiles, card.tiles)
-        val long = ShareCards.roast(day, "word ".repeat(80)).coachLine.orEmpty()
+        val long = ShareCards.roast(day, "word ".repeat(160)).coachLine.orEmpty()
         assertTrue(long.length <= ShareCards.ROAST_MAX && long.endsWith("…"))
         assertTrue(!day.roast)
     }
@@ -57,9 +57,19 @@ class ShareCardsTest {
         val first = "I can't roast thin air, and your food log is currently an empty void."
         val second = "You've managed to burn over 300 active calories today, but the one lonely puri you logged at lunch is doing all of the heavy lifting."
         val third = "Bold."
-        val fitted = ShareCards.fitRoast("$first $second $third")
-        assertEquals(first, fitted)
-        assertEquals("$first $third", ShareCards.fitRoast("$first $third"))
+        // A full chat roast is kept whole, not cut to its first line.
+        assertEquals("$first $second $third", ShareCards.fitRoast("$first $second $third"))
+        val tooLong = "$first " + "$second ".repeat(5) + third
+        val fitted = ShareCards.fitRoast(tooLong)
+        assertTrue(fitted.length <= ShareCards.ROAST_MAX && fitted.startsWith(first) && fitted.endsWith("."))
+    }
+
+    @Test
+    fun aShortOpeningLineBecomesTheHeadline() {
+        val (headline, rest) = ShareCards.splitRoast("Oh, a gulgule enthusiast! You fuelled Tuesday with fried sugar.")
+        assertEquals("Oh, a gulgule enthusiast!", headline)
+        assertEquals("You fuelled Tuesday with fried sugar.", rest)
+        assertEquals("Just one line." to null, ShareCards.splitRoast("Just one line."))
     }
 
     @Test
