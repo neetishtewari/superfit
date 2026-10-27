@@ -330,7 +330,7 @@ object CoachExportPdf {
             logo(MARGIN, 30f, 40f)
             wordmark(MARGIN + 52f, 57f, 18f)
             style(10f, Font.MEDIUM, Color.argb(230, 255, 255, 255))
-            canvas.drawText("Your AI coach for food and fitness", MARGIN + 52f, 72f, paint)
+            canvas.drawText("The simplest app to crush your fitness goals", MARGIN + 52f, 72f, paint)
             style(9f, Font.BOLD, Color.argb(220, 255, 255, 255))
             paint.letterSpacing = 0.08f
             val label = "PROGRESS REPORT"
