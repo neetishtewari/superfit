@@ -71,8 +71,12 @@ fun OnboardingScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Wizard step state (0 to 4)
+    // Wizard step state (0 to 5)
     var currentStep by remember { mutableIntStateOf(0) }
+    // Roast me starts selected: most people see the fun version, but still pick it themselves.
+    var coachStyle by remember {
+        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.ROAST)
+    }
     var validationError by remember { mutableStateOf<String?>(null) }
     // Spoken guidance is opt-in: it starts off and the "Voice" chip turns it on.
     var voiceGuideEnabled by remember { mutableStateOf(false) }
@@ -106,8 +110,9 @@ fun OnboardingScreen(
             0 to "Welcome to Superfit! It is the absolute easiest way to track your fitness and get personalized, science-backed insights. Choose your appearance preference and tap Get Started to begin our journey!",
             1 to "Let's enter your essential stats so we can calculate your resting metabolism.",
             2 to "Awesome! Now, select your baseline activity level and fitness goals. We'll use these to find your daily energy budget.",
-            3 to "Great. Now, let's sync your daily steps and sleep telemetry locally. Tap connect to auto-fill your physical details in one tap.",
-            4 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
+            3 to "Pick how your AI coach talks to you. Supportive, straight talk, or roast me.",
+            4 to "Great. Now, let's sync your daily steps and sleep telemetry locally. Tap connect to auto-fill your physical details in one tap.",
+            5 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
         )
     }
 
@@ -155,7 +160,7 @@ fun OnboardingScreen(
         viewModel.checkPermissions()
         if (granted.isNotEmpty()) {
             viewModel.autofillFromHealthConnect()
-            currentStep = 4
+            currentStep = 5
         }
     }
 
@@ -282,7 +287,7 @@ fun OnboardingScreen(
 
             // Segmented progress indicator bar
             val animatedProgress by animateFloatAsState(
-                targetValue = (currentStep + 1) / 5f,
+                targetValue = (currentStep + 1) / 6f,
                 label = "progressBarGlow"
             )
             Box(
@@ -361,13 +366,21 @@ fun OnboardingScreen(
                                 onOpenTdeePopup = { showTdeeHelper = true },
                                 onNext = { currentStep = 3 }
                             )
-                            3 -> HealthConnectStep(
+                            3 -> CoachStyleStep(
+                                selected = coachStyle,
+                                onSelect = { coachStyle = it },
+                                onNext = {
+                                    com.superfit.app.data.CoachStyleStore.save(context, coachStyle)
+                                    currentStep = 4
+                                }
+                            )
+                            4 -> HealthConnectStep(
                                 uiState = uiState,
                                 healthConnectManager = healthConnectManager,
                                 requestPermissionsLauncher = requestPermissionsLauncher,
-                                onNext = { currentStep = 4 }
+                                onNext = { currentStep = 5 }
                             )
-                            4 -> OnboardingSummaryStep(
+                            5 -> OnboardingSummaryStep(
                                 uiState = uiState,
                                 onStartClick = { viewModel.saveProfile(onOnboardingComplete) }
                             )

@@ -223,12 +223,17 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     }
 }
 
-/**
- * Shows the card scaled to fit while recording it at full size into [layer], so the shared
- * picture is always 1080 x 1920 whatever the phone's screen.
- */
 @Composable
 private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, light: Boolean, layer: GraphicsLayer, modifier: Modifier) {
+    CapturableStory(layer, modifier) { ShareCardView(card, accent, photo = photo, light = light) }
+}
+
+/**
+ * Shows a 360 x 640 dp story scaled to fit while recording it at full size into [layer], so the
+ * shared picture is always 1080 x 1920 whatever the phone's screen.
+ */
+@Composable
+fun CapturableStory(layer: GraphicsLayer, modifier: Modifier, content: @Composable () -> Unit) {
     BoxWithConstraints(modifier) {
         val widthPx = constraints.maxWidth
         val scale = widthPx / CARD_WIDTH_PX.toFloat()
@@ -253,15 +258,13 @@ private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, 
                     drawLayer(layer)
                 }
         ) {
-            CompositionLocalProvider(LocalDensity provides CardDensity) {
-                ShareCardView(card, accent, photo = photo, light = light)
-            }
+            CompositionLocalProvider(LocalDensity provides CardDensity) { content() }
         }
     }
 }
 
 /** Saves the picture in the app's cache (replacing the last one) and opens the share sheet. */
-private suspend fun shareImage(context: Context, bitmap: Bitmap) {
+suspend fun shareImage(context: Context, bitmap: Bitmap) {
     val file = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "shares").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
