@@ -21,6 +21,7 @@ import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RepeatMealCache
+import com.superfit.app.domain.SpokenInput
 import com.superfit.app.domain.StreakEngine
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
@@ -910,8 +911,11 @@ class DashboardViewModel(
     // Whether the last input came from the mic (food, exercise or both) or the typed meal box.
     private var lastInputWasSpoken = false
 
+    // The phone's other versions of what it heard, kept for a retry.
+    private var lastSpokenVersions: List<String> = emptyList()
+
     fun retryLastMeal() {
-        lastMealInput?.let { if (lastInputWasSpoken) smartLog(it) else parseAndAddMeal(it) }
+        lastMealInput?.let { if (lastInputWasSpoken) smartLog(it, lastSpokenVersions) else parseAndAddMeal(it) }
     }
 
     /**
@@ -919,9 +923,11 @@ class DashboardViewModel(
      * meals is logged straight away; anything else is split by [LogRouter] and each part goes to
      * its usual parser. If one part can't be understood, the other is still logged.
      */
-    fun smartLog(input: String) {
+    fun smartLog(input: String, otherVersions: List<String> = emptyList()) {
         lastMealInput = input
         lastInputWasSpoken = true
+        lastSpokenVersions = otherVersions
+        val spoken = SpokenInput(input, otherVersions)
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
@@ -929,11 +935,11 @@ class DashboardViewModel(
                 val history = repository.getAllNutritionEntries()
                 RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
                     saveMeal(repeat)
-                    _parsingState.value = ParsingState.Success(repeat.foodText)
+                    _parsingState.value = ParsingState.Success(repeat.foodText).withHeard(input)
                     return@launch
                 }
 
-                val routed = LogRouter().route(input)
+                val routed = LogRouter().route(spoken)
                 if (routed.isEmpty) {
                     _parsingState.value = ParsingState.Error(NOTHING_RECOGNISED)
                     return@launch
@@ -944,7 +950,7 @@ class DashboardViewModel(
                         if (routed.food.isBlank()) {
                             null
                         } else {
-                            runCatching { NutritionParser().parseFoodInput(routed.food, history) }
+                            runCatching { NutritionParser().parseFoodInput(routed.food, history, spoken) }
                         }
                     }
                     val workoutJob = async {
@@ -966,6 +972,7 @@ class DashboardViewModel(
                     saveMeal(it)
                     // A retry after this point must not log the meal twice.
                     lastMealInput = routed.exercise.ifBlank { null }
+                    lastSpokenVersions = emptyList()
                 }
                 workoutResult?.let { saveWorkout(it, "JUST_RIGHT") }
                 val foodMissed = routed.food.isNotBlank() && mealResult == null
@@ -993,7 +1000,7 @@ class DashboardViewModel(
                         if (failure != null) android.util.Log.e("DashboardViewModel", "Smart log failed", failure)
                         ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: NOTHING_RECOGNISED)
                     }
-                }
+                }.withHeard(input)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1257,6 +1264,10 @@ class DashboardViewModel(
 }
 
 private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
+
+/** Shows what the phone heard above a voice log's result, so a misheard word is easy to spot. */
+internal fun ParsingState.withHeard(heard: String): ParsingState =
+    if (this is ParsingState.Success) copy(message = "Heard: \u201C${heard.trim()}\u201D\n${message ?: "Logged: $foodText"}") else this
 
 sealed interface ParsingState {
     object Idle : ParsingState

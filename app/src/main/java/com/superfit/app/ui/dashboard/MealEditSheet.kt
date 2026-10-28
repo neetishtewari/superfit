@@ -376,7 +376,7 @@ private fun ChangeItemBox(
                 com.superfit.app.ui.components.MicButton(
                     onClick = {
                         try {
-                            voice.launch(SpeechRecognizerHelper.systemDialogIntent().putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what it was"))
+                            voice.launch(SpeechRecognizerHelper.systemDialogIntent(context).putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what it was"))
                         } catch (e: ActivityNotFoundException) {
                             Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
                         }

@@ -2,7 +2,9 @@ package com.superfit.app.domain
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -57,5 +59,19 @@ class NutritionParserTest {
         )
         assertEquals("invalid", result.foodText)
         assertNull(result.items)
+    }
+
+    @Test
+    fun `typed meals get no speech note`() {
+        assertEquals("", NutritionParser.spokenNote(null))
+    }
+
+    @Test
+    fun `spoken meals say they may be misheard and list every version heard`() {
+        val note = NutritionParser.spokenNote(SpokenInput("jaipuri chane", listOf("cheh poori aur chane")))
+        assertTrue(note.contains("mishears"))
+        assertTrue(note.contains("any language"))
+        assertTrue(note.contains("- \"jaipuri chane\"\n- \"cheh poori aur chane\""))
+        assertFalse(NutritionParser.spokenNote(SpokenInput("2 roti")).contains("best guess first"))
     }
 }

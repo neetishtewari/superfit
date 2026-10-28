@@ -145,9 +145,9 @@ internal fun CoachChatSheet(
     val speechHelper = remember {
         SpeechRecognizerHelper(
             context = context,
-            onResult = { text ->
+            onResult = { heard ->
                 liveText = ""
-                viewModel.sendChatMessage(text, how = "voice")
+                viewModel.sendChatMessage(heard.text, how = "voice")
             },
             onError = { error ->
                 liveText = ""
@@ -157,7 +157,7 @@ internal fun CoachChatSheet(
             onLiveText = { liveText = it },
             onNeedsSystemDialog = {
                 try {
-                    systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent())
+                    systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent(context))
                 } catch (e: Exception) {
                     voiceProblem = "Voice input isn't available on this phone. Type your question instead."
                 }
