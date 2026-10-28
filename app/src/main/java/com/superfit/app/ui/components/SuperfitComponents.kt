@@ -135,7 +135,7 @@ fun rememberVoiceTyping(prompt: String, onText: (String) -> Unit): () -> Unit {
     }
     return {
         try {
-            launcher.launch(SpeechRecognizerHelper.systemDialogIntent().putExtra(RecognizerIntent.EXTRA_PROMPT, prompt))
+            launcher.launch(SpeechRecognizerHelper.systemDialogIntent(context).putExtra(RecognizerIntent.EXTRA_PROMPT, prompt))
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
         }

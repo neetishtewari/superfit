@@ -32,7 +32,9 @@ class NutritionParser {
 
     suspend fun parseFoodInput(
         input: String,
-        history: List<NutritionEntryEntity> = emptyList()
+        history: List<NutritionEntryEntity> = emptyList(),
+        /** Set when the words came from the mic: the AI is told they may be misheard, in any language. */
+        spoken: SpokenInput? = null
     ): ParsedNutritionResult {
         if (input.isBlank()) {
             throw IllegalArgumentException("Food input cannot be empty")
@@ -48,7 +50,7 @@ class NutritionParser {
 
         // 2. Cascade across Gemini models (2.5-flash -> 2.0-flash -> 1.5-flash)
         val jsonText = GeminiClient.generateContent(
-            prompt = PersonalNutrition.promptContext() + "Meal input: \"$input\"",
+            prompt = PersonalNutrition.promptContext() + spokenNote(spoken) + "Meal input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true
         )
@@ -61,5 +63,28 @@ class NutritionParser {
             .trim()
 
         return ParsedNutritionResult.fromJson(JSONObject(cleanJsonText), input)
+    }
+
+    companion object {
+        /**
+         * Tells the AI the meal was spoken. A food that sounds like a misheard word goes in as the
+         * item with the sound-alike as an alternative, so the person sees an "Is it…?" choice.
+         */
+        internal fun spokenNote(spoken: SpokenInput?): String {
+            if (spoken == null) return ""
+            return buildString {
+                append(
+                    "This meal was spoken and turned into text by the phone. It may be in any language or a mix " +
+                        "(for example Hindi and English, or Portuguese), numbers may be said in any language, and the " +
+                        "phone sometimes mishears words. If a word looks misheard, use the food it most likely was, judging " +
+                        "by how it sounds and what makes sense in a meal, and give the other reading in \"alternatives\". " +
+                        "Keep \"name\" in short English as usual.\n"
+                )
+                if (spoken.otherVersions.isNotEmpty()) {
+                    append("Everything the phone thought it heard, best guess first. Log only the food in the meal input; use these just to spot mishearings:\n")
+                    (listOf(spoken.text) + spoken.otherVersions).forEach { append("- \"").append(it).append("\"\n") }
+                }
+            }
+        }
     }
 }

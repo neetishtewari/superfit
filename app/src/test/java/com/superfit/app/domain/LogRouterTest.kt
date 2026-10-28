@@ -40,4 +40,18 @@ class LogRouterTest {
     fun `code fences are ignored`() {
         assertEquals(RoutedLog("chai", ""), LogRouter.parse("```json\n{\"food\":\"chai\",\"exercise\":\"\"}\n```"))
     }
+
+    @Test
+    fun `prompt lists the phone's other versions so the AI can pick the right one`() {
+        assertEquals("Said: \"2 roti\"", LogRouter.prompt(SpokenInput("2 roti")))
+        val prompt = LogRouter.prompt(SpokenInput("jaipuri chane", listOf("cheh poori aur chane")))
+        assertTrue(prompt.startsWith("Said: \"jaipuri chane\""))
+        assertTrue(prompt.contains("Other ways the phone heard it:\n- \"cheh poori aur chane\""))
+    }
+
+    @Test
+    fun `told the words were spoken, in any language`() {
+        assertTrue(LogRouter.SYSTEM_INSTRUCTION.contains("any language"))
+        assertTrue(LogRouter.SYSTEM_INSTRUCTION.contains("numbers"))
+    }
 }

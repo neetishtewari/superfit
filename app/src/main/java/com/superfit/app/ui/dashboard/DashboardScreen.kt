@@ -69,6 +69,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.domain.SpokenInput
 import com.superfit.app.theme.*
 import com.superfit.app.ui.camera.FoodCameraController
 import com.superfit.app.ui.camera.FoodCameraScreen
@@ -139,21 +140,20 @@ fun DashboardScreen(
     val systemSpeechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val text = result.data
-            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-            ?.firstOrNull()
-        if (!text.isNullOrBlank()) viewModel.smartLog(text)
+        SpokenInput.fromGuesses(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS))
+            ?.let { viewModel.smartLog(it.text, it.otherVersions) }
     }
     var showMicOffDialog by remember { mutableStateOf(false) }
     var voiceLiveText by remember { mutableStateOf("") }
+    var voiceChecking by remember { mutableStateOf(false) }
 
     // Speech recognizer helper instantiation
     val speechHelper = remember {
         SpeechRecognizerHelper(
             context = context,
-            onResult = { text ->
+            onResult = { heard ->
                 // One mic for everything: food, exercise or both, whichever tab is showing.
-                viewModel.smartLog(text)
+                viewModel.smartLog(heard.text, heard.otherVersions)
             },
             onError = { error ->
                 voiceMessage = error
@@ -164,9 +164,10 @@ fun DashboardScreen(
                 isListening = listening
             },
             onLiveText = { voiceLiveText = it },
+            onChecking = { voiceChecking = it },
             onNeedsSystemDialog = {
                 try {
-                    systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent())
+                    systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent(context))
                 } catch (e: Exception) {
                     voiceMessage = "Voice input isn't available on this phone. Type your meal or use the camera instead."
                     voiceBannerColor = EnergeticCoral
@@ -220,7 +221,8 @@ fun DashboardScreen(
     // Auto-dismiss voice feedback banner
     LaunchedEffect(showVoiceBanner) {
         if (showVoiceBanner) {
-            kotlinx.coroutines.delay(4000)
+            // A voice log also shows what was heard, which needs a little longer to read.
+            kotlinx.coroutines.delay(if (voiceMessage?.startsWith("Heard") == true) 6000 else 4000)
             showVoiceBanner = false
         }
     }
@@ -475,6 +477,7 @@ fun DashboardScreen(
                             onLogTypeChange = { logType = it },
                             isListening = isListening,
                             isProcessing = isProcessing,
+                            isChecking = voiceChecking,
                             liveText = voiceLiveText,
                             onMicClick = {
                                 val hasPermission = ContextCompat.checkSelfPermission(
