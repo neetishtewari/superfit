@@ -69,8 +69,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.data.WorkoutEntryEntity
-import com.superfit.app.theme.*
 import com.superfit.app.domain.SpokenInput
+import com.superfit.app.theme.*
 import com.superfit.app.ui.camera.FoodCameraController
 import com.superfit.app.ui.camera.FoodCameraScreen
 import com.superfit.app.widget.WidgetPin
