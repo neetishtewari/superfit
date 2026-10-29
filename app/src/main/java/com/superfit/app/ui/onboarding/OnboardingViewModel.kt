@@ -87,8 +87,8 @@ class OnboardingViewModel(
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
-                    height = height?.let { "%.1f".format(it) } ?: _uiState.value.height,
-                    weight = weight?.let { "%.1f".format(it) } ?: _uiState.value.weight,
+                    height = height?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: _uiState.value.height,
+                    weight = weight?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: _uiState.value.weight,
                     isAutofilling = false
                 )
             }

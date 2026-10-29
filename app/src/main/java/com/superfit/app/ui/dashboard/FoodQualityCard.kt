@@ -38,7 +38,6 @@ import com.superfit.app.theme.*
 fun FoodQualityCard(
     metrics: DietQualityMetrics,
     modifier: Modifier = Modifier,
-    onLogSwap: ((String) -> Unit)? = null,
     note: DietNote? = null,
     onFineForMe: ((FoodItemRating, Boolean) -> Unit)? = null
 ) {
@@ -232,7 +231,6 @@ fun FoodQualityCard(
         DietQualityDetailBottomSheet(
             metrics = metrics,
             onDismiss = { showDetailBottomSheet = false },
-            onLogSwap = onLogSwap,
             onFineForMe = onFineForMe
         )
     }
@@ -310,7 +308,6 @@ private fun DietScorePartRow(part: DietScorePart) {
 fun DietQualityDetailBottomSheet(
     metrics: DietQualityMetrics,
     onDismiss: () -> Unit,
-    onLogSwap: ((String) -> Unit)? = null,
     onFineForMe: ((FoodItemRating, Boolean) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -449,13 +446,7 @@ fun DietQualityDetailBottomSheet(
                         }
 
                         items(metrics.swapSuggestions) { swap ->
-                            FoodSwapCard(
-                                swap = swap,
-                                onLogSwap = { alternative ->
-                                    onLogSwap?.invoke(alternative)
-                                    onDismiss()
-                                }
-                            )
+                            FoodSwapCard(swap = swap)
                         }
                     }
                 }
@@ -565,7 +556,6 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
 @Composable
 fun FoodSwapCard(
     swap: FoodSwapSuggestion,
-    onLogSwap: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -683,24 +673,6 @@ fun FoodSwapCard(
                 fontWeight = FontWeight.Medium,
                 color = SuperfitTheme.colors.textSecondary
             )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Button(
-                onClick = { onLogSwap(swap.suggestedAlternative) },
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = NeonMint,
-                    contentColor = Color.White
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Log Smart Swap (1-Tap)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }

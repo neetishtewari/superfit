@@ -149,12 +149,11 @@ fun HistoryScreen(
                                 if (dashboardState is DashboardUiState.Success) {
                                     FoodQualityCard(
                                         metrics = dashboardState.dietQualityMetrics,
-                                        onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) },
                                         note = dietNote,
                                         onFineForMe = { item, fine -> dashboardViewModel?.setFineForMe(item.approvalKey, fine) }
                                     )
                                     dashboardState.dietQualityMetrics.swapSuggestions.forEach { swap ->
-                                        FoodSwapCard(swap = swap, onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) })
+                                        FoodSwapCard(swap = swap)
                                     }
                                 }
                             },

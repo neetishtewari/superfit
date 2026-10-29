@@ -36,8 +36,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.superfit.app.domain.NumberInput
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.dashboard.SpeechRecognizerHelper
 
@@ -76,9 +78,16 @@ fun SuperfitField(
         focused -> colors.primaryAccent
         else -> Color.Transparent
     }
+    // Number boxes stay one line (Enter doesn't grow them) and take at most two decimals.
+    val type = keyboardOptions.keyboardType
+    val numeric = type == KeyboardType.Number || type == KeyboardType.Decimal
     TextField(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = if (numeric) {
+            { typed -> NumberInput.clean(typed, allowDecimals = type == KeyboardType.Decimal)?.let(onValueChange) }
+        } else {
+            onValueChange
+        },
         modifier = modifier.border(2.dp, frame, FieldShape),
         enabled = enabled,
         readOnly = readOnly,
@@ -92,8 +101,8 @@ fun SuperfitField(
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        singleLine = singleLine,
-        maxLines = maxLines,
+        singleLine = singleLine || numeric,
+        maxLines = if (numeric) 1 else maxLines,
         minLines = minLines,
         interactionSource = interaction,
         shape = FieldShape,
