@@ -92,18 +92,25 @@ class PersonalBestsTest {
     @Test
     fun stepsCountOnlyFinishedDaysWeeksAndMonths() {
         // Day 100 (Sat 11 Apr 1970) is today; day 88 is Mon 30 Mar and day 95 is Mon 6 Apr, this week.
-        val steps = listOf(
-            DaySteps(LocalDate.ofEpochDay(88), 9000),
-            DaySteps(LocalDate.ofEpochDay(89), 12000),
-            DaySteps(LocalDate.ofEpochDay(95), 15000),
-            DaySteps(LocalDate.ofEpochDay(100), 30000)
-        )
+        // Every day from 1 Mar (day 59) to today has 3,000 steps, plus a few bigger days.
+        val big = mapOf(88L to 9000, 89L to 12000, 95L to 15000, 100L to 30000)
+        val steps = (59L..100L).map { DaySteps(LocalDate.ofEpochDay(it), big[it] ?: 3000) }
         val bests = compute(emptyList(), steps)
         assertEquals(15000.0, best(bests, BestKind.MOST_STEPS_DAY).value, 0.1)
-        assertEquals(21000.0, best(bests, BestKind.MOST_STEPS_WEEK).value, 0.1)
+        // Week of 30 Mar: 9,000 + 12,000 + 5 days of 3,000.
+        assertEquals(36000.0, best(bests, BestKind.MOST_STEPS_WEEK).value, 0.1)
         assertEquals(LocalDate.ofEpochDay(88), best(bests, BestKind.MOST_STEPS_WEEK).periodStart)
-        // April isn't over yet, so the month best is March.
-        assertEquals(21000.0, best(bests, BestKind.MOST_STEPS_MONTH).value, 0.1)
+        // April isn't over yet, so the month best is March: 29 days of 3,000 + 9,000 + 12,000.
+        assertEquals(108000.0, best(bests, BestKind.MOST_STEPS_MONTH).value, 0.1)
+    }
+
+    @Test
+    fun weeksAndMonthsWithGapsInStepsDontCount() {
+        // Only two days of the week of 30 Mar have steps, so that week can't be a best.
+        val steps = listOf(DaySteps(LocalDate.ofEpochDay(88), 9000), DaySteps(LocalDate.ofEpochDay(89), 12000))
+        val bests = compute(emptyList(), steps)
+        assertTrue(bests.none { it.kind == BestKind.MOST_STEPS_WEEK || it.kind == BestKind.MOST_STEPS_MONTH })
+        assertEquals(12000.0, best(bests, BestKind.MOST_STEPS_DAY).value, 0.1)
     }
 
     @Test

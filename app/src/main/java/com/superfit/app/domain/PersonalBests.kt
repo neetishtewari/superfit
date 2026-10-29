@@ -169,9 +169,18 @@ object PersonalBests {
             .mapNotNull { (start, days) ->
                 val end = periodEnd(kind.period, start)
                 if (!end.isBefore(today)) return@mapNotNull null
+                // Steps are counted every day, so a week or month with gaps in the data would undercount.
+                if (kind.isSteps && days.size < minStepDays(kind.period, start)) return@mapNotNull null
                 val endMillis = end.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
                 Entry(days.sumOf { it.value }, endMillis, periodStart = start)
             }
+    }
+
+    /** Days of step data a week or month needs to count: all but one of a week, all but three of a month. */
+    private fun minStepDays(period: BestPeriod, start: LocalDate): Int = when (period) {
+        BestPeriod.WEEK -> 6
+        BestPeriod.MONTH -> start.lengthOfMonth() - 3
+        else -> 1
     }
 
     fun periodStart(period: BestPeriod, date: LocalDate): LocalDate = when (period) {
