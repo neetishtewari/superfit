@@ -425,7 +425,11 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
         Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = accent, modifier = Modifier.size(56.dp))
         Spacer(Modifier.height(16.dp))
         Text(
-            if (card.isNew) "NEW PERSONAL BEST" else "PERSONAL BEST",
+            when {
+                card.podium -> "TOP 3"
+                card.isNew -> "NEW PERSONAL BEST"
+                else -> "PERSONAL BEST"
+            },
             color = accent,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
@@ -435,9 +439,18 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
         Text(card.label, color = TextMain, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(card.bigValue, color = TextMain, fontSize = 88.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 88.sp, maxLines = 1)
+            val size = bigValueSize(card.bigValue, 88)
+            Text(card.bigValue, color = TextMain, fontSize = size.sp, fontWeight = FontWeight.ExtraBold, lineHeight = size.sp, maxLines = 1)
             Spacer(Modifier.width(8.dp))
-            Text(card.bigUnit, color = accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 14.dp))
+            Text(
+                card.bigUnit,
+                color = accent,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(bottom = (size / 6).dp)
+            )
         }
         card.detail?.takeIf { it.isNotBlank() }?.let {
             Spacer(Modifier.height(12.dp))
@@ -564,13 +577,29 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, mo
                     }
                 }
                 is ShareCard.Best -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            when {
+                                card.podium -> "TOP 3"
+                                card.isNew -> "NEW PERSONAL BEST"
+                                else -> "PERSONAL BEST"
+                            },
+                            color = accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 2.sp,
+                            maxLines = 1
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        (if (card.isNew) "NEW PERSONAL BEST · " else "PERSONAL BEST · ") + card.label.uppercase(),
-                        color = accent,
-                        fontSize = 12.sp,
+                        card.label,
+                        color = Color.White,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     BigNumber(card.bigValue, card.bigUnit, accent)
@@ -603,10 +632,27 @@ private val PhotoSoft = Color.White.copy(alpha = 0.8f)
 @Composable
 private fun BigNumber(value: String, unit: String, accent: Color) {
     Row(verticalAlignment = Alignment.Bottom) {
-        Text(value, color = Color.White, fontSize = 76.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 76.sp, maxLines = 1)
+        val size = bigValueSize(value, 76)
+        Text(value, color = Color.White, fontSize = size.sp, fontWeight = FontWeight.ExtraBold, lineHeight = size.sp, maxLines = 1)
         Spacer(Modifier.width(8.dp))
-        Text(unit, color = accent, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
+        Text(
+            unit,
+            color = accent,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(bottom = (size / 6).dp)
+        )
     }
+}
+
+/** Long numbers like "80,733" get a smaller size so the number and its unit fit on one line. */
+private fun bigValueSize(value: String, full: Int): Int = when {
+    value.length <= 4 -> full
+    value.length == 5 -> full * 7 / 8
+    value.length == 6 -> full * 3 / 4
+    else -> full * 5 / 8
 }
 
 private fun shortLabel(label: String): String = if (label == "AVG HEART RATE") "AVG HR" else label

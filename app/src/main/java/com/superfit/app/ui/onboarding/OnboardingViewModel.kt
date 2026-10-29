@@ -27,8 +27,8 @@ class OnboardingViewModel(
             if (existing != null) {
                 _uiState.value = _uiState.value.copy(
                     age = existing.age.toString(),
-                    height = existing.heightCm.toString(),
-                    weight = existing.weightKg.toString(),
+                    height = com.superfit.app.domain.BodyReadings.fmt(existing.heightCm),
+                    weight = com.superfit.app.domain.BodyReadings.fmt(existing.weightKg),
                     isMale = existing.isMale,
                     activityMultiplier = existing.activityMultiplier,
                     goal = existing.goal,
@@ -87,8 +87,8 @@ class OnboardingViewModel(
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
-                    height = height?.let { "%.1f".format(it) } ?: _uiState.value.height,
-                    weight = weight?.let { "%.1f".format(it) } ?: _uiState.value.weight,
+                    height = height?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: _uiState.value.height,
+                    weight = weight?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: _uiState.value.weight,
                     isAutofilling = false
                 )
             }

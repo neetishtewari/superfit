@@ -34,8 +34,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.GoalPicker
 import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.widget.WidgetPin
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,12 +276,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (hasHealthConnectPermissions) {
-                                    try {
-                                        val intent = Intent("androidx.health.connect.client.ACTION_HEALTH_CONNECT_SETTINGS")
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Could not open Health Connect settings.", Toast.LENGTH_SHORT).show()
-                                    }
+                                    com.superfit.app.ui.openHealthConnectSettings(context)
                                 } else {
                                     com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, viewModel.healthConnectManager.permissions + viewModel.healthConnectManager.bodyPermissions)
                                 }
@@ -359,16 +357,11 @@ fun SettingsScreen(
 
                     if (dashboardState is DashboardUiState.Success) {
                         val state = dashboardState as DashboardUiState.Success
-                        val goals = listOf(
-                            Triple("LOSE_WEIGHT", "Lose", -500),
-                            Triple("MAINTAIN", "Maintain", 0),
-                            Triple("GAIN_MUSCLE", "Gain", 300)
-                        )
-
-                        SegmentedPills(
-                            options = goals.map { it.first to it.second },
+                        val targets = state.macroTargets
+                        GoalPicker(
                             selected = state.profile.goal,
-                            onSelect = { key -> goals.first { it.first == key }.let { viewModel.updateGoal(it.first, it.third) } }
+                            onSelect = { goal -> viewModel.updateGoal(goal.key, goal.calorieOffset) },
+                            selectedDetail = "Today's target: ${"%,d".format(targets.calories.roundToInt())} kcal · ${targets.proteinG.roundToInt()} g protein"
                         )
                     }
 
@@ -398,9 +391,21 @@ fun SettingsScreen(
                         }
                         Switch(
                             checked = customMacroEnabled,
-                            onCheckedChange = {
-                                customMacroEnabled = it
-                                sharedPrefs.edit().putBoolean("custom_macro_enabled", it).apply()
+                            onCheckedChange = { on ->
+                                customMacroEnabled = on
+                                if (on) {
+                                    // Just opens the boxes; nothing changes until "Save targets".
+                                    // First time, start from the person's current plan, not generic numbers.
+                                    val plan = (dashboardState as? DashboardUiState.Success)?.macroTargets
+                                    if (plan != null && !sharedPrefs.contains("custom_calories")) {
+                                        customCalories = plan.calories.roundToInt().toString()
+                                        customProtein = plan.proteinG.roundToInt().toString()
+                                        customCarbs = plan.carbsG.roundToInt().toString()
+                                        customFat = plan.fatG.roundToInt().toString()
+                                    }
+                                } else {
+                                    sharedPrefs.edit().putBoolean("custom_macro_enabled", false).apply()
+                                }
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = NeonMint,
@@ -467,6 +472,7 @@ fun SettingsScreen(
                                         .putInt("custom_protein_g", protVal)
                                         .putInt("custom_carbs_g", carbVal)
                                         .putInt("custom_fat_g", fatVal)
+                                        .putBoolean("custom_macro_enabled", true)
                                         .apply()
 
                                     Toast.makeText(context, "Targets saved", Toast.LENGTH_SHORT).show()
@@ -701,6 +707,26 @@ fun SettingsScreen(
                         }
                         widgetRequested = false
                     }
+                }
+                // The add-widget box covers the app; when the person comes back without adding
+                // it (they cancelled), stop waiting so the row doesn't keep saying "Tap Add".
+                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                val scope = rememberCoroutineScope()
+                DisposableEffect(lifecycleOwner, widgetRequested) {
+                    var leftApp = false
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (!widgetRequested) return@LifecycleEventObserver
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) leftApp = true
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME && leftApp) {
+                            scope.launch {
+                                kotlinx.coroutines.delay(1500)
+                                if (WidgetPin.isPlaced(context)) widgetPlaced = true
+                                widgetRequested = false
+                            }
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
                 Card(
                     shape = RoundedCornerShape(20.dp),

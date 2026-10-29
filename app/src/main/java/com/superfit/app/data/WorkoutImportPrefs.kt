@@ -58,10 +58,10 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
         get() = decodeBests(prefs.getStringSet(KEY_BEST_BASELINE, emptySet()).orEmpty())
         set(value) = prefs.edit().putStringSet(KEY_BEST_BASELINE, encodeBests(value)).apply()
 
-    /** True while the current streak is a best that was already offered, so it isn't offered every day. */
-    var bestStreakRiding: Boolean
-        get() = prefs.getBoolean(KEY_BEST_STREAK_RIDING, false)
-        set(value) = prefs.edit().putBoolean(KEY_BEST_STREAK_RIDING, value).apply()
+    /** 2nd and 3rd best runs already offered, so each is offered once. */
+    var bestPodiumSeen: Set<String>
+        get() = prefs.getStringSet(KEY_BEST_PODIUM, emptySet()).orEmpty()
+        set(value) = prefs.edit().putStringSet(KEY_BEST_PODIUM, value).apply()
 
     /** What the cloud backup holds. */
     fun toBackup(): Map<String, Any> = mapOf(
@@ -70,7 +70,7 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
         KEY_ADD_BACK to addBack.name,
         KEY_HIDDEN to hiddenIds.toList(),
         KEY_BEST_BASELINE to encodeBests(bestBaseline).toList(),
-        KEY_BEST_STREAK_RIDING to bestStreakRiding
+        KEY_BEST_PODIUM to bestPodiumSeen.toList()
     )
 
     /** Restores the backup, keeping workouts hidden on this phone hidden. */
@@ -83,7 +83,8 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
             putStringSet(KEY_HIDDEN, hiddenIds + hidden)
             val bests = (data[KEY_BEST_BASELINE] as? List<*>)?.filterIsInstance<String>().orEmpty()
             if (bests.isNotEmpty()) putStringSet(KEY_BEST_BASELINE, encodeBests(decodeBests(bests) + bestBaseline))
-            (data[KEY_BEST_STREAK_RIDING] as? Boolean)?.let { putBoolean(KEY_BEST_STREAK_RIDING, it) }
+            val podium = (data[KEY_BEST_PODIUM] as? List<*>)?.filterIsInstance<String>().orEmpty()
+            putStringSet(KEY_BEST_PODIUM, podium.toSet() + bestPodiumSeen)
         }.apply()
     }
 
@@ -105,6 +106,6 @@ class WorkoutImportPrefs(private val prefs: SharedPreferences) {
         private const val KEY_LAST_IMPORT = "workout_import_last_millis"
         private const val KEY_DUPLICATE_ASKED = "workout_import_duplicate_asked"
         private const val KEY_BEST_BASELINE = "workout_import_best_baseline"
-        private const val KEY_BEST_STREAK_RIDING = "workout_import_best_streak_riding"
+        private const val KEY_BEST_PODIUM = "workout_import_best_podium"
     }
 }

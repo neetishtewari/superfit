@@ -51,7 +51,9 @@ sealed interface ShareCard {
         val bigUnit: String,
         val detail: String?,
         val previous: String?,
-        val gain: String?
+        val gain: String?,
+        // A 2nd or 3rd best run rather than the best itself.
+        val podium: Boolean = false
     ) : ShareCard
 }
 
@@ -60,6 +62,7 @@ object ShareCards {
 
     private val dayFormat = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())
     private val shortDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+    private val monthFormat = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
     private val clock = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 
     /** The day's longest workout for the daily card's workout tile. */
@@ -149,41 +152,57 @@ object ShareCards {
     }
 
     fun best(b: PersonalBest, isNew: Boolean, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): ShareCard.Best {
-        val date = b.workout?.let { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() } ?: today
-        val previousDate = b.previousTime?.let { " · " + Instant.ofEpochMilli(it).atZone(zone).toLocalDate().format(shortDate) }.orEmpty()
-        val prev = b.previousValue
-        return when (b.kind) {
-            BestKind.FASTEST_RUN_PACE -> ShareCard.Best(
-                dateLine = date.format(dayFormat),
+        val date = b.workout?.let { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() } ?: b.periodStart ?: today
+        val dateLine = when (b.kind.period) {
+            BestPeriod.WEEK -> "Week of " + date.format(shortDate)
+            BestPeriod.MONTH -> date.format(monthFormat)
+            else -> date.format(dayFormat)
+        }
+        // Week and month bests read fine without the date of the one they beat.
+        val datedPrevious = b.kind.period == BestPeriod.WORKOUT || b.kind.period == BestPeriod.DAY
+        val previousDate = b.previousTime?.takeIf { datedPrevious }
+            ?.let { " · " + Instant.ofEpochMilli(it).atZone(zone).toLocalDate().format(shortDate) }
+            .orEmpty()
+        val prev = b.previousValue.takeIf { b.rank == 1 }
+        return when {
+            b.kind.isPace -> ShareCard.Best(
+                dateLine = dateLine,
                 isNew = isNew,
-                label = b.kind.label,
+                label = b.title,
                 bigValue = pace(b.value.roundToLong()),
                 bigUnit = "/km",
-                detail = b.workout?.distanceKm?.let { String.format(Locale.US, "on a %.2f km run", it) },
+                detail = b.workout?.let { w ->
+                    listOfNotNull(
+                        w.distanceKm?.let { String.format(Locale.US, "%.2f km run", it) },
+                        duration(w.merged.durationMillis)
+                    ).joinToString(" · ")
+                },
                 previous = prev?.let { pace(it.roundToLong()) + " /km" + previousDate },
-                gain = prev?.let { "${(it - b.value).roundToInt()} s faster" }
+                gain = prev?.let { "${(it - b.value).roundToInt()} s/km faster" },
+                podium = b.rank > 1
             )
-            BestKind.LONGEST_STREAK -> ShareCard.Best(
-                dateLine = date.format(dayFormat),
+            b.kind.isSteps -> ShareCard.Best(
+                dateLine = dateLine,
                 isNew = isNew,
-                label = b.kind.label,
-                bigValue = "${b.value.roundToInt()}",
-                bigUnit = "days",
-                detail = "meals logged day after day",
-                previous = prev?.let { "${it.roundToInt()} days" },
-                gain = prev?.let { "+${(b.value - it).roundToInt()} days" }
+                label = b.title,
+                bigValue = PersonalBests.stepsText(b.value),
+                bigUnit = "steps",
+                detail = null,
+                previous = prev?.let { PersonalBests.stepsText(it) + " steps" + previousDate },
+                gain = prev?.let { "+" + PersonalBests.stepsText(b.value - it) + " steps" }
             )
             else -> ShareCard.Best(
-                dateLine = date.format(dayFormat),
+                dateLine = dateLine,
                 isNew = isNew,
-                label = b.kind.label,
+                label = b.title,
                 bigValue = String.format(Locale.US, "%.2f", b.value),
                 bigUnit = "km",
                 detail = b.workout?.let { w ->
                     listOfNotNull(duration(w.merged.durationMillis), w.paceSecondsPerKm?.let { pace(it) + " /km" }).joinToString(" · ")
-                },
+                } ?: "running and walking",
                 previous = prev?.let { String.format(Locale.US, "%.2f km", it) + previousDate },
-                gain = prev?.let { String.format(Locale.US, "+%.2f km", abs(b.value - it)) }
+                gain = prev?.let { String.format(Locale.US, "+%.2f km", abs(b.value - it)) },
+                podium = b.rank > 1
             )
         }
     }

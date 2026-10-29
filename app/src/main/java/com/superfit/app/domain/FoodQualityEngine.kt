@@ -163,7 +163,8 @@ object FoodQualityEngine {
                 ?: "Waiting for the AI to rate this meal"
 
             FoodItemRating(
-                foodText = foodName.capitalizeWords(),
+                // The key is cut to 30 characters for grouping; show the full name of the latest log.
+                foodText = newest.foodText.trim().lowercase().capitalizeWords(),
                 cleanlinessScore = baseScore,
                 tier = tier,
                 weeklyFrequency = weeklyFreq,

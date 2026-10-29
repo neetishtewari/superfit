@@ -135,7 +135,7 @@ fun RationaleScreen(
                         color = textPrimary
                     )
                     Text(
-                        text = "To see the full picture of your day, Superfit reads specific health statistics. This allows Superfit's AI coach (powered by Google Gemini) to adjust your daily target macronutrients based on real-time activity and sleep telemetry.",
+                        text = "To see the full picture of your day, Superfit reads a few kinds of health data. Superfit's AI coach (powered by Google Gemini) uses them to set your daily targets and give advice that fits your day.",
                         fontSize = 14.sp,
                         color = textSecondary,
                         lineHeight = 20.sp
@@ -144,7 +144,7 @@ fun RationaleScreen(
             }
 
             Text(
-                text = "Requested Permissions & Rationale",
+                text = "What Superfit reads and why",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary,
@@ -158,19 +158,19 @@ fun RationaleScreen(
             val rationaleItems = listOf(
                 RationaleItem(
                     title = "Steps & Activity",
-                    description = "Used to estimate daily energy expenditure. Steps determine active metabolic rate increments, shifting your carbohydrate target upward for active recovery."
+                    description = "Shows how much you moved today, so your calorie target and the coach's advice match your day."
                 ),
                 RationaleItem(
                     title = "Active Calories",
-                    description = "Used to log completed workouts and adjust calorie targets automatically, avoiding manual input error."
+                    description = "Adds the calories you burned in workouts, so you don't have to log them by hand."
                 ),
                 RationaleItem(
-                    title = "Sleep Telemetry",
-                    description = "Duration and sleep architecture parameters shape your daily Recovery Score. Poor sleep shifts targets towards higher protein and lower sugar to balance endocrine response."
+                    title = "Sleep",
+                    description = "How long and how well you slept, shown in the app so you can see how sleep and your days line up."
                 ),
                 RationaleItem(
                     title = "Height & Weight",
-                    description = "Baseline physical metrics are necessary to compute your Basal Metabolic Rate (BMR) using scientific formulas (Mifflin-St Jeor)."
+                    description = "Needed to work out how many calories your body uses at rest, the starting point for your daily target."
                 ),
                 RationaleItem(
                     title = "Body Measurements",

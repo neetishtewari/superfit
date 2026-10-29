@@ -43,8 +43,8 @@ fun GoalEditDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double, Double, LocalDate?) -> Unit
 ) {
-    var startInput by remember { mutableStateOf(startingWeight.toString()) }
-    var targetInput by remember { mutableStateOf(targetWeight.toString()) }
+    var startInput by remember { mutableStateOf(com.superfit.app.domain.BodyReadings.fmt(startingWeight)) }
+    var targetInput by remember { mutableStateOf(com.superfit.app.domain.BodyReadings.fmt(targetWeight)) }
     var date by remember { mutableStateOf(targetDate) }
     var picking by remember { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }

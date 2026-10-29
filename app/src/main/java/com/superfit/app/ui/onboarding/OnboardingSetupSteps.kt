@@ -73,7 +73,7 @@ internal fun HealthConnectStep(
         color = ThemeTextPrimary
     )
     Text(
-        text = "Sync your baseline activity telemetry. Superfit reads steps, sleep cycles, and active workouts locally from your device.",
+        text = "Superfit reads your steps, sleep and workouts from Health Connect on your phone.",
         fontSize = 13.sp,
         color = ThemeTextTertiary,
         lineHeight = 18.sp

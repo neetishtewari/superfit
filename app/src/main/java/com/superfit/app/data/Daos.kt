@@ -34,6 +34,9 @@ interface TelemetryDao {
     @Query("SELECT * FROM activity_telemetry")
     suspend fun getAllActivity(): List<ActivityTelemetryEntity>
 
+    @Query("SELECT * FROM activity_telemetry")
+    fun getAllActivityFlow(): Flow<List<ActivityTelemetryEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertActivities(activities: List<ActivityTelemetryEntity>)
 

@@ -160,7 +160,11 @@ class HistoryViewModel(
         loadData()
     }
 
+    /** The calendar stops at the current month; there's nothing to show in the future. */
+    val canGoToNextMonth: Boolean get() = currentMonth < YearMonth.now()
+
     fun nextMonth() {
+        if (!canGoToNextMonth) return
         currentMonth = currentMonth.plusMonths(1)
         loadData()
     }

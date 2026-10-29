@@ -73,9 +73,9 @@ fun OnboardingScreen(
 
     // Wizard step state (0 to 5)
     var currentStep by remember { mutableIntStateOf(0) }
-    // Roast me starts selected: most people see the fun version, but still pick it themselves.
+    // Supportive starts selected: Roast me is there for people who pick it themselves.
     var coachStyle by remember {
-        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.ROAST)
+        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.SUPPORTIVE)
     }
     var validationError by remember { mutableStateOf<String?>(null) }
     // Spoken guidance is opt-in: it starts off and the "Voice" chip turns it on.
@@ -111,7 +111,7 @@ fun OnboardingScreen(
             1 to "Let's enter your essential stats so we can calculate your resting metabolism.",
             2 to "Awesome! Now, select your baseline activity level and fitness goals. We'll use these to find your daily energy budget.",
             3 to "Pick how your AI coach talks to you. Supportive, straight talk, or roast me.",
-            4 to "Great. Now, let's sync your daily steps and sleep telemetry locally. Tap connect to auto-fill your physical details in one tap.",
+            4 to "Great. Now let's connect your steps and sleep. Tap Connect, and your height and weight can fill in too.",
             5 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
         )
     }

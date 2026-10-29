@@ -59,6 +59,7 @@ fun CalendarCard(
     onDateSelected: (LocalDate) -> Unit,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
+    canGoNext: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -101,9 +102,10 @@ fun CalendarCard(
 
                 IconButton(
                     onClick = onNextMonth,
+                    enabled = canGoNext,
                     colors = IconButtonDefaults.iconButtonColors(containerColor = ThemeTextPrimary.copy(alpha = 0.05f))
                 ) {
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = ThemeTextPrimary)
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = if (canGoNext) ThemeTextPrimary else ThemeTextPrimary.copy(alpha = 0.25f))
                 }
             }
 

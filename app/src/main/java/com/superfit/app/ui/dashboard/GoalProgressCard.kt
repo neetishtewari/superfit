@@ -306,7 +306,7 @@ fun WeighInDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit
 ) {
-    var weightInput by remember { mutableStateOf(currentWeight.toString()) }
+    var weightInput by remember { mutableStateOf(com.superfit.app.domain.BodyReadings.fmt(currentWeight)) }
     var isError by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -376,8 +376,8 @@ fun EditGoalDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double, Double) -> Unit
 ) {
-    var startInput by remember { mutableStateOf(startingWeight.toString()) }
-    var targetInput by remember { mutableStateOf(targetWeight.toString()) }
+    var startInput by remember { mutableStateOf(com.superfit.app.domain.BodyReadings.fmt(startingWeight)) }
+    var targetInput by remember { mutableStateOf(com.superfit.app.domain.BodyReadings.fmt(targetWeight)) }
     var isError by remember { mutableStateOf(false) }
 
     AlertDialog(

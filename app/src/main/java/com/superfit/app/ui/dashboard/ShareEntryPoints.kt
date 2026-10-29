@@ -70,7 +70,7 @@ fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) 
             Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = HyperViolet, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("New personal best", fontSize = 12.sp, color = HyperViolet, fontWeight = FontWeight.Bold)
+                Text(if (best.rank == 1) "New personal best" else "New top 3 run", fontSize = 12.sp, color = HyperViolet, fontWeight = FontWeight.Bold)
                 Text(
                     "${card.label}, ${card.bigValue} ${card.bigUnit}",
                     fontSize = 15.sp,
@@ -95,34 +95,46 @@ fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) 
     }
 }
 
-/** Settings list of every personal best, each shareable any time. */
+/** Every personal best, each shareable any time. The 2nd and 3rd best runs sit under the best. */
 @Composable
 fun PersonalBestsList(bests: List<PersonalBest>, onShare: (PersonalBest) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (bests.isEmpty()) {
             Text(
-                "Your bests appear here once you have a few workouts from other apps or a meal streak going.",
+                "Your bests appear here once your steps or workouts from other apps come in through Health Connect.",
                 fontSize = 12.sp,
                 color = SuperfitTheme.colors.textSecondary
             )
         }
         bests.forEach { best ->
-            val card = ShareCards.best(best, isNew = false, today = LocalDate.now())
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(card.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary)
-                    Text(
-                        if (best.workout != null) "${card.bigValue} ${card.bigUnit} · ${card.dateLine}" else "${card.bigValue} ${card.bigUnit}",
-                        fontSize = 12.sp,
-                        color = SuperfitTheme.colors.textSecondary
-                    )
-                }
-                TextButton(onClick = { onShare(best) }) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Share")
-                }
-            }
+            BestRow(best, onShare)
+            best.runnersUp.forEach { BestRow(it, onShare, Modifier.padding(start = 16.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun BestRow(best: PersonalBest, onShare: (PersonalBest) -> Unit, modifier: Modifier = Modifier) {
+    val card = ShareCards.best(best, isNew = false, today = LocalDate.now())
+    val main = best.rank == 1
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                card.label,
+                fontSize = if (main) 13.sp else 12.sp,
+                fontWeight = if (main) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (main) SuperfitTheme.colors.textPrimary else SuperfitTheme.colors.textSecondary
+            )
+            Text(
+                "${card.bigValue} ${card.bigUnit} · ${card.dateLine}",
+                fontSize = 12.sp,
+                color = SuperfitTheme.colors.textSecondary
+            )
+        }
+        TextButton(onClick = { onShare(best) }) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Share")
         }
     }
 }

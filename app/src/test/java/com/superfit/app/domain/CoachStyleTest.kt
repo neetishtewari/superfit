@@ -27,6 +27,14 @@ class CoachStyleTest {
     }
 
     @Test
+    fun roastAsksForShortPlainJokes() {
+        val roast = CoachStyle.ROAST.instruction()
+        assertTrue(roast.contains("No long winding sentences"))
+        assertTrue(roast.contains("No layered sarcasm"))
+        assertTrue(!roast.contains("loaded sarcasm"))
+    }
+
+    @Test
     fun roastReminderRotatesAndShowsTheNumbers() {
         val lines = (0..2).map { CoachStyle.ROAST.logReminder(800, 2000, it) }
         assertEquals(3, lines.toSet().size)

@@ -51,3 +51,17 @@ private fun openHealthConnectInPlayStore(context: Context) {
         }
     }
 }
+
+/**
+ * Opens Health Connect, where the person can tap Superfit to see and change what it may read.
+ * Android doesn't let ordinary apps open their own Health Connect permission page directly
+ * (it needs a system-only permission), so this is the closest screen we can reach.
+ */
+fun openHealthConnectSettings(context: Context) {
+    try {
+        context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: Exception) {
+        AppAnalytics.recordError(e)
+        Toast.makeText(context, "Couldn't open Health Connect. Open it from your phone's Settings.", Toast.LENGTH_LONG).show()
+    }
+}

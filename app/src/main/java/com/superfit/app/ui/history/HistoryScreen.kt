@@ -149,12 +149,11 @@ fun HistoryScreen(
                                 if (dashboardState is DashboardUiState.Success) {
                                     FoodQualityCard(
                                         metrics = dashboardState.dietQualityMetrics,
-                                        onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) },
                                         note = dietNote,
                                         onFineForMe = { item, fine -> dashboardViewModel?.setFineForMe(item.approvalKey, fine) }
                                     )
                                     dashboardState.dietQualityMetrics.swapSuggestions.forEach { swap ->
-                                        FoodSwapCard(swap = swap, onLogSwap = { foodText -> dashboardViewModel?.parseAndAddMeal(foodText) })
+                                        FoodSwapCard(swap = swap)
                                     }
                                 }
                             },
@@ -237,7 +236,8 @@ fun HistoryScreen(
                             selectedDate = viewModel.selectedDate,
                             onDateSelected = { viewModel.selectDate(it) },
                             onPrevMonth = { viewModel.prevMonth() },
-                            onNextMonth = { viewModel.nextMonth() }
+                            onNextMonth = { viewModel.nextMonth() },
+                            canGoNext = viewModel.canGoToNextMonth
                         )
 
                         viewModel.selectedSummary?.let { summary ->
