@@ -81,13 +81,14 @@ fun SuperfitField(
     // Number boxes stay one line (Enter doesn't grow them) and take at most two decimals.
     val type = keyboardOptions.keyboardType
     val numeric = type == KeyboardType.Number || type == KeyboardType.Decimal
+    val onChange: (String) -> Unit = if (numeric) {
+        { typed -> NumberInput.clean(typed, allowDecimals = type == KeyboardType.Decimal)?.let(onValueChange) }
+    } else {
+        onValueChange
+    }
     TextField(
         value = value,
-        onValueChange = if (numeric) {
-            { typed -> NumberInput.clean(typed, allowDecimals = type == KeyboardType.Decimal)?.let(onValueChange) }
-        } else {
-            onValueChange
-        },
+        onValueChange = onChange,
         modifier = modifier.border(2.dp, frame, FieldShape),
         enabled = enabled,
         readOnly = readOnly,
