@@ -269,9 +269,9 @@ class CoachingEngine {
         ): String {
             val t = report.today
             val goalText = when (profile.goal) {
-                "LOSE_WEIGHT" -> "lose weight"
+                "LOSE_WEIGHT" -> "lose fat while keeping muscle"
                 "GAIN_MUSCLE" -> "build muscle"
-                else -> "maintain weight and stay fit"
+                else -> "tone up: keep weight steady while building some muscle"
             }
             val meals = if (t.mealsLogged.isEmpty()) "none yet" else t.mealsLogged.joinToString { it.name.lowercase() }
             val treats = if (t.treatsToday.isEmpty()) "none" else t.treatsToday.joinToString()

@@ -171,10 +171,5 @@ object CoachExportBuilder {
         w.distanceKm?.takeIf { it > 0 }?.let { add(String.format(java.util.Locale.US, "%.1f km", it)) }
     }.joinToString(" · ")
 
-    fun goalLabel(goal: String): String = when (goal) {
-        "LOSE_WEIGHT" -> "Lose weight"
-        "GAIN_MUSCLE" -> "Build muscle"
-        "MAINTAIN" -> "Maintain"
-        else -> goal.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
-    }
+    fun goalLabel(goal: String): String = FitnessGoals.title(goal)
 }

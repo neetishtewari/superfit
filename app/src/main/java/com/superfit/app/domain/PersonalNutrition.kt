@@ -81,8 +81,8 @@ object PersonalNutrition {
         append(
             when (goal) {
                 "GAIN_MUSCLE" -> "build muscle"
-                "MAINTAIN" -> "maintain weight"
-                else -> "lose weight"
+                "MAINTAIN" -> "tone up (keep weight steady, build some muscle)"
+                else -> "lose fat while keeping muscle"
             }
         )
         calorieTarget?.let { append(", about ${it.roundToInt()} kcal a day") }

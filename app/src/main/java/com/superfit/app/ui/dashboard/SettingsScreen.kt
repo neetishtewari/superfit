@@ -34,8 +34,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.GoalPicker
 import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.widget.WidgetPin
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -359,16 +361,11 @@ fun SettingsScreen(
 
                     if (dashboardState is DashboardUiState.Success) {
                         val state = dashboardState as DashboardUiState.Success
-                        val goals = listOf(
-                            Triple("LOSE_WEIGHT", "Lose", -500),
-                            Triple("MAINTAIN", "Maintain", 0),
-                            Triple("GAIN_MUSCLE", "Gain", 300)
-                        )
-
-                        SegmentedPills(
-                            options = goals.map { it.first to it.second },
+                        val targets = state.macroTargets
+                        GoalPicker(
                             selected = state.profile.goal,
-                            onSelect = { key -> goals.first { it.first == key }.let { viewModel.updateGoal(it.first, it.third) } }
+                            onSelect = { goal -> viewModel.updateGoal(goal.key, goal.calorieOffset) },
+                            selectedDetail = "Today's target: ${"%,d".format(targets.calories.roundToInt())} kcal · ${targets.proteinG.roundToInt()} g protein"
                         )
                     }
 

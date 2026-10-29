@@ -55,6 +55,7 @@ import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.GoalPicker
 import com.superfit.app.ui.components.SuperfitField
 
 // 1. Welcome Step View (Step 0)
@@ -401,39 +402,12 @@ internal fun ActivityGoalsStep(
 
         // Goals Cards selection list
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(text = "Fitness Goal", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
+            Text(text = "Your goal", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
 
-            val goalsList = listOf(
-                Triple("LOSE_WEIGHT", "Weight Loss (-500 kcal)", -500),
-                Triple("MAINTAIN", "Maintenance (Energy Balance)", 0),
-                Triple("GAIN_MUSCLE", "Muscle Gain (+300 kcal)", 300)
+            GoalPicker(
+                selected = uiState.goal,
+                onSelect = { goal -> viewModel.onGoalChanged(goal.key, goal.calorieOffset) }
             )
-
-            goalsList.forEach { (goalKey, goalLabel, offset) ->
-                val isSelected = uiState.goal == goalKey
-                val cardBg = if (isSelected) NeonGreen.copy(alpha = 0.08f) else ThemeTextPrimary.copy(alpha = 0.02f)
-                val cardBorder = if (isSelected) NeonGreen else ThemeGlassBorder
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
-                        .clickable { viewModel.onGoalChanged(goalKey, offset) }
-                        .padding(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = goalLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (isSelected) NeonGreen else ThemeTextPrimary, modifier = Modifier.weight(1f))
-                    RadioButton(
-                        selected = isSelected,
-                        onClick = { viewModel.onGoalChanged(goalKey, offset) },
-                        colors = RadioButtonDefaults.colors(selectedColor = NeonGreen, unselectedColor = Color.Gray)
-                    )
-                }
-            }
         }
 
         // Live Mifflin-St Jeor TDEE calculation Ticker
