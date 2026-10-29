@@ -153,4 +153,11 @@ class FoodQualityEngineTest {
         val gravy = MealTags(2, false, false, 0.5, 4.0, false, "dal makhani")
         assertEquals(FoodQualityEngine.scoreFromTags(gravy, false) - 1, FoodQualityEngine.scoreFromTags(gravy.copy(hiddenOil = true), false))
     }
+
+    @Test
+    fun `long food names are shown in full`() {
+        val name = "6 small deep-fried puris and 1 bowl chana"
+        val result = FoodQualityEngine.analyzeDietQuality(listOf(food(name, 600.0, 15.0, cleanTags)), zoneId = zoneId)
+        assertEquals("6 Small Deep-fried Puris And 1 Bowl Chana", result.allRatedItems.single().foodText)
+    }
 }

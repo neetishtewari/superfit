@@ -336,11 +336,8 @@ fun DietQualityDetailBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                    val sheetTitle = when {
-                        metrics.distinctDaysLogged <= 1 -> "Today's diet quality"
-                        metrics.distinctDaysLogged < 7 -> "Diet quality, last ${metrics.distinctDaysLogged} days"
-                        else -> "Diet quality, last 7 days"
-                    }
+                    // Same window and score as the card, so the two never disagree.
+                    val sheetTitle = "Diet quality, last 7 days"
                     val sheetSubtitle = when {
                         metrics.distinctDaysLogged <= 1 -> "Each food rated as a nutritionist would"
                         else -> "Each food rated as a nutritionist would, for its amount and your goal"
@@ -363,7 +360,7 @@ fun DietQualityDetailBottomSheet(
                     color = NeonMint.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "${metrics.overallScore} / 100",
+                        text = if (metrics.hasEnoughData) "${metrics.overallScore} / 100" else "– / 100",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = NeonMint,
@@ -502,7 +499,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
                     )
                     val freqDesc = when {
                         item.daysLoggedCount <= 1 && item.weeklyFrequency <= 1 -> "Logged 1x • ~${item.avgCalories} kcal"
-                        item.daysLoggedCount <= 1 -> "Logged ${item.weeklyFrequency}x today • ~${item.avgCalories} kcal avg"
+                        item.daysLoggedCount <= 1 -> "Logged ${item.weeklyFrequency}x on one day • ~${item.avgCalories} kcal avg"
                         else -> "Logged ${item.weeklyFrequency}x across ${item.daysLoggedCount} days • ~${item.avgCalories} kcal avg"
                     }
                     Text(
