@@ -275,12 +275,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (hasHealthConnectPermissions) {
-                                    try {
-                                        val intent = Intent("androidx.health.connect.client.ACTION_HEALTH_CONNECT_SETTINGS")
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Could not open Health Connect settings.", Toast.LENGTH_SHORT).show()
-                                    }
+                                    com.superfit.app.ui.openHealthConnectSettings(context)
                                 } else {
                                     com.superfit.app.ui.launchHealthConnectPermissions(context, requestPermissionsLauncher, viewModel.healthConnectManager.permissions + viewModel.healthConnectManager.bodyPermissions)
                                 }

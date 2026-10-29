@@ -3,6 +3,7 @@ package com.superfit.app.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
@@ -50,4 +51,30 @@ private fun openHealthConnectInPlayStore(context: Context) {
         } catch (_: Exception) {
         }
     }
+}
+
+/**
+ * Opens the screen where the person can see and change what Superfit may read. Android 14+
+ * goes straight to Superfit's own page in Health Connect; older phones open the Health
+ * Connect app's settings.
+ */
+fun openHealthConnectSettings(context: Context) {
+    val intents = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            add(
+                Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS")
+                    .putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
+            )
+        }
+        add(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+    }
+    for (intent in intents) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: Exception) {
+            AppAnalytics.recordError(e)
+        }
+    }
+    Toast.makeText(context, "Couldn't open Health Connect. Open it from your phone's Settings.", Toast.LENGTH_LONG).show()
 }
