@@ -98,10 +98,10 @@ fun CoachStyleOptions(selected: CoachStyle, onSelect: (CoachStyle) -> Unit, show
     }
 }
 
-/** The one-time "Pick your coach" for existing users: Roast me starts selected; "Not now" keeps Supportive. */
+/** The one-time "Pick your coach" for existing users: Supportive starts selected, as does "Not now". */
 @Composable
 fun CoachStyleChooserDialog(onChoose: (CoachStyle) -> Unit) {
-    var picked by remember { mutableStateOf(CoachStyle.ROAST) }
+    var picked by remember { mutableStateOf(CoachStyle.SUPPORTIVE) }
     AlertDialog(
         onDismissRequest = { onChoose(CoachStyle.current) },
         containerColor = SuperfitTheme.colors.cardBg,

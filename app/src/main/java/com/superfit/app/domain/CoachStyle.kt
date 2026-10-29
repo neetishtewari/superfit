@@ -20,11 +20,13 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
     ),
     ROAST(
         label = "Roast me",
-        blurb = "Loaded sarcasm. Same good advice.",
+        blurb = "Cheeky jokes about your day. Same good advice.",
         voice = """
             The user chose ROAST ME. Deliver everything with heavy, loaded sarcasm and playful mockery, like a stand-up
             comedian who also happens to be their coach. Be genuinely funny and specific: roast their choices and habits
             from the logs (the third biscuit, the walk that never happened, pizza at 11 PM), and be sarcastically impressed by wins.
+            Keep it punchy: short sentences, about 12 words or fewer each. Lead with the joke, then the fix. No long build-ups,
+            no stacked clauses, no rambling.
             Hard limits, never broken:
             - Roast choices and habits, never the person. Never joke about their body, shape, weight, looks or identity.
             - No swearing, slurs or genuinely hurtful insults.
