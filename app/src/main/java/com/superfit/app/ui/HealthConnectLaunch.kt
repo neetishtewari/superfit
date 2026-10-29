@@ -3,7 +3,6 @@ package com.superfit.app.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
@@ -54,27 +53,15 @@ private fun openHealthConnectInPlayStore(context: Context) {
 }
 
 /**
- * Opens the screen where the person can see and change what Superfit may read. Android 14+
- * goes straight to Superfit's own page in Health Connect; older phones open the Health
- * Connect app's settings.
+ * Opens Health Connect, where the person can tap Superfit to see and change what it may read.
+ * Android doesn't let ordinary apps open their own Health Connect permission page directly
+ * (it needs a system-only permission), so this is the closest screen we can reach.
  */
 fun openHealthConnectSettings(context: Context) {
-    val intents = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            add(
-                Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS")
-                    .putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
-            )
-        }
-        add(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+    try {
+        context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: Exception) {
+        AppAnalytics.recordError(e)
+        Toast.makeText(context, "Couldn't open Health Connect. Open it from your phone's Settings.", Toast.LENGTH_LONG).show()
     }
-    for (intent in intents) {
-        try {
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            return
-        } catch (e: Exception) {
-            AppAnalytics.recordError(e)
-        }
-    }
-    Toast.makeText(context, "Couldn't open Health Connect. Open it from your phone's Settings.", Toast.LENGTH_LONG).show()
 }
