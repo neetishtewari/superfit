@@ -7,10 +7,10 @@ import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
 import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.ReviewPrompt
-import com.superfit.app.domain.BestKind
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.LogRouter
@@ -22,7 +22,6 @@ import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RepeatMealCache
 import com.superfit.app.domain.SpokenInput
-import com.superfit.app.domain.StreakEngine
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutParser
@@ -790,16 +789,16 @@ class DashboardViewModel(
     )
 
     /**
-     * Personal bests from every imported workout and the meal streak, plus the one new best to
-     * offer on Home. Workout bests wait for the first import to finish, so it sets the starting
-     * points quietly.
+     * Personal bests from every imported workout and daily steps, plus the one new best to offer
+     * on Home. Workout bests wait for the first import to finish, so it sets the starting points
+     * quietly.
      */
     val personalBests: StateFlow<BestsUiState> = combine(
         repository.profileFlow,
         repository.allImportedWorkoutsFlow,
-        repository.allNutritionEntriesFlow,
+        repository.allActivityTelemetryFlow,
         customMacroTrigger
-    ) { profile, rows, meals, _ ->
+    ) { profile, rows, activity, _ ->
         if (profile == null) return@combine BestsUiState()
         val prefs = repository.workoutImportPrefs
         val views = if (prefs.enabled && prefs.lastImportMillis > 0) {
@@ -807,14 +806,14 @@ class DashboardViewModel(
         } else {
             emptyList()
         }
-        val streak = StreakEngine.fromMealTimestamps(meals.map { it.timestamp })
-        val bests = PersonalBests.compute(views, streak.longestStreak)
+        val steps = activity.mapNotNull { row -> runCatching { DaySteps(LocalDate.parse(row.date), row.steps) }.getOrNull() }
+        val bests = PersonalBests.compute(views, steps, LocalDate.now())
         val baseline = prefs.bestBaseline
-        val riding = prefs.bestStreakRiding
-        val check = PersonalBests.check(bests, baseline, riding, streak.currentStreak, System.currentTimeMillis())
-        if (check.baseline != baseline || check.streakRiding != riding) {
+        val seen = prefs.bestPodiumSeen
+        val check = PersonalBests.check(bests, baseline, seen, System.currentTimeMillis())
+        if (check.baseline != baseline || check.podiumSeen != seen) {
             prefs.bestBaseline = check.baseline
-            prefs.bestStreakRiding = check.streakRiding
+            prefs.bestPodiumSeen = check.podiumSeen
             viewModelScope.launch { runCatching { repository.backUpWorkoutImportSettings() } }
         }
         BestsUiState(all = bests, toOffer = check.announce.firstOrNull())
@@ -828,7 +827,7 @@ class DashboardViewModel(
     fun acknowledgeBest(best: PersonalBest) {
         val prefs = repository.workoutImportPrefs
         prefs.bestBaseline = PersonalBests.acknowledge(best, prefs.bestBaseline)
-        if (best.kind == BestKind.LONGEST_STREAK) prefs.bestStreakRiding = true
+        prefs.bestPodiumSeen = PersonalBests.acknowledgePodium(best, prefs.bestPodiumSeen)
         viewModelScope.launch { runCatching { repository.backUpWorkoutImportSettings() } }
     }
 

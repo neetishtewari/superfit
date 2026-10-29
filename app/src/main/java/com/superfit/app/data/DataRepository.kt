@@ -173,6 +173,8 @@ class DataRepository(
         return database.nutritionDao().getAllEntries()
     }
 
+    val allActivityTelemetryFlow: Flow<List<ActivityTelemetryEntity>> get() = database.telemetryDao().getAllActivityFlow()
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> {
         return database.telemetryDao().getAllActivity()
     }

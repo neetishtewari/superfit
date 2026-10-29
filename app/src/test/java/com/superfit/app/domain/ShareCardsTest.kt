@@ -128,6 +128,15 @@ class ShareCardsTest {
     }
 
     @Test
+    fun weekStepsCardNamesTheWeek() {
+        val best = PersonalBest(BestKind.MOST_STEPS_WEEK, 84200.0, null, previousValue = 80000.0, previousTime = null, periodStart = LocalDate.of(2026, 10, 13))
+        val card = ShareCards.best(best, isNew = true, today = today, zone = utc)
+        assertEquals("Week of 13 Oct", card.dateLine)
+        assertEquals("84,200", card.bigValue)
+        assertEquals("+4,200 steps", card.gain)
+    }
+
+    @Test
     fun durationsReadLikeAWatch() {
         assertEquals("48:12", ShareCards.duration((48 * 60 + 12) * 1000L))
         assertEquals("1:09:40", ShareCards.duration((3600 + 9 * 60 + 40) * 1000L))

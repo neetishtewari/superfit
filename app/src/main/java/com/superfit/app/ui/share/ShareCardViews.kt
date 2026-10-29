@@ -425,7 +425,11 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
         Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = accent, modifier = Modifier.size(56.dp))
         Spacer(Modifier.height(16.dp))
         Text(
-            if (card.isNew) "NEW PERSONAL BEST" else "PERSONAL BEST",
+            when {
+                card.podium -> "TOP 3"
+                card.isNew -> "NEW PERSONAL BEST"
+                else -> "PERSONAL BEST"
+            },
             color = accent,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
@@ -565,7 +569,13 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, mo
                 }
                 is ShareCard.Best -> {
                     Text(
-                        (if (card.isNew) "NEW PERSONAL BEST · " else "PERSONAL BEST · ") + card.label.uppercase(),
+                        (
+                            when {
+                                card.podium -> "TOP 3 · "
+                                card.isNew -> "NEW PERSONAL BEST · "
+                                else -> "PERSONAL BEST · "
+                            }
+                            ) + card.label.uppercase(),
                         color = accent,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
