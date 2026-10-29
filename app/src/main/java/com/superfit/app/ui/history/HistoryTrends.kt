@@ -406,7 +406,9 @@ fun CalorieTrendChart(
 
                     val stepX = width / (days.size - 1)
 
-                    val eatenPoints = days.mapIndexed { index, day ->
+                    // Only days with food logged: a blank day isn't a day of eating nothing.
+                    val eatenPoints = days.mapIndexedNotNull { index, day ->
+                        if (day.caloriesEaten <= 0.0) return@mapIndexedNotNull null
                         val x = index * stepX
                         val y = height - ((day.caloriesEaten.toFloat() - minVal) / (maxVal - minVal)) * height
                         Offset(x, y)
@@ -448,7 +450,10 @@ fun CalorieTrendChart(
                         )
                     )
 
-                    // Eaten Bezier Path
+                    // Eaten Bezier Path (a single logged day is just its dot)
+                    if (eatenPoints.size == 1) {
+                        drawCircle(color = NeonMint, radius = 4.dp.toPx(), center = eatenPoints[0])
+                    }
                     if (eatenPoints.size >= 2) {
                         val eatenPath = Path().apply {
                             moveTo(eatenPoints[0].x, eatenPoints[0].y)

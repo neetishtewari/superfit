@@ -111,7 +111,7 @@ fun OnboardingScreen(
             1 to "Let's enter your essential stats so we can calculate your resting metabolism.",
             2 to "Awesome! Now, select your baseline activity level and fitness goals. We'll use these to find your daily energy budget.",
             3 to "Pick how your AI coach talks to you. Supportive, straight talk, or roast me.",
-            4 to "Great. Now, let's sync your daily steps and sleep telemetry locally. Tap connect to auto-fill your physical details in one tap.",
+            4 to "Great. Now let's connect your steps and sleep. Tap Connect, and your height and weight can fill in too.",
             5 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
         )
     }

@@ -193,7 +193,7 @@ fun LoginScreen(
                 )
 
                 Text(
-                    text = if (viewModel.isLoginMode) "Sign in to resume tracking and sync history." else "Join Superfit to back up telemetry and log meals securely.",
+                    text = if (viewModel.isLoginMode) "Sign in to resume tracking and sync history." else "Join Superfit to log meals and keep your history backed up.",
                     fontSize = 13.sp,
                     color = ThemeTextTertiary,
                     textAlign = TextAlign.Center,

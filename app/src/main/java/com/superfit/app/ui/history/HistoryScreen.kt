@@ -237,7 +237,8 @@ fun HistoryScreen(
                             selectedDate = viewModel.selectedDate,
                             onDateSelected = { viewModel.selectDate(it) },
                             onPrevMonth = { viewModel.prevMonth() },
-                            onNextMonth = { viewModel.nextMonth() }
+                            onNextMonth = { viewModel.nextMonth() },
+                            canGoNext = viewModel.canGoToNextMonth
                         )
 
                         viewModel.selectedSummary?.let { summary ->

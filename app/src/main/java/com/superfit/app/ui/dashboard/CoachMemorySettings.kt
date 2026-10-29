@@ -79,20 +79,24 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
         val speakNote = com.superfit.app.ui.components.rememberVoiceTyping("Say something your coach should know") { said ->
             newNote = (if (newNote.isBlank()) said else newNote.trimEnd() + "\n" + said).take(com.superfit.app.domain.CoachNotes.MAX_USER_PASTE)
         }
-        // Tap an example to start from it; each adds one line.
-        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(NOTE_EXAMPLES.size) { i ->
-                val example = NOTE_EXAMPLES[i]
-                Text(
-                    text = "+ $example",
-                    color = SuperfitTheme.colors.textPrimary,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
-                        .background(SuperfitTheme.colors.fieldBg)
-                        .clickable { newNote = if (newNote.isBlank()) example else newNote.trimEnd() + "\n" + example }
-                        .padding(horizontal = 12.dp, vertical = 7.dp)
-                )
+        // Tap an example to start from it; each adds one line. Hide ones already saved or typed.
+        val known = (active.map { it.text } + newNote.lines()).map { it.trim().lowercase() }.toSet()
+        val examples = NOTE_EXAMPLES.filter { it.lowercase() !in known }
+        if (examples.isNotEmpty()) {
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(examples.size) { i ->
+                    val example = examples[i]
+                    Text(
+                        text = "+ $example",
+                        color = SuperfitTheme.colors.textPrimary,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(50))
+                            .background(SuperfitTheme.colors.fieldBg)
+                            .clickable { newNote = if (newNote.isBlank()) example else newNote.trimEnd() + "\n" + example }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    )
+                }
             }
         }
         // Mic and Add sit inside the field (like the coach chat) so the box gets the full width.
