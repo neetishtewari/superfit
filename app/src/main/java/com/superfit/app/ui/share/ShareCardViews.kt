@@ -577,19 +577,29 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, mo
                     }
                 }
                 is ShareCard.Best -> {
-                    Text(
-                        (
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
                             when {
-                                card.podium -> "TOP 3 · "
-                                card.isNew -> "NEW PERSONAL BEST · "
-                                else -> "PERSONAL BEST · "
-                            }
-                            ) + card.label.uppercase(),
-                        color = accent,
-                        fontSize = 12.sp,
+                                card.podium -> "TOP 3"
+                                card.isNew -> "NEW PERSONAL BEST"
+                                else -> "PERSONAL BEST"
+                            },
+                            color = accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 2.sp,
+                            maxLines = 1
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        card.label,
+                        color = Color.White,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.5.sp,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     BigNumber(card.bigValue, card.bigUnit, accent)
