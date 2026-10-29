@@ -73,9 +73,9 @@ fun OnboardingScreen(
 
     // Wizard step state (0 to 5)
     var currentStep by remember { mutableIntStateOf(0) }
-    // Roast me starts selected: most people see the fun version, but still pick it themselves.
+    // Supportive starts selected: Roast me is there for people who pick it themselves.
     var coachStyle by remember {
-        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.ROAST)
+        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.SUPPORTIVE)
     }
     var validationError by remember { mutableStateOf<String?>(null) }
     // Spoken guidance is opt-in: it starts off and the "Voice" chip turns it on.
