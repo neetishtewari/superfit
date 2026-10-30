@@ -178,7 +178,7 @@ object FoodQualityEngine {
                 rated = tags != null,
                 approvalKey = PersonalNutrition.key(tags?.foodType?.takeIf { it.isNotBlank() } ?: foodName),
                 approved = approved,
-                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved) } ?: FoodVerdict.GOOD
+                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved, Treats.kcalOf(newest, it)) } ?: FoodVerdict.GOOD
             )
         }.sortedWith(
             compareByDescending<FoodItemRating> { it.weeklyFrequency * 5 + it.daysLoggedCount * 10 }

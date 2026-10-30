@@ -90,14 +90,14 @@ object DietScoreEngine {
             balancePart(judgedDays.map { day -> day.map { it.first } }, goal, w.balance),
             proteinPart(byDate, dates - today, inWindow, proteinTargetG, calorieTarget, today, zone, w.protein),
             vegPart(judgedDays, w.veg),
-            treatPart(aiTagged, w.treats),
+            treatPart(aiTagged, w.treats, zone),
             fibrePart(aiTagged, w.fibre)
         )
         return DietScore(
             score = parts.sumOf { it.points }.coerceIn(0, 100),
             parts = parts,
             daysLogged = daysLogged,
-            treatMeals = treatOccasions(aiTagged),
+            treatMeals = treatOccasions(aiTagged, zone),
             estimatedShare = tagged.count { it.second.estimated }.toDouble() / tagged.size
         )
     }
@@ -244,20 +244,24 @@ object DietScoreEngine {
         )
     }
 
-    /** Real treats, where foods eaten within an hour of each other are one occasion. */
-    private fun treatOccasions(tagged: List<Pair<NutritionEntryEntity, MealTags>>): Int {
-        val times = tagged.filter { (e, t) -> PersonalNutrition.countsAsTreat(e, t) }.map { it.first.timestamp }.sorted()
-        var count = 0
-        var last = Long.MIN_VALUE
-        for (t in times) {
-            if (count == 0 || t - last > 3_600_000L) count++
-            last = t
-        }
-        return count
-    }
+    /**
+     * Real treats, where foods eaten within an hour of each other are one sitting, and a sitting
+     * needs a treat's worth of treat food to count (see [Treats]).
+     */
+    private fun treatOccasions(tagged: List<Pair<NutritionEntryEntity, MealTags>>, zone: ZoneId): Int =
+        tagged.map { it.first }.filter { Treats.kcalOf(it) > 0.0 }
+            .groupBy { dateOf(it.timestamp, zone) }.values
+            .sumOf { day ->
+                val sittings = mutableListOf<MutableList<NutritionEntryEntity>>()
+                for (e in day.sortedBy { it.timestamp }) {
+                    val last = sittings.lastOrNull()
+                    if (last != null && e.timestamp - last.last().timestamp <= 3_600_000L) last += e else sittings += mutableListOf(e)
+                }
+                Treats.occasions(sittings).size
+            }
 
-    private fun treatPart(tagged: List<Pair<NutritionEntryEntity, MealTags>>, max: Int): DietScorePart {
-        val treats = treatOccasions(tagged)
+    private fun treatPart(tagged: List<Pair<NutritionEntryEntity, MealTags>>, max: Int, zone: ZoneId): DietScorePart {
+        val treats = treatOccasions(tagged, zone)
         val allowance = CoachPatternEngine.WEEKLY_TREAT_ALLOWANCE
         val extra = (treats - allowance).coerceAtLeast(0)
         // Foods to avoid until the goal is reached have no free allowance.

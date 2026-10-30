@@ -24,6 +24,9 @@ class MealTagsTest {
         val tags = MealTags(2, fried = true, addedSugar = false, vegFruitServings = 1.5, fiberG = 6.0, treat = true, foodType = "pav|bhaji")
         val back = MealTags.decode(tags.encode())!!
         assertEquals(tags.copy(foodType = "pav bhaji"), back)
+        val withTreatKcal = tags.copy(foodType = "pav bhaji", treatKcal = 120)
+        assertEquals(withTreatKcal, MealTags.decode(withTreatKcal.encode()))
+        assertEquals(60, withTreatKcal.scaled(0.5).treatKcal)
         assertNull(MealTags.decode(null))
         assertNull(MealTags.decode("garbage"))
     }
@@ -35,6 +38,8 @@ class MealTagsTest {
         assertEquals(3, tags.processing)
         assertTrue(tags.treat)
         assertEquals("burger", tags.foodType)
+        assertNull(tags.treatKcal)
+        assertEquals(55, MealTags.fromJson(JSONObject("""{"processing":2,"treat":false,"treatKcal":55,"foodType":"dark chocolate"}"""))!!.treatKcal)
         assertNull(MealTags.fromJson(JSONObject("""{"foodText":"x","calories":1}""")))
     }
 

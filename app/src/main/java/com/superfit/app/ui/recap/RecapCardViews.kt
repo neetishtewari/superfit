@@ -242,6 +242,7 @@ private fun verdictWord(v: FoodVerdict): String = when (v) {
     FoodVerdict.GOOD -> "Solid pick"
     FoodVerdict.PORTION -> "Watch the portion"
     FoodVerdict.TREAT -> "A treat"
+    FoodVerdict.SMALL_TREAT -> "A small treat"
     FoodVerdict.AVOID -> "Ease off"
 }
 

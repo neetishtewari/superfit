@@ -196,6 +196,17 @@ class CoachPatternEngineTest {
     }
 
     @Test
+    fun `a square of dark chocolate every day is not a treat habit`() {
+        val square = treat("dark chocolate")
+        val logs = (1..6).flatMap { d -> fullDay(d, 130.0) } + (0..6).map { d -> meal(d, 16, "1 square dark chocolate", 55.0, tags = square) }
+        val report = analyze(logs)
+        assertTrue(report.findings.none { it.area == "treats" })
+        assertTrue(report.today.treatsToday.isEmpty())
+        // A sweet on the side of dinner is "treat", not the dinner's dish.
+        assertEquals("treat", CoachPatternEngine.treatCategoryOf(meal(1, 20, "dal rice and gulab jamun", 900.0, tags = MealTags(1, false, false, 1.0, 6.0, treat = false, foodType = "dal", treatKcal = 150))))
+    }
+
+    @Test
     fun `treats come only from the AI's tags, never from the meal's name`() {
         assertNull(CoachPatternEngine.treatCategoryOf(meal(1, 20, "chicken burger", 600.0)))
         assertEquals("kulfi", CoachPatternEngine.treatCategoryOf(meal(1, 20, "कुल्फी", 200.0, tags = treat("kulfi"))))

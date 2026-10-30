@@ -185,7 +185,7 @@ object MonthlyRecap {
         val byFood = meals.flatMap { meal -> foodNames(meal).distinct().map { it to meal } }.groupBy({ it.first }, { it.second })
         val (food, withIt) = byFood.maxByOrNull { it.value.size } ?: return null
         if (withIt.size < 3) return null
-        val verdicts = withIt.mapNotNull { m -> MealTags.decode(m.qualityTags)?.let { FoodVerdict.of(it, DietScoreEngine.mealRating(m, it), PersonalNutrition.isApproved(m, it)) } }
+        val verdicts = withIt.mapNotNull { m -> MealTags.decode(m.qualityTags)?.let { FoodVerdict.of(it, DietScoreEngine.mealRating(m, it), PersonalNutrition.isApproved(m, it), Treats.kcalOf(m, it)) } }
         val verdict = verdicts.groupingBy { it }.eachCount().maxByOrNull { it.value }?.takeIf { it.value * 2 > verdicts.size }?.key
         return RecapCard.OnRepeat(food.replaceFirstChar { it.titlecase(Locale.getDefault()) }, withIt.size, verdict)
     }

@@ -465,6 +465,7 @@ fun FoodRatingItemRow(item: FoodItemRating, onFineForMe: ((FoodItemRating, Boole
             FoodVerdict.GOOD -> ElectricCyan
             FoodVerdict.PORTION -> SolarAmber
             FoodVerdict.TREAT -> HyperViolet
+            FoodVerdict.SMALL_TREAT -> ElectricCyan
             FoodVerdict.AVOID -> SolarAmber
         }
     }
