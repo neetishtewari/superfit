@@ -46,13 +46,44 @@ class CoachingEngineTest {
     }
 
     @Test
-    fun `the coach doesn't nag about the same thing three days running`() {
-        val r = report(listOf(finding("protein_low", 92), finding("veg_low", 60)))
-        // Raised yesterday: still the most important.
-        assertEquals("protein_low", CoachingEngine.chooseFocus(r, listOf(said(1, "protein_low")), today).id)
-        // Raised yesterday and the day before: give it a rest.
-        val twice = listOf(said(1, "protein_low"), said(2, "protein_low"))
-        assertEquals("veg_low", CoachingEngine.chooseFocus(r, twice, today).id)
+    fun `a subject gets a rest after the coach talks about it`() {
+        val r = report(listOf(finding("protein_low", 92), finding("veg_low", 70)))
+        assertEquals("veg_low", CoachingEngine.chooseFocus(r, listOf(said(1, "protein_low")), today).id)
+        // Any finding in the same area rests, not just the same one.
+        val sameArea = report(listOf(finding("protein_short_weekends", 92), finding("veg_low", 70)))
+        assertEquals("veg_low", CoachingEngine.chooseFocus(sameArea, listOf(said(3, "protein_low")), today).id)
+        // After the rest it can come back.
+        assertEquals("protein_low", CoachingEngine.chooseFocus(r, listOf(said(5, "protein_low")), today).id)
+    }
+
+    @Test
+    fun `an old cake isn't raised again, a new one is`() {
+        val r = report(listOf(finding("treats_high", 72), finding("veg_low", 40)))
+        val memory = listOf(said(2, "treats_high"), said(1, "habit_walk_after_meals", FindingKind.HABIT))
+        // The cake was 3 days ago, before the coach mentioned treats.
+        assertEquals("veg_low", CoachingEngine.chooseFocus(r, memory, today, lastTreatDay = today.minusDays(3)).id)
+        // A treat logged since then brings the subject back.
+        assertEquals("treats_high", CoachingEngine.chooseFocus(r, memory, today, lastTreatDay = today).id)
+    }
+
+    @Test
+    fun `quiet days get an everyday habit tip`() {
+        val r = report(listOf(finding("protein_low", 92), finding("veg_low", 50)))
+        val focus = CoachingEngine.chooseFocus(r, listOf(said(1, "protein_low")), today)
+        assertEquals(FindingKind.HABIT, focus.kind)
+        // The next one is a different habit, and an urgent pattern still wins over a habit.
+        val next = CoachingEngine.chooseFocus(r, listOf(said(1, focus.id, FindingKind.HABIT), said(6, "protein_low")), today)
+        assertEquals("protein_low", next.id)
+        val after = CoachingEngine.habitFor(listOf(said(1, focus.id, FindingKind.HABIT)), today)
+        assertTrue(after != null && after.id != focus.id)
+    }
+
+    @Test
+    fun `habit tips never ask anyone to eat less`() {
+        CoachingEngine.HABITS.forEach { h ->
+            val text = "${h.fact} ${h.meaning} ${h.suggestion}".lowercase()
+            listOf("eat less", "skip", "smaller portion", "cut calories", "fasting").forEach { assertTrue(h.id, !text.contains(it)) }
+        }
     }
 
     @Test
@@ -67,14 +98,14 @@ class CoachingEngineTest {
     @Test
     fun `a follow-up is only given once`() {
         val r = report(listOf(finding("steps_down", 50)), checked = setOf("protein", "steps"))
-        val memory = listOf(said(1, "followup_protein", FindingKind.WIN), said(3, "protein_low"))
+        val memory = listOf(said(1, "followup_protein", FindingKind.WIN), said(2, "habit_water", FindingKind.HABIT), said(3, "protein_low"))
         assertEquals("steps_down", CoachingEngine.chooseFocus(r, memory, today).id)
     }
 
     @Test
     fun `no follow-up while the area can't be judged`() {
         val r = report(listOf(finding("steps_down", 50)), checked = setOf("steps"))
-        assertEquals("steps_down", CoachingEngine.chooseFocus(r, listOf(said(3, "protein_low")), today).id)
+        assertEquals("steps_down", CoachingEngine.chooseFocus(r, listOf(said(2, "habit_water", FindingKind.HABIT), said(3, "protein_low")), today).id)
     }
 
     @Test

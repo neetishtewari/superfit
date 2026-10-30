@@ -25,11 +25,15 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
             The user chose ROAST ME. Tease them like a quick-witted friend who is also their coach. Be genuinely funny and
             specific: roast their choices and habits from the logs (the third biscuit, the walk that never happened, pizza at
             11 PM), and be playfully impressed by wins.
-            Keep it punchy:
-            - Short sentences, about 12 words or fewer each. No long winding sentences, no build-up.
-            - One clear joke per point, then the fix in plain words.
+            Keep it punchy, like an Instagram caption people screenshot:
+            - Short sentences, 8 words or fewer each. No long winding sentences, no build-up, no "and also".
+            - Use about two thirds of any word limit given above, except a limit written just for roasts: keep to that one. Shorter is funnier.
+            - One clear joke per point, then the fix in plain words. Cut every word the joke works without.
+            - Lead with the punchline. Don't explain the joke.
             - The joke must be obvious on first read. No layered sarcasm, double meanings or irony that could be taken
               literally; if a line could be misread as a real criticism, make it plainer.
+            Too long: "Your protein intake has been so low this week that it's practically become a mythical creature, so maybe add some curd at dinner tonight."
+            Right length: "Protein's gone missing again. Curd at dinner, today."
             Hard limits, never broken:
             - Roast choices and habits, never the person. Never joke about their body, shape, weight, looks or identity.
             - No swearing, slurs or genuinely hurtful insults.
@@ -45,7 +49,7 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
         get() = when (this) {
             SUPPORTIVE -> "Protein's been short a few days. Dal and a bowl of curd tonight gets you most of the way."
             STRAIGHT -> "Protein short 4 of 5 days. Add curd at dinner. Every day."
-            ROAST -> "Your protein has filed a missing person report. Curd at dinner, before it calls the police."
+            ROAST -> "Your protein filed a missing person report. Curd at dinner."
         }
 
     /** Title of the evening notification that carries the AI coach's daily tip. */
@@ -64,11 +68,11 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
                 "$logged / $target kcal logged. Log the rest of today's meals now, it takes a minute."
         ROAST -> listOf(
             "🔥 Your food log is half-written" to
-                "$logged / $target kcal logged. I'm a coach, not a mind reader. The rest of today's meals, please.",
+                "$logged / $target kcal. I'm a coach, not a psychic. Log it.",
             "🔥 Your food log called" to
-                "It says it's been ghosted at $logged / $target kcal. Those snacks don't log themselves, sadly.",
+                "Ghosted at $logged / $target kcal. Snacks don't log themselves.",
             "🔥 Plot hole in your log" to
-                "Your log stops at $logged / $target kcal, like a series cancelled mid-season. Finish the story, champ."
+                "Cancelled mid-season at $logged / $target kcal. Finish the story."
         )[Math.floorMod(day, 3)]
     }
 
@@ -76,7 +80,7 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
     fun completeDayFallback(logged: Int): Pair<String, String> = when (this) {
         ROAST ->
             "🔥 Look who logged everything" to
-                "All $logged kcal accounted for. I'm almost proud. Now go to bed on time and really shock me."
+                "All $logged kcal logged. I'm almost proud. Now shock me: sleep on time."
         else ->
             "⚡ Daily log complete" to
                 "You've logged your whole day ($logged kcal). Prioritise sleep tonight for recovery."
