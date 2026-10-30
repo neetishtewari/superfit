@@ -68,7 +68,7 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
                 "$logged / $target kcal logged. Log the rest of today's meals now, it takes a minute."
         ROAST -> listOf(
             "🔥 Your food log is half-written" to
-                "$logged / $target kcal logged. I'm a coach, not a psychic. Log the rest.",
+                "$logged / $target kcal. I'm a coach, not a psychic. Log the rest.",
             "🔥 Your food log called" to
                 "Ghosted at $logged / $target kcal. Snacks don't log themselves.",
             "🔥 Plot hole in your log" to
