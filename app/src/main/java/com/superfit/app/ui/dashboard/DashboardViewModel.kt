@@ -1264,7 +1264,6 @@ class DashboardViewModel(
 
 private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
 
-
 sealed interface ParsingState {
     object Idle : ParsingState
     object Loading : ParsingState
