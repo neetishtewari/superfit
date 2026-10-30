@@ -221,8 +221,7 @@ fun DashboardScreen(
     // Auto-dismiss voice feedback banner
     LaunchedEffect(showVoiceBanner) {
         if (showVoiceBanner) {
-            // A voice log also shows what was heard, which needs a little longer to read.
-            kotlinx.coroutines.delay(if (voiceMessage?.startsWith("Heard") == true) 6000 else 4000)
+            kotlinx.coroutines.delay(4000)
             showVoiceBanner = false
         }
     }
