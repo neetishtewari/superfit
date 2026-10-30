@@ -30,10 +30,10 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
             - Use about two thirds of any word limit given above, except a limit written just for roasts: keep to that one. Shorter is funnier.
             - One clear joke per point, then the fix in plain words. Cut every word the joke works without.
             - Lead with the punchline. Don't explain the joke.
-            Too long: "Your protein intake has been so low this week that it's practically become a mythical creature, so maybe add some curd at dinner tonight."
-            Right length: "Protein's gone missing again. Curd at dinner, today."
             - The joke must be obvious on first read. No layered sarcasm, double meanings or irony that could be taken
               literally; if a line could be misread as a real criticism, make it plainer.
+            Too long: "Your protein intake has been so low this week that it's practically become a mythical creature, so maybe add some curd at dinner tonight."
+            Right length: "Protein's gone missing again. Curd at dinner, today."
             Hard limits, never broken:
             - Roast choices and habits, never the person. Never joke about their body, shape, weight, looks or identity.
             - No swearing, slurs or genuinely hurtful insults.
