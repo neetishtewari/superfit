@@ -333,4 +333,79 @@ class MealItemsTest {
         assertEquals(listOf("roti", "chana", "raita", "chai"), replaced.items.map { it.name })
         assertEquals(meal, meal.replace(1, emptyList<MealItem>()))
     }
+
+    private val weighedDal = dal.copy(weight = 150.0, metric = "g")
+    private val weighedChai = chai.copy(weight = 150.0, metric = "ml")
+
+    @Test
+    fun `AI weight and liquid become per-unit weight and g or ml`() {
+        val arr = JSONArray(
+            """[{"name":"aloo paratha","quantity":2,"unit":"piece","calories":500,"grams":240,"liquid":false},
+               {"name":"chai","quantity":1,"unit":"cup","calories":90,"grams":150,"liquid":true},
+               {"name":"milk","quantity":200,"unit":"ml","calories":130},
+               {"name":"rusk","quantity":2,"unit":"piece","calories":100}]"""
+        )
+        val items = MealItems.fromGemini(arr)!!.items
+        assertEquals(120.0, items[0].weight!!, 0.01)
+        assertEquals("g", items[0].metric)
+        assertEquals("ml", items[1].metric)
+        assertEquals(1.0, items[2].weight!!, 0.01)
+        assertEquals("ml", items[2].metric)
+        assertNull(items[3].weight)
+        assertNull(items[3].metric)
+    }
+
+    @Test
+    fun `labels show the weight beside household amounts`() {
+        assertEquals("1 katori dal (150 g)", weighedDal.label())
+        assertEquals("1 cup chai (150 ml)", weighedChai.label())
+        assertEquals("1 katori dal", dal.label())
+        assertEquals("about 150 g", weighedDal.weightText())
+        assertNull(dal.weightText())
+    }
+
+    @Test
+    fun `switching to grams and back keeps the calories`() {
+        val meal = MealItems(listOf(weighedDal))
+        val grams = weighedDal.switchUnit()
+        assertEquals("g", grams.unit)
+        assertEquals(150.0, grams.qty, 0.01)
+        assertEquals(meal.totals(), MealItems(listOf(grams)).totals())
+        assertEquals("150 g dal", grams.label())
+        val back = grams.switchUnit()
+        assertEquals("katori", back.unit)
+        assertEquals(1.0, back.qty, 0.01)
+        assertEquals(meal.totals(), MealItems(listOf(back)).totals())
+    }
+
+    @Test
+    fun `a typed amount in grams changes calories by weight`() {
+        val grams = weighedDal.switchUnit().copy(qty = 75.0)
+        assertEquals(90.0, MealItems(listOf(grams)).totals().kcal, 0.01)
+    }
+
+    @Test
+    fun `items without a weight can't switch`() {
+        assertFalse(dal.canSwitchUnit)
+        assertEquals(dal, dal.switchUnit())
+        assertFalse(dal.copy(qty = 200.0, unit = "g", weight = 1.0, metric = "g").canSwitchUnit)
+        assertTrue(weighedDal.canSwitchUnit)
+    }
+
+    @Test
+    fun `gram steps grow with the amount`() {
+        val g = weighedDal.switchUnit()
+        assertEquals(5.0, g.copy(qty = 10.0).step, 0.0)
+        assertEquals(10.0, g.copy(qty = 150.0).step, 0.0)
+        assertEquals(25.0, g.copy(qty = 300.0).step, 0.0)
+        assertEquals(0.5, weighedDal.step, 0.0)
+    }
+
+    @Test
+    fun `weights and switched units survive saving`() {
+        val meal = MealItems(listOf(weighedDal.switchUnit(), weighedChai, roti))
+        val decoded = MealItems.decode(meal.encode())!!
+        assertEquals(meal, decoded)
+        assertEquals("katori", decoded.items[0].switchUnit().unit)
+    }
 }

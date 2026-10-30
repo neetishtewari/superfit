@@ -59,6 +59,8 @@ object AppAnalytics {
 
     /** A meal item swapped for a different food, by picking a choice or typing/saying a name. */
     fun mealItemChanged(typed: Boolean) = log("meal_item_changed", "how" to if (typed) "typed" else "choice")
+    /** A meal item's amount typed in, or switched between household units and g/ml ([how]: typed, switch). */
+    fun mealAmountChanged(how: String) = log("meal_amount_changed", "how" to how)
     fun workoutLogged() = log("workout_logged", "method" to "voice")
     fun workoutsConnected() = log("workouts_connected")
 
