@@ -136,12 +136,17 @@ fun DashboardScreen(
     var voiceBannerColor by remember { mutableStateOf(Color.Transparent) }
     var showVoiceBanner by remember { mutableStateOf(false) }
 
+    // The Food tab's mic logs meals and the Activity tab's mic logs workouts, so each needs only one AI call.
+    val logSpoken = { heard: SpokenInput ->
+        if (logType == "MEAL") viewModel.logSpokenMeal(heard.text, heard.otherVersions) else viewModel.parseAndAddWorkout(heard.text)
+    }
+
     // The phone's own voice-typing dialog, used when the in-app recognizer can't run on this phone.
     val systemSpeechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         SpokenInput.fromGuesses(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS))
-            ?.let { viewModel.smartLog(it.text, it.otherVersions) }
+            ?.let { logSpoken(it) }
     }
     var showMicOffDialog by remember { mutableStateOf(false) }
     var voiceLiveText by remember { mutableStateOf("") }
@@ -151,10 +156,7 @@ fun DashboardScreen(
     val speechHelper = remember {
         SpeechRecognizerHelper(
             context = context,
-            onResult = { heard ->
-                // One mic for everything: food, exercise or both, whichever tab is showing.
-                viewModel.smartLog(heard.text, heard.otherVersions)
-            },
+            onResult = { heard -> logSpoken(heard) },
             onError = { error ->
                 voiceMessage = error
                 voiceBannerColor = EnergeticCoral
@@ -167,7 +169,10 @@ fun DashboardScreen(
             onChecking = { voiceChecking = it },
             onNeedsSystemDialog = {
                 try {
-                    systemSpeechLauncher.launch(SpeechRecognizerHelper.systemDialogIntent(context))
+                    systemSpeechLauncher.launch(
+                        SpeechRecognizerHelper.systemDialogIntent(context)
+                            .putExtra(RecognizerIntent.EXTRA_PROMPT, if (logType == "MEAL") "Say what you ate" else "Say your workout")
+                    )
                 } catch (e: Exception) {
                     voiceMessage = "Voice input isn't available on this phone. Type your meal or use the camera instead."
                     voiceBannerColor = EnergeticCoral

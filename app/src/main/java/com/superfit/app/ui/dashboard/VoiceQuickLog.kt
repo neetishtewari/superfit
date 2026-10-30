@@ -466,7 +466,7 @@ class SpeechRecognizerHelper(
 }
 
 // Home's log buttons: "Snap your plate" and "Say what you ate" side by side on Food,
-// one wide "Say your workout" on Activity. The mic understands food and exercise either way.
+// one wide "Say your workout" on Activity. Each tab's mic logs only that kind of entry.
 @Composable
 fun VoiceQuickLogCard(
     logType: String,
@@ -495,9 +495,10 @@ fun VoiceQuickLogCard(
     val micHint = when {
         isChecking -> "One moment"
         isListening -> "Tap when you're done"
-        isProcessing -> "Logging food, exercise or both"
+        isProcessing && logType == "MEAL" -> "Logging your meal"
+        isProcessing -> "Logging your workout"
         logType == "MEAL" && showCamera -> "Best after a meal"
-        logType == "MEAL" -> "Or what you did"
+        logType == "MEAL" -> "e.g. \u201C2 roti and dal\u201D"
         else -> "e.g. \u201C20 push-ups and 50 dumbbell curls\u201D"
     }
 

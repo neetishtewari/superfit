@@ -13,7 +13,6 @@ import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
-import com.superfit.app.domain.LogRouter
 import com.superfit.app.domain.MacroTargets
 import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.NutritionParser
@@ -30,8 +29,6 @@ import com.superfit.app.widget.SuperfitWidget
 import com.superfit.app.widget.WidgetSnapshot
 import com.superfit.app.widget.WidgetSnapshotStore
 import java.time.LocalDate
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -907,103 +904,42 @@ class DashboardViewModel(
     private var lastMealInput: String? = null
     val canRetryLastMeal: Boolean get() = !lastMealInput.isNullOrBlank()
 
-    // Whether the last input came from the mic (food, exercise or both) or the typed meal box.
+    // Whether the last meal came from the mic or the typed meal box.
     private var lastInputWasSpoken = false
 
     // The phone's other versions of what it heard, kept for a retry.
     private var lastSpokenVersions: List<String> = emptyList()
 
     fun retryLastMeal() {
-        lastMealInput?.let { if (lastInputWasSpoken) smartLog(it, lastSpokenVersions) else parseAndAddMeal(it) }
+        lastMealInput?.let { if (lastInputWasSpoken) logSpokenMeal(it, lastSpokenVersions) else parseAndAddMeal(it) }
     }
 
     /**
-     * Logs whatever was said: food, exercise or both. An exact repeat of one of the user's own
-     * meals is logged straight away; anything else is split by [LogRouter] and each part goes to
-     * its usual parser. If one part can't be understood, the other is still logged.
+     * Logs a meal said into the mic on the Food tab. An exact repeat of one of the user's own
+     * meals is logged straight away; anything else goes to the meal parser along with the phone's
+     * other versions of what it heard.
      */
-    fun smartLog(input: String, otherVersions: List<String> = emptyList()) {
+    fun logSpokenMeal(input: String, otherVersions: List<String> = emptyList()) {
         lastMealInput = input
         lastInputWasSpoken = true
         lastSpokenVersions = otherVersions
-        val spoken = SpokenInput(input, otherVersions)
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
             try {
                 val history = repository.getAllNutritionEntries()
-                RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
-                    saveMeal(repeat)
-                    _parsingState.value = ParsingState.Success(repeat.foodText)
+                val result = RepeatMealCache.findRepeatMeal(input, history)
+                    ?: NutritionParser().parseFoodInput(input, history, SpokenInput(input, otherVersions))
+                if (result.foodText == "invalid") {
+                    _parsingState.value = ParsingState.Error(NO_FOOD_HEARD)
                     return@launch
                 }
-
-                val routed = LogRouter().route(spoken)
-                if (routed.isEmpty) {
-                    _parsingState.value = ParsingState.Error(NOTHING_RECOGNISED)
-                    return@launch
-                }
-
-                val (meal, workout) = coroutineScope {
-                    val mealJob = async {
-                        if (routed.food.isBlank()) {
-                            null
-                        } else {
-                            runCatching { NutritionParser().parseFoodInput(routed.food, history, spoken) }
-                        }
-                    }
-                    val workoutJob = async {
-                        if (routed.exercise.isBlank()) {
-                            null
-                        } else {
-                            runCatching { WorkoutParser().parseWorkoutInput(routed.exercise) }
-                        }
-                    }
-                    mealJob.await() to workoutJob.await()
-                }
-                listOfNotNull(meal?.exceptionOrNull(), workout?.exceptionOrNull())
-                    .firstOrNull { it is kotlinx.coroutines.CancellationException }
-                    ?.let { throw it }
-
-                val mealResult = meal?.getOrNull()?.takeIf { it.foodText != "invalid" }
-                val workoutResult = workout?.getOrNull()?.takeIf { it.workoutText != "invalid" }
-                mealResult?.let {
-                    saveMeal(it)
-                    // A retry after this point must not log the meal twice.
-                    lastMealInput = routed.exercise.ifBlank { null }
-                    lastSpokenVersions = emptyList()
-                }
-                workoutResult?.let { saveWorkout(it, "JUST_RIGHT") }
-                val foodMissed = routed.food.isNotBlank() && mealResult == null
-                val exerciseMissed = routed.exercise.isNotBlank() && workoutResult == null
-
-                _parsingState.value = when {
-                    mealResult != null && workoutResult != null -> ParsingState.Success(
-                        mealResult.foodText,
-                        message = "Logged: ${mealResult.foodText} · Workout: ${workoutResult.workoutText}"
-                    )
-                    mealResult != null -> ParsingState.Success(
-                        mealResult.foodText,
-                        message = if (exerciseMissed) "Logged: ${mealResult.foodText} · Couldn't log the exercise. Try saying it again." else null
-                    )
-                    workoutResult != null -> ParsingState.Success(
-                        workoutResult.workoutText,
-                        message = if (foodMissed) {
-                            "Logged workout: ${workoutResult.workoutText} · Couldn't log the food. Try saying it again."
-                        } else {
-                            "Logged workout: ${workoutResult.workoutText}"
-                        }
-                    )
-                    else -> {
-                        val failure = meal?.exceptionOrNull() ?: workout?.exceptionOrNull()
-                        if (failure != null) android.util.Log.e("DashboardViewModel", "Smart log failed", failure)
-                        ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: NOTHING_RECOGNISED)
-                    }
-                }
+                saveMeal(result)
+                _parsingState.value = ParsingState.Success(result.foodText)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                android.util.Log.e("DashboardViewModel", "Smart log failed", e)
+                android.util.Log.e("DashboardViewModel", "Spoken meal failed", e)
                 _parsingState.value = ParsingState.Error(GeminiClient.sanitizeError(e))
             }
         }
@@ -1262,7 +1198,7 @@ class DashboardViewModel(
     }
 }
 
-private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
+private const val NO_FOOD_HEARD = "Couldn't catch any food. Try 'two roti and dal'."
 
 sealed interface ParsingState {
     object Idle : ParsingState
