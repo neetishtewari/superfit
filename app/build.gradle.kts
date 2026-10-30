@@ -25,8 +25,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 47
-        versionName = "1.0.43"
+        versionCode = 48
+        versionName = "1.0.44"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
@@ -178,6 +178,8 @@ dependencies {
 
   // Play Store rating sheet
   implementation(libs.play.review)
+  // Play install referrer: tells an install it came from a friend's invite link
+  implementation(libs.install.referrer)
 
   // Google Health Connect
   implementation(libs.androidx.health.connect)

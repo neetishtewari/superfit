@@ -14,9 +14,11 @@ import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import com.superfit.app.R
+import com.superfit.app.data.InviteStore
 import com.superfit.app.domain.BodyReadings
 import com.superfit.app.domain.CoachExport
 import com.superfit.app.domain.CoachExportBuilder
+import com.superfit.app.domain.InviteLink
 import java.io.File
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -36,7 +38,6 @@ object CoachExportPdf {
     private const val CONTENT_W = PAGE_W - 2 * MARGIN
     private const val BAND_H = 64f // green header band on later pages
     private const val FOOTER_TOP = PAGE_H - 50f
-    private const val PLAY_URL = "https://play.google.com/store/apps/details?id=com.superfit.aifitness"
 
     // Superfit "Fresh Green" colours, matching the app.
     private val GREEN = Color.rgb(14, 159, 117)
@@ -106,7 +107,8 @@ object CoachExportPdf {
         runCatching {
             PdfLinks.addLinkToEveryPage(
                 file,
-                PLAY_URL,
+                // The link carries this person's invite code, so installs from reports are counted.
+                InviteLink.url(context?.let { InviteStore.myCode(it) }),
                 floatArrayOf(
                     MARGIN - 2f,
                     PAGE_H - (FOOTER_TOP + 36f),
