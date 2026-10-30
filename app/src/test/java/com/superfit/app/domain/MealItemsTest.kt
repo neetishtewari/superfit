@@ -138,10 +138,10 @@ class MealItemsTest {
     }
 
     @Test
-    fun `quantities step by 25 for grams and millilitres and by half otherwise`() {
+    fun `quantities step by half for household units and by size for grams and millilitres`() {
         assertEquals(0.5, roti.step, 0.0)
-        assertEquals(25.0, roti.copy(unit = "g").step, 0.0)
-        assertEquals(25.0, roti.copy(unit = "ml").step, 0.0)
+        assertEquals(25.0, roti.copy(qty = 300.0, unit = "g").step, 0.0)
+        assertEquals(25.0, roti.copy(qty = 300.0, unit = "ml").step, 0.0)
     }
 
     @Test
