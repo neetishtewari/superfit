@@ -232,7 +232,9 @@ class CoachingEngine {
                 var score = f.priority
                 val lastSaid = restingSince[f.area]
                 val newSince = f.area == "treats" && lastTreatDay != null && lastSaid != null && lastTreatDay > lastSaid
-                if (lastSaid != null && !newSince) score -= REST_PENALTY
+                // A follow-up is about a subject that was just raised, so it never rests.
+                val followUp = f.id.startsWith("followup_")
+                if (lastSaid != null && !newSince && !followUp) score -= REST_PENALTY
                 score
             }
         }
