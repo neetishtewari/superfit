@@ -19,6 +19,9 @@ class NutritionParser {
             "\"quantity\": Double, " +
             "\"unit\": String (one of piece, katori, bowl, cup, glass, slice, tbsp, tsp, g, ml, serving), " +
             "\"calories\", \"protein\", \"carbs\", \"fat\", \"fiber\": Double (for that whole quantity), " +
+            "\"grams\": Double (how much that whole quantity weighs: grams for food, ml for drinks; e.g. 1 home-made " +
+            "aloo paratha about 120), \"liquid\": Boolean (true for drinks and other pourable liquids such as milk, chai, " +
+            "juice, soup, lassi; false for solid food), " +
             "\"oilG\": Double (grams of oil, ghee or butter added in cooking or serving it, 0 if none), " +
             "\"sugarG\": Double (grams of added sugar, 0 if none), " +
             "\"alternatives\": Array (ONLY when you genuinely can't tell this food apart from similar-looking or " +
@@ -27,6 +30,9 @@ class NutritionParser {
             "\"calories\", \"protein\", \"carbs\", \"fat\", \"fiber\", \"oilG\", \"sugarG\" for the same quantity and unit. " +
             "The item itself is your best guess. The items' numbers must add up to the meal's totals.\n" +
             MealTags.PROMPT_FIELDS +
+            "When the user gives an amount or unit (\"200 ml milk\", \"2 katori dal\", \"150 g paneer\", \"1 cup tea\"), use " +
+            "exactly that quantity and unit for that item. In \"foodText\", put the weight after each household amount, e.g. " +
+            "\"1 aloo paratha (120 g) and 1 cup chai (150 ml)\".\n" +
             "Provide reasonable estimations if quantities or specific types are not detailed by the user.\n" +
             "CRITICAL: If the user's input is gibberish, background noise, or completely unrelated to food, meals, or beverages, set the \"foodText\" field to exactly \"invalid\" and set \"calories\", \"protein\", \"carbs\", and \"fat\" all to 0.0."
 

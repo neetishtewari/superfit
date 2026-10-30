@@ -10,6 +10,9 @@ import org.json.JSONObject
 /** How much oil or sugar went in compared with the AI's estimate. */
 enum class Level(val factor: Double) { LOW(0.5), NORMAL(1.0), HIGH(1.5) }
 
+/** A household unit an item was switched away from, so it can be switched back. */
+data class HomeUnit(val unit: String, val weight: Double)
+
 /**
  * One food in a meal. The nutrient numbers are for ONE unit (one roti, one katori, one gram),
  * at the AI's normal amount of oil and sugar, so changing the amount is a multiplication.
@@ -32,7 +35,13 @@ data class MealItem(
      * veg or chicken momos), every option it considered, its best guess first, each with its own
      * per-unit numbers. Empty when it was sure. The options' qty, unit and choices are unused.
      */
-    val choices: List<MealItem> = emptyList()
+    val choices: List<MealItem> = emptyList(),
+    /** Grams (or ml for drinks) in ONE [unit], as the AI weighed it. Null for older meals. */
+    val weight: Double? = null,
+    /** "g" for solid food, "ml" for drinks, as the AI judged it. Null for older meals. */
+    val metric: String? = null,
+    /** Set after the user switched a household amount to g or ml: what to switch back to. */
+    val home: HomeUnit? = null
 ) {
     /** True when the AI offered other foods this might be. */
     val isUnsure: Boolean get() = choices.size > 1
@@ -41,6 +50,9 @@ data class MealItem(
     fun choose(index: Int): MealItem {
         val c = choices.getOrNull(index) ?: return this
         return copy(
+            // Once switched to g or ml, the amount is already a weight.
+            weight = if (home != null) weight else c.weight ?: weight,
+            metric = c.metric ?: metric,
             name = c.name,
             kcal = c.kcal,
             protein = c.protein,
@@ -52,17 +64,64 @@ data class MealItem(
         )
     }
 
-    /** How much one tap of − or + changes the amount. */
-    val step: Double get() = if (unit == "g" || unit == "ml") 25.0 else 0.5
+    /** True when the amount is in grams or ml. */
+    val isMetric: Boolean get() = unit == "g" || unit == "ml"
 
-    /** "3 roti", "1 katori dal", "150 g rice". */
+    /** How much one tap of − or + changes the amount: small steps for a spoon of ghee, bigger for rice. */
+    val step: Double get() = when {
+        !isMetric -> 0.5
+        qty < 50.0 -> 5.0
+        qty < 250.0 -> 10.0
+        else -> 25.0
+    }
+
+    /** "about 120 g" for a household amount the AI weighed; null when it's already in g or ml. */
+    fun weightText(): String? {
+        val w = weight ?: return null
+        val m = metric ?: return null
+        if (isMetric || w <= 0.0) return null
+        return "about ${roundWeight(w * qty)} $m"
+    }
+
+    /** True when this item can be shown in g or ml, or switched back to its household unit. */
+    val canSwitchUnit: Boolean get() = if (isMetric) home != null else weightText() != null
+
+    /** The same food and amount in g or ml (1 katori at 150 g becomes 150 g), or back again. */
+    fun switchUnit(): MealItem {
+        if (!canSwitchUnit) return this
+        return if (isMetric) {
+            val h = home ?: return this
+            perUnitTimes(h.weight).copy(qty = qty / h.weight, unit = h.unit, weight = h.weight, home = null)
+        } else {
+            val w = weight ?: return this
+            perUnitTimes(1.0 / w).copy(qty = qty * w, unit = metric ?: "g", weight = 1.0, home = HomeUnit(unit, w))
+        }
+    }
+
+    /** Every per-unit number, including the choices', multiplied by [factor]. */
+    private fun perUnitTimes(factor: Double): MealItem {
+        fun MealItem.times() = copy(
+            kcal = kcal * factor,
+            protein = protein * factor,
+            carbs = carbs * factor,
+            fat = fat * factor,
+            fiber = fiber * factor,
+            oilG = oilG * factor,
+            sugarG = sugarG * factor
+        )
+        return times().copy(choices = choices.map { it.times() })
+    }
+
+    /** "3 roti (120 g)", "1 katori dal (150 g)", "150 g rice". */
     fun label(): String {
         val amount = formatQty(qty)
-        return when (unit) {
+        val base = when (unit) {
             "piece" -> "$amount $name"
             "serving" -> if (qty == 1.0) name else "$amount × $name"
             else -> "$amount $unit $name"
         }
+        val w = weight
+        return if (!isMetric && w != null && w > 0.0 && metric != null) "$base (${roundWeight(w * qty)} $metric)" else base
     }
 }
 
@@ -140,6 +199,7 @@ data class MealItems(
                 items.forEach { item ->
                     put(
                         nutrientsJson(item).put("qty", item.qty).put("unit", item.unit).apply {
+                            item.home?.let { put("hu", it.unit).put("hw", it.weight) }
                             if (item.choices.isNotEmpty()) put("alt", JSONArray().apply { item.choices.forEach { put(nutrientsJson(it)) } })
                         }
                     )
@@ -152,6 +212,10 @@ data class MealItems(
         .put("name", item.name)
         .put("kcal", item.kcal).put("p", item.protein).put("c", item.carbs).put("f", item.fat)
         .put("fib", item.fiber).put("oil", item.oilG).put("sug", item.sugarG)
+        .apply {
+            item.weight?.let { put("w", it) }
+            item.metric?.let { put("m", it) }
+        }
 
     companion object {
         fun decode(raw: String?): MealItems? {
@@ -163,7 +227,9 @@ data class MealItems(
                     name = o.getString("name"), qty = qty, unit = unit,
                     kcal = o.getDouble("kcal"), protein = o.getDouble("p"), carbs = o.getDouble("c"),
                     fat = o.getDouble("f"), fiber = o.optDouble("fib", 0.0),
-                    oilG = o.optDouble("oil", 0.0), sugarG = o.optDouble("sug", 0.0)
+                    oilG = o.optDouble("oil", 0.0), sugarG = o.optDouble("sug", 0.0),
+                    weight = o.optDouble("w", Double.NaN).takeIf { !it.isNaN() && it > 0.0 },
+                    metric = o.optString("m", "").takeIf { it == "g" || it == "ml" }
                 )
                 val items = (0 until arr.length()).map { i ->
                     val o = arr.getJSONObject(i)
@@ -171,7 +237,9 @@ data class MealItems(
                     val unit = o.getString("unit")
                     val alt = o.optJSONArray("alt")
                     val choices = if (alt == null) emptyList() else (0 until alt.length()).map { read(alt.getJSONObject(it), qty, unit) }
-                    read(o, qty, unit).copy(choices = choices)
+                    val hw = o.optDouble("hw", Double.NaN)
+                    val home = o.optString("hu", "").takeIf { it.isNotBlank() && !hw.isNaN() && hw > 0.0 }?.let { HomeUnit(it, hw) }
+                    read(o, qty, unit).copy(choices = choices, home = home)
                 }
                 if (items.isEmpty()) return null
                 MealItems(
@@ -224,10 +292,22 @@ data class MealItems(
             val unit = o.optString("unit", "serving").trim().lowercase().ifEmpty { "serving" }
             fun nutrients(src: JSONObject, label: String): MealItem {
                 fun perUnit(key: String) = src.optDouble(key, 0.0).let { if (it.isNaN() || it < 0.0) 0.0 else it / qty }
+                // The AI says how much the whole amount weighs and whether it's a drink.
+                val metric = when {
+                    unit == "g" || unit == "ml" -> unit
+                    (if (src.has("liquid")) src else o).optBoolean("liquid", false) -> "ml"
+                    else -> "g"
+                }
+                val weight = when {
+                    unit == "g" || unit == "ml" -> 1.0
+                    else -> (if (src.has("grams")) src else o).optDouble("grams", Double.NaN)
+                        .takeIf { !it.isNaN() && it > 0.0 }?.let { it / qty }
+                }
                 return MealItem(
                     name = label, qty = qty, unit = unit,
                     kcal = perUnit("calories"), protein = perUnit("protein"), carbs = perUnit("carbs"),
-                    fat = perUnit("fat"), fiber = perUnit("fiber"), oilG = perUnit("oilG"), sugarG = perUnit("sugarG")
+                    fat = perUnit("fat"), fiber = perUnit("fiber"), oilG = perUnit("oilG"), sugarG = perUnit("sugarG"),
+                    weight = weight, metric = if (weight == null) null else metric
                 )
             }
             val item = nutrients(o, name)
@@ -290,6 +370,12 @@ fun NutritionEntryEntity.hasNewFood(items: MealItems): Boolean {
 }
 
 private fun round1(value: Double): Double = (value * 10.0).roundToLong() / 10.0
+
+/** Weights to a sensible precision: 7 g, 85 g, 120 g, 350 ml. */
+private fun roundWeight(w: Double): String = when {
+    w < 20.0 -> w.roundToLong().toString()
+    else -> ((w / 5.0).roundToLong() * 5).toString()
+}
 
 private fun formatQty(qty: Double): String =
     if (qty == Math.floor(qty)) qty.toLong().toString() else String.format(Locale.US, "%.1f", qty)

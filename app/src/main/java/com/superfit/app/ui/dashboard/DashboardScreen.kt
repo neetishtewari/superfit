@@ -69,6 +69,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.SpokenInput
 import com.superfit.app.theme.*
 import com.superfit.app.ui.camera.FoodCameraController
@@ -136,12 +137,15 @@ fun DashboardScreen(
     var voiceBannerColor by remember { mutableStateOf(Color.Transparent) }
     var showVoiceBanner by remember { mutableStateOf(false) }
 
+    // Which mic started listening: Food's, Activity's, or the widget's and reminders' (either).
+    var voiceKind by remember { mutableStateOf(LogKind.ANY) }
+
     // The phone's own voice-typing dialog, used when the in-app recognizer can't run on this phone.
     val systemSpeechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         SpokenInput.fromGuesses(result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS))
-            ?.let { viewModel.smartLog(it.text, it.otherVersions) }
+            ?.let { viewModel.smartLog(it.text, it.otherVersions, voiceKind) }
     }
     var showMicOffDialog by remember { mutableStateOf(false) }
     var voiceLiveText by remember { mutableStateOf("") }
@@ -152,8 +156,8 @@ fun DashboardScreen(
         SpeechRecognizerHelper(
             context = context,
             onResult = { heard ->
-                // One mic for everything: food, exercise or both, whichever tab is showing.
-                viewModel.smartLog(heard.text, heard.otherVersions)
+                // Food's mic logs meals and Activity's workouts; the widget and reminders log either.
+                viewModel.smartLog(heard.text, heard.otherVersions, voiceKind)
             },
             onError = { error ->
                 voiceMessage = error
@@ -221,8 +225,7 @@ fun DashboardScreen(
     // Auto-dismiss voice feedback banner
     LaunchedEffect(showVoiceBanner) {
         if (showVoiceBanner) {
-            // A voice log also shows what was heard, which needs a little longer to read.
-            kotlinx.coroutines.delay(if (voiceMessage?.startsWith("Heard") == true) 6000 else 4000)
+            kotlinx.coroutines.delay(4000)
             showVoiceBanner = false
         }
     }
@@ -327,6 +330,7 @@ fun DashboardScreen(
     // Trigger voice log from notifications and the widget mic
     LaunchedEffect(triggerVoiceLog) {
         if (triggerVoiceLog) {
+            voiceKind = LogKind.ANY
             val hasPermission = ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.RECORD_AUDIO
@@ -480,6 +484,7 @@ fun DashboardScreen(
                             isChecking = voiceChecking,
                             liveText = voiceLiveText,
                             onMicClick = {
+                                voiceKind = if (logType == "MEAL") LogKind.MEAL else LogKind.WORKOUT
                                 val hasPermission = ContextCompat.checkSelfPermission(
                                     context,
                                     Manifest.permission.RECORD_AUDIO

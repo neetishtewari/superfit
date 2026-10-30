@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +42,7 @@ import com.superfit.app.domain.Level
 import com.superfit.app.domain.MealItem
 import com.superfit.app.domain.MealItemReplacer
 import com.superfit.app.domain.MealItems
+import com.superfit.app.domain.NumberInput
 import com.superfit.app.domain.withItems
 import com.superfit.app.theme.DeleteRed
 import com.superfit.app.theme.SuperfitTheme
@@ -173,6 +175,14 @@ internal fun MealItemsEditor(
                     onQtyChange = { qty ->
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
                     },
+                    onSwitchUnit = {
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.switchUnit() }))
+                        AppAnalytics.mealAmountChanged(how = "switch")
+                    },
+                    onTypeAmount = { qty ->
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
+                        AppAnalytics.mealAmountChanged(how = "typed")
+                    },
                     onChoose = { choice ->
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.choose(choice) }))
                         AppAnalytics.mealItemChanged(typed = false)
@@ -225,11 +235,20 @@ private fun MealItemEditRow(
     canRemove: Boolean,
     canChange: Boolean,
     onQtyChange: (Double) -> Unit,
+    onSwitchUnit: () -> Unit,
+    onTypeAmount: (Double) -> Unit,
     onChoose: (Int) -> Unit,
     onChangeName: () -> Unit,
     onRemove: () -> Unit
 ) {
     val highlight = item.isUnsure && askToCheck
+    var typing by remember(item.name, item.unit) { mutableStateOf(false) }
+    if (typing) {
+        AmountDialog(item = item, onDismiss = { typing = false }, onDone = {
+            typing = false
+            onTypeAmount(it)
+        })
+    }
     // Name on its own line and the controls below it, so large text sizes never squeeze the name.
     Column(
         modifier = Modifier
@@ -277,13 +296,19 @@ private fun MealItemEditRow(
                 enabled = item.qty - item.step >= item.step - 1e-9,
                 onClick = { onQtyChange(item.qty - item.step) }
             )
+            // Tap the amount to type an exact number, for people who weigh their food.
             Text(
                 text = "${formatAmount(item.qty)} ${unitLabel(item.unit)}",
                 color = ThemeTextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(min = 72.dp).padding(horizontal = 8.dp)
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClickLabel = "Type the amount") { typing = true }
+                    .widthIn(min = 72.dp)
+                    .padding(horizontal = 4.dp, vertical = 6.dp)
             )
             StepButton(
                 icon = { Icon(Icons.Default.Add, contentDescription = "More ${item.name}") },
@@ -295,6 +320,17 @@ private fun MealItemEditRow(
                 IconButton(onClick = onRemove) {
                     Icon(Icons.Default.Close, contentDescription = "Remove ${item.name}", tint = DeleteRed.copy(alpha = 0.8f))
                 }
+            }
+        }
+        if (item.canSwitchUnit) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.weightText().orEmpty(),
+                    color = ThemeTextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                UnitSwitch(item = item, onSwitch = onSwitchUnit)
             }
         }
         if (item.isUnsure) {
@@ -325,6 +361,69 @@ private fun MealItemEditRow(
             }
         }
     }
+}
+
+/** Two small pills, household unit and g or ml, to show one item either way. */
+@Composable
+private fun UnitSwitch(item: MealItem, onSwitch: () -> Unit) {
+    val household = if (item.isMetric) item.home?.unit else item.unit
+    val metric = if (item.isMetric) item.unit else item.metric
+    if (household == null || metric == null) return
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(50))
+    ) {
+        listOf(unitLabel(household) to !item.isMetric, metric to item.isMetric).forEach { (label, selected) ->
+            Box(
+                modifier = Modifier
+                    .background(if (selected) NeonGreen else Color.Transparent)
+                    .clickable(enabled = !selected, onClickLabel = "Show in $label", onClick = onSwitch)
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) Color.White else ThemeTextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+/** Type an exact amount, such as 40 g for a small home-made paratha. */
+@Composable
+private fun AmountDialog(item: MealItem, onDismiss: () -> Unit, onDone: (Double) -> Unit) {
+    var text by remember { mutableStateOf(formatAmount(item.qty)) }
+    val value = text.toDoubleOrNull()?.takeIf { it > 0.0 }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SuperfitTheme.colors.cardBg,
+        title = { Text("How much ${item.name}?", color = ThemeTextPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SuperfitField(
+                    value = text,
+                    onValueChange = { typed -> NumberInput.clean(typed, allowDecimals = true)?.let { text = it } },
+                    singleLine = true,
+                    trailingIcon = { Text(unitLabel(item.unit), color = ThemeTextSecondary, modifier = Modifier.padding(end = 14.dp)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { value?.let(onDone) }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (!item.isMetric && item.canSwitchUnit) {
+                    Text("Want grams? Use the ${item.metric} switch under the amount.", color = ThemeTextSecondary, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { value?.let(onDone) }, enabled = value != null) {
+                Text("Done", color = NeonGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = ThemeTextSecondary) } }
+    )
 }
 
 /** Type or say what the item really was. */

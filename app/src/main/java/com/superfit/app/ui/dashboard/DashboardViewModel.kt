@@ -13,6 +13,7 @@ import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
+import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.LogRouter
 import com.superfit.app.domain.MacroTargets
 import com.superfit.app.domain.MealTags
@@ -913,34 +914,41 @@ class DashboardViewModel(
     // The phone's other versions of what it heard, kept for a retry.
     private var lastSpokenVersions: List<String> = emptyList()
 
+    /** Which mic the last spoken log came from, so Retry treats it the same way. */
+    private var lastKind = LogKind.ANY
+
     fun retryLastMeal() {
-        lastMealInput?.let { if (lastInputWasSpoken) smartLog(it, lastSpokenVersions) else parseAndAddMeal(it) }
+        lastMealInput?.let { if (lastInputWasSpoken) smartLog(it, lastSpokenVersions, lastKind) else parseAndAddMeal(it) }
     }
 
     /**
-     * Logs whatever was said: food, exercise or both. An exact repeat of one of the user's own
-     * meals is logged straight away; anything else is split by [LogRouter] and each part goes to
-     * its usual parser. If one part can't be understood, the other is still logged.
+     * Logs what was said. From the Food or Activity mic ([kind]) it goes straight to that parser;
+     * otherwise it can be food, exercise or both and is split by [LogRouter] first. An exact
+     * repeat of one of the user's own meals is logged straight away. If one part can't be
+     * understood, the other is still logged.
      */
-    fun smartLog(input: String, otherVersions: List<String> = emptyList()) {
+    fun smartLog(input: String, otherVersions: List<String> = emptyList(), kind: LogKind = LogKind.ANY) {
         lastMealInput = input
         lastInputWasSpoken = true
         lastSpokenVersions = otherVersions
+        lastKind = kind
         val spoken = SpokenInput(input, otherVersions)
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
             try {
                 val history = repository.getAllNutritionEntries()
-                RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
-                    saveMeal(repeat)
-                    _parsingState.value = ParsingState.Success(repeat.foodText).withHeard(input)
-                    return@launch
+                if (kind != LogKind.WORKOUT) {
+                    RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
+                        saveMeal(repeat)
+                        _parsingState.value = ParsingState.Success(repeat.foodText)
+                        return@launch
+                    }
                 }
 
-                val routed = LogRouter().route(spoken)
+                val routed = kind.presplit(input) ?: LogRouter().route(spoken)
                 if (routed.isEmpty) {
-                    _parsingState.value = ParsingState.Error(NOTHING_RECOGNISED)
+                    _parsingState.value = ParsingState.Error(kind.nothingRecognised)
                     return@launch
                 }
 
@@ -972,6 +980,7 @@ class DashboardViewModel(
                     // A retry after this point must not log the meal twice.
                     lastMealInput = routed.exercise.ifBlank { null }
                     lastSpokenVersions = emptyList()
+                    lastKind = LogKind.WORKOUT
                 }
                 workoutResult?.let { saveWorkout(it, "JUST_RIGHT") }
                 val foodMissed = routed.food.isNotBlank() && mealResult == null
@@ -997,9 +1006,9 @@ class DashboardViewModel(
                     else -> {
                         val failure = meal?.exceptionOrNull() ?: workout?.exceptionOrNull()
                         if (failure != null) android.util.Log.e("DashboardViewModel", "Smart log failed", failure)
-                        ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: NOTHING_RECOGNISED)
+                        ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: kind.nothingRecognised)
                     }
-                }.withHeard(input)
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1261,12 +1270,6 @@ class DashboardViewModel(
         private const val RERATE_DAYS = 14L
     }
 }
-
-private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
-
-/** Shows what the phone heard above a voice log's result, so a misheard word is easy to spot. */
-internal fun ParsingState.withHeard(heard: String): ParsingState =
-    if (this is ParsingState.Success) copy(message = "Heard: \u201C${heard.trim()}\u201D\n${message ?: "Logged: $foodText"}") else this
 
 sealed interface ParsingState {
     object Idle : ParsingState
