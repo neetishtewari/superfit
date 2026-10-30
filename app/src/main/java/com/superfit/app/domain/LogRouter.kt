@@ -8,6 +8,30 @@ data class RoutedLog(val food: String, val exercise: String) {
 }
 
 /**
+ * Which mic was used. The Food tab's mic only logs meals and the Activity tab's only workouts, so
+ * they skip the splitting call and answer faster. The widget and reminders still log either.
+ */
+enum class LogKind {
+    ANY,
+    MEAL,
+    WORKOUT;
+
+    /** [input] already split for this mic, or null when it needs [LogRouter] to split it. */
+    fun presplit(input: String): RoutedLog? = when (this) {
+        MEAL -> RoutedLog(food = input, exercise = "")
+        WORKOUT -> RoutedLog(food = "", exercise = input)
+        ANY -> null
+    }
+
+    /** What to say when nothing could be logged. */
+    val nothingRecognised: String get() = when (this) {
+        MEAL -> "Couldn't catch any food. Try 'two roti and dal'. For a workout, use the mic on Activity."
+        WORKOUT -> "Couldn't catch any exercise. Try 'ran 5k' or '20 push-ups'. For food, use the mic on Food."
+        ANY -> "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
+    }
+}
+
+/**
  * Lets one mic log food, exercise or both: a quick AI call splits the spoken words, and each part
  * then goes to its usual parser. The AI decides what is food and what is exercise; there are no
  * word lists here.
