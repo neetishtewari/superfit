@@ -37,7 +37,8 @@ data class DayLog(
     val tagsKnown: Boolean = false
 )
 
-enum class FindingKind { CONCERN, WIN, LOGGING }
+/** HABIT is an everyday tip for a quiet day, not something seen in the logs. */
+enum class FindingKind { CONCERN, WIN, LOGGING, HABIT }
 
 /**
  * One thing the coach noticed. [fact] and [meaning] are plain sentences shown to the user

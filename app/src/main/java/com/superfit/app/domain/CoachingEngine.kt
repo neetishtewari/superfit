@@ -89,7 +89,7 @@ class CoachingEngine {
             targetWeightKg = profile.targetWeightKg
         )
         val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today)
-        val focus = chooseFocus(report, memory, today, plans)
+        val focus = chooseFocus(report, memory, today, plans, lastTreatDay(historyNutrition))
         val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
         val why = whyLines(focus, report)
 
@@ -119,7 +119,7 @@ class CoachingEngine {
             3. Days without logs are unknown, not days without food. Never say or imply the user is under-eating or skipping meals because something wasn't logged.
             4. Don't recite today's totals. Mention today only when it's needed for the action.
             5. If THE FOCUS is a win, celebrate it specifically and don't add a criticism.
-            6. Don't repeat your recent messages. If THE FOCUS was also a recent topic, say it's still going on and give a different, more concrete tip than before.
+            6. Don't repeat your recent messages. If THE FOCUS was also a recent topic, talk only about what's new since then and give a different, more concrete tip than before.
             7. Avoid jargon such as bioavailable, thermic, macronutrients, glycemic, telemetry.
             8. The action is one concrete thing for the rest of today, or for tomorrow if it's after 9 PM. Prefer foods the user already eats.
             9. Respect what you know about the user: never suggest something an injury, dislike or diet day rules out, and adapt the action instead (a walk instead of a run for a sore knee).
@@ -129,7 +129,68 @@ class CoachingEngine {
             {"headline": "1 or 2 sentences, at most 40 words, may put one key phrase in **bold**", "action": "one sentence, at most 25 words, no bold"}
         """.trimIndent()
 
-        private const val REPEAT_PENALTY = 25
+        /** A subject the coach just talked about is left alone for this many days. */
+        const val REST_DAYS = 4
+        private const val REST_PENALTY = 60
+
+        // Above most everyday patterns once a few days have gone by without a habit tip, below anything urgent.
+        private const val HABIT_PRIORITY_DUE = 64
+        private const val HABIT_PRIORITY = 10
+
+        private fun habit(id: String, fact: String, meaning: String, suggestion: String) =
+            CoachFinding(id = id, area = "habit", kind = FindingKind.HABIT, priority = 0, fact = fact, meaning = meaning, suggestion = suggestion)
+
+        /** Everyday habits with solid evidence behind them. Nothing here asks anyone to eat less. */
+        val HABITS = listOf(
+            habit(
+                "habit_walk_after_meals",
+                "A short walk after a meal is one of the simplest habits with real benefits.",
+                "10 minutes of walking after eating helps your body handle the sugar from the meal and adds easy steps.",
+                "After your next main meal, walk for 10 minutes."
+            ),
+            habit(
+                "habit_protein_breakfast",
+                "Protein at breakfast makes the rest of the day's protein much easier to reach.",
+                "It also keeps you full for longer, so mid-morning snacking drops.",
+                "Add eggs, curd, paneer or sprouts to tomorrow's breakfast."
+            ),
+            habit(
+                "habit_water",
+                "Thirst is easy to mistake for hunger.",
+                "Drinking enough water helps energy, workouts and appetite control.",
+                "Keep a bottle on your desk and finish it before lunch."
+            ),
+            habit(
+                "habit_bedtime",
+                "A regular bedtime is one of the best things for recovery and appetite.",
+                "Short or late sleep makes cravings for sweet and fried food stronger the next day.",
+                "Pick a bedtime for tonight and put your phone away 30 minutes before it."
+            ),
+            habit(
+                "habit_veg_first",
+                "Starting a meal with vegetables or salad is an easy upgrade.",
+                "It adds fibre and helps you feel full on a normal portion.",
+                "Start your next lunch or dinner with a bowl of salad or sabzi."
+            ),
+            habit(
+                "habit_strength",
+                "Strength training twice a week protects muscle at any goal.",
+                "Muscle keeps your metabolism up and makes everyday movement easier.",
+                "Do 15 minutes of squats, push-ups and lunges at home this week."
+            ),
+            habit(
+                "habit_slow_eating",
+                "Eating slowly gives your body time to notice it's full.",
+                "Fullness signals take about 20 minutes to arrive.",
+                "Put your spoon down between bites at your next meal."
+            ),
+            habit(
+                "habit_stand_breaks",
+                "Long stretches of sitting slow you down even on workout days.",
+                "Short standing or walking breaks add up to hundreds of extra steps.",
+                "Stand up and move for 2 minutes every hour this afternoon."
+            )
+        )
 
         private val areaLabels = mapOf(
             "protein" to "your protein",
@@ -144,30 +205,53 @@ class CoachingEngine {
         )
 
         /**
-         * Picks what to talk about today. The highest-priority finding wins, but one that was
-         * the focus yesterday is marked down so the coach doesn't nag about the same thing every
-         * day, and a concern that has since cleared up becomes a follow-up win.
+         * Picks today's topic. A subject the coach talked about in the last [REST_DAYS] days gets a rest,
+         * so a cake from three days ago isn't raised again and again; it can come back sooner only when
+         * there's something new (a treat logged after the coach last mentioned treats). On quiet days an
+         * everyday habit tip ([HABITS]) brings some variety.
          */
         fun chooseFocus(
             report: CoachReport,
             memory: List<CoachMemoryEntry>,
             today: LocalDate,
-            plans: List<CoachFinding> = emptyList()
+            plans: List<CoachFinding> = emptyList(),
+            lastTreatDay: LocalDate? = null
         ): CoachFinding {
             val past = memory.filter { it.date < today }.sortedByDescending { it.date }
-            val yesterday = past.firstOrNull { it.date == today.minusDays(1) }?.focusId
-            val dayBefore = past.firstOrNull { it.date == today.minusDays(2) }?.focusId
+            val restingSince = past
+                .filter { ChronoUnit.DAYS.between(it.date, today) <= REST_DAYS }
+                .groupBy { areaOf(it.focusId) }
+                .mapValues { (_, entries) -> entries.maxOf { it.date } }
 
-            val candidates = report.findings + followUps(report, past, today) + plans
-            if (candidates.isEmpty()) return gettingStarted(report)
+            val findings = report.findings + followUps(report, past, today) + plans
+            if (findings.isEmpty()) return gettingStarted(report)
+            // A plan the user made with the coach always comes before a generic habit.
+            val candidates = findings + listOfNotNull(habitFor(past, today).takeIf { plans.isEmpty() })
 
             return candidates.maxBy { f ->
                 var score = f.priority
-                if (f.id == yesterday) score -= REPEAT_PENALTY
-                if (f.id == yesterday && f.id == dayBefore) score -= REPEAT_PENALTY
+                val lastSaid = restingSince[f.area]
+                val newSince = f.area == "treats" && lastTreatDay != null && lastSaid != null && lastTreatDay > lastSaid
+                if (lastSaid != null && !newSince) score -= REST_PENALTY
                 score
             }
         }
+
+        /** The next everyday habit the user hasn't heard in a while; it competes harder after a few days without one. */
+        fun habitFor(past: List<CoachMemoryEntry>, today: LocalDate): CoachFinding? {
+            val lastHabit = past.firstOrNull { it.focusKind == FindingKind.HABIT }?.date
+            val recentIds = past.map { it.focusId }.toSet()
+            val habit = HABITS.firstOrNull { it.id !in recentIds }
+                ?: HABITS[Math.floorMod(today.toEpochDay(), HABITS.size.toLong()).toInt()]
+            val due = lastHabit == null || ChronoUnit.DAYS.between(lastHabit, today) > REST_DAYS
+            return habit.copy(priority = if (due) HABIT_PRIORITY_DUE else HABIT_PRIORITY)
+        }
+
+        /** The day of the latest logged treat, so treats can come back as soon as there's a new one. */
+        fun lastTreatDay(nutrition: List<NutritionEntryEntity>): LocalDate? =
+            nutrition.filter { CoachPatternEngine.treatCategoryOf(it) != null }
+                .maxOfOrNull { it.timestamp }
+                ?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
 
         /** Concerns the coach raised in the last two weeks that the latest logs no longer show. */
         fun followUps(report: CoachReport, past: List<CoachMemoryEntry>, today: LocalDate): List<CoachFinding> {
@@ -285,6 +369,9 @@ class CoachingEngine {
                 appendLine("User: goal is to $goalText. Age ${profile.age}, ${profile.weightKg.toInt()} kg.")
                 appendLine()
                 appendLine("THE FOCUS (${focus.kind.name.lowercase()}): ${focus.fact}")
+                if (focus.kind == FindingKind.HABIT) {
+                    appendLine("This is an everyday habit tip for variety, not a problem in their logs: don't say they did anything wrong. Link it to their own foods or day if one fits naturally.")
+                }
                 appendLine("Why it matters: ${focus.meaning}")
                 appendLine("A tip you can use or improve on: ${focus.suggestion}")
                 if (support != null && focus.kind != FindingKind.WIN) {
