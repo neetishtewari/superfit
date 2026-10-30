@@ -101,8 +101,13 @@ data class MealItem(
     /** Every per-unit number, including the choices', multiplied by [factor]. */
     private fun perUnitTimes(factor: Double): MealItem {
         fun MealItem.times() = copy(
-            kcal = kcal * factor, protein = protein * factor, carbs = carbs * factor, fat = fat * factor,
-            fiber = fiber * factor, oilG = oilG * factor, sugarG = sugarG * factor
+            kcal = kcal * factor,
+            protein = protein * factor,
+            carbs = carbs * factor,
+            fat = fat * factor,
+            fiber = fiber * factor,
+            oilG = oilG * factor,
+            sugarG = sugarG * factor
         )
         return times().copy(choices = choices.map { it.times() })
     }
