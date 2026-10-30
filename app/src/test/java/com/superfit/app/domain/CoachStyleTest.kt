@@ -40,4 +40,20 @@ class CoachStyleTest {
         assertEquals(3, lines.toSet().size)
         lines.forEach { (_, text) -> assertTrue(text.contains("800") && text.contains("2000")) }
     }
+
+    @Test
+    fun roastAsksForAboutTwoThirdsOfEveryWordLimit() {
+        val roast = CoachStyle.ROAST.instruction()
+        assertTrue(roast.contains("8 words or fewer"))
+        assertTrue(roast.contains("two thirds of any word limit"))
+        assertTrue(CoachChatContext.RULES.contains("at most 16 words"))
+    }
+
+    @Test
+    fun roastLinesWrittenByTheAppAreShortToo() {
+        fun words(text: String) = text.split(Regex("""\s+""")).count { it.isNotBlank() }
+        assertTrue(words(CoachStyle.ROAST.sample) <= 12)
+        (0..2).forEach { day -> assertTrue(words(CoachStyle.ROAST.logReminder(800, 2000, day).second) <= 12) }
+        assertTrue(words(CoachStyle.ROAST.completeDayFallback(1800).second) <= 14)
+    }
 }
