@@ -107,7 +107,7 @@ class DietScoreEngineTest {
     @Test
     fun `a food marked fine for me is never a treat`() {
         val chocolate = MealTags(2, fried = false, addedSugar = true, vegFruitServings = 0.0, fiberG = 2.0, treat = true, foodType = "dark chocolate", rating = 4)
-        val week = (1..6).flatMap { goodDay(it) } + (1..5).map { meal(it, 16, 120.0, 2.0, chocolate, "2 squares dark chocolate") }
+        val week = (1..6).flatMap { goodDay(it) } + (1..5).map { meal(it, 16, 280.0, 4.0, chocolate, "half a bar of dark chocolate") }
         assertEquals(5, score(week)!!.treatMeals)
 
         PersonalNutrition.approvedFoods = setOf("dark chocolate")
@@ -115,6 +115,21 @@ class DietScoreEngineTest {
         assertEquals(0, s.treatMeals)
         assertEquals(10, s.part("treats").points)
         assertEquals(7, DietScoreEngine.mealRating(week.last(), chocolate))
+    }
+
+    @Test
+    fun `a square of dark chocolate is not a treat, but bites that add up are`() {
+        val square = MealTags(2, fried = false, addedSugar = true, vegFruitServings = 0.0, fiberG = 1.0, treat = true, foodType = "dark chocolate", rating = 4)
+        val week = (1..6).flatMap { goodDay(it) }
+        // One square (55 kcal) every afternoon, from a meal tagged before the AI gave treat calories.
+        assertEquals(0, score(week + (1..6).map { meal(it, 16, 55.0, 1.0, square, "1 square dark chocolate") })!!.treatMeals)
+        // A gulab jamun on the side of dinner: only its calories are treat food.
+        val dinnerWithSweet = homeCooked.copy(treatKcal = 150)
+        assertEquals(1, score(week + meal(2, 21, 900.0, 40.0, dinnerWithSweet, "dal rice and a gulab jamun"))!!.treatMeals)
+        assertEquals(0, score(week + meal(2, 21, 800.0, 40.0, homeCooked.copy(treatKcal = 55), "dal rice and a square of chocolate"))!!.treatMeals)
+        // Three small bites in one day add up to one treat.
+        val bites = listOf(11, 15, 19).map { h -> meal(3, h, 60.0, 1.0, square.copy(treatKcal = 60), "a biscuit") }
+        assertEquals(1, score(week + bites)!!.treatMeals)
     }
 
     @Test
@@ -138,6 +153,9 @@ class DietScoreEngineTest {
         assertEquals(FoodVerdict.GOOD, FoodVerdict.of(homeCooked, 7, approved = false))
         assertEquals(FoodVerdict.PORTION, FoodVerdict.of(homeCooked, 5, approved = false))
         assertEquals(FoodVerdict.TREAT, FoodVerdict.of(burger, 3, approved = false))
+        assertEquals(FoodVerdict.TREAT, FoodVerdict.of(burger, 3, approved = false, treatKcal = 600.0))
+        assertEquals(FoodVerdict.SMALL_TREAT, FoodVerdict.of(burger, 3, approved = false, treatKcal = 55.0))
+        assertEquals(FoodVerdict.GOOD, FoodVerdict.of(burger, 3, approved = true, treatKcal = 55.0))
         assertEquals("avoid", MealTags.decode(homeCooked.copy(verdict = "avoid").encode())!!.verdict)
     }
 

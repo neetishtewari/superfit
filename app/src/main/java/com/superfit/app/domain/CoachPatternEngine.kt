@@ -138,7 +138,8 @@ object CoachPatternEngine {
             proteinSoFar = proteinSoFar.roundToInt(),
             proteinStillNeeded = (targets.proteinG - proteinSoFar).coerceAtLeast(0.0).roundToInt(),
             mealsLogged = todayEntries.map { slotOf(it.timestamp, zone) }.distinct().sorted(),
-            treatsToday = todayEntries.mapNotNull { treatCategoryOf(it) }.distinct(),
+            treatsToday = Treats.occasions(todayEntries.groupBy { slotOf(it.timestamp, zone) }.values.toList())
+                .flatten().mapNotNull { treatCategoryOf(it) }.distinct(),
             hour = now.hour
         )
 
@@ -582,19 +583,16 @@ object CoachPatternEngine {
         out: MutableList<CoachFinding>,
         checked: MutableSet<String>
     ) {
-        // A "treat meal" is one meal sitting (day + meal time) with at least one treat food in it,
-        // so a pizza and a beer at the same dinner count once.
+        // A "treat meal" is one meal sitting (day + meal time) with a treat's worth of treat food in it,
+        // so a pizza and a beer at the same dinner count once and a square of chocolate not at all.
+        // Small bites across the day count once when they add up (see Treats).
         data class TreatMeal(val date: LocalDate, val categories: Set<String>)
 
         fun treatMeals(fromDaysAgo: Int, toDaysAgo: Int): List<TreatMeal> =
             (toDaysAgo..fromDaysAgo).flatMap { offset ->
                 val date = today.minusDays(offset.toLong())
-                byDate[date].orEmpty()
-                    .groupBy { slotOf(it.timestamp, zone) }
-                    .values.mapNotNull { meal ->
-                        val cats = meal.mapNotNull { treatCategoryOf(it) }.toSet()
-                        if (cats.isEmpty()) null else TreatMeal(date, cats)
-                    }
+                Treats.occasions(byDate[date].orEmpty().groupBy { slotOf(it.timestamp, zone) }.values.toList())
+                    .map { meal -> TreatMeal(date, meal.mapNotNull { treatCategoryOf(it) }.toSet()) }
             }
 
         val anyLogs = (0..27).any { byDate[today.minusDays(it.toLong())].orEmpty().isNotEmpty() }
@@ -939,11 +937,15 @@ object CoachPatternEngine {
     // Food matching
     // ---------------------------------------------------------------------------------------
 
-    /** Treat category of a logged meal from the AI's tags; null when it isn't a treat or isn't tagged yet. */
+    /**
+     * Treat category of a logged meal from the AI's tags, whatever the amount ([Treats] decides whether
+     * it counts); null when it has no treat food or isn't tagged yet. A meal with a sweet on the side
+     * (dal rice and a gulab jamun) is just "treat", not "dal".
+     */
     fun treatCategoryOf(entry: NutritionEntryEntity): String? {
         val tags = MealTags.decode(entry.qualityTags) ?: return null
-        if (!PersonalNutrition.countsAsTreat(entry, tags)) return null
-        return tags.foodType.ifBlank { "treat" }
+        if (Treats.kcalOf(entry, tags) <= 0.0) return null
+        return tags.foodType.takeIf { tags.treat }?.ifBlank { null } ?: "treat"
     }
 
     fun hasVegOrFruit(entry: NutritionEntryEntity): Boolean =

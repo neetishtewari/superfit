@@ -37,7 +37,9 @@ data class MealTags(
     /** [PersonalNutrition.adviceVersion] when the meal was rated, so new advice re-rates recent meals. */
     val adviceVersion: String? = null,
     /** The AI's plain verdict for the person: great, good, portion, treat or avoid (see [FoodVerdict]). */
-    val verdict: String? = null
+    val verdict: String? = null,
+    /** Calories of treat food in it (the gulab jamun, not the dal rice), so a small bite isn't a treat. Null for older meals. */
+    val treatKcal: Int? = null
 ) {
     /** True when the AI also gave its reason and swap, which meals tagged before those existed lack. */
     val hasAdvice: Boolean get() = why != null
@@ -47,7 +49,8 @@ data class MealTags(
         vegFruitServings = (vegFruitServings * factor).coerceIn(0.0, 10.0),
         fiberG = (fiberG * factor).coerceIn(0.0, 100.0),
         fruitServings = (fruitServings * factor).coerceIn(0.0, 10.0),
-        swap = swap?.let { it.copy(kcalSaved = (it.kcalSaved * factor).toInt()) }
+        swap = swap?.let { it.copy(kcalSaved = (it.kcalSaved * factor).toInt()) },
+        treatKcal = treatKcal?.let { (it * factor).toInt().coerceAtLeast(0) }
     )
 
     fun encode(): String = listOf(
@@ -70,7 +73,8 @@ data class MealTags(
             if (fruitServings > 0) "fs=${String.format(Locale.US, "%.1f", fruitServings)}" else null,
             if (vegKinds > 0) "vk=$vegKinds" else null,
             adviceVersion?.let { "av=${clean(it, 8)}" },
-            verdict?.let { "vd=${clean(it, 10)}" }
+            verdict?.let { "vd=${clean(it, 10)}" },
+            treatKcal?.let { "tk=$it" }
         )
     ).joinToString("|")
 
@@ -100,7 +104,8 @@ data class MealTags(
                 fruitServings = fields["fs"]?.toDoubleOrNull() ?: 0.0,
                 vegKinds = fields["vk"]?.toIntOrNull() ?: 0,
                 adviceVersion = fields["av"],
-                verdict = fields["vd"]?.takeIf { it in FoodVerdict.KEYS }
+                verdict = fields["vd"]?.takeIf { it in FoodVerdict.KEYS },
+                treatKcal = fields["tk"]?.toIntOrNull()?.coerceAtLeast(0)
             )
         }
 
@@ -129,7 +134,8 @@ data class MealTags(
                 fruitServings = json.optDouble("fruitServings", 0.0).takeIf { !it.isNaN() }?.coerceIn(0.0, 10.0) ?: 0.0,
                 vegKinds = json.optInt("vegKinds", 0).coerceIn(0, 15),
                 adviceVersion = if (json.has("rating")) PersonalNutrition.adviceVersion() else null,
-                verdict = json.optString("verdict", "").trim().lowercase().takeIf { it in FoodVerdict.KEYS }
+                verdict = json.optString("verdict", "").trim().lowercase().takeIf { it in FoodVerdict.KEYS },
+                treatKcal = if (json.has("treatKcal")) json.optInt("treatKcal", 0).coerceIn(0, 5000) else null
             )
         }
 
@@ -143,7 +149,9 @@ data class MealTags(
                 "- \"vegFruitServings\": Double (servings of vegetables or fruit; about a cup of cooked vegetables, a bowl of salad or one piece of fruit is 1)\n" +
                 "- \"fiber\": Double (estimated grams of fibre)\n" +
                 "- \"treat\": Boolean (true only for a real treat in a real amount: desserts, mithai, fried snacks, fast food, sugary drinks or alcohol. " +
-                "Small amounts are not treats: a square or two of dark chocolate, tea or coffee with a little sugar, roasted chana, chana chaat, a home thali)\n" +
+                "Small amounts are not treats: a square or two of dark chocolate, a bite of mithai, tea or coffee with a little sugar, roasted chana, chana chaat, a home thali)\n" +
+                "- \"treatKcal\": Int (calories from treat food in this meal: desserts, mithai, chocolate, ice cream, biscuits, fried snacks, fast food, sugary drinks or alcohol, " +
+                "even in small amounts. Count only that part: for dal rice and one gulab jamun, only the gulab jamun. 0 when there is none; tea or coffee with a little sugar is 0)\n" +
                 "- \"foodType\": String (the main dish as a short generic name in lowercase, one or two words, e.g. \"burger\", \"pizza\", \"biryani\", \"dal\", \"salad\")\n" +
                 "- \"hiddenOil\": Boolean (true if it carries a lot of oil, ghee or butter that is easy to miss, not counting deep-frying, such as restaurant gravies, butter chicken, dal makhani, ghee-laden parathas or oily sabzi)\n" +
                 "- \"why\": String (one plain sentence, at most 15 words, on what makes this meal good or not for health)\n" +
@@ -198,16 +206,21 @@ enum class FoodVerdict(val key: String, val label: String) {
     GOOD("good", "Good"),
     PORTION("portion", "Watch the portion"),
     TREAT("treat", "Treat"),
+
+    /** Treat food in a small amount (a square of chocolate): set by the app, never by the AI. */
+    SMALL_TREAT("small_treat", "Small treat"),
     AVOID("avoid", "Avoid for now");
 
     companion object {
-        val KEYS = entries.map { it.key }.toSet()
+        /** The verdicts the AI may give. */
+        val KEYS = entries.filter { it != SMALL_TREAT }.map { it.key }.toSet()
 
         /**
          * The AI's verdict when it gave one; older ratings are put into words from their number.
+         * A treat below [Treats.REAL_TREAT_KCAL] of treat food is a Small treat, given [treatKcal].
          * A food the user marked "Fine for me" is always at least Good.
          */
-        fun of(tags: MealTags, rating: Int, approved: Boolean): FoodVerdict {
+        fun of(tags: MealTags, rating: Int, approved: Boolean, treatKcal: Double? = null): FoodVerdict {
             val fromAi = entries.firstOrNull { it.key == tags.verdict }
             val v = fromAi ?: when {
                 tags.treat -> TREAT
@@ -215,7 +228,8 @@ enum class FoodVerdict(val key: String, val label: String) {
                 rating >= 6 -> GOOD
                 else -> PORTION
             }
-            return if (approved && v !in setOf(GREAT, GOOD)) GOOD else v
+            val sized = if (v == TREAT && treatKcal != null && treatKcal < Treats.REAL_TREAT_KCAL) SMALL_TREAT else v
+            return if (approved && sized !in setOf(GREAT, GOOD)) GOOD else sized
         }
     }
 }
