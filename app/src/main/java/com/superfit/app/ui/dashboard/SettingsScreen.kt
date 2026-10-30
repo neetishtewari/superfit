@@ -211,6 +211,50 @@ fun SettingsScreen(
                 }
             }
 
+            // Invite family and friends: their personal Play link, sent through the normal share sheet.
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Invite family and friends",
+                            fontWeight = FontWeight.Bold,
+                            color = SuperfitTheme.colors.textPrimary,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Fitness is easier together. Send them your Superfit link on WhatsApp or anywhere.",
+                            fontSize = 12.sp,
+                            color = SuperfitTheme.colors.textSecondary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = {
+                            val code = com.superfit.app.data.InviteStore.myCode(context)
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, com.superfit.app.domain.InviteLink.inviteMessage(code))
+                            }
+                            context.startActivity(Intent.createChooser(send, "Invite to Superfit"))
+                            com.superfit.app.data.AppAnalytics.inviteSent("settings")
+                        },
+                        modifier = Modifier.heightIn(min = 44.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(text = "Invite", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+
             SettingsGroupLabel("Health data")
             // SECTION 2: Google Health Connect
             Card(

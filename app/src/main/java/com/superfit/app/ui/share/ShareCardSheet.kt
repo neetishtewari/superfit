@@ -72,6 +72,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.superfit.app.data.InviteStore
+import com.superfit.app.domain.InviteLink
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
 import java.io.File
@@ -85,7 +87,6 @@ const val CARD_WIDTH_PX = 1080
 const val CARD_HEIGHT_PX = 1920
 private val CardDensity = Density(density = 3f, fontScale = 1f)
 
-private const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
 private val accentNames = listOf("Mint", "Cyan", "Violet", "Amber")
 
 /**
@@ -277,7 +278,8 @@ suspend fun shareImage(context: Context, bitmap: Bitmap) {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "image/png"
         putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_TEXT, SHARE_TEXT)
+        // The Play link carries this person's invite code, so installs from shares are counted.
+        putExtra(Intent.EXTRA_TEXT, InviteLink.shareCardText(InviteStore.myCode(context)))
         clipData = ClipData.newRawUri(null, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

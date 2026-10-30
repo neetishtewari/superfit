@@ -12,3 +12,8 @@
 # the constructor and each OneTimeWorkRequest fails in release ("Could not create Input Merger"),
 # which left the widget loading forever and stopped the daily reminder.
 -keep class * extends androidx.work.InputMerger { <init>(); }
+
+# Play install referrer (InviteStore): binds to the Play Store's AIDL service; keep it whole so
+# R8 can't break the binder classes in the minified build.
+-keep class com.android.installreferrer.** { *; }
+-keep class com.google.android.finsky.externalreferrer.** { *; }

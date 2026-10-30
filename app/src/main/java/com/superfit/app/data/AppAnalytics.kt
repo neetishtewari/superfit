@@ -78,6 +78,12 @@ object AppAnalytics {
     fun coachStyleChanged(style: String) = log("coach_style_changed", "style" to style)
     fun reportShared(weeks: Int) = log("coach_report_shared", "weeks" to "$weeks")
 
+    /** "Invite family and friends" sent from [from] (settings). */
+    fun inviteSent(from: String) = log("invite_sent", "from" to from)
+
+    /** This install came from someone's invite link (no code or person in the event). */
+    fun inviteJoined() = log("invite_joined")
+
     /** Which speech service voice logging used, attached to any later crash report. */
     fun setSpeechService(name: String) {
         if (!active) return
