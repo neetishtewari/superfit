@@ -934,7 +934,7 @@ class DashboardViewModel(
                 val history = repository.getAllNutritionEntries()
                 RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
                     saveMeal(repeat)
-                    _parsingState.value = ParsingState.Success(repeat.foodText).withHeard(input)
+                    _parsingState.value = ParsingState.Success(repeat.foodText)
                     return@launch
                 }
 
@@ -999,7 +999,7 @@ class DashboardViewModel(
                         if (failure != null) android.util.Log.e("DashboardViewModel", "Smart log failed", failure)
                         ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: NOTHING_RECOGNISED)
                     }
-                }.withHeard(input)
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1264,9 +1264,6 @@ class DashboardViewModel(
 
 private const val NOTHING_RECOGNISED = "Couldn't catch any food or exercise. Try 'two roti and dal' or 'ran 5k'."
 
-/** Shows what the phone heard above a voice log's result, so a misheard word is easy to spot. */
-internal fun ParsingState.withHeard(heard: String): ParsingState =
-    if (this is ParsingState.Success) copy(message = "Heard: \u201C${heard.trim()}\u201D\n${message ?: "Logged: $foodText"}") else this
 
 sealed interface ParsingState {
     object Idle : ParsingState
