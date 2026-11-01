@@ -19,7 +19,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
- * Once a day, late morning: on the first days of a month, one "Your October is ready" notification.
+ * Once a day, late morning: on the first days of a month, one "Your October review is ready" notification.
  * People who turned notifications off still find the recap on Home and in Progress.
  */
 class RecapNotificationWorker(
@@ -68,7 +68,7 @@ class RecapNotificationWorker(
             ReminderNotifications.ensureChannel(context)
             val notification = NotificationCompat.Builder(context, ReminderNotifications.CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.star_on)
-                .setContentTitle("Your $name is ready")
+                .setContentTitle("Your $name review is ready")
                 .setContentText("Your month in a few cards worth sharing. Tap to see it.")
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(pending)

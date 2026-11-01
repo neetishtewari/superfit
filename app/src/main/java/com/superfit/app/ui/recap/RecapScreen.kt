@@ -5,14 +5,19 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,10 +28,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,7 +41,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,17 +58,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.MonthlyRecapData
 import com.superfit.app.domain.MonthRecap
+import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.SetupItem
@@ -105,6 +120,10 @@ class RecapViewModel(private val repository: DataRepository, private val appCont
 @Composable
 fun RecapScreen(viewModel: RecapViewModel, onBack: () -> Unit, onOpenSettings: () -> Unit) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
+    val music = remember { RecapMusic(context.applicationContext, viewModel.month) }
+    var muted by remember { mutableStateOf(music.muted) }
+    DisposableEffect(music) { onDispose { music.release() } }
     Column(
         Modifier
             .fillMaxSize()
@@ -120,8 +139,18 @@ fun RecapScreen(viewModel: RecapViewModel, onBack: () -> Unit, onOpenSettings: (
                 "Your ${monthName(viewModel.month)}",
                 color = SuperfitTheme.colors.textPrimary,
                 fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
             )
+            if (state is RecapState.Ready) {
+                IconButton(onClick = { muted = music.toggleMute() }) {
+                    Icon(
+                        if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = if (muted) "Turn music on" else "Turn music off",
+                        tint = SuperfitTheme.colors.textPrimary
+                    )
+                }
+            }
         }
         when (val s = state) {
             RecapState.Loading -> Centered {
@@ -137,55 +166,152 @@ fun RecapScreen(viewModel: RecapViewModel, onBack: () -> Unit, onOpenSettings: (
                     modifier = Modifier.padding(32.dp)
                 )
             }
-            is RecapState.Ready -> RecapPager(s, viewModel.month, onOpenSettings, viewModel::reload)
+            is RecapState.Ready -> RecapPager(s, viewModel.month, music, onOpenSettings, viewModel::reload)
         }
     }
 }
 
+/**
+ * The recap plays on its own like a story: each card stays up long enough to read, numbers count up
+ * as it arrives, and a quiet original track plays (muted on a silent phone). Tap the right of a card
+ * for the next one, the left to go back, and hold to pause. It stops at the last story card; the
+ * "Get more from Superfit" card is never played automatically.
+ */
 @Composable
-private fun RecapPager(state: RecapState.Ready, month: YearMonth, onOpenSettings: () -> Unit, onChanged: () -> Unit) {
+private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMusic, onOpenSettings: () -> Unit, onChanged: () -> Unit) {
     val cards = state.recap.cards
+    val stories = cards.count { it !is RecapCard.Setup }
     val pager = rememberPagerState { cards.size }
+    val scope = rememberCoroutineScope()
+    var held by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
+    var inBackground by remember { mutableStateOf(false) }
+    var finished by remember { mutableStateOf(false) }
+    val progress = remember { Animatable(0f) }
+    val page = pager.currentPage
+    val onStory = page < cards.size && cards[page] !is RecapCard.Setup
+    val paused = held || sharing || inBackground || pager.isScrollInProgress
+
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> inBackground = true
+                Lifecycle.Event.ON_RESUME -> inBackground = false
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    // Music plays while the story is on screen and not paused by a hold or the app going away.
+    LaunchedEffect(inBackground, onStory, held) {
+        if (!inBackground && onStory && !held) music.play() else music.pause()
+    }
+
+    val progressPage = remember { intArrayOf(-1) }
+    LaunchedEffect(page, paused, onStory) {
+        if (progressPage[0] != page) {
+            progress.snapTo(0f)
+            progressPage[0] = page
+        }
+        if (!onStory || paused) return@LaunchedEffect
+        val card = cards[page]
+        val words = state.words[card.id]
+        val total = RecapAutoplay.durationMs(words?.line.orEmpty(), words?.title.orEmpty())
+        val left = ((1f - progress.value) * total).toInt()
+        progress.animateTo(1f, tween(left, easing = LinearEasing))
+        if (page + 1 < stories) {
+            // Its own coroutine: the page turn itself pauses the timer, which would cancel it here.
+            scope.launch { pager.animateScrollToPage(page + 1) }
+        } else if (!finished) {
+            finished = true
+            AppAnalytics.recapWatched(stories)
+        }
+    }
+
+    fun go(to: Int) {
+        scope.launch { pager.animateScrollToPage(to.coerceIn(0, cards.size - 1)) }
+    }
+
     Column(Modifier.fillMaxSize()) {
-        HorizontalPager(state = pager, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 36.dp), pageSpacing = 14.dp) { page ->
-            val card = cards[page]
+        // Story progress: one segment per story card, filled as each plays.
+        Row(Modifier.fillMaxWidth().padding(horizontal = 36.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(stories) { i ->
+                val fill = when {
+                    i < page || !onStory -> 1f
+                    i == page -> progress.value
+                    else -> 0f
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(SuperfitTheme.colors.textTertiary.copy(alpha = 0.35f))
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(fill)
+                            .background(SuperfitTheme.colors.primaryAccent)
+                    )
+                }
+            }
+        }
+        HorizontalPager(state = pager, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 36.dp), pageSpacing = 14.dp) { index ->
+            val card = cards[index]
             val words = state.words[card.id] ?: return@HorizontalPager
             if (card is RecapCard.Setup) {
                 SetupPage(card, onOpenSettings, onChanged)
             } else {
-                SharePage(card, words, month)
+                val reveal = when {
+                    index != page -> if (index < page) RecapReveal.Full else RecapReveal.Waiting
+                    else -> RecapReveal.Playing
+                }
+                CompositionLocalProvider(LocalRecapReveal provides reveal) {
+                    SharePage(
+                        card,
+                        words,
+                        month,
+                        onSharing = { sharing = it },
+                        tapModifier = Modifier.pointerInput(index) {
+                            detectTapGestures(
+                                onPress = {
+                                    held = true
+                                    tryAwaitRelease()
+                                    held = false
+                                },
+                                onTap = { at -> go(if (at.x < size.width / 3f) index - 1 else index + 1) }
+                            )
+                        }
+                    )
+                }
             }
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            cards.indices.forEach { i ->
-                Box(
-                    Modifier
-                        .padding(horizontal = 3.dp)
-                        .size(if (i == pager.currentPage) 9.dp else 7.dp)
-                        .clip(CircleShape)
-                        .background(if (i == pager.currentPage) SuperfitTheme.colors.primaryAccent else SuperfitTheme.colors.textTertiary)
-                )
+        if (cards.size > stories) {
+            TextButton(onClick = { go(cards.size - 1) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text("Get more from Superfit", color = SuperfitTheme.colors.textSecondary, fontWeight = FontWeight.Bold)
             }
+        } else {
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth) {
+private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth, onSharing: (Boolean) -> Unit, tapModifier: Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
     var busy by remember { mutableStateOf(false) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        CapturableStory(layer, Modifier.fillMaxWidth()) { RecapStory(card, words, month) }
+        CapturableStory(layer, Modifier.fillMaxWidth().then(tapModifier)) { RecapStory(card, words, month) }
         Button(
             onClick = {
                 busy = true
+                onSharing(true)
                 scope.launch {
                     try {
                         shareImage(context, layer.toImageBitmap().asAndroidBitmap())
@@ -194,6 +320,7 @@ private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth) {
                         Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
                     } finally {
                         busy = false
+                        onSharing(false)
                     }
                 }
             },

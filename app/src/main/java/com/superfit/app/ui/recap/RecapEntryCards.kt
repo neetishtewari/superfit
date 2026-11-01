@@ -33,7 +33,7 @@ import java.time.YearMonth
 private val RecapAmber = Color(0xFFF2A33A)
 private val RecapInk = Color(0xFF14201B)
 
-/** "Your October is ready": on Home from the 1st, and at the top of Progress for the first week. */
+/** "Your October review is ready": on Home from the 1st, and at the top of Progress for the first week. */
 @Composable
 fun RecapReadyCard(month: YearMonth, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     Row(
@@ -48,7 +48,7 @@ fun RecapReadyCard(month: YearMonth, onOpen: () -> Unit, modifier: Modifier = Mo
         Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = RecapInk, modifier = Modifier.size(28.dp))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text("Your ${monthName(month)} is ready", color = RecapInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("Your ${monthName(month)} review is ready", color = RecapInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             Text("Your month in a few cards worth sharing.", color = RecapInk.copy(alpha = 0.8f), fontSize = 13.sp)
         }
         Button(
