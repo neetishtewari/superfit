@@ -1,5 +1,8 @@
 package com.superfit.app.ui.recap
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +22,9 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +40,7 @@ import com.superfit.app.R
 import com.superfit.app.domain.ActivityPatterns
 import com.superfit.app.domain.BodyArea
 import com.superfit.app.domain.MonthlyRecap
+import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
@@ -42,6 +49,29 @@ import com.superfit.app.theme.Manrope
 import java.time.YearMonth
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
+
+/**
+ * How far the card's numbers and bars have grown, 0-1. The playing recap counts them up as each card
+ * comes on screen; everywhere else (and every shared picture) shows them in full.
+ */
+val LocalRecapReveal = compositionLocalOf { RecapReveal.Full }
+
+enum class RecapReveal { Full, Waiting, Playing }
+
+/** 0 to 1 over a second once the card is playing; 1 straight away when it isn't animated. */
+@Composable
+private fun revealFraction(): Float {
+    val reveal = LocalRecapReveal.current
+    val progress = remember { Animatable(if (reveal == RecapReveal.Full) 1f else 0f) }
+    LaunchedEffect(reveal) {
+        when (reveal) {
+            RecapReveal.Full -> progress.snapTo(1f)
+            RecapReveal.Playing -> progress.animateTo(1f, tween(1_100, easing = FastOutSlowInEasing))
+            RecapReveal.Waiting -> Unit
+        }
+    }
+    return progress.value
+}
 
 /** A recap card's own colours: background, main text, soft text and the accent for bars and numbers. */
 private data class StoryPalette(val bg: Color, val text: Color, val soft: Color, val accent: Color, val track: Color)
@@ -270,7 +300,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
         is RecapCard.Rhythm -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             val r = card.rhythm
             if (r.hour != null) {
-                Big(ActivityPatterns.hourLabel(r.hour), "person", p)
+                Big(ActivityPatterns.hourLabel(r.hour), "person", p, countUp = false)
                 Small("${r.workoutsNearHour} of ${r.workoutsTimed} workouts started around then", p, bold = true)
             }
             r.bestDay?.let { d ->
@@ -331,9 +361,11 @@ private fun CalorieMoment(card: RecapCard.Calories, p: StoryPalette) {
 }
 
 @Composable
-private fun Big(value: String, unit: String, p: StoryPalette) {
+private fun Big(value: String, unit: String, p: StoryPalette, countUp: Boolean = true) {
+    val f = revealFraction()
+    val shown = RecapAutoplay.parse(value)?.takeIf { countUp && RecapAutoplay.worthCounting(it) }?.let { RecapAutoplay.format(it, f) } ?: value
     Row(verticalAlignment = Alignment.Bottom) {
-        Text(value, color = p.text, fontFamily = Manrope, fontSize = 76.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 1.em)
+        Text(shown, color = p.text, fontFamily = Manrope, fontSize = 76.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 1.em)
         Spacer(Modifier.width(6.dp))
         Text(unit, color = p.text, fontFamily = Manrope, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
     }
@@ -346,6 +378,7 @@ private fun Small(text: String, p: StoryPalette, bold: Boolean = false) {
 
 @Composable
 private fun Bar(fraction: Float, p: StoryPalette, modifier: Modifier = Modifier) {
+    val grown = fraction * revealFraction()
     Box(
         modifier
             .fillMaxWidth()
@@ -356,7 +389,7 @@ private fun Bar(fraction: Float, p: StoryPalette, modifier: Modifier = Modifier)
         Box(
             Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(fraction.coerceIn(0.03f, 1f))
+                .fillMaxWidth(grown.coerceIn(0.03f, 1f))
                 .clip(RoundedCornerShape(50))
                 .background(p.accent)
         )
