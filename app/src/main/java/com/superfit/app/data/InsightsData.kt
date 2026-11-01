@@ -2,6 +2,8 @@ package com.superfit.app.data
 
 import com.superfit.app.domain.ActivityFact
 import com.superfit.app.domain.DayTotals
+import com.superfit.app.domain.DietScoreEngine
+import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.WorkoutView
 import java.time.Instant
 import java.time.LocalDate
@@ -34,9 +36,11 @@ object InsightsData {
                 proteinG = dayMeals.sumOf { it.proteinG },
                 proteinTargetG = proteinTargetG,
                 steps = steps[date] ?: 0,
-                workouts = imported[date].orEmpty().map { ActivityFact.of(it) } + voice[date].orEmpty().map { w ->
-                    ActivityFact(title = w.description, minutes = 0, distanceKm = null, kcal = w.caloriesBurned, paceSecondsPerKm = null, isRun = false)
-                }
+                workouts = imported[date].orEmpty().map { ActivityFact.of(it, zone) } + voice[date].orEmpty().map { w ->
+                    ActivityFact(title = w.description, minutes = 0, distanceKm = null, kcal = w.caloriesBurned, paceSecondsPerKm = null, isRun = false, reps = w.repsCount.coerceAtLeast(0))
+                },
+                mealRating = dayMeals.mapNotNull { m -> MealTags.decode(m.qualityTags)?.takeIf { !it.estimated }?.let { DietScoreEngine.mealRating(m, it).toDouble() } }
+                    .takeIf { it.isNotEmpty() }?.average()
             )
         }
     }

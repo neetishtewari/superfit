@@ -49,9 +49,7 @@ object RecapWriter {
             card.helped.takeIf { it.isNotEmpty() }?.joinToString("; ", "Helped: ") { "${it.title} (${it.detail})" },
             card.held.takeIf { it.isNotEmpty() }?.joinToString("; ", "Held back: ") { "${it.title} (${it.detail})" }
         ).joinToString(". ")
-        is RecapCard.OnRepeat ->
-            "Most-logged food: ${card.food}, in ${card.times} meals." +
-                (card.verdict?.let { " Usually rated by the app's nutritionist as: ${it.label}." } ?: "")
+        is RecapCard.Calories -> calorieFacts(card.sources)
         is RecapCard.Macros -> listOfNotNull(
             "Protein averaged ${card.proteinPct}% of the daily goal on logged days.",
             if (card.weekdayProteinPct != null && card.weekendProteinPct != null) "Weekdays ${card.weekdayProteinPct}%, weekends ${card.weekendProteinPct}%." else null,
@@ -72,10 +70,57 @@ object RecapWriter {
             "No strength sessions logged this month" + (if (card.km >= 1) ", while doing ${fmt(card.km)} km of cardio" else "") +
                 ". Strength training twice a week helps keep muscle. They may already lift and just not log it: they can say it into the mic."
         } else {
-            "${card.sessions} strength sessions this month" + (if (card.prevSessions > 0) ", ${card.prevSessions} last month." else ".")
+            "${card.sessions} strength sessions this month" + (if (card.prevSessions > 0) ", ${card.prevSessions} last month." else ".") +
+                (card.detail?.let { strengthFacts(it) } ?: "")
+        }
+        is RecapCard.Heart -> card.change.let { h ->
+            "On ${h.activity}s, average pace ${MonthlyRecap.pace(h.paceNow)} per km (last month ${MonthlyRecap.pace(h.pacePrev)}), " +
+                "average heart rate ${h.bpmNow} bpm, down from ${h.bpmPrev} last month: ${h.bpmDrop} beats a minute lower at the same pace or faster, a sign of getting fitter."
+        }
+        is RecapCard.Reps -> card.totals.let { r ->
+            "${num(r.total)} reps of exercises logged by voice this month" + (if (r.prev > 0) " (last month ${num(r.prev)})." else ".") +
+                (r.top?.let { " Most of them: ${num(it.second)} ${it.first}." } ?: "")
+        }
+        is RecapCard.Rhythm -> card.rhythm.let { r ->
+            listOfNotNull(
+                r.hour?.let { "${r.workoutsNearHour} of ${r.workoutsTimed} workouts started around ${ActivityPatterns.hourLabel(it)}." },
+                r.bestDay?.let { "${dayName(it)} is their biggest step day: ${num(r.bestDaySteps)} steps on average, against ${num(r.avgSteps)} on a usual day." }
+            ).joinToString(" ")
         }
         is RecapCard.Setup -> ""
     }
+
+    /** The top 5 by calories and the treat rule, said so the AI can't turn it around. */
+    fun calorieFacts(c: CalorieSources): String = buildString {
+        append("Top foods by calories added this month (not by how often): ")
+        append(c.top.mapIndexed { i, f -> "${i + 1}. ${f.name} ${num(f.kcal)} kcal (${f.times} times, ${f.pct}% of calories${if (f.isTreat) ", a treat" else ""})" }.joinToString("; "))
+        append(". ")
+        val b = c.biggestTreat
+        when {
+            b == null && c.surelyNoTreats -> append("No treat foods this month: good news.")
+            b == null -> Unit
+            c.treatRank != null -> {
+                append("Biggest treat food: ${b.name}, ${num(b.treatKcal)} kcal in ${b.times} sittings, and it IS in the top 5 at number ${c.treatRank}")
+                c.outweighs?.let { append(", more calories than ${it.name} logged ${it.times} times") }
+                append(". Be honest that this works against the goal.")
+                c.swap?.let { append(" A swap idea: ${it.alternative}.") }
+            }
+            else -> append("Biggest treat food: ${b.name}, ${num(b.treatKcal)} kcal, and it is NOT in the top 5: good news, everyday food made up most calories.")
+        }
+        c.mostLogged?.takeIf { m -> c.top.firstOrNull()?.key != m.key }?.let { append(" Most-logged food: ${it.name}, ${it.times} times.") }
+    }
+
+    /** How often, how long and what was trained, only from what the user said when logging. */
+    fun strengthFacts(d: StrengthDetail): String = listOfNotNull(
+        " That is ${d.perWeekText()}.",
+        if (d.timedSessions > 0) " ${d.minutes} minutes in total across the ${d.timedSessions} sessions with a time logged." else null,
+        if (d.areas.isNotEmpty()) " Of the ${d.taggedSessions} sessions that said what was trained: ${StrengthSessions.areasText(d)}." else null,
+        d.missing?.let { " No ${it.label} sessions were logged: suggest adding one a week for balance, or logging it if they already train it." }
+    ).joinToString("")
+
+    private fun num(v: Int) = String.format(Locale.US, "%,d", v)
+
+    private fun dayName(d: java.time.DayOfWeek) = d.getDisplayName(java.time.format.TextStyle.FULL, Locale.US) + "s"
 
     /** Reads the AI's words; any card it skipped or got wrong keeps the plain wording. */
     fun parse(json: String, recap: MonthRecap): Map<String, RecapWords> {
@@ -98,7 +143,18 @@ object RecapWriter {
             else -> RecapWords("Your goal", "${fmt(card.kgDone)} of ${fmt(card.kgTotal)} kg done so far." + (card.eta?.let { " At this pace you get there around ${it.format(etaFormat)}." } ?: ""))
         }
         is RecapCard.Needle -> RecapWords("What moved the needle", (card.helped.map { it.title } + card.held.map { it.title }).joinToString(". ") + ".")
-        is RecapCard.OnRepeat -> RecapWords("On repeat", "Your most-logged food this month." + (card.verdict?.let { " Usually: ${it.label.lowercase(Locale.getDefault())}." } ?: ""))
+        is RecapCard.Calories -> card.sources.let { c ->
+            val b = c.biggestTreat
+            RecapWords(
+                "Where your calories came from",
+                when {
+                    b != null && c.treatRank != null -> "${b.name} made your top 5, at number ${c.treatRank}. " + (c.swap?.let { "Try ${it.alternative.lowercase(Locale.getDefault())} next month." } ?: "An easy win for next month.")
+                    b != null -> "Your biggest treat, ${b.name.lowercase(Locale.getDefault())}, stayed out of your top 5. Everyday food did the heavy lifting."
+                    c.surelyNoTreats -> "No treat foods this month. Everyday food did all the work."
+                    else -> "Your five biggest calorie foods this month."
+                }
+            )
+        }
         is RecapCard.Macros -> RecapWords(
             "Your macros",
             if (card.weekdayProteinPct != null && card.weekendProteinPct != null && abs(card.weekdayProteinPct - card.weekendProteinPct) >= 15) {
@@ -113,8 +169,15 @@ object RecapWriter {
         is RecapCard.Strength -> if (card.sessions == 0) {
             RecapWords("Strength sessions logged", "Two short strength sessions a week help keep muscle while you lose fat.")
         } else {
-            RecapWords("Strength sessions", "Keep it going: strength work keeps muscle while you lose fat.")
+            RecapWords(
+                "Strength sessions",
+                card.detail?.missing?.let { "Only ${if (it == BodyArea.LOWER) "upper" else "lower"} body logged. Add a ${if (it == BodyArea.LOWER) "leg" else "upper body"} day, or say it when you log it." }
+                    ?: "Keep it going: strength work keeps muscle while you lose fat."
+            )
         }
+        is RecapCard.Heart -> RecapWords("Fitter heart", "Same pace or faster, ${card.change.bpmDrop} beats a minute lower than last month.")
+        is RecapCard.Reps -> RecapWords("Reps this month", if (card.totals.prev > 0 && card.totals.total > card.totals.prev) "Up from ${num(card.totals.prev)} last month." else "Every rep you said out loud, added up.")
+        is RecapCard.Rhythm -> RecapWords("Your moving rhythm", card.rhythm.bestDay?.let { "${dayName(it)} are your big step days." } ?: "You've got a routine going.")
         is RecapCard.Setup -> RecapWords("Make next month's recap smarter", "Only what's missing is listed.")
     }
 

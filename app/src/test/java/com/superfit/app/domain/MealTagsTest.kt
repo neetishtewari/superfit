@@ -29,6 +29,16 @@ class MealTagsTest {
     }
 
     @Test
+    fun `treat items survive saving and loading`() {
+        val tags = MealTags(1, false, false, 1.0, 5.0, treat = false, foodType = "thali", treatItems = listOf("gulab jamun", "jalebi"))
+        assertEquals(listOf("gulab jamun", "jalebi"), MealTags.decode(tags.encode())!!.treatItems)
+        assertEquals(emptyList<String>(), MealTags.decode(tags.copy(treatItems = emptyList()).encode())!!.treatItems)
+        assertNull(MealTags.decode(tags.copy(treatItems = null).encode())!!.treatItems)
+        val json = JSONObject("""{"processing":1,"treatItems":["Gulab Jamun"]}""")
+        assertEquals(listOf("gulab jamun"), MealTags.fromJson(json)!!.treatItems)
+    }
+
+    @Test
     fun `reads the AI's meal answer`() {
         val json = JSONObject("""{"foodText":"veg burger","calories":450,"processing":3,"fried":false,"addedSugar":false,"vegFruitServings":0.5,"fiber":4,"treat":true,"foodType":"Burger"}""")
         val tags = MealTags.fromJson(json)!!
