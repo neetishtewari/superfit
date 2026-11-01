@@ -221,7 +221,8 @@ object MonthlyRecap {
         val rated = meals.mapNotNull { m -> MealTags.decode(m.qualityTags)?.takeIf { !it.estimated }?.let { m to DietScoreEngine.mealRating(m, it) } }
         fun names(list: List<Pair<NutritionEntryEntity, Int>>) = list.map { mealName(it.first) }.distinctBy { it.lowercase() }
         val good = names(rated.filter { it.second >= 8 }.sortedByDescending { it.second }).take(3)
-        val rethink = names(rated.filter { it.second <= 4 }.sortedBy { it.second }).take(2)
+        // A small taste (a teaspoon of cake) is portion control, never a choice to rethink.
+        val rethink = names(rated.filter { it.second <= 4 && it.first.calories >= CalorieSourcesEngine.SMALL_TASTE_KCAL }.sortedBy { it.second }).take(2)
         if (good.isEmpty() && rethink.isEmpty()) return null
         return RecapCard.Choices(good, rethink)
     }

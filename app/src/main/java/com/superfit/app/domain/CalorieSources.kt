@@ -62,6 +62,13 @@ object CalorieSourcesEngine {
 
     private const val TOP = 5
 
+    /**
+     * A treat food under this many kcal in one sitting is a small taste (a teaspoon of birthday
+     * cake, one square of chocolate): portion control, never counted against the user. Same line
+     * as the treat-by-portion rule.
+     */
+    const val SMALL_TASTE_KCAL = 150.0
+
     fun build(meals: List<NutritionEntryEntity>): CalorieSources? {
         val perMeal = meals.filter { it.calories > 0 }.map { meal -> meal to parts(meal) }
         val total = perMeal.sumOf { it.first.calories }
@@ -127,7 +134,7 @@ object CalorieSourcesEngine {
 
         if (items.isEmpty()) {
             val name = shortName(meal.foodText)
-            return listOf(MealPart(key(name), name, meal.calories, isTreat(name, single = true)))
+            return listOf(MealPart(key(name), name, meal.calories, meal.calories >= SMALL_TASTE_KCAL && isTreat(name, single = true)))
         }
         val weights = items.map { (it.kcal * it.qty).coerceAtLeast(0.0) }
         val sum = weights.sum()
@@ -135,7 +142,8 @@ object CalorieSourcesEngine {
         return items.mapIndexed { i, item ->
             val share = if (sum > 0) weights[i] / sum else 1.0 / items.size
             val name = item.name.trim().replaceFirstChar { it.titlecase(Locale.getDefault()) }
-            MealPart(key(item.name), name, meal.calories * share, isTreat(item.name, single))
+            val kcal = meal.calories * share
+            MealPart(key(item.name), name, kcal, kcal >= SMALL_TASTE_KCAL && isTreat(item.name, single))
         }
     }
 

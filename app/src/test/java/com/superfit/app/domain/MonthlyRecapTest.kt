@@ -93,6 +93,16 @@ class MonthlyRecapTest {
     }
 
     @Test
+    fun aSmallTasteIsNeverAChoiceToRethink() {
+        val meals = listOf(
+            meal(october.atDay(1), "dal", 9, "Dal, roti and salad"),
+            meal(october.atDay(2), "cake", 2, "1 tsp birthday cake").copy(calories = 40.0)
+        )
+        val card = MonthlyRecap.choices(meals)!!
+        assertTrue(card.rethink.isEmpty())
+    }
+
+    @Test
     fun choicesNameTheBestAndLowestRatedMeals() {
         val meals = listOf(
             meal(october.atDay(1), "dal", 9, "Dal, roti and salad"),

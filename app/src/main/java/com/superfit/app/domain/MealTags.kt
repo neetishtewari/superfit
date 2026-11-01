@@ -169,6 +169,8 @@ data class MealTags(
                 "Don't mark a home meal down for being a little low in protein; protein is judged separately over the day. " +
                 "Judge supplements and packaged foods by what they do for this person: whey or a protein shake that helps reach the protein goal is about 8. " +
                 "Treats and fast food are 2-4, fried snacks 3-4, sugary drinks 2. " +
+                "But a small taste eaten for portion control (a teaspoon or a bite or two of cake, one small piece of mithai, a square of chocolate) " +
+                "is not a treat and rates 6-7: logging it is a good habit, never a problem. " +
                 "Use the person's goal, targets, own nutritionist's advice and approved foods given with the meal; their nutritionist's advice outranks these rules. " +
                 "The \"why\" sentence should explain the rating in plain words, mentioning the amount when it matters.\n" +
                 "- \"verdict\": String, one of: \"great\" (a choice that helps their goal), \"good\" (fine, normal food), " +

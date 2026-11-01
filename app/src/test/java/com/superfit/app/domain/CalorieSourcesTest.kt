@@ -74,6 +74,14 @@ class CalorieSourcesTest {
     }
 
     @Test
+    fun aTeaspoonOfCakeIsPortionControlNotTreatCalories() {
+        val taste = meal(40.0, item("birthday cake", 40.0), tags = tags("treat", treat = true, treatItems = listOf("birthday cake")))
+        assertFalse(CalorieSourcesEngine.parts(taste).single().treat)
+        val c = CalorieSourcesEngine.build(listOf(taste) + (1..5).map { meal(300.0, item("dal", 300.0)) })!!
+        assertNull(c.biggestTreat)
+    }
+
+    @Test
     fun foodsMarkedFineForMeNeverCountAsTreats() {
         PersonalNutrition.approvedFoods = setOf("dark chocolate")
         val parts = CalorieSourcesEngine.parts(meal(150.0, item("dark chocolate", 150.0), tags = tags("treat", treat = true, treatItems = listOf("dark chocolate"))))

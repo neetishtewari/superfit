@@ -19,6 +19,9 @@ treat stays out of the top 5.
 - Treat calories: an item counts when the AI listed it in the meal's new `treatItems`. Meals rated
   before `treatItems` existed only count when the meal is a single food and its verdict is Treat or
   Avoid for now. Foods marked "Fine for me" never count.
+- Small tastes: a treat food under 150 kcal in one sitting (a teaspoon of birthday cake) is portion
+  control and never counts as treat calories or as a recap "worth a rethink" meal; the AI is told such
+  tastes rate 6-7 (Neetish, 2026-11-01).
 - The rule:
   - biggest treat NOT in the top 5: good news ("Treats stayed small");
   - biggest treat IN the top 5: honest heads-up with its rank, the everyday food it outweighs and the
