@@ -61,20 +61,35 @@ class MonthlyRecapTest {
     @Test
     fun cardsComeInStoryOrderAndEmptyOnesAreLeftOut() {
         val days = month { d -> day(d) }
-        val meals = (1..20).map { meal(october.atDay(it), if (it % 2 == 0) "dal" else "poha", 8) }
+        val meals = (1..21).map { meal(october.atDay(it), listOf("dal", "poha", "upma")[it % 3], 8) }
         val r = recap(days, meals, setup = allSet.copy(widget = false))!!
         val ids = r.cards.map { it.id }
-        assertEquals(listOf("needle", "repeat", "macros", "choices", "moving", "strength", "setup"), ids)
+        assertEquals(listOf("needle", "calories", "macros", "choices", "moving", "strength", "setup"), ids)
         assertTrue(ids.none { it == "goal" || it == "faster" })
     }
 
     @Test
-    fun onRepeatIsTheMostLoggedFoodWithItsUsualVerdict() {
-        val meals = (1..12).map { meal(october.atDay(it), "dal", 8) } + (1..4).map { meal(october.atDay(it), "samosa", 3) }
-        val card = MonthlyRecap.onRepeat(meals)!!
-        assertEquals("Dal", card.food)
-        assertEquals(12, card.times)
-        assertEquals(FoodVerdict.GREAT, card.verdict)
+    fun caloriesCardRanksFoodsByCaloriesNotByCount() {
+        val days = month { d -> day(d) }
+        val chai = (1..20).map { meal(october.atDay(it), "chai", 7, "Chai").copy(calories = 70.0) }
+        val pizza = (1..4).map { meal(october.atDay(it), "pizza", 3, "Pizza").copy(calories = 800.0) }
+        val dal = (1..10).map { meal(october.atDay(it), "dal", 8, "Dal").copy(calories = 300.0) }
+        val r = recap(days, chai + pizza + dal)!!
+        val card = r.cards.filterIsInstance<RecapCard.Calories>().single()
+        assertEquals(listOf("Pizza", "Dal", "Chai"), card.sources.top.map { it.name })
+        assertEquals("Chai", card.sources.mostLogged?.name)
+    }
+
+    @Test
+    fun walksAtTheSamePaceWithALowerHeartRateMakeAHeartCard() {
+        fun walk(bpm: Long) = ActivityFact("Walk", 60, 5.0, 250.0, 720, isRun = false, avgHeartRate = bpm)
+        val days = (1..30).associate { i ->
+            val sep = october.atDay(1).minusDays(i.toLong())
+            sep to day(sep, workouts = if (i % 5 == 0) listOf(walk(120)) else emptyList())
+        } + month { d -> day(d, workouts = if (d.dayOfMonth % 5 == 0) listOf(walk(112)) else emptyList()) }
+        val card = recap(days)!!.cards.filterIsInstance<RecapCard.Heart>().single()
+        assertEquals(8, card.change.bpmDrop)
+        assertEquals("walk", card.change.activity)
     }
 
     @Test

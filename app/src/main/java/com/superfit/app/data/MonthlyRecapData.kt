@@ -29,7 +29,9 @@ object MonthlyRecapData {
 
     private const val KEY_OPENED = "recap_opened_" // + yyyy-MM -> the date it was first opened
     private const val KEY_NOTIFIED = "recap_notified_month"
-    private const val KEY_WORDS = "recap_words_" // + yyyy-MM_STYLE -> JSON
+
+    // v2: the calorie and new activity cards need their own words, so saved months are written again once.
+    private const val KEY_WORDS = "recap_words_v2_" // + yyyy-MM_STYLE -> JSON
     private const val LAST_HOME_DAY = 10
     private const val DAYS_AFTER_OPENING = 2
 

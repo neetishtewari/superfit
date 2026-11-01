@@ -8,7 +8,7 @@ class MealTagger {
 
     suspend fun tag(entries: List<NutritionEntryEntity>): Map<Long, MealTags> {
         if (entries.isEmpty()) return emptyMap()
-        val list = entries.mapIndexed { i, e -> "${i + 1}. ${e.foodText} (${e.calories.toInt()} kcal)" }.joinToString("\n")
+        val list = entries.mapIndexed { i, e -> "${i + 1}. ${e.foodText} (${e.calories.toInt()} kcal)" + itemsNote(e) }.joinToString("\n")
         val response = GeminiClient.generateContent(
             prompt = PersonalNutrition.promptContext() + "Meals:\n$list",
             systemInstructionText = SYSTEM_INSTRUCTION,
@@ -28,6 +28,11 @@ class MealTagger {
     }
 
     companion object {
+        /** The meal's item names, so the AI's "treatItems" use the same names. */
+        fun itemsNote(e: NutritionEntryEntity): String =
+            MealItems.decode(e.items)?.items?.map { it.name }?.filter { it.isNotBlank() }?.takeIf { it.size > 1 }
+                ?.joinToString(", ", " [items: ", "]") ?: ""
+
         val SYSTEM_INSTRUCTION =
             "You are a nutrition expert. For each numbered meal, describe what kind of food it is.\n" +
                 "Return a raw JSON object {\"meals\": [ ... ]} with one object per meal, in the same order, each with:\n" +

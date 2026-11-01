@@ -52,10 +52,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.BodyReadings
 import com.superfit.app.domain.BodySummary
+import com.superfit.app.domain.CalorieFood
+import com.superfit.app.domain.CalorieSources
+import com.superfit.app.domain.CalorieSourcesEngine
 import com.superfit.app.domain.ForecastStatus
 import com.superfit.app.domain.GoalForecast
 import com.superfit.app.domain.Insight
@@ -66,6 +70,7 @@ import com.superfit.app.domain.WeekReport
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
+import com.superfit.app.theme.ThemeAmberSoft
 import com.superfit.app.theme.ThemeCardBg
 import com.superfit.app.theme.ThemeCardBgTranslucent
 import com.superfit.app.theme.ThemeGlassBorder
@@ -191,6 +196,8 @@ fun InsightsTab(
             }
         }
 
+        report.calories?.let { CalorieSourcesCard(it, days = 7) }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -202,6 +209,86 @@ fun InsightsTab(
             ExpandRow("Personal bests", content = bests)
             ExpandRow("All trends", "steps, sleep, protein, streaks", content = trends)
             ShareWithCoachRow(onShareWithCoach)
+        }
+    }
+}
+
+/** The week's top 5 foods by calories added, each with how often and its share; treats tagged amber. */
+@Composable
+private fun CalorieSourcesCard(c: CalorieSources, days: Int) {
+    SectionCard {
+        SectionLabel("Where your calories came from")
+        val biggest = c.top.maxOf { it.kcal }.coerceAtLeast(1)
+        c.top.forEachIndexed { i, food -> CalorieFoodRow(i + 1, food, biggest, days) }
+        val treatLine = when {
+            c.biggestTreat != null -> {
+                val b = c.biggestTreat!!
+                val share = if (c.totalKcal > 0) (c.treatKcal * 100.0 / c.totalKcal).roundToInt() else 0
+                "Treat foods: ${InsightsEngine.kcal(c.treatKcal.toDouble())} kcal this week ($share%). Biggest: ${b.name.lowercase(Locale.getDefault())}, ${b.times} ${if (b.times == 1) "time" else "times"}."
+            }
+            c.surelyNoTreats -> "No treat foods this week."
+            else -> null
+        }
+        Text(
+            listOfNotNull("From ${InsightsEngine.kcal(c.totalKcal.toDouble())} kcal logged.", treatLine).joinToString(" "),
+            fontSize = 12.sp,
+            color = ThemeTextSecondary
+        )
+    }
+}
+
+@Composable
+private fun CalorieFoodRow(rank: Int, food: CalorieFood, max: Int, days: Int) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("$rank", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = ThemeTextSecondary, modifier = Modifier.width(20.dp))
+            Text(
+                food.name,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemeTextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (food.isTreat) {
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Treat",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = SolarAmber,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(ThemeAmberSoft)
+                        .padding(horizontal = 8.dp, vertical = 1.dp)
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Text(InsightsEngine.kcal(food.kcal.toDouble()), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary)
+        }
+        val often = CalorieSourcesEngine.howOften(food.times, days)
+        Text(
+            "${food.times} ${if (food.times == 1) "time" else "times"}${often?.let { ", $it" } ?: ""} · ${food.pct}%",
+            fontSize = 12.sp,
+            color = ThemeTextSecondary,
+            modifier = Modifier.padding(start = 20.dp)
+        )
+        Box(
+            Modifier
+                .padding(start = 20.dp)
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(50))
+                .background(ThemeTextPrimary.copy(alpha = 0.06f))
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth((food.kcal.toFloat() / max).coerceIn(0.03f, 1f))
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (food.isTreat) SolarAmber else NeonMint)
+            )
         }
     }
 }

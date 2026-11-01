@@ -369,7 +369,7 @@ class HistoryViewModel(
             }
             allMeals = allNutrition
             val loseGoal = profile.targetWeightKg < profile.startingWeightKg
-            weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal)
+            weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal, allNutrition)
             goalTargetDate = GoalDatePref.get(sharedPrefs)
             val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
             goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5

@@ -37,7 +37,12 @@ data class MealTags(
     /** [PersonalNutrition.adviceVersion] when the meal was rated, so new advice re-rates recent meals. */
     val adviceVersion: String? = null,
     /** The AI's plain verdict for the person: great, good, portion, treat or avoid (see [FoodVerdict]). */
-    val verdict: String? = null
+    val verdict: String? = null,
+    /**
+     * The foods in this meal (by item name, lower case) that are the treat or best avoided, e.g. the
+     * gulab jamun in a home thali. Null for meals rated before this existed; empty when none is.
+     */
+    val treatItems: List<String>? = null
 ) {
     /** True when the AI also gave its reason and swap, which meals tagged before those existed lack. */
     val hasAdvice: Boolean get() = why != null
@@ -70,7 +75,8 @@ data class MealTags(
             if (fruitServings > 0) "fs=${String.format(Locale.US, "%.1f", fruitServings)}" else null,
             if (vegKinds > 0) "vk=$vegKinds" else null,
             adviceVersion?.let { "av=${clean(it, 8)}" },
-            verdict?.let { "vd=${clean(it, 10)}" }
+            verdict?.let { "vd=${clean(it, 10)}" },
+            treatItems?.let { list -> "ti=" + list.joinToString(";") { clean(it.replace(';', ' '), 40) } }
         )
     ).joinToString("|")
 
@@ -100,7 +106,8 @@ data class MealTags(
                 fruitServings = fields["fs"]?.toDoubleOrNull() ?: 0.0,
                 vegKinds = fields["vk"]?.toIntOrNull() ?: 0,
                 adviceVersion = fields["av"],
-                verdict = fields["vd"]?.takeIf { it in FoodVerdict.KEYS }
+                verdict = fields["vd"]?.takeIf { it in FoodVerdict.KEYS },
+                treatItems = fields["ti"]?.let { raw -> raw.split(';').map { it.trim() }.filter { it.isNotEmpty() } }
             )
         }
 
@@ -129,7 +136,10 @@ data class MealTags(
                 fruitServings = json.optDouble("fruitServings", 0.0).takeIf { !it.isNaN() }?.coerceIn(0.0, 10.0) ?: 0.0,
                 vegKinds = json.optInt("vegKinds", 0).coerceIn(0, 15),
                 adviceVersion = if (json.has("rating")) PersonalNutrition.adviceVersion() else null,
-                verdict = json.optString("verdict", "").trim().lowercase().takeIf { it in FoodVerdict.KEYS }
+                verdict = json.optString("verdict", "").trim().lowercase().takeIf { it in FoodVerdict.KEYS },
+                treatItems = json.optJSONArray("treatItems")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i -> arr.optString(i, "").trim().lowercase().takeIf { it.isNotEmpty() && it != "null" } }
+                }
             )
         }
 
@@ -166,6 +176,9 @@ data class MealTags(
                 "\"avoid\" (best skipped completely until their goal is reached, because it works directly against it: for example sugary soft drinks, " +
                 "regular alcohol or deep-fried snacks when losing weight). Use \"avoid\" sparingly, never for normal home food, " +
                 "never for a food on their approved list, and follow their nutritionist's advice.\n" +
+                "- \"treatItems\": Array of Strings: the names of the foods in this meal that are a treat or best avoided, by the rules above, " +
+                "written exactly as in \"items\" when items are given. List them even when the rest of the meal is everyday food, e.g. the " +
+                "gulab jamun in a home thali. Never a food on their approved list. An empty array when no food in the meal is.\n" +
                 "Write all text in English, even when the meal is described in Hindi or another language or script.\n"
 
         /**
