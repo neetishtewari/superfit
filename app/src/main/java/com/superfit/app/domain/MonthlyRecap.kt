@@ -56,7 +56,8 @@ sealed interface RecapCard {
         override val id = "moving"
     }
 
-    data class Strength(val sessions: Int, val prevSessions: Int, val km: Double) : RecapCard {
+    /** [detail] adds how often, how long and what was trained, from whatever the user said when logging. */
+    data class Strength(val sessions: Int, val prevSessions: Int, val km: Double, val detail: StrengthDetail? = null) : RecapCard {
         override val id = "strength"
     }
 
@@ -106,7 +107,7 @@ object MonthlyRecap {
         month: YearMonth,
         days: Map<LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity>,
-        strengthDates: List<LocalDate>,
+        strength: List<StrengthSession>,
         weighIns: List<Pair<LocalDate, Double>>,
         journey: JourneyForecast?,
         goalSet: Boolean,
@@ -124,8 +125,9 @@ object MonthlyRecap {
         val monthMeals = meals.filter { dateOf(it.timestamp, zone).let { d -> !d.isBefore(first) && !d.isAfter(last) } }
         val loggedDates = logged.map { it.date }.toSet()
         val lose = journey?.let { it.targetKg < it.startKg } ?: true
-        val strengthNow = strengthDates.count { !it.isBefore(first) && !it.isAfter(last) }
-        val strengthPrev = strengthDates.count { !it.isBefore(first.minusMonths(1)) && it.isBefore(first) }
+        val strengthMonth = strength.filter { !it.date.isBefore(first) && !it.date.isAfter(last) }
+        val strengthNow = strengthMonth.size
+        val strengthPrev = strength.count { !it.date.isBefore(first.minusMonths(1)) && it.date.isBefore(first) }
 
         val cards = buildList {
             if (goalSet && journey != null) add(goal(journey, weighIns, first, last))
@@ -139,7 +141,7 @@ object MonthlyRecap {
             moving(monthDays, prev, month)?.let { add(it) }
             ActivityPatterns.heart(monthDays.flatMap { it.workouts }, prev.flatMap { it.workouts }, minNow = 3, minBefore = 3)?.let { add(RecapCard.Heart(it)) }
             ActivityPatterns.rhythm(monthDays)?.let { add(RecapCard.Rhythm(it)) }
-            if (strengthNow > 0 || active.isNotEmpty()) add(RecapCard.Strength(strengthNow, strengthPrev, monthDays.sumOf { it.workoutKm }))
+            if (strengthNow > 0 || active.isNotEmpty()) add(RecapCard.Strength(strengthNow, strengthPrev, monthDays.sumOf { it.workoutKm }, StrengthSessions.detail(strengthMonth, month.lengthOfMonth())))
             ActivityPatterns.reps(monthDays.flatMap { it.workouts }, prev.flatMap { it.workouts }, minTotal = 100)?.let { add(RecapCard.Reps(it)) }
             setup(setup, logged.size, month.lengthOfMonth())?.let { add(it) }
         }

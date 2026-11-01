@@ -32,10 +32,12 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.superfit.app.R
 import com.superfit.app.domain.ActivityPatterns
+import com.superfit.app.domain.BodyArea
 import com.superfit.app.domain.MonthlyRecap
 import com.superfit.app.domain.RecapCard
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
+import com.superfit.app.domain.StrengthSessions
 import com.superfit.app.theme.Manrope
 import java.time.YearMonth
 import java.time.format.TextStyle as DateTextStyle
@@ -206,6 +208,31 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
         }
         is RecapCard.Strength -> {
             Big("${card.sessions}", if (card.sessions == 1) "session" else "sessions", p)
+            card.detail?.takeIf { card.sessions > 0 }?.let { d ->
+                Small(
+                    listOfNotNull(d.perWeekText(), if (d.timedSessions > 0) "${d.minutes} min${if (d.timedSessions < card.sessions) "+" else ""}" else null).joinToString(" · "),
+                    p,
+                    bold = true
+                )
+                if (d.areas.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(StrengthSessions.areasText(d), color = p.text, fontFamily = Manrope, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                d.missing?.let { m ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No ${m.label} logged. Add a ${if (m == BodyArea.LOWER) "leg" else "upper body"} day, or say it when you log it.",
+                        color = Color.White,
+                        fontFamily = Manrope,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF14201B))
+                            .padding(horizontal = 12.dp, vertical = 9.dp)
+                    )
+                }
+            }
             if (card.sessions == 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(

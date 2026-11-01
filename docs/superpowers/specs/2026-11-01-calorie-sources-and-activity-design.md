@@ -63,3 +63,13 @@ meal that are a treat or best avoided. Stored as `ti=` in the meal's tags. The r
 
 - Grouping differently named versions of a food ("chai" and "masala chai").
 - "Burned like food" comparisons.
+
+## Strength detail (Neetish, 2026-11-01)
+
+The recap's Strength card says more when the logs say more: how often ("about 2 a week"), total
+minutes (sessions with a known length; "+" when some had none), what was trained ("2 upper body ·
+2 lower body") and a dark nudge when every described session left out upper or lower body ("No
+lower body logged. Add a leg day, or say it when you log it."). Voice-logged strength sessions are
+tagged by one batched AI call (areas only when the log says them, minutes only when stated, never
+guessed), kept in user prefs so each log is tagged once; Health Connect strength sessions give
+minutes only. No database change.

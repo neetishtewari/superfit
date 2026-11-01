@@ -48,7 +48,7 @@ class MonthlyRecapTest {
     private fun recap(
         days: Map<LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity> = emptyList(),
-        strength: List<LocalDate> = emptyList(),
+        strength: List<StrengthSession> = emptyList(),
         setup: RecapSetup = allSet
     ) = MonthlyRecap.build(october, days, meals, strength, emptyList(), journey = null, goalSet = false, setup = setup, zone = utc)
 
@@ -144,6 +144,44 @@ class MonthlyRecapTest {
         val strength = recap(days)!!.cards.filterIsInstance<RecapCard.Strength>().single()
         assertEquals(0, strength.sessions)
         assertEquals(155.0, strength.km, 0.01)
+    }
+
+    @Test
+    fun strengthCardSaysHowOftenHowLongAndWhatWasTrained() {
+        val days = month { d -> day(d) }
+        val sessions = listOf(
+            StrengthSession(october.atDay(2), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(october.atDay(9), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(october.atDay(16), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(october.atDay(23), 40, setOf(BodyArea.UPPER))
+        )
+        val d = recap(days, strength = sessions)!!.cards.filterIsInstance<RecapCard.Strength>().single().detail!!
+        assertEquals(160, d.minutes)
+        assertEquals("about once a week", d.perWeekText())
+        assertEquals("4 upper body", StrengthSessions.areasText(d))
+        assertEquals(BodyArea.LOWER, d.missing)
+    }
+
+    @Test
+    fun bothHalvesTrainedIsNotFlagged() {
+        val d = StrengthSessions.detail(
+            listOf(
+                StrengthSession(october.atDay(1), null, setOf(BodyArea.UPPER)),
+                StrengthSession(october.atDay(4), null, setOf(BodyArea.LOWER)),
+                StrengthSession(october.atDay(8), null, emptySet())
+            ),
+            31
+        )!!
+        assertNull(d.missing)
+        assertEquals(0, d.timedSessions)
+        assertEquals(2, d.taggedSessions)
+    }
+
+    @Test
+    fun strengthTagsAreReadFromTheAiAnswer() {
+        val r = StrengthSessions.parse("""{"logs":[{"n":1,"areas":["upper","core"],"minutes":45},{"n":2,"areas":[],"minutes":null}]}""", 2)
+        assertEquals(setOf(BodyArea.UPPER, BodyArea.CORE) to 45, r[0])
+        assertEquals(emptySet<BodyArea>() to null, r[1])
     }
 
     @Test

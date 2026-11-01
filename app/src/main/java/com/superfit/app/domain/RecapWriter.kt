@@ -70,7 +70,8 @@ object RecapWriter {
             "No strength sessions logged this month" + (if (card.km >= 1) ", while doing ${fmt(card.km)} km of cardio" else "") +
                 ". Strength training twice a week helps keep muscle. They may already lift and just not log it: they can say it into the mic."
         } else {
-            "${card.sessions} strength sessions this month" + (if (card.prevSessions > 0) ", ${card.prevSessions} last month." else ".")
+            "${card.sessions} strength sessions this month" + (if (card.prevSessions > 0) ", ${card.prevSessions} last month." else ".") +
+                (card.detail?.let { strengthFacts(it) } ?: "")
         }
         is RecapCard.Heart -> card.change.let { h ->
             "On ${h.activity}s, average pace ${MonthlyRecap.pace(h.paceNow)} per km (last month ${MonthlyRecap.pace(h.pacePrev)}), " +
@@ -108,6 +109,14 @@ object RecapWriter {
         }
         c.mostLogged?.takeIf { m -> c.top.firstOrNull()?.key != m.key }?.let { append(" Most-logged food: ${it.name}, ${it.times} times.") }
     }
+
+    /** How often, how long and what was trained, only from what the user said when logging. */
+    fun strengthFacts(d: StrengthDetail): String = listOfNotNull(
+        " That is ${d.perWeekText()}.",
+        if (d.timedSessions > 0) " ${d.minutes} minutes in total across the ${d.timedSessions} sessions with a time logged." else null,
+        if (d.areas.isNotEmpty()) " Of the ${d.taggedSessions} sessions that said what was trained: ${StrengthSessions.areasText(d)}." else null,
+        d.missing?.let { " No ${it.label} sessions were logged: suggest adding one a week for balance, or logging it if they already train it." }
+    ).joinToString("")
 
     private fun num(v: Int) = String.format(Locale.US, "%,d", v)
 
@@ -160,7 +169,11 @@ object RecapWriter {
         is RecapCard.Strength -> if (card.sessions == 0) {
             RecapWords("Strength sessions logged", "Two short strength sessions a week help keep muscle while you lose fat.")
         } else {
-            RecapWords("Strength sessions", "Keep it going: strength work keeps muscle while you lose fat.")
+            RecapWords(
+                "Strength sessions",
+                card.detail?.missing?.let { "Only ${if (it == BodyArea.LOWER) "upper" else "lower"} body logged. Add a ${if (it == BodyArea.LOWER) "leg" else "upper body"} day, or say it when you log it." }
+                    ?: "Keep it going: strength work keeps muscle while you lose fat."
+            )
         }
         is RecapCard.Heart -> RecapWords("Fitter heart", "Same pace or faster, ${card.change.bpmDrop} beats a minute lower than last month.")
         is RecapCard.Reps -> RecapWords("Reps this month", if (card.totals.prev > 0 && card.totals.total > card.totals.prev) "Up from ${num(card.totals.prev)} last month." else "Every rep you said out loud, added up.")
