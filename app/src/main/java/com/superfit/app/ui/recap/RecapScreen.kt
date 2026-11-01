@@ -121,7 +121,7 @@ class RecapViewModel(private val repository: DataRepository, private val appCont
 fun RecapScreen(viewModel: RecapViewModel, onBack: () -> Unit, onOpenSettings: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    val music = remember { RecapMusic(context.applicationContext) }
+    val music = remember { RecapMusic(context.applicationContext, viewModel.month) }
     var muted by remember { mutableStateOf(music.muted) }
     DisposableEffect(music) { onDispose { music.release() } }
     Column(

@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import com.superfit.app.R
+import java.time.YearMonth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -12,11 +13,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The recap's background track: an original loop made for Superfit, so there are no rights to clear.
+ * The recap's background track: a different original loop for each month of the year, made for
+ * Superfit (tools/music/recap_music.py), so there are no rights to clear.
  * Plays quietly, fades in and out, and starts muted when the phone is on silent or vibrate, or when
  * another app is already playing music.
  */
-class RecapMusic(private val context: Context) {
+class RecapMusic(private val context: Context, private val month: YearMonth) {
     private var player: MediaPlayer? = null
     private var fade: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
@@ -38,7 +40,7 @@ class RecapMusic(private val context: Context) {
         val p = player ?: runCatching {
             MediaPlayer.create(
                 context,
-                R.raw.recap_music,
+                trackFor(month),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build(),
                 (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).generateAudioSessionId()
             )?.apply { isLooping = true }
@@ -75,6 +77,15 @@ class RecapMusic(private val context: Context) {
         private const val MAX_VOLUME = 0.6f
         private const val PREFS = "superfit_recap_music"
         private const val KEY_MUTED = "muted"
+
+        private val TRACKS = intArrayOf(
+            R.raw.recap_music_01, R.raw.recap_music_02, R.raw.recap_music_03, R.raw.recap_music_04,
+            R.raw.recap_music_05, R.raw.recap_music_06, R.raw.recap_music_07, R.raw.recap_music_08,
+            R.raw.recap_music_09, R.raw.recap_music_10, R.raw.recap_music_11, R.raw.recap_music_12
+        )
+
+        /** The month's own track: January's recap plays January's music. */
+        fun trackFor(month: YearMonth): Int = TRACKS[month.monthValue - 1]
 
         private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 

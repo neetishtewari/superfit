@@ -12,12 +12,11 @@ Asked for by Neetish on 2026-11-01 ("autoplay mode with some bg music, similar t
 - The big number on each card counts up as the card arrives, and its bars grow. Paces and times of day stay as they are. Shared pictures always show the full values.
 
 ## Music
-- One original 40-second loop (`res/raw/recap_music.ogg`, about 640 KB). It was synthesised from scratch by `tools/music/recap_music.py`, so there are no rights to clear and it is safe in shared videos later.
+- Every month has its own original loop (Neetish, 2026-11-01): `res/raw/recap_music_01..12.ogg`, about 300 KB each and 3.5 MB in total. Each one has its own key, tempo, chords, groove and mood, for example a fresh start in January, sunny in June, cosy in October and festive in December. They were synthesised from scratch by `tools/music/recap_music.py`, so there are no rights to clear and they are safe in shared videos later.
 - It plays quietly at 60% volume and fades in and out. It pauses with the story and stops when the recap is closed.
 - It starts muted when the phone is on silent or vibrate, when the media volume is 0, or when another app is playing music. Otherwise it follows the speaker button in the header, which is remembered.
 - It uses Android's own MediaPlayer, so there is no new library and no new permission.
 
 ## Later
 - Save the recap as a video with the music, for Instagram and WhatsApp.
-- A track per coach style.
 - Optional meal photos (opt-in).
