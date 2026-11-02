@@ -159,6 +159,8 @@ fun RecapStory(card: RecapCard, words: RecapWords, month: YearMonth, modifier: M
                 autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 17.sp)
             )
         }
+        // Keeps the longest lines clear of the badge.
+        Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
@@ -270,7 +272,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             if (card.sessions == 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Already lifting? Tap the mic and say it, like \"30 minutes of weights\".",
+                    "Next month's side quest: two strength sessions a week.",
                     color = Color.White,
                     fontFamily = Manrope,
                     fontSize = 12.sp,
