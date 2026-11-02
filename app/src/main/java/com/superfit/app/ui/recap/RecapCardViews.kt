@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.superfit.app.R
 import com.superfit.app.domain.ActivityPatterns
 import com.superfit.app.domain.BodyArea
+import com.superfit.app.domain.BodyReadings
 import com.superfit.app.domain.MonthlyRecap
 import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
@@ -49,6 +50,8 @@ import com.superfit.app.theme.Manrope
 import java.time.YearMonth
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * How far the card's numbers and bars have grown, 0-1. The playing recap counts them up as each card
@@ -87,7 +90,7 @@ private fun paletteFor(card: RecapCard): StoryPalette = when (card) {
     is RecapCard.Goal, is RecapCard.Choices -> Mint
     is RecapCard.Needle, is RecapCard.Moving, is RecapCard.Rhythm -> Night
     is RecapCard.Calories -> Cream
-    is RecapCard.Faster, is RecapCard.Heart -> Sky
+    is RecapCard.Faster, is RecapCard.Heart, is RecapCard.Body -> Sky
     is RecapCard.Strength, is RecapCard.Reps -> Orange
     else -> Paper
 }
@@ -104,6 +107,7 @@ private fun kicker(card: RecapCard): String = when (card) {
     is RecapCard.Moving -> "Movement"
     is RecapCard.Strength -> "Strength"
     is RecapCard.Heart -> "Heart"
+    is RecapCard.Body -> "Body"
     is RecapCard.Reps -> "Reps"
     is RecapCard.Rhythm -> "Rhythm"
     is RecapCard.Setup -> "Setup"
@@ -282,6 +286,23 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             Big("−${card.change.bpmDrop}", "bpm", p)
             Small(
                 "${card.change.activity.replaceFirstChar { it.titlecase(Locale.getDefault()) }}s at ${MonthlyRecap.pace(card.change.paceNow)} /km · ${card.change.bpmNow} bpm, was ${card.change.bpmPrev}",
+                p,
+                bold = true
+            )
+        }
+        is RecapCard.Body -> card.change.let { b ->
+            val fat = b.fatChange
+            if (fat != null) {
+                Big("${if (fat < 0) "−" else "+"}${BodyReadings.fmt(abs(fat))}", "points", p)
+            } else {
+                val bmr = b.bmrChange ?: 0.0
+                Big("${if (bmr < 0) "−" else "+"}${abs(bmr).roundToInt()}", "kcal", p)
+            }
+            Small(
+                listOfNotNull(
+                    if (fat != null) "Body fat ${BodyReadings.fmt(b.fatNow!!)}%, was ${BodyReadings.fmt(b.fatBefore!!)}%" else null,
+                    if (b.bmrChange != null) String.format(Locale.US, "Resting burn %,d kcal, was %,d", b.bmrNow!!.roundToInt(), b.bmrBefore!!.roundToInt()) else null
+                ).joinToString(" · "),
                 p,
                 bold = true
             )

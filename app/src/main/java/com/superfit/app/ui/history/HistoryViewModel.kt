@@ -369,7 +369,13 @@ class HistoryViewModel(
             }
             allMeals = allNutrition
             val loseGoal = profile.targetWeightKg < profile.startingWeightKg
-            weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal, allNutrition)
+            body = com.superfit.app.domain.BodyReadings.summary(
+                mine = com.superfit.app.data.BodyImporter.mine(appContext),
+                latestWeightKg = repository.getAllWeightEntries().maxByOrNull { it.timestamp }?.weightKg ?: profile.weightKg,
+                heightCm = profile.heightCm,
+                today = today
+            )
+            weekReport = com.superfit.app.domain.InsightsEngine.weekReport(dayTotals, today, loseGoal, allNutrition, body = body)
             goalTargetDate = GoalDatePref.get(sharedPrefs)
             val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
             goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
@@ -392,12 +398,6 @@ class HistoryViewModel(
                 fallbackCurrentKg = profile.weightKg
             )
 
-            body = com.superfit.app.domain.BodyReadings.summary(
-                mine = com.superfit.app.data.BodyImporter.mine(appContext),
-                latestWeightKg = repository.getAllWeightEntries().maxByOrNull { it.timestamp }?.weightKg ?: profile.weightKg,
-                heightCm = profile.heightCm,
-                today = today
-            )
             val hc = repository.healthConnectManager
             canAskBodyAccess = hc.isAvailable() && !hc.hasBodyPermissions()
 

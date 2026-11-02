@@ -77,6 +77,14 @@ object RecapWriter {
             "On ${h.activity}s, average pace ${MonthlyRecap.pace(h.paceNow)} per km (last month ${MonthlyRecap.pace(h.pacePrev)}), " +
                 "average heart rate ${h.bpmNow} bpm, down from ${h.bpmPrev} last month: ${h.bpmDrop} beats a minute lower at the same pace or faster, a sign of getting fitter."
         }
+        is RecapCard.Body -> card.change.let { b ->
+            listOfNotNull(
+                b.fatChange?.let { "Body fat on their smart scale went ${if (it < 0) "down" else "up"} ${points(abs(it))} this month, from ${fmt(b.fatBefore!!)}% to ${fmt(b.fatNow!!)}%." },
+                b.bmrChange?.let { "The resting burn their scale reports went ${if (it < 0) "down" else "up"} ${num(abs(it).roundToInt())} kcal a day, from ${num(b.bmrBefore!!.roundToInt())} to ${num(b.bmrNow!!.roundToInt())}." },
+                if ((b.bmrChange ?: 0.0) < 0) "A lower resting burn is normal when weight falls: don't call it a problem." else null,
+                "Talk about the trend in these scale readings only, never about how they look."
+            ).joinToString(" ")
+        }
         is RecapCard.Reps -> card.totals.let { r ->
             "${num(r.total)} reps of exercises logged by voice this month" + (if (r.prev > 0) " (last month ${num(r.prev)})." else ".") +
                 (r.top?.let { " Most of them: ${num(it.second)} ${it.first}." } ?: "")
@@ -119,6 +127,8 @@ object RecapWriter {
     ).joinToString("")
 
     private fun num(v: Int) = String.format(Locale.US, "%,d", v)
+
+    private fun points(v: Double) = "${fmt(v)} ${if (fmt(v) == "1") "point" else "points"}"
 
     private fun dayName(d: java.time.DayOfWeek) = d.getDisplayName(java.time.format.TextStyle.FULL, Locale.US) + "s"
 
@@ -176,6 +186,16 @@ object RecapWriter {
             )
         }
         is RecapCard.Heart -> RecapWords("Fitter heart", "Same pace or faster, ${card.change.bpmDrop} beats a minute lower than last month.")
+        is RecapCard.Body -> card.change.let { b ->
+            val fat = b.fatChange
+            val bmr = b.bmrChange
+            when {
+                fat != null && fat < 0 -> RecapWords("Body fat down ${points(-fat)}", "From ${fmt(b.fatBefore!!)}% to ${fmt(b.fatNow!!)}% on your scale. Keep doing what you did this month.")
+                fat != null -> RecapWords("Body fat up ${points(fat)}", "From ${fmt(b.fatBefore!!)}% to ${fmt(b.fatNow!!)}% on your scale. Scales swing, so see where next month lands.")
+                bmr != null && bmr > 0 -> RecapWords("Resting burn up ${num(bmr.roundToInt())} kcal", "Your scale says your body burns more at rest than last month.")
+                else -> RecapWords("Resting burn down ${num(abs(bmr ?: 0.0).roundToInt())} kcal", "Your scale says your body burns a little less at rest. That's normal when weight falls.")
+            }
+        }
         is RecapCard.Reps -> RecapWords("Reps this month", if (card.totals.prev > 0 && card.totals.total > card.totals.prev) "Up from ${num(card.totals.prev)} last month." else "Every rep you said out loud, added up.")
         is RecapCard.Rhythm -> RecapWords("Your moving rhythm", card.rhythm.bestDay?.let { "${dayName(it)} are your big step days." } ?: "You've got a routine going.")
         is RecapCard.Setup -> RecapWords("Make next month's recap smarter", "Only what's missing is listed.")

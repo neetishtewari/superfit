@@ -124,7 +124,7 @@ object MonthlyRecapData {
             mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
             widget = !WidgetPin.canPin(context) || WidgetPin.isPlaced(context)
         )
-        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone)
+        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, BodyImporter.mine(context))
     }
 
     private fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"

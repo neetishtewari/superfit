@@ -582,7 +582,7 @@ private fun BodyCard(b: BodySummary, canAskBodyAccess: Boolean, onAllowBody: () 
         b.bodyFatPct?.let { BodyRow("Body fat", "${BodyReadings.fmt(it)}%", b.bodyFatChange?.let { c -> change(c, "pts", lowerIsGood = true) }) }
         b.leanKg?.let { BodyRow("Muscle (lean mass)", "${BodyReadings.fmt(it)} kg", b.leanChange?.let { c -> change(c, "kg", lowerIsGood = false) }) }
         b.boneKg?.let { BodyRow("Bone mass", "${BodyReadings.fmt(it)} kg", null) }
-        b.scaleBmr?.let { BodyRow("Resting burn (from scale)", "${it.toInt()} kcal", null) }
+        b.scaleBmr?.let { BodyRow("Resting burn (from scale)", "${it.toInt()} kcal", b.scaleBmrChange?.let { c -> neutralChange(c, "kcal") }) }
         b.bmi?.let { BodyRow("BMI", BodyReadings.fmt(it), null) }
         when {
             b.hasScaleData -> {
@@ -631,6 +631,13 @@ private fun change(diff: Double, unit: String, lowerIsGood: Boolean): Delta? {
     if (abs(diff) < 0.1) return null
     val good = (diff < 0) == lowerIsGood
     return Delta("${if (diff > 0) "▲" else "▼"} ${BodyReadings.fmt(abs(diff))} $unit in 4 wks", if (good) NeonMint else SolarAmber)
+}
+
+/** A move that's neither good nor bad on its own: resting burn falls with weight, for one. */
+@Composable
+private fun neutralChange(diff: Double, unit: String): Delta? {
+    if (abs(diff) < BodyReadings.MIN_BMR_KCAL) return null
+    return Delta("${if (diff > 0) "▲" else "▼"} ${abs(diff).toInt()} $unit in 4 wks", ThemeTextSecondary)
 }
 
 @Composable

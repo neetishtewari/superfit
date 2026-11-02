@@ -109,12 +109,15 @@ data class WeekReport(
  */
 object InsightsEngine {
 
+    private const val BODY_FAT_WATCH_POINTS = 1.0
+
     fun weekReport(
         days: Map<LocalDate, DayTotals>,
         today: LocalDate,
         loseGoal: Boolean = true,
         meals: List<NutritionEntryEntity> = emptyList(),
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
+        body: BodySummary? = null
     ): WeekReport {
         val to = today.minusDays(1)
         val from = to.minusDays(6)
@@ -128,9 +131,10 @@ object InsightsEngine {
         val treat = calories?.let { treatFinding(it) }
 
         // The treat line and the activity patterns join the usual findings; good news is never crowded out.
-        val extras = listOfNotNull(treat?.takeIf { it.id != "treat_top" }) + activityFindings(days, week, prev, today)
+        val bodyNews = body?.let { bodyFindings(it, loseGoal) }.orEmpty()
+        val extras = listOfNotNull(treat?.takeIf { it.id != "treat_top" }) + bodyNews.filter { it.id != "body_fat_up" } + activityFindings(days, week, prev, today)
         val working = workingFindings(days, week, thisWeek, lastWeek, today, loseGoal).take(2) + extras.take(2)
-        val watch = (listOfNotNull(treat?.takeIf { it.id == "treat_top" }) + watchFindings(days, week, thisWeek, today, loseGoal)).take(2)
+        val watch = (listOfNotNull(treat?.takeIf { it.id == "treat_top" }) + bodyNews.filter { it.id == "body_fat_up" } + watchFindings(days, week, thisWeek, today, loseGoal)).take(2)
 
         return WeekReport(
             from = from,
@@ -173,6 +177,27 @@ object InsightsEngine {
             }
         }
         return Insight("treat_top", "$name is your #$rank calorie food", detail, "${name.lowercase(Locale.getDefault())} made your top 5 calorie foods")
+    }
+
+    /**
+     * Real moves on a smart scale over about 4 weeks. Body fat rising only counts against a goal of
+     * losing weight, and a falling resting burn isn't news: it's normal when weight falls.
+     */
+    fun bodyFindings(b: BodySummary, loseGoal: Boolean): List<Insight> = buildList {
+        val fat = b.bodyFatPct
+        val fatChange = b.bodyFatChange
+        if (fat != null && fatChange != null) {
+            if (fatChange <= -BodyReadings.MIN_FAT_POINTS) {
+                add(Insight("body_fat_down", "Body fat down ${BodyReadings.fmt(-fatChange)} points", "Now ${BodyReadings.fmt(fat)}% on your scale, over about 4 weeks.", "your body fat is coming down"))
+            } else if (loseGoal && fatChange >= BODY_FAT_WATCH_POINTS) {
+                add(Insight("body_fat_up", "Body fat up ${BodyReadings.fmt(fatChange)} points", "Now ${BodyReadings.fmt(fat)}% on your scale, over about 4 weeks.", "your body fat crept up"))
+            }
+        }
+        val bmr = b.scaleBmr
+        val bmrChange = b.scaleBmrChange
+        if (bmr != null && bmrChange != null && bmrChange >= BodyReadings.MIN_BMR_KCAL) {
+            add(Insight("resting_burn", "Resting burn up ${kcal(bmrChange)} kcal", "Your scale now says ${kcal(bmr)} kcal a day, over about 4 weeks.", "your resting burn went up"))
+        }
     }
 
     /** Fitter heart, rep totals and better meals on move days, when the data clearly shows them. */

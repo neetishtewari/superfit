@@ -66,6 +66,11 @@ sealed interface RecapCard {
         override val id = "heart"
     }
 
+    /** Body fat and resting burn from a smart scale, only when one of them really moved. */
+    data class Body(val change: BodyMonthChange) : RecapCard {
+        override val id = "body"
+    }
+
     /** Reps logged by voice this month and last. */
     data class Reps(val totals: RepTotals) : RecapCard {
         override val id = "reps"
@@ -100,8 +105,8 @@ object MonthlyRecap {
     private const val MIN_DAYS = 3
     private const val MEAL_DAYS = 5
 
-    /** Story order: goal first, then meals, then activity; "Get more from Superfit" always last. */
-    val ORDER = listOf("goal", "needle", "calories", "macros", "choices", "faster", "heart", "moving", "rhythm", "strength", "reps", "setup")
+    /** Story order: goal and body first, then meals, then activity; "Get more from Superfit" always last. */
+    val ORDER = listOf("goal", "body", "needle", "calories", "macros", "choices", "faster", "heart", "moving", "rhythm", "strength", "reps", "setup")
 
     fun build(
         month: YearMonth,
@@ -112,7 +117,8 @@ object MonthlyRecap {
         journey: JourneyForecast?,
         goalSet: Boolean,
         setup: RecapSetup,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
+        scale: List<ScaleReading> = emptyList()
     ): MonthRecap? {
         val first = month.atDay(1)
         val last = month.atEndOfMonth()
@@ -131,6 +137,7 @@ object MonthlyRecap {
 
         val cards = buildList {
             if (goalSet && journey != null) add(goal(journey, weighIns, first, last))
+            BodyReadings.monthChange(scale, first, last, zone)?.let { add(RecapCard.Body(it)) }
             needle(monthDays, prev, lose)?.let { add(it) }
             if (logged.size >= MEAL_DAYS) {
                 CalorieSourcesEngine.build(monthMeals)?.takeIf { it.top.size >= 3 }?.let { add(RecapCard.Calories(it, month.lengthOfMonth())) }

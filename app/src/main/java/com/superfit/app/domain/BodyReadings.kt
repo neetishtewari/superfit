@@ -47,6 +47,11 @@ object BodyReadings {
     /** A body fat reading older than this no longer sets the calorie target. */
     const val BODY_FAT_VALID_DAYS = 45L
 
+    /** Smaller moves than these are scale noise, not news. */
+    const val MIN_FAT_POINTS = 0.5
+    const val MIN_BMR_KCAL = 20.0
+    private const val MONTH_BASELINE_DAYS = 45L
+
     private val PAIR_WINDOW: Duration = Duration.ofMinutes(10)
 
     /** Puts body fat, lean mass, bone mass and BMR saved by the same app within minutes onto their weigh-in. */
@@ -126,11 +131,36 @@ object BodyReadings {
             leanChange = if (latest { it.leanKg } != null) change { it.leanKg } else null,
             boneKg = latest { it.boneKg }?.second,
             scaleBmr = latest { it.bmrKcal }?.second,
+            scaleBmrChange = change { it.bmrKcal },
             bmi = weight?.let { bmi(it, heightCm) },
             source = sorted.lastOrNull { it.bodyFatPct != null }?.source,
             measuredOn = fat?.first?.time?.atZone(zone)?.toLocalDate(),
             insight = insight(weightChange, fatChange, leanChange)
         )
+    }
+
+    /**
+     * How body fat and the scale's resting burn moved over [first]..[last], against the last reading
+     * before the month or, without one, an early reading of the month itself. Small moves are scale
+     * noise and count as no change. Null when neither moved.
+     */
+    fun monthChange(mine: List<ScaleReading>, first: LocalDate, last: LocalDate, zone: ZoneId = ZoneId.systemDefault()): BodyMonthChange? {
+        val sorted = mine.sortedBy { it.time }
+        val start = first.atStartOfDay(zone).toInstant()
+        val end = last.plusDays(1).atStartOfDay(zone).toInstant()
+        val oldest = first.minusDays(MONTH_BASELINE_DAYS).atStartOfDay(zone).toInstant()
+
+        fun move(f: (ScaleReading) -> Double?, smallest: Double): Pair<Double, Double>? {
+            val now = sorted.lastOrNull { f(it) != null && it.time >= start && it.time < end } ?: return null
+            val then = sorted.lastOrNull { f(it) != null && it.time < start && it.time >= oldest }
+                ?: sorted.firstOrNull { f(it) != null && it.time >= start && Duration.between(it.time, now.time).toDays() >= 14 }
+                ?: return null
+            return (f(now)!! to f(then)!!).takeIf { abs(it.first - it.second) >= smallest }
+        }
+
+        val fat = move({ it.bodyFatPct }, MIN_FAT_POINTS)
+        val bmr = move({ it.bmrKcal }, MIN_BMR_KCAL)
+        return if (fat == null && bmr == null) null else BodyMonthChange(fat?.first, fat?.second, bmr?.first, bmr?.second)
     }
 
     /** "Down 2.1 kg in 4 weeks, body fat down 1.4 points: mostly fat, not muscle." */
@@ -155,6 +185,12 @@ object BodyReadings {
     fun fmt(v: Double): String = ((v * 10).roundToInt() / 10.0).toString()
 }
 
+/** A month's real moves in body fat and resting burn. Null fields didn't move, or weren't measured. */
+data class BodyMonthChange(val fatNow: Double?, val fatBefore: Double?, val bmrNow: Double?, val bmrBefore: Double?) {
+    val fatChange: Double? get() = if (fatNow != null && fatBefore != null) fatNow - fatBefore else null
+    val bmrChange: Double? get() = if (bmrNow != null && bmrBefore != null) bmrNow - bmrBefore else null
+}
+
 data class BodySummary(
     val bodyFatPct: Double?,
     val bodyFatChange: Double?,
@@ -162,6 +198,7 @@ data class BodySummary(
     val leanChange: Double?,
     val boneKg: Double?,
     val scaleBmr: Double?,
+    val scaleBmrChange: Double? = null,
     val bmi: Double?,
     /** The scale app the latest body fat came from, as people know it ("FitDays"). */
     val source: String?,

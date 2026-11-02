@@ -156,4 +156,34 @@ class InsightsEngineTest {
         assertTrue(busy.chatLine().contains("steps 9000 vs 8000"))
         assertNull(TodayVsUsual.of(today, 9000, emptyList(), null).coachLine(20))
     }
+
+    private fun body(fat: Double? = null, fatChange: Double? = null, bmr: Double? = null, bmrChange: Double? = null) =
+        BodySummary(fat, fatChange, null, null, null, bmr, bmi = null, source = null, measuredOn = null, insight = null, scaleBmrChange = bmrChange)
+
+    @Test
+    fun bodyFatComingDownIsGoodNewsAndGoingUpIsAWatchItemWhenLosing() {
+        val days = map(day(today.minusDays(1)))
+        val down = InsightsEngine.weekReport(days, today, body = body(22.0, -0.8))
+        assertTrue(down.working.any { it.id == "body_fat_down" })
+        val up = InsightsEngine.weekReport(days, today, body = body(24.0, 1.2))
+        assertTrue(up.watch.any { it.id == "body_fat_up" })
+        assertTrue(up.working.none { it.id == "body_fat_up" })
+    }
+
+    @Test
+    fun bodyFatRisingIsNotAProblemOnAGainGoal() {
+        assertTrue(InsightsEngine.bodyFindings(body(18.0, 1.5), loseGoal = false).isEmpty())
+    }
+
+    @Test
+    fun onlyARisingRestingBurnIsNews() {
+        assertEquals("resting_burn", InsightsEngine.bodyFindings(body(bmr = 1650.0, bmrChange = 25.0), true).single().id)
+        assertTrue(InsightsEngine.bodyFindings(body(bmr = 1650.0, bmrChange = -40.0), true).isEmpty())
+    }
+
+    @Test
+    fun smallMovesAndNoScaleDataSayNothing() {
+        assertTrue(InsightsEngine.bodyFindings(body(22.0, -0.3, 1650.0, 10.0), true).isEmpty())
+        assertTrue(InsightsEngine.bodyFindings(body(), true).isEmpty())
+    }
 }

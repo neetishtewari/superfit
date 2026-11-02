@@ -1,6 +1,7 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
@@ -219,5 +220,33 @@ class MonthlyRecapTest {
         val prompt = RecapWriter.prompt(r)
         assertTrue(!prompt.contains("setup"))
         assertTrue(RecapWriter.SYSTEM_INSTRUCTION.contains("Never use the word \"roast\""))
+    }
+
+    private fun scale(date: String, fat: Double?, bmr: Double?) =
+        ScaleReading(date, Instant.parse("${date}T07:00:00Z"), 80.0, "FitDays", bodyFatPct = fat, bmrKcal = bmr)
+
+    private fun recapWithScale(vararg readings: ScaleReading) =
+        MonthlyRecap.build(october, month { d -> day(d) }, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = utc, scale = readings.toList())!!
+
+    @Test
+    fun aRealMoveOnTheScaleGetsABodyCardAfterTheGoal() {
+        val r = recapWithScale(scale("2026-09-28", 24.0, 1600.0), scale("2026-10-28", 23.0, 1625.0))
+        assertEquals("body", r.cards.first().id)
+        val facts = RecapWriter.facts(r.cards.first())
+        assertTrue(facts, facts.contains("down 1 point this month") && facts.contains("from 24% to 23%") && facts.contains("up 25 kcal"))
+        assertEquals("Body fat down 1 point", RecapWriter.plain(r.cards.first()).title)
+    }
+
+    @Test
+    fun noScaleDataOrNoRealMoveMeansNoBodyCard() {
+        assertTrue(recapWithScale().cards.none { it.id == "body" })
+        assertTrue(recapWithScale(scale("2026-09-28", 24.0, 1600.0), scale("2026-10-28", 23.9, 1605.0)).cards.none { it.id == "body" })
+    }
+
+    @Test
+    fun aFallingRestingBurnIsCalledNormal() {
+        val card = recapWithScale(scale("2026-09-28", null, 1650.0), scale("2026-10-28", null, 1620.0)).cards.first { it.id == "body" }
+        assertEquals("Resting burn down 30 kcal", RecapWriter.plain(card).title)
+        assertTrue(RecapWriter.facts(card).contains("normal when weight falls"))
     }
 }
