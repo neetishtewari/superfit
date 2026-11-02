@@ -2,7 +2,7 @@
 
 Neetish, 2026-11-02: the second half of the "Google Photos memories" idea. The whole recap becomes one short video with the month's music, ready for Instagram or WhatsApp.
 
-- There is a "Save as video" button under the recap cards.
+- There is a "Share as video" button (Neetish 2026-11-02: share, not download; it opens the share sheet straight away) under the recap cards.
 - The app captures each story card at its final values and leaves out "Get more from Superfit".
 - Each card holds for about 4 seconds, less when there are many, so the video stays under about 45 seconds. As in the app, each card's numbers and bars count up over about 1.1 seconds when it comes on (drawn 12 times a second), then the card swipes to the next over 0.45 seconds. Neetish, 2026-11-02: the first version (still cards with fades) felt like a slideshow.
 - The video is 720 x 1280 (9:16) at 24 fps.
