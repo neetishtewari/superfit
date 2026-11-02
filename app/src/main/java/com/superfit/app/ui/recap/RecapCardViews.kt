@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.superfit.app.R
 import com.superfit.app.domain.ActivityPatterns
 import com.superfit.app.domain.BodyArea
+import com.superfit.app.domain.BodyChange
 import com.superfit.app.domain.MonthlyRecap
 import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
@@ -49,6 +50,8 @@ import com.superfit.app.theme.Manrope
 import java.time.YearMonth
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * How far the card's numbers and bars have grown, 0-1. The playing recap counts them up as each card
@@ -84,7 +87,7 @@ private val Orange = StoryPalette(Color(0xFFF2A33A), Color(0xFF14201B), Color(0x
 private val Paper = StoryPalette(Color(0xFFF4F7F6), Color(0xFF14201B), Color(0xFF55635C), Color(0xFF0E9F75), Color(0x2214201B))
 
 private fun paletteFor(card: RecapCard): StoryPalette = when (card) {
-    is RecapCard.Goal, is RecapCard.Choices -> Mint
+    is RecapCard.Goal, is RecapCard.Choices, is RecapCard.Body -> Mint
     is RecapCard.Needle, is RecapCard.Moving, is RecapCard.Rhythm -> Night
     is RecapCard.Calories -> Cream
     is RecapCard.Faster, is RecapCard.Heart -> Sky
@@ -103,6 +106,7 @@ private fun kicker(card: RecapCard): String = when (card) {
     is RecapCard.Faster -> "Pace"
     is RecapCard.Moving -> "Movement"
     is RecapCard.Strength -> "Strength"
+    is RecapCard.Body -> "Body"
     is RecapCard.Heart -> "Heart"
     is RecapCard.Reps -> "Reps"
     is RecapCard.Rhythm -> "Rhythm"
@@ -278,6 +282,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
                 )
             }
         }
+        is RecapCard.Body -> BodyMoment(card.change, p)
         is RecapCard.Heart -> {
             Big("−${card.change.bpmDrop}", "bpm", p)
             Small(
@@ -313,6 +318,31 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             }
         }
         is RecapCard.Setup -> Unit
+    }
+}
+
+/** The scale's own measures, start of the month to the end; good moves in the card's colour, the rest amber. */
+@Composable
+private fun BodyMoment(c: BodyChange, p: StoryPalette) {
+    fun signed(v: Double) = (if (v > 0) "+" else "−") + RecapWriter.fmt(abs(v))
+    when {
+        c.fatMoved -> Big(signed(c.fat!!), "pts body fat", p)
+        c.leanMoved -> Big(signed(c.lean!!), "kg muscle", p)
+        else -> Big(signed(c.bmr!!), "kcal at rest", p)
+    }
+    Spacer(Modifier.height(14.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val amber = Color(0xFFB86E00)
+        c.fat?.let { FactRow("Body fat", "${RecapWriter.fmt(c.fatFrom!!)}% → ${RecapWriter.fmt(c.fatTo!!)}%", if (it <= 0) p.accent else amber, p) }
+        c.lean?.let { FactRow("Muscle", "${RecapWriter.fmt(c.leanFrom!!)} → ${RecapWriter.fmt(c.leanTo!!)} kg", if (it >= 0) p.accent else amber, p) }
+        c.bmr?.let {
+            FactRow(
+                "Resting burn",
+                String.format(Locale.US, "%,d → %,d kcal a day", c.bmrFrom!!.roundToInt(), c.bmrTo!!.roundToInt()),
+                if (it >= 0) p.accent else amber,
+                p
+            )
+        }
     }
 }
 

@@ -73,6 +73,7 @@ object RecapWriter {
             "${card.sessions} strength sessions this month" + (if (card.prevSessions > 0) ", ${card.prevSessions} last month." else ".") +
                 (card.detail?.let { strengthFacts(it) } ?: "")
         }
+        is RecapCard.Body -> bodyFacts(card)
         is RecapCard.Heart -> card.change.let { h ->
             "On ${h.activity}s, average pace ${MonthlyRecap.pace(h.paceNow)} per km (last month ${MonthlyRecap.pace(h.pacePrev)}), " +
                 "average heart rate ${h.bpmNow} bpm, down from ${h.bpmPrev} last month: ${h.bpmDrop} beats a minute lower at the same pace or faster, a sign of getting fitter."
@@ -89,6 +90,35 @@ object RecapWriter {
         }
         is RecapCard.Setup -> ""
     }
+
+    /** Start and end of the month from the smart scale; only what it measured. */
+    fun bodyFacts(card: RecapCard.Body): String {
+        val c = card.change
+        val measured = listOfNotNull(
+            c.fat?.let { "body fat ${fmt(c.fatFrom!!)}% to ${fmt(c.fatTo!!)}% (${signed(it)} points)" },
+            c.lean?.let { "muscle (lean mass) ${fmt(c.leanFrom!!)} kg to ${fmt(c.leanTo!!)} kg (${signed(it)} kg)" },
+            c.bmr?.let { "resting burn ${num(c.bmrFrom!!.roundToInt())} to ${num(c.bmrTo!!.roundToInt())} kcal a day" },
+            c.weight?.let { "weight ${signed(it)} kg" }
+        )
+        return "From their smart scale, start of the month against the end (averages, so one odd reading doesn't count): " +
+            measured.joinToString(", ") + ". Goal: ${if (card.lose) "lose fat" else "build or keep muscle"}. " +
+            "Losing fat while keeping or adding muscle is the good outcome; muscle going down while losing weight means more protein and strength work."
+    }
+
+    fun bodyWords(card: RecapCard.Body): RecapWords {
+        val c = card.change
+        val fat = c.fat?.takeIf { c.fatMoved }
+        val lean = c.lean?.takeIf { c.leanMoved }
+        return when {
+            lean != null && lean < 0 && card.lose -> RecapWords("Some of it was muscle", "Muscle down ${fmt(-lean)} kg. More protein and two strength sessions a week help keep it.")
+            fat != null && fat < 0 -> RecapWords("Body fat down ${fmt(-fat)} points", if (lean == null || lean > 0) "Fat went, muscle stayed. That's the good kind of change." else "Your scale saw the fat come down.")
+            lean != null && lean > 0 -> RecapWords("Muscle up ${fmt(lean)} kg", "More muscle burns more, even at rest.")
+            fat != null -> RecapWords("Body fat up ${fmt(fat)} points", "A month to steady it: protein at every meal and a bit more moving.")
+            else -> RecapWords("Your resting burn", "What your body burns at rest moved with your muscle.")
+        }
+    }
+
+    private fun signed(v: Double) = (if (v > 0) "+" else "−") + fmt(abs(v))
 
     /** The top 5 by calories and the treat rule, said so the AI can't turn it around. */
     fun calorieFacts(c: CalorieSources): String = buildString {
@@ -175,6 +205,7 @@ object RecapWriter {
                     ?: "Keep it going: strength work keeps muscle while you lose fat."
             )
         }
+        is RecapCard.Body -> bodyWords(card)
         is RecapCard.Heart -> RecapWords("Fitter heart", "Same pace or faster, ${card.change.bpmDrop} beats a minute lower than last month.")
         is RecapCard.Reps -> RecapWords("Reps this month", if (card.totals.prev > 0 && card.totals.total > card.totals.prev) "Up from ${num(card.totals.prev)} last month." else "Every rep you said out loud, added up.")
         is RecapCard.Rhythm -> RecapWords("Your moving rhythm", card.rhythm.bestDay?.let { "${dayName(it)} are your big step days." } ?: "You've got a routine going.")

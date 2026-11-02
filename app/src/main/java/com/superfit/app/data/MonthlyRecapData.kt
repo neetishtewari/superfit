@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.superfit.app.domain.BodyArea
+import com.superfit.app.domain.BodyTrend
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.GoalForecast
@@ -36,7 +37,7 @@ object MonthlyRecapData {
     private const val KEY_STRENGTH_TAGS = "recap_strength_tags"
 
     // v2: the calorie and new activity cards need their own words, so saved months are written again once.
-    private const val KEY_WORDS = "recap_words_v2_" // + yyyy-MM_STYLE -> JSON
+    private const val KEY_WORDS = "recap_words_v3_" // + yyyy-MM_STYLE -> JSON
     private const val LAST_HOME_DAY = 10
     private const val DAYS_AFTER_OPENING = 2
 
@@ -124,7 +125,8 @@ object MonthlyRecapData {
             mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
             widget = !WidgetPin.canPin(context) || WidgetPin.isPlaced(context)
         )
-        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone)
+        val body = BodyTrend.month(BodyImporter.mine(context), month, zone)
+        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, body)
     }
 
     private fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"

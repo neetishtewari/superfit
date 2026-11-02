@@ -220,4 +220,16 @@ class MonthlyRecapTest {
         assertTrue(!prompt.contains("setup"))
         assertTrue(RecapWriter.SYSTEM_INSTRUCTION.contains("Never use the word \"roast\""))
     }
+
+    @Test
+    fun bodyCardOnlyWhenTheScaleSawAChange() {
+        val days = month { d -> if (d.dayOfMonth <= 20) day(d) else null }
+        fun build(body: BodyChange?) = MonthlyRecap.build(october, days, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = utc, body = body)
+        val moved = BodyChange(26.0, 24.8, 58.0, 58.2, null, null, 80.0, 78.6)
+        val flat = BodyChange(26.0, 25.8, 58.0, 58.1, null, null, 80.0, 79.9)
+        val card = build(moved)!!.cards.filterIsInstance<RecapCard.Body>().single()
+        assertEquals("Body fat down 1.2 points", RecapWriter.plain(card).title)
+        assertTrue(build(flat)!!.cards.none { it is RecapCard.Body })
+        assertTrue(build(null)!!.cards.none { it is RecapCard.Body })
+    }
 }
