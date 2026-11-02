@@ -1,139 +1,118 @@
 package com.superfit.app.ui.onboarding
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
-import android.view.View
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import androidx.health.connect.client.PermissionController
-import com.superfit.app.data.HealthConnectManager
-import com.superfit.app.theme.*
+import com.superfit.app.theme.NeonMint
+import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.IconBadge
 
-// Sub-widgets and helper components
+/** Title and one plain line under it, at the top of every step. */
 @Composable
-internal fun FeatureItemBullet(icon: String, title: String, desc: String) {
+internal fun StepTitle(title: String, subtitle: String? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, color = SuperfitTheme.colors.textPrimary)
+        if (subtitle != null) {
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = SuperfitTheme.colors.textSecondary)
+        }
+    }
+}
+
+/** A small grey label above a field or a group of choices. */
+@Composable
+internal fun FieldLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = SuperfitTheme.colors.textSecondary, modifier = modifier)
+}
+
+/** One line with a round green icon, a bold title and a short explanation. */
+@Composable
+internal fun FeatureRow(icon: ImageVector, title: String, desc: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(ThemeTextPrimary.copy(alpha = 0.04f))
-                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = icon, fontSize = 16.sp)
-        }
-        Column {
-            Text(text = title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ThemeTextPrimary)
-            Text(text = desc, fontSize = 12.sp, color = ThemeTextTertiary, lineHeight = 14.sp)
+        IconBadge(icon = icon, background = SuperfitTheme.colors.brandSoft, tint = SuperfitTheme.colors.primaryAccent, size = 40)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = SuperfitTheme.colors.textPrimary)
+            Text(desc, style = MaterialTheme.typography.bodySmall, color = SuperfitTheme.colors.textSecondary)
         }
     }
 }
 
+/** A label and its value on one line, e.g. "Protein   120 g". */
 @Composable
-internal fun StepGuideItem(number: String, text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(HyperViolet.copy(alpha = 0.12f))
-                .border(1.dp, HyperViolet.copy(alpha = 0.3f), RoundedCornerShape(6.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = number, color = HyperViolet, fontWeight = FontWeight.Black, fontSize = 12.sp)
-        }
-        Text(text = text, fontSize = 12.sp, color = ThemeTextSecondary)
-    }
-}
-
-@Composable
-internal fun MacroSplitRow(color: Color, label: String, value: String) {
+internal fun ValueRow(label: String, value: String, valueColor: Color = SuperfitTheme.colors.textPrimary) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(color)
-            )
-            Text(text = label, fontSize = 13.sp, color = ThemeTextPrimary)
-        }
-        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ThemeTextPrimary)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = SuperfitTheme.colors.textPrimary, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.titleSmall, color = valueColor)
     }
 }
 
+/**
+ * Choices laid out [columns] per row as rounded pills, the chosen one solid green with white text
+ * (the same look as the app's SegmentedPills, but it can wrap onto two rows).
+ */
 @Composable
-internal fun ChecklistRow(label: String, value: String, isOk: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+internal fun <T> ChoiceGrid(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, columns: Int = 2) {
+    val colors = SuperfitTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(colors.fieldBg)
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(text = label, fontSize = 12.sp, color = ThemeTextSecondary, modifier = Modifier.weight(1f).padding(end = 8.dp))
-        Text(
-            text = value,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            color = if (isOk) NeonGreen else Color.Gray
-        )
+        options.chunked(columns).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.forEach { (key, label) ->
+                    val isOn = key == selected
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isOn) Color.White else colors.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isOn) NeonMint else Color.Transparent)
+                            .semantics {
+                                role = Role.RadioButton
+                                this.selected = isOn
+                            }
+                            .clickable { onSelect(key) }
+                            .heightIn(min = 44.dp)
+                            .padding(horizontal = 8.dp, vertical = 12.dp)
+                    )
+                }
+            }
+        }
     }
 }

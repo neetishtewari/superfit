@@ -4,9 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,8 +13,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -24,8 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -36,14 +30,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.PrimaryButton
+import com.superfit.app.ui.components.SuperfitBrandHeader
 import com.superfit.app.ui.components.SuperfitField
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,8 +56,7 @@ fun LoginScreen(
     var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
     var resetErrorMessage by remember { mutableStateOf<String?>(null) }
 
-    val primaryColor = NeonMint
-    val secondaryColor = ElectricCyan
+    val colors = SuperfitTheme.colors
 
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -96,368 +89,218 @@ fun LoginScreen(
                 val credential = GoogleAuthProvider.getCredential(idToken, null)
                 viewModel.signInWithCredential(credential, onLoginSuccess)
             } else {
-                viewModel.setCustomErrorMessage("Google Sign-In failed: ID token is null.")
+                viewModel.setCustomErrorMessage(AuthMessages.forGoogle(-1))
             }
         } catch (e: ApiException) {
-            viewModel.setCustomErrorMessage("Google Sign-In failed: ${e.localizedMessage ?: "Unknown error"}")
+            viewModel.setCustomErrorMessage(AuthMessages.forGoogle(e.statusCode))
         }
+    }
+
+    val isLogin = viewModel.isLoginMode
+    val passwordHint: @Composable () -> Unit = { Text("At least 6 characters") }
+    val submit = {
+        focusManager.clearFocus()
+        viewModel.authenticate(onLoginSuccess)
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(ThemeBgStart, ThemeBgEnd)
-                )
-            )
+            .background(colors.bgStart)
     ) {
-        // Ambient Aurora background glow
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(HyperViolet.copy(alpha = 0.12f), Color.Transparent),
-                    center = Offset(size.width * 0.2f, size.height * 0.2f),
-                    radius = size.minDimension * 0.8f
-                ),
-                radius = size.minDimension * 0.8f,
-                center = Offset(size.width * 0.2f, size.height * 0.2f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(ElectricCyan.copy(alpha = 0.08f), Color.Transparent),
-                    center = Offset(size.width * 0.8f, size.height * 0.8f),
-                    radius = size.minDimension * 0.7f
-                ),
-                radius = size.minDimension * 0.7f,
-                center = Offset(size.width * 0.8f, size.height * 0.8f)
-            )
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .systemBarsPadding()
+                .imePadding()
                 .verticalScroll(scrollState)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            SuperfitBrandHeader()
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Branding Section
             Text(
-                text = "SUPERFIT",
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Black,
-                color = ThemeTextPrimary,
-                letterSpacing = 3.sp
+                text = if (isLogin) "Welcome back" else "Create your account",
+                style = MaterialTheme.typography.headlineSmall,
+                color = colors.textPrimary
             )
             Text(
-                text = "Your AI coach for food and fitness",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = ElectricCyan,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(top = 4.dp)
+                text = if (isLogin) {
+                    "Sign in to pick up where you left off. Your meals and progress are backed up."
+                } else {
+                    "Free, no ads. Your meals and progress are backed up to your account."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
-
-            // Glassmorphic Authentication Card
-            Column(
+            // Google first: one tap for most people, and it works for new and returning accounts alike.
+            OutlinedButton(
+                onClick = {
+                    focusManager.clearFocus()
+                    if (webClientId != null && googleSignInClient != null) {
+                        googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                    } else {
+                        viewModel.setCustomErrorMessage(AuthMessages.NOT_SET_UP)
+                    }
+                },
+                enabled = !viewModel.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(ThemeCardBgTranslucent)
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                ThemeGlassBorder,
-                                ThemeGlassBorderGlow
-                            )
-                        ),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .heightIn(min = 54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = colors.cardBg,
+                    contentColor = colors.textPrimary
+                ),
+                border = BorderStroke(1.dp, colors.textTertiary.copy(alpha = 0.35f))
             ) {
-                Text(
-                    text = if (viewModel.isLoginMode) "Welcome Back" else "Create Account",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ThemeTextPrimary,
-                    textAlign = TextAlign.Center
+                Icon(
+                    painter = painterResource(id = com.superfit.app.R.drawable.ic_google_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = Color.Unspecified
                 )
-
-                Text(
-                    text = if (viewModel.isLoginMode) "Sign in to resume tracking and sync history." else "Join Superfit to log meals and keep your history backed up.",
-                    fontSize = 13.sp,
-                    color = ThemeTextTertiary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                // Email field
-                SuperfitField(
-                    value = viewModel.email,
-                    onValueChange = { viewModel.onEmailChange(it) },
-                    label = { Text("Email Address") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = ThemeTextTertiary) },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email,
-                        imeAction = ImeAction.Next
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                // Password field
-                SuperfitField(
-                    value = viewModel.password,
-                    onValueChange = { viewModel.onPasswordChange(it) },
-                    label = { Text("Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ThemeTextTertiary) },
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                tint = ThemeTextTertiary
-                            )
-                        }
-                    },
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = if (viewModel.isLoginMode) ImeAction.Done else ImeAction.Next
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            if (viewModel.isLoginMode) {
-                                focusManager.clearFocus()
-                                viewModel.authenticate(onLoginSuccess)
-                            }
-                        }
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                // Forgot Password link (only in Login Mode)
-                if (viewModel.isLoginMode) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
-                        Text(
-                            text = "Forgot Password?",
-                            color = primaryColor,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable {
-                                resetEmail = viewModel.email
-                                resetSuccessMessage = null
-                                resetErrorMessage = null
-                                showForgotPasswordDialog = true
-                            }
-                        )
-                    }
-                }
-
-                // Confirm Password field (only for Signup)
-                AnimatedVisibility(
-                    visible = !viewModel.isLoginMode,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    SuperfitField(
-                        value = viewModel.confirmPassword,
-                        onValueChange = { viewModel.onConfirmPasswordChange(it) },
-                        label = { Text("Confirm Password") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ThemeTextTertiary) },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.authenticate(onLoginSuccess)
-                            }
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-
-                // Error Message Section
-                if (viewModel.errorMessage != null) {
-                    Text(
-                        text = viewModel.errorMessage!!,
-                        color = SolarAmber,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Submit Button
-                Button(
-                    onClick = {
-                        focusManager.clearFocus()
-                        viewModel.authenticate(onLoginSuccess)
-                    },
-                    enabled = !viewModel.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    contentPadding = PaddingValues()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(primaryColor, secondaryColor)
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (viewModel.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.5.dp,
-                                color = Color.White
-                            )
-                        } else {
-                            Text(
-                                text = if (viewModel.isLoginMode) "Sign In" else "Create Account",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-
-                // Divider and Google Sign-In Button
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HorizontalDivider(
-                        modifier = Modifier.weight(1f),
-                        color = ThemeGlassBorder
-                    )
-                    Text(
-                        text = "OR",
-                        color = ThemeTextTertiary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.weight(1f),
-                        color = ThemeGlassBorder
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        focusManager.clearFocus()
-                        if (webClientId != null && googleSignInClient != null) {
-                            val signInIntent = googleSignInClient.signInIntent
-                            googleSignInLauncher.launch(signInIntent)
-                        } else {
-                            viewModel.setCustomErrorMessage(
-                                "Google Services not configured. Please replace mock google-services.json in the app/ directory with your real Firebase config."
-                            )
-                        }
-                    },
-                    enabled = !viewModel.isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = ThemeTextPrimary.copy(alpha = 0.03f),
-                        contentColor = ThemeTextPrimary
-                    ),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                ThemeGlassBorder,
-                                ThemeGlassBorderGlow
-                            )
-                        )
-                    )
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = com.superfit.app.R.drawable.ic_google_logo),
-                            contentDescription = "Google Logo",
-                            modifier = Modifier.size(20.dp),
-                            tint = Color.Unspecified
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = if (viewModel.isLoginMode) "Sign In with Google" else "Sign Up with Google",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = ThemeTextPrimary
-                        )
-                    }
-                }
-
-                // Mode toggle link
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = if (viewModel.isLoginMode) "New to Superfit? " else "Already have an account? ",
-                        color = ThemeTextTertiary,
-                        fontSize = 13.sp
-                    )
-                    Text(
-                        text = if (viewModel.isLoginMode) "Register" else "Login",
-                        color = primaryColor,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { viewModel.toggleMode() }
-                    )
-                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Continue with Google", style = MaterialTheme.typography.titleMedium)
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = colors.textTertiary.copy(alpha = 0.25f))
+                Text(
+                    text = "or use email",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f), color = colors.textTertiary.copy(alpha = 0.25f))
+            }
+
+            SuperfitField(
+                value = viewModel.email,
+                onValueChange = { viewModel.onEmailChange(it) },
+                label = { Text("Email") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            SuperfitField(
+                value = viewModel.password,
+                onValueChange = { viewModel.onPasswordChange(it) },
+                label = { Text("Password") },
+                supportingText = if (isLogin) null else passwordHint,
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                        )
+                    }
+                },
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = if (isLogin) ImeAction.Done else ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onDone = { if (isLogin) submit() }),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            AnimatedVisibility(
+                visible = !isLogin,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                SuperfitField(
+                    value = viewModel.confirmPassword,
+                    onValueChange = { viewModel.onConfirmPasswordChange(it) },
+                    label = { Text("Password again") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit() }),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+
+            if (isLogin) {
+                Text(
+                    text = "Forgot password?",
+                    color = colors.primaryAccent,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            resetEmail = viewModel.email
+                            resetSuccessMessage = null
+                            resetErrorMessage = null
+                            showForgotPasswordDialog = true
+                        }
+                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+            }
+
+            viewModel.errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = colors.errorColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.amberSoft)
+                        .padding(12.dp)
+                )
+            }
+
+            PrimaryButton(
+                text = if (isLogin) "Sign in" else "Create account",
+                onClick = submit,
+                loading = viewModel.isLoading
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isLogin) "New to Superfit? " else "Already have an account? ",
+                    color = colors.textSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = if (isLogin) "Create an account" else "Sign in",
+                    color = colors.primaryAccent,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { viewModel.toggleMode() }
+                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+            }
         }
 
         if (showForgotPasswordDialog) {
             AlertDialog(
                 onDismissRequest = { showForgotPasswordDialog = false },
+                containerColor = colors.cardBg,
                 title = {
                     Text(
-                        text = "Reset Password",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = ThemeTextPrimary
+                        text = "Reset your password",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colors.textPrimary
                     )
                 },
                 text = {
@@ -466,15 +309,16 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Enter your email address and we'll send you a link to reset your password.",
-                            fontSize = 13.sp,
-                            color = ThemeTextSecondary
+                            text = "We'll email you a link to set a new one.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
                         )
 
                         SuperfitField(
                             value = resetEmail,
                             onValueChange = { resetEmail = it },
-                            label = { Text("Email Address") },
+                            label = { Text("Email") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -482,18 +326,18 @@ fun LoginScreen(
                         if (resetErrorMessage != null) {
                             Text(
                                 text = resetErrorMessage!!,
-                                color = SolarAmber,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                color = colors.errorColor,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
 
                         if (resetSuccessMessage != null) {
                             Text(
                                 text = resetSuccessMessage!!,
-                                color = NeonMint,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                color = colors.primaryAccent,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -516,13 +360,13 @@ fun LoginScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = primaryColor,
+                            containerColor = NeonMint,
                             contentColor = Color.White
                         ),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = if (resetSuccessMessage != null) "Close" else "Send Reset Link",
+                            text = if (resetSuccessMessage != null) "Close" else "Send link",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -532,7 +376,7 @@ fun LoginScreen(
                         TextButton(
                             onClick = { showForgotPasswordDialog = false }
                         ) {
-                            Text("Cancel", color = ThemeTextTertiary)
+                            Text("Cancel", color = colors.textSecondary)
                         }
                     }
                 }
