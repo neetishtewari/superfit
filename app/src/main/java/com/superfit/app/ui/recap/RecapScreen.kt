@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,11 +54,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +68,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
@@ -81,12 +87,16 @@ import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.share.CapturableStory
 import com.superfit.app.ui.share.shareImage
 import com.superfit.app.widget.WidgetPin
+import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface RecapState {
     data object Loading : RecapState
@@ -187,10 +197,16 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
     var sharing by remember { mutableStateOf(false) }
     var inBackground by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
+    // Progress 0-1 while the video is being made; null otherwise.
+    var making by remember { mutableStateOf<Float?>(null) }
+    // The count-up point the video is drawing right now.
+    var videoReveal by remember { mutableStateOf(1f) }
+    val layers = remember { mutableMapOf<Int, GraphicsLayer>() }
+    val context = LocalContext.current
     val progress = remember { Animatable(0f) }
     val page = pager.currentPage
     val onStory = page < cards.size && cards[page] !is RecapCard.Setup
-    val paused = held || sharing || inBackground || pager.isScrollInProgress
+    val paused = held || sharing || inBackground || making != null || pager.isScrollInProgress
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -206,8 +222,8 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
     }
 
     // Music plays while the story is on screen and not paused by a hold or the app going away.
-    LaunchedEffect(inBackground, onStory, held) {
-        if (!inBackground && onStory && !held) music.play() else music.pause()
+    LaunchedEffect(inBackground, onStory, held, making == null) {
+        if (!inBackground && onStory && !held && making == null) music.play() else music.pause()
     }
 
     val progressPage = remember { intArrayOf(-1) }
@@ -267,15 +283,17 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
                 SetupPage(card, onOpenSettings, onChanged)
             } else {
                 val reveal = when {
+                    making != null -> RecapReveal.Full
                     index != page -> if (index < page) RecapReveal.Full else RecapReveal.Waiting
                     else -> RecapReveal.Playing
                 }
-                CompositionLocalProvider(LocalRecapReveal provides reveal) {
+                CompositionLocalProvider(LocalRecapReveal provides reveal, LocalRecapVideoReveal provides videoReveal.takeIf { making != null }) {
                     SharePage(
                         card,
                         words,
                         month,
                         onSharing = { sharing = it },
+                        onLayer = { if (it != null) layers[index] = it else layers.remove(index) },
                         tapModifier = Modifier.pointerInput(index) {
                             detectTapGestures(
                                 onPress = {
@@ -290,47 +308,119 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
                 }
             }
         }
-        if (cards.size > stories) {
-            TextButton(onClick = { go(cards.size - 1) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text("Get more from Superfit", color = SuperfitTheme.colors.textSecondary, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(
+                onClick = {
+                    if (making != null) return@OutlinedButton
+                    making = 0f
+                    scope.launch {
+                        val back = pager.currentPage
+                        try {
+                            val dir = File(context.cacheDir, "shares").apply { mkdirs() }
+                            dir.listFiles()?.forEach { it.delete() }
+                            val file = File(dir, "superfit-${month.month.name.lowercase()}-${month.year}.mp4")
+                            // The video asks for each picture as it needs it: the card on screen, its
+                            // numbers drawn at that point of the count-up, then captured.
+                            val capture: suspend (Int, Float) -> RecapVideo.Frame = { i, at ->
+                                val bitmap = withContext(Dispatchers.Main) {
+                                    if (pager.currentPage != i || pager.isScrollInProgress) {
+                                        pager.scrollToPage(i)
+                                        delay(250)
+                                    }
+                                    videoReveal = at
+                                    withFrameNanos { }
+                                    withFrameNanos { }
+                                    val layer = layers[i] ?: error("Card $i not drawn")
+                                    layer.toImageBitmap().asAndroidBitmap()
+                                }
+                                RecapVideo.frameOf(bitmap)
+                            }
+                            try {
+                                RecapVideo.make(context, stories, capture, RecapMusic.trackFor(month), file) { making = it }
+                            } finally {
+                                videoReveal = 1f
+                                pager.scrollToPage(back)
+                            }
+                            AppAnalytics.cardShared("recap_video")
+                            RecapVideo.share(context, file)
+                        } catch (e: Exception) {
+                            AppAnalytics.recordError(e)
+                            Toast.makeText(context, "Couldn't make the video on this phone. You can still share each card.", Toast.LENGTH_LONG).show()
+                        } finally {
+                            making = null
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(50)
+            ) {
+                Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Save as video", fontWeight = FontWeight.Bold)
             }
-        } else {
-            Spacer(Modifier.height(12.dp))
+            if (cards.size > stories) {
+                TextButton(onClick = { go(cards.size - 1) }) {
+                    Text("Setup tips", color = SuperfitTheme.colors.textSecondary, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+    making?.let { p ->
+        Dialog(onDismissRequest = {}, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(SuperfitTheme.colors.cardBg)
+                    .padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(progress = { p }, color = SuperfitTheme.colors.primaryAccent)
+                Spacer(Modifier.height(14.dp))
+                Text("Making your video… ${(p * 100).toInt()}%", color = SuperfitTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
 @Composable
-private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth, onSharing: (Boolean) -> Unit, tapModifier: Modifier) {
+private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth, onSharing: (Boolean) -> Unit, onLayer: (GraphicsLayer?) -> Unit, tapModifier: Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
+    DisposableEffect(layer) {
+        onLayer(layer)
+        onDispose { onLayer(null) }
+    }
     var busy by remember { mutableStateOf(false) }
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        CapturableStory(layer, Modifier.fillMaxWidth().then(tapModifier)) { RecapStory(card, words, month) }
-        Button(
-            onClick = {
-                busy = true
-                onSharing(true)
-                scope.launch {
-                    try {
-                        shareImage(context, layer.toImageBitmap().asAndroidBitmap())
-                        AppAnalytics.cardShared("recap_${card.id}")
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        busy = false
-                        onSharing(false)
+    // The card shrinks to leave room for its Share button on shorter screens, keeping its 9:16 shape.
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val cardWidth = if (constraints.hasBoundedHeight) minOf(maxWidth, ((maxHeight - 66.dp) * 9f / 16f).coerceAtLeast(120.dp)) else maxWidth
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            CapturableStory(layer, Modifier.width(cardWidth).then(tapModifier)) { RecapStory(card, words, month) }
+            Button(
+                onClick = {
+                    busy = true
+                    onSharing(true)
+                    scope.launch {
+                        try {
+                            shareImage(context, layer.toImageBitmap().asAndroidBitmap())
+                            AppAnalytics.cardShared("recap_${card.id}")
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            busy = false
+                            onSharing(false)
+                        }
                     }
-                }
-            },
-            enabled = !busy,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = SuperfitTheme.colors.primaryAccent, contentColor = Color.White)
-        ) {
-            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Share this card", fontWeight = FontWeight.Bold)
+                },
+                enabled = !busy,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = SuperfitTheme.colors.primaryAccent, contentColor = Color.White)
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Share this card", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

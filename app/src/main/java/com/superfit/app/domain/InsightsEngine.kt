@@ -114,7 +114,8 @@ object InsightsEngine {
         today: LocalDate,
         loseGoal: Boolean = true,
         meals: List<NutritionEntryEntity> = emptyList(),
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
+        body: BodyChange? = null
     ): WeekReport {
         val to = today.minusDays(1)
         val from = to.minusDays(6)
@@ -126,11 +127,14 @@ object InsightsEngine {
         val weekMeals = meals.filter { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate().let { d -> !d.isBefore(from) && !d.isAfter(to) } }
         val calories = if (thisWeek.loggedDays >= 3) CalorieSourcesEngine.build(weekMeals) else null
         val treat = calories?.let { treatFinding(it) }
+        // Smart scale: only when it measures body fat, muscle or resting burn and one of them moved.
+        val bodyLine = body?.takeIf { it.notable }?.let { BodyTrend.finding(it, loseGoal) }
+        val bodyWatch = bodyLine?.takeIf { BodyTrend.isWatch(it) }
 
-        // The treat line and the activity patterns join the usual findings; good news is never crowded out.
-        val extras = listOfNotNull(treat?.takeIf { it.id != "treat_top" }) + activityFindings(days, week, prev, today)
+        // The treat line, the body line and the activity patterns join the usual findings; good news is never crowded out.
+        val extras = listOfNotNull(treat?.takeIf { it.id != "treat_top" }, bodyLine?.takeIf { bodyWatch == null }) + activityFindings(days, week, prev, today)
         val working = workingFindings(days, week, thisWeek, lastWeek, today, loseGoal).take(2) + extras.take(2)
-        val watch = (listOfNotNull(treat?.takeIf { it.id == "treat_top" }) + watchFindings(days, week, thisWeek, today, loseGoal)).take(2)
+        val watch = (listOfNotNull(treat?.takeIf { it.id == "treat_top" }, bodyWatch) + watchFindings(days, week, thisWeek, today, loseGoal)).take(2)
 
         return WeekReport(
             from = from,
