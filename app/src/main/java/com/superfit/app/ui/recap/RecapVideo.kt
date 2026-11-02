@@ -13,6 +13,7 @@ import android.media.MediaCodecInfo
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.core.content.FileProvider
 import com.superfit.app.domain.RecapAutoplay
 import java.io.File
@@ -24,8 +25,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * Turns the recap's story cards into one short MP4 with the month's music, made on the phone with
- * Android's own encoders (no library, nothing uploaded). Each card holds, then softly fades into the
- * next; the music loops to fit and fades out at the end.
+ * Android's own encoders (no library, nothing uploaded). Each card counts its numbers up as it does
+ * in the app, holds, then swipes to the next; the music loops to fit and fades out at the end.
  */
 object RecapVideo {
     const val WIDTH = 720
@@ -77,16 +78,23 @@ object RecapVideo {
      * Writes the video to [out]. [onProgress] goes from 0 to 1 while it works. Runs off the main
      * thread; throws when the phone can't encode, so the caller can say so.
      */
-    suspend fun make(context: Context, frames: List<Frame>, music: Int, out: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.Default) {
-        require(frames.isNotEmpty())
-        val cardMs = RecapAutoplay.videoCardMs(frames.size)
-        val totalMs = cardMs * frames.size
+    suspend fun make(
+        context: Context,
+        cards: Int,
+        capture: suspend (card: Int, reveal: Float) -> Frame,
+        music: Int,
+        out: File,
+        onProgress: (Float) -> Unit
+    ) = withContext(Dispatchers.Default) {
+        require(cards > 0)
+        val cardMs = RecapAutoplay.videoCardMs(cards)
+        val totalMs = cardMs * cards
         val audio = runCatching { encodeAudio(context, music, totalMs) }.getOrNull()
         onProgress(0.1f)
         out.delete()
         val muxer = MediaMuxer(out.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         try {
-            encodeVideo(frames, cardMs, totalMs, muxer, audio) { onProgress(0.1f + 0.9f * it) }
+            encodeVideo(Pictures(cards, cardMs, capture), totalMs, muxer, audio) { onProgress(0.1f + 0.9f * it) }
         } finally {
             runCatching { muxer.stop() }
             runCatching { muxer.release() }
@@ -96,7 +104,7 @@ object RecapVideo {
 
     private class Encoded(val format: MediaFormat, val samples: List<Pair<ByteArray, MediaCodec.BufferInfo>>)
 
-    private fun encodeVideo(frames: List<Frame>, cardMs: Long, totalMs: Long, muxer: MediaMuxer, audio: Encoded?, onProgress: (Float) -> Unit) {
+    private suspend fun encodeVideo(pictures: Pictures, totalMs: Long, muxer: MediaMuxer, audio: Encoded?, onProgress: (Float) -> Unit) {
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, WIDTH, HEIGHT).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
             setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_BITRATE)
@@ -107,7 +115,6 @@ object RecapVideo {
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         codec.start()
         val totalFrames = (totalMs * FPS / 1000).toInt()
-        val blend = ByteArray(frames[0].yuv.size)
         var frameIndex = 0
         var inputDone = false
         var videoTrack = -1
@@ -122,7 +129,7 @@ object RecapVideo {
                             codec.queueInputBuffer(idx, 0, 0, ptsUs(frameIndex), MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inputDone = true
                         } else {
-                            val yuv = frameAt(frames, frameIndex, cardMs, blend)
+                            val yuv = pictures.at(frameIndex * 1000L / FPS)
                             val image = codec.getInputImage(idx) ?: error("No input image")
                             writeI420(image, yuv)
                             codec.queueInputBuffer(idx, 0, yuv.size, ptsUs(frameIndex), 0)
@@ -163,20 +170,48 @@ object RecapVideo {
 
     private fun ptsUs(frame: Int): Long = frame * 1_000_000L / FPS
 
-    /** The picture for one frame: a card, or two cards mid-fade. */
-    private fun frameAt(frames: List<Frame>, index: Int, cardMs: Long, blend: ByteArray): ByteArray {
-        val t = index * 1000L / FPS
-        val card = (t / cardMs).toInt().coerceAtMost(frames.lastIndex)
-        val local = t - card * cardMs
-        val fadeStart = cardMs - RecapAutoplay.VIDEO_FADE_MS
-        if (card == frames.lastIndex || local < fadeStart) return frames[card].yuv
-        val a = ((local - fadeStart) * 256 / RecapAutoplay.VIDEO_FADE_MS).toInt().coerceIn(0, 256)
-        val from = frames[card].yuv
-        val to = frames[card + 1].yuv
-        for (k in blend.indices) {
-            blend[k] = (((from[k].toInt() and 0xff) * (256 - a) + (to[k].toInt() and 0xff) * a) shr 8).toByte()
+    /**
+     * The picture for each moment, drawn on demand: the card's numbers counting up, then the swipe to
+     * the next card. Keeps only the pictures it still needs, so a long recap doesn't fill memory.
+     */
+    private class Pictures(val cards: Int, val cardMs: Long, val capture: suspend (Int, Float) -> Frame) {
+        private var current: Triple<Int, Float, Frame>? = null
+        private var next: Pair<Int, Frame>? = null
+        private val slid = ByteArray(WIDTH * HEIGHT * 3 / 2)
+
+        private suspend fun picture(card: Int, reveal: Float): Frame {
+            current?.let { (c, r, f) -> if (c == card && r == reveal) return f }
+            val eased = FastOutSlowInEasing.transform(reveal)
+            val f = next?.takeIf { it.first == card && reveal == 0f }?.second ?: capture(card, eased)
+            current = Triple(card, reveal, f)
+            return f
         }
-        return blend
+
+        suspend fun at(timeMs: Long): ByteArray {
+            val shot = RecapAutoplay.videoShot(timeMs, cardMs, cards)
+            val from = picture(shot.card, shot.reveal).yuv
+            if (shot.slide <= 0f) return from
+            val to = (next?.takeIf { it.first == shot.card + 1 }?.second ?: capture(shot.card + 1, 0f).also { next = shot.card + 1 to it }).yuv
+            val x = (FastOutSlowInEasing.transform(shot.slide) * WIDTH).toInt() and 1.inv()
+            slide(from, to, x, slid)
+            return slid
+        }
+    }
+
+    /** [from] pushed [x] pixels left with [to] coming in from the right, plane by plane. */
+    private fun slide(from: ByteArray, to: ByteArray, x: Int, out: ByteArray) {
+        fun plane(start: Int, w: Int, h: Int, dx: Int) {
+            for (row in 0 until h) {
+                val o = start + row * w
+                System.arraycopy(from, o + dx, out, o, w - dx)
+                System.arraycopy(to, o, out, o + w - dx, dx)
+            }
+        }
+        plane(0, WIDTH, HEIGHT, x)
+        val cw = WIDTH / 2
+        val ch = HEIGHT / 2
+        plane(WIDTH * HEIGHT, cw, ch, x / 2)
+        plane(WIDTH * HEIGHT + cw * ch, cw, ch, x / 2)
     }
 
     /** Copies an I420 picture into the encoder's own layout, whatever its strides. */

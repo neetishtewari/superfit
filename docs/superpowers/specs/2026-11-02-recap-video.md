@@ -4,7 +4,7 @@ Neetish, 2026-11-02: the second half of the "Google Photos memories" idea. The w
 
 - There is a "Save as video" button under the recap cards.
 - The app captures each story card at its final values and leaves out "Get more from Superfit".
-- Each card holds for about 4 seconds, less when there are many, so the video stays under about 45 seconds. Each card fades softly into the next over 0.5 seconds.
+- Each card holds for about 4 seconds, less when there are many, so the video stays under about 45 seconds. As in the app, each card's numbers and bars count up over about 1.1 seconds when it comes on (drawn 12 times a second), then the card swipes to the next over 0.45 seconds. Neetish, 2026-11-02: the first version (still cards with fades) felt like a slideshow.
 - The video is 720 x 1280 (9:16) at 24 fps.
 - It plays that month's original track, looped to fit, with a fade in and a fade out.
 - It is made on the phone with Android's own encoders: H.264 video, AAC audio and MP4. There is no new library, nothing is uploaded and no new permission is needed.

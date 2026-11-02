@@ -61,6 +61,9 @@ val LocalRecapReveal = compositionLocalOf { RecapReveal.Full }
 
 enum class RecapReveal { Full, Waiting, Playing }
 
+/** Set while the video is made: the exact count-up point to draw, frame by frame. */
+val LocalRecapVideoReveal = compositionLocalOf<Float?> { null }
+
 /** 0 to 1 over a second once the card is playing; 1 straight away when it isn't animated. */
 @Composable
 private fun revealFraction(): Float {
@@ -73,7 +76,7 @@ private fun revealFraction(): Float {
             RecapReveal.Waiting -> Unit
         }
     }
-    return progress.value
+    return LocalRecapVideoReveal.current ?: progress.value
 }
 
 /** A recap card's own colours: background, main text, soft text and the accent for bars and numbers. */

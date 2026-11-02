@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,11 +89,13 @@ import com.superfit.app.widget.WidgetPin
 import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface RecapState {
     data object Loading : RecapState
@@ -195,6 +198,8 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
     var finished by remember { mutableStateOf(false) }
     // Progress 0-1 while the video is being made; null otherwise.
     var making by remember { mutableStateOf<Float?>(null) }
+    // The count-up point the video is drawing right now.
+    var videoReveal by remember { mutableStateOf(1f) }
     val layers = remember { mutableMapOf<Int, GraphicsLayer>() }
     val context = LocalContext.current
     val progress = remember { Animatable(0f) }
@@ -281,7 +286,7 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
                     index != page -> if (index < page) RecapReveal.Full else RecapReveal.Waiting
                     else -> RecapReveal.Playing
                 }
-                CompositionLocalProvider(LocalRecapReveal provides reveal) {
+                CompositionLocalProvider(LocalRecapReveal provides reveal, LocalRecapVideoReveal provides videoReveal.takeIf { making != null }) {
                     SharePage(
                         card,
                         words,
@@ -310,18 +315,31 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
                     scope.launch {
                         val back = pager.currentPage
                         try {
-                            // Every story card at its finished values, captured one by one.
-                            val frames = (0 until stories).map { i ->
-                                pager.scrollToPage(i)
-                                delay(250)
-                                val layer = layers[i] ?: error("Card $i not drawn")
-                                RecapVideo.frameOf(layer.toImageBitmap().asAndroidBitmap())
-                            }
-                            pager.scrollToPage(back)
                             val dir = File(context.cacheDir, "shares").apply { mkdirs() }
                             dir.listFiles()?.forEach { it.delete() }
                             val file = File(dir, "superfit-${month.month.name.lowercase()}-${month.year}.mp4")
-                            RecapVideo.make(context, frames, RecapMusic.trackFor(month), file) { making = it }
+                            // The video asks for each picture as it needs it: the card on screen, its
+                            // numbers drawn at that point of the count-up, then captured.
+                            val capture: suspend (Int, Float) -> RecapVideo.Frame = { i, at ->
+                                val bitmap = withContext(Dispatchers.Main) {
+                                    if (pager.currentPage != i || pager.isScrollInProgress) {
+                                        pager.scrollToPage(i)
+                                        delay(250)
+                                    }
+                                    videoReveal = at
+                                    withFrameNanos { }
+                                    withFrameNanos { }
+                                    val layer = layers[i] ?: error("Card $i not drawn")
+                                    layer.toImageBitmap().asAndroidBitmap()
+                                }
+                                RecapVideo.frameOf(bitmap)
+                            }
+                            try {
+                                RecapVideo.make(context, stories, capture, RecapMusic.trackFor(month), file) { making = it }
+                            } finally {
+                                videoReveal = 1f
+                                pager.scrollToPage(back)
+                            }
                             AppAnalytics.cardShared("recap_video")
                             RecapVideo.share(context, file)
                         } catch (e: Exception) {
