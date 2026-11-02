@@ -16,7 +16,7 @@ object AuthMessages {
     private const val GOOGLE_CANCELLED_CODE = 12501
     private const val GOOGLE_NETWORK_CODE = 7
 
-    fun resetSent(email: String) = "Link sent to $email. It can take a minute, and sometimes lands in spam."
+    fun resetSent(email: String) = "Sent to $email. Look for an email from Superfit; it can take a minute, and sometimes lands in spam."
 
     /**
      * [errorCode] is FirebaseAuthException.errorCode when there is one, [message] the raw text,
