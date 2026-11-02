@@ -355,7 +355,7 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
             ) {
                 Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Save as video", fontWeight = FontWeight.Bold)
+                Text("Share as video", fontWeight = FontWeight.Bold)
             }
             if (cards.size > stories) {
                 TextButton(onClick = { go(cards.size - 1) }) {
