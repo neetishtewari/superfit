@@ -339,7 +339,8 @@ private fun BodyMoment(c: BodyChange, p: StoryPalette) {
             FactRow(
                 "Resting burn",
                 String.format(Locale.US, "%,d → %,d kcal a day", c.bmrFrom!!.roundToInt(), c.bmrTo!!.roundToInt()),
-                if (it >= 0) p.accent else amber,
+                // A lower resting burn is normal while losing weight: never shown as a warning.
+                if (it >= 0) p.accent else p.soft,
                 p
             )
         }

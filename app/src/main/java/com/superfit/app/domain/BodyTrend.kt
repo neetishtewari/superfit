@@ -88,7 +88,7 @@ object BodyTrend {
         val fat = c.fat
         val lean = c.lean
         val bmr = c.bmr
-        val bmrText = bmr?.takeIf { c.bmrMoved }?.let { "Resting burn ${if (it > 0) "up" else "down"} ${kcal(abs(it))} kcal a day." }
+        val bmrText = bmr?.takeIf { c.bmrMoved && it > 0 }?.let { "Resting burn up ${kcal(it)} kcal a day." }
         return when {
             lean != null && lean <= -LEAN_KG && (c.weight ?: 0.0) < 0 && loseGoal && (fat == null || fat > -1.0) -> Insight(
                 "body_muscle_loss",
@@ -117,18 +117,19 @@ object BodyTrend {
                 listOfNotNull("In 4 weeks, from your scale.", bmrText).joinToString(" "),
                 "muscle went up"
             )
-            bmr != null && c.bmrMoved -> Insight(
-                if (bmr > 0) "body_bmr_up" else "body_bmr_down",
-                "Resting burn ${if (bmr > 0) "up" else "down"} ${kcal(abs(bmr))} kcal a day",
-                "In 4 weeks, from your scale." + if (bmr > 0) " More muscle burns more at rest." else " Keeping muscle helps keep it up.",
-                "resting burn ${if (bmr > 0) "rose" else "dipped"}"
+            // A lower resting burn is normal as weight comes down, so only a rise is news on its own.
+            bmr != null && c.bmrMoved && bmr > 0 -> Insight(
+                "body_bmr_up",
+                "Resting burn up ${kcal(bmr)} kcal a day",
+                "In 4 weeks, from your scale. More muscle burns more at rest.",
+                "resting burn rose"
             )
             else -> null
         }
     }
 
     /** True when [finding] is a heads-up rather than good news. */
-    fun isWatch(i: Insight): Boolean = i.id in setOf("body_muscle_loss", "body_fat_up", "body_bmr_down")
+    fun isWatch(i: Insight): Boolean = i.id in setOf("body_muscle_loss", "body_fat_up")
 
     private fun kcal(v: Double) = Math.round(v).toString()
 }

@@ -12,7 +12,7 @@ Neetish, 2026-11-02: when Health Connect has body fat and BMR data and it change
 - Insights, Your week: one body line, goal-aware.
   - Going well: "Body fat down X points" (adds "with muscle kept" when it was), "Muscle up", or "Resting burn up".
   - Watch out: "Some of the loss is muscle" (losing, muscle down 0.3 kg or more, fat not clearly down), or "Body fat up X points" (1 point or more, unless building muscle and muscle went up).
-  - The resting burn change rides along in the detail.
+  - A rise in resting burn rides along in the detail. A fall is never flagged, because it is normal as weight comes down.
 - Recap: a "Body" card right after Goal.
   - Big number: body fat points, otherwise muscle kg, otherwise resting burn.
   - Rows: from → to for each measure the scale sends. Good moves are shown in the card colour, the rest in amber.

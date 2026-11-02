@@ -102,7 +102,7 @@ object RecapWriter {
         )
         return "From their smart scale, start of the month against the end (averages, so one odd reading doesn't count): " +
             measured.joinToString(", ") + ". Goal: ${if (card.lose) "lose fat" else "build or keep muscle"}. " +
-            "Losing fat while keeping or adding muscle is the good outcome; muscle going down while losing weight means more protein and strength work."
+            "Losing fat while keeping or adding muscle is the good outcome; muscle going down while losing weight means more protein and strength work. A small dip in resting burn while weight comes down is normal, never a problem."
     }
 
     fun bodyWords(card: RecapCard.Body): RecapWords {
@@ -114,7 +114,8 @@ object RecapWriter {
             fat != null && fat < 0 -> RecapWords("Body fat down ${fmt(-fat)} points", if (lean == null || lean > 0) "Fat went, muscle stayed. That's the good kind of change." else "Your scale saw the fat come down.")
             lean != null && lean > 0 -> RecapWords("Muscle up ${fmt(lean)} kg", "More muscle burns more, even at rest.")
             fat != null -> RecapWords("Body fat up ${fmt(fat)} points", "A month to steady it: protein at every meal and a bit more moving.")
-            else -> RecapWords("Your resting burn", "What your body burns at rest moved with your muscle.")
+            (c.bmr ?: 0.0) > 0 -> RecapWords("Resting burn up", "Your body burns a little more at rest than it did.")
+            else -> RecapWords("Your resting burn", "It dips a little as weight comes down. That's normal; muscle keeps it up.")
         }
     }
 
