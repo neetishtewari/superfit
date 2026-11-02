@@ -1,0 +1,5 @@
+<en-US>
+- Save your monthly recap as a video with music, ready for Instagram or WhatsApp
+- Body fat, muscle and resting burn changes from your smart scale now show in Insights and your recap
+- Share buttons on recap cards are easier to tap
+</en-US>
