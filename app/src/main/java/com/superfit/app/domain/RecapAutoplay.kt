@@ -11,6 +11,12 @@ object RecapAutoplay {
     fun durationMs(line: String, title: String = ""): Long =
         (4_500L + (line.length + title.length) * 28L).coerceIn(5_500L, 10_000L)
 
+    /** In the saved video: each card's time, so the whole video stays under about 45 seconds. */
+    fun videoCardMs(cards: Int): Long = if (cards <= 0) 0L else (45_000L / cards).coerceIn(2_500L, 4_000L)
+
+    /** The soft fade from one card to the next in the video. */
+    const val VIDEO_FADE_MS = 500L
+
     /** A big number split so it can count up: "1.4" -> 1.4 with one decimal, "12,450" -> 12450 grouped. */
     data class Number(val prefix: String, val value: Double, val decimals: Int, val grouped: Boolean, val suffix: String)
 

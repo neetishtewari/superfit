@@ -38,4 +38,12 @@ class RecapAutoplayTest {
         assertFalse(RecapAutoplay.worthCounting(RecapAutoplay.parse("1")!!))
         assertTrue(RecapAutoplay.worthCounting(RecapAutoplay.parse("12")!!))
     }
+
+    @Test
+    fun savedVideoStaysUnderAboutFortyFiveSeconds() {
+        assertEquals(4_000L, RecapAutoplay.videoCardMs(5))
+        assertEquals(3_750L, RecapAutoplay.videoCardMs(12))
+        assertEquals(2_500L, RecapAutoplay.videoCardMs(40))
+        assertTrue(RecapAutoplay.videoCardMs(11) * 11 <= 45_000L)
+    }
 }
