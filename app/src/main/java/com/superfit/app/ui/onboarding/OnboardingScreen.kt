@@ -1,60 +1,70 @@
 package com.superfit.app.ui.onboarding
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
 import android.view.View
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
-import com.superfit.app.theme.*
+import com.superfit.app.theme.NeonMint
+import com.superfit.app.theme.SuperfitTheme
+
+/** The six sign-up steps, in order. Health Connect comes early so "About you" can fill itself in. */
+private const val STEP_WELCOME = 0
+private const val STEP_HEALTH = 1
+private const val STEP_ABOUT_YOU = 2
+private const val STEP_GOAL = 3
+private const val STEP_COACH = 4
+private const val STEP_ALL_SET = 5
+private const val STEP_COUNT = 6
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,24 +76,18 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val isDarkTheme by ThemeConfig.isDarkTheme.collectAsState()
-
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
+    val colors = SuperfitTheme.colors
 
-    // Wizard step state (0 to 5)
-    var currentStep by remember { mutableIntStateOf(0) }
+    var currentStep by rememberSaveable { mutableIntStateOf(STEP_WELCOME) }
     // Supportive starts selected: Roast me is there for people who pick it themselves.
     var coachStyle by remember {
         mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.SUPPORTIVE)
     }
-    var validationError by remember { mutableStateOf<String?>(null) }
-    // Spoken guidance is opt-in: it starts off and the "Voice" chip turns it on.
+    var aboutYouErrors by remember { mutableStateOf(AboutYouErrors()) }
+    // Spoken guidance is opt-in: it starts off and the speaker button turns it on.
     var voiceGuideEnabled by remember { mutableStateOf(false) }
-
-    // Tooltip / Cheat Sheet dialog states
-    var showHeightHelper by remember { mutableStateOf(false) }
-    var showTdeeHelper by remember { mutableStateOf(false) }
+    var showBurnInfo by remember { mutableStateOf(false) }
 
     // Text to Speech engine configuration
     var tts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
@@ -91,11 +95,7 @@ fun OnboardingScreen(
         var ttsInstance: android.speech.tts.TextToSpeech? = null
         ttsInstance = android.speech.tts.TextToSpeech(context) { status ->
             if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-                try {
-                    ttsInstance?.language = java.util.Locale.US
-                } catch (e: Exception) {
-                    // Fallback
-                }
+                runCatching { ttsInstance?.language = java.util.Locale.US }
             }
         }
         tts = ttsInstance
@@ -107,41 +107,20 @@ fun OnboardingScreen(
 
     val guidanceVoices = remember {
         mapOf(
-            0 to "Welcome to Superfit! It is the absolute easiest way to track your fitness and get personalized, science-backed insights. Choose your appearance preference and tap Get Started to begin our journey!",
-            1 to "Let's enter your essential stats so we can calculate your resting metabolism.",
-            2 to "Awesome! Now, select your baseline activity level and fitness goals. We'll use these to find your daily energy budget.",
-            3 to "Pick how your AI coach talks to you. Supportive, straight talk, or roast me.",
-            4 to "Great. Now let's connect your steps and sleep. Tap Connect, and your height and weight can fill in too.",
-            5 to "We are all set! Remember that tracking your meals and workouts is now easier than ever. By logging your entries regularly, you provide richer, more complete data for analysis—making Superfit vastly more useful to help you reach your goals. Activate your coach to start!"
+            STEP_WELCOME to "Welcome to Superfit. Tell it what you ate, or snap your plate, and your AI coach does the counting. Tap Get started.",
+            STEP_HEALTH to "Connect Health Connect, and Superfit can add your steps and workouts, and fill in your height and weight. Or tap Not now.",
+            STEP_ABOUT_YOU to "Now a few things about you, so we can work out how many calories your body burns at rest.",
+            STEP_GOAL to "Pick your goal, and how active a normal week is. We'll set your daily calories and protein from this.",
+            STEP_COACH to "Pick how your AI coach talks to you. Supportive, straight talk, or roast me. Same advice, different voice.",
+            STEP_ALL_SET to "You're all set. Here's your daily plan. Tap Start using Superfit, and log your first meal."
         )
     }
 
-    // Dynamic narration triggers on step navigation
     LaunchedEffect(currentStep, voiceGuideEnabled) {
         val currentTts = tts ?: return@LaunchedEffect
-        if (!voiceGuideEnabled) {
-            currentTts.stop()
-            return@LaunchedEffect
-        }
-
         currentTts.stop()
-
-        val voicePhrase = guidanceVoices[currentStep] ?: ""
-        if (voicePhrase.isNotEmpty()) {
-            if (currentStep == 0) {
-                val part1 = "Welcome to Superfit!"
-                val part2 = "It is the easiest way to track your fitness and get personalized, science-backed insights. Choose your appearance preference and tap Get Started to begin our journey!"
-
-                speakUtterance(currentTts, part1)
-                while (currentTts.isSpeaking) {
-                    kotlinx.coroutines.delay(100)
-                }
-                kotlinx.coroutines.delay(1400) // Precise 1.4 second pause strictly after Greeting
-                speakUtterance(currentTts, part2)
-            } else {
-                speakUtterance(currentTts, voicePhrase)
-            }
-        }
+        if (!voiceGuideEnabled) return@LaunchedEffect
+        guidanceVoices[currentStep]?.let { speakUtterance(currentTts, it) }
     }
 
     val view = LocalView.current
@@ -153,330 +132,183 @@ fun OnboardingScreen(
         }
     }
 
-    // Health Connect Permission Launcher
+    // Health Connect permission prompt: on the Health step it moves on to "About you" with
+    // height and weight filled in; from the last step it just refreshes "Connected".
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) { granted ->
         viewModel.checkPermissions()
         if (granted.isNotEmpty()) {
             viewModel.autofillFromHealthConnect()
-            currentStep = 5
+            if (currentStep == STEP_HEALTH) currentStep = STEP_ABOUT_YOU
         }
+    }
+
+    fun goBack() {
+        aboutYouErrors = AboutYouErrors()
+        currentStep -= 1
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(ThemeBgStart, ThemeBgEnd)
-                )
-            )
+            .background(colors.bgStart)
     ) {
-        // Ambient Aurora background glow
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(HyperViolet.copy(alpha = 0.12f), Color.Transparent),
-                    center = Offset(0f, 0f),
-                    radius = size.minDimension * 0.8f
-                ),
-                radius = size.minDimension * 0.8f,
-                center = Offset(0f, 0f)
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(com.superfit.app.theme.ElectricCyan.copy(alpha = 0.08f), Color.Transparent),
-                    center = Offset(size.width, size.height * 0.5f),
-                    radius = size.minDimension * 0.7f
-                ),
-                radius = size.minDimension * 0.7f,
-                center = Offset(size.width, size.height * 0.5f)
-            )
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .systemBarsPadding()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .imePadding()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
-            // Header navigation / actions bar
+            // Top bar: back, "Step N of 6", read aloud
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .height(52.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (currentStep > 0) {
-                    IconButton(
-                        onClick = {
-                            validationError = null
-                            currentStep -= 1
-                        },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(ThemeCardBgTranslucent)
-                            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp)),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = ThemeTextPrimary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Navigate Back",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                } else {
-                    if (onBack != null) {
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(ThemeCardBgTranslucent)
-                                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp)),
-                            colors = IconButtonDefaults.iconButtonColors(
-                                contentColor = ThemeTextPrimary
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Exit Preview Mode",
-                                modifier = Modifier.size(20.dp)
-                            )
+                val backAction: (() -> Unit)? = if (currentStep > STEP_WELCOME) ({ goBack() }) else onBack
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    if (backAction != null) {
+                        IconButton(onClick = backAction) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textPrimary)
                         }
-                    } else {
-                        Spacer(modifier = Modifier.width(40.dp))
                     }
                 }
-
                 Text(
-                    text = "SUPERFIT",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                    color = ThemeTextPrimary,
-                    letterSpacing = 2.sp
+                    text = "Step ${currentStep + 1} of $STEP_COUNT",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.textSecondary,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
-
-                // Voice Guide Equalizer / Toggle button
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (voiceGuideEnabled) ElectricCyan.copy(alpha = 0.12f) else ThemeTextPrimary.copy(alpha = 0.03f))
-                        .border(1.dp, if (voiceGuideEnabled) ElectricCyan else ThemeGlassBorder, RoundedCornerShape(20.dp))
-                        .clickable { voiceGuideEnabled = !voiceGuideEnabled }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                IconButton(
+                    onClick = { voiceGuideEnabled = !voiceGuideEnabled },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = if (voiceGuideEnabled) colors.brandSoft else androidx.compose.ui.graphics.Color.Transparent,
+                        contentColor = if (voiceGuideEnabled) colors.primaryAccent else colors.textSecondary
+                    )
                 ) {
-                    Text(
-                        text = if (voiceGuideEnabled) "Voice: On" else "Voice: Off",
-                        color = if (voiceGuideEnabled) ElectricCyan else ThemeTextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = if (voiceGuideEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                        contentDescription = if (voiceGuideEnabled) "Stop reading aloud" else "Read aloud"
                     )
                 }
             }
 
-            // Segmented progress indicator bar
-            val animatedProgress by animateFloatAsState(
-                targetValue = (currentStep + 1) / 6f,
-                label = "progressBarGlow"
-            )
-            Box(
+            // Segmented progress: one green bar per finished or current step
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(3.dp)
-                    .background(Color.White.copy(alpha = 0.06f), shape = RoundedCornerShape(10.dp))
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(animatedProgress)
-                        .background(
-                            brush = Brush.horizontalGradient(listOf(NeonGreen, com.superfit.app.theme.ElectricCyan)),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                )
+                repeat(STEP_COUNT) { i ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(if (i <= currentStep) NeonMint else colors.fieldBg)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Wizard step view content area (Animated slide/scale entries)
-            Box(
+            AnimatedContent(
+                targetState = currentStep,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        (slideInHorizontally { width -> width } + fadeIn()).togetherWith(slideOutHorizontally { width -> -width } + fadeOut())
+                    } else {
+                        (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(slideOutHorizontally { width -> width } + fadeOut())
+                    }
+                },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                AnimatedContent(
-                    targetState = currentStep,
-                    transitionSpec = {
-                        if (targetState > initialState) {
-                            (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
-                                slideOutHorizontally { width -> -width } + fadeOut()
-                            )
-                        } else {
-                            (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
-                                slideOutHorizontally { width -> width } + fadeOut()
-                            )
-                        }
-                    },
-                    label = "StepNavigationTransition"
-                ) { step ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        when (step) {
-                            0 -> WelcomeStep(
-                                isDarkTheme = isDarkTheme,
-                                onThemeChange = { isDark -> ThemeConfig.setThemeMode(context, isDark) },
-                                onNext = { currentStep = 1 }
-                            )
-                            1 -> PhysiologyStep(
-                                uiState = uiState,
-                                viewModel = viewModel,
-                                validationError = validationError,
-                                onOpenCheatSheet = { showHeightHelper = true },
-                                onNext = {
-                                    val ageInt = uiState.age.toIntOrNull()
-                                    val heightDouble = uiState.height.toDoubleOrNull()
-                                    val weightDouble = uiState.weight.toDoubleOrNull()
-                                    if (ageInt == null || ageInt <= 0 || heightDouble == null || heightDouble <= 0 || weightDouble == null || weightDouble <= 0) {
-                                        validationError = "Please enter valid age, weight, and height measurements to continue."
-                                    } else {
-                                        validationError = null
-                                        currentStep = 2
-                                    }
-                                }
-                            )
-                            2 -> ActivityGoalsStep(
-                                uiState = uiState,
-                                viewModel = viewModel,
-                                onOpenTdeePopup = { showTdeeHelper = true },
-                                onNext = { currentStep = 3 }
-                            )
-                            3 -> CoachStyleStep(
-                                selected = coachStyle,
-                                onSelect = { coachStyle = it },
-                                onNext = {
-                                    com.superfit.app.data.CoachStyleStore.save(context, coachStyle)
-                                    currentStep = 4
-                                }
-                            )
-                            4 -> HealthConnectStep(
-                                uiState = uiState,
-                                healthConnectManager = healthConnectManager,
-                                requestPermissionsLauncher = requestPermissionsLauncher,
-                                onNext = { currentStep = 5 }
-                            )
-                            5 -> OnboardingSummaryStep(
-                                uiState = uiState,
-                                onStartClick = { viewModel.saveProfile(onOnboardingComplete) }
-                            )
-                        }
+                label = "StepNavigationTransition"
+            ) { step ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    when (step) {
+                        STEP_WELCOME -> WelcomeStep(onNext = { currentStep = STEP_HEALTH })
+                        STEP_HEALTH -> HealthConnectStep(
+                            uiState = uiState,
+                            healthConnectManager = healthConnectManager,
+                            requestPermissionsLauncher = requestPermissionsLauncher,
+                            onNext = { currentStep = STEP_ABOUT_YOU }
+                        )
+                        STEP_ABOUT_YOU -> AboutYouStep(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            errors = aboutYouErrors,
+                            onNext = {
+                                val errors = AboutYouErrors(
+                                    age = (uiState.age.toIntOrNull() ?: 0) <= 0,
+                                    height = (uiState.height.toDoubleOrNull() ?: 0.0) <= 0.0,
+                                    weight = (uiState.weight.toDoubleOrNull() ?: 0.0) <= 0.0
+                                )
+                                aboutYouErrors = errors
+                                if (!errors.any) currentStep = STEP_GOAL
+                            }
+                        )
+                        STEP_GOAL -> GoalStep(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            onOpenBurnInfo = { showBurnInfo = true },
+                            onNext = { currentStep = STEP_COACH }
+                        )
+                        STEP_COACH -> CoachStyleStep(
+                            selected = coachStyle,
+                            onSelect = { coachStyle = it },
+                            onNext = {
+                                com.superfit.app.data.CoachStyleStore.save(context, coachStyle)
+                                currentStep = STEP_ALL_SET
+                            }
+                        )
+                        STEP_ALL_SET -> OnboardingSummaryStep(
+                            uiState = uiState,
+                            onConnectHealth = {
+                                com.superfit.app.ui.launchHealthConnectPermissions(
+                                    context,
+                                    requestPermissionsLauncher,
+                                    healthConnectManager.permissions + healthConnectManager.bodyPermissions
+                                )
+                            },
+                            onStartClick = { viewModel.saveProfile(onOnboardingComplete) }
+                        )
                     }
                 }
             }
         }
 
-        // Height Helper cheat sheet dialog overlay
-        if (showHeightHelper) {
+        if (showBurnInfo) {
             AlertDialog(
-                onDismissRequest = { showHeightHelper = false },
-                title = {
-                    Text(
-                        text = "Height conversion chart",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = ThemeTextPrimary
-                    )
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Reference conversions from feet and inches to metric centimeters:",
-                            fontSize = 13.sp,
-                            color = ThemeTextSecondary
-                        )
-                        HorizontalDivider(color = ThemeTextPrimary.copy(alpha = 0.05f))
-
-                        val chart = listOf(
-                            "5'0\" (5 ft 0 in)" to "152 cm",
-                            "5'2\" (5 ft 2 in)" to "157 cm",
-                            "5'4\" (5 ft 4 in)" to "163 cm",
-                            "5'6\" (5 ft 6 in)" to "168 cm",
-                            "5'8\" (5 ft 8 in)" to "173 cm",
-                            "5'10\" (5 ft 10 in)" to "178 cm",
-                            "6'0\" (6 ft 0 in)" to "183 cm",
-                            "6'2\" (6 ft 2 in)" to "188 cm"
-                        )
-                        chart.forEach { (imp, met) ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = imp, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = ThemeTextPrimary)
-                                Text(text = met, fontSize = 12.sp, color = ThemeTextSecondary)
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { showHeightHelper = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
-                    ) {
-                        Text("Done", fontWeight = FontWeight.Bold)
-                    }
-                },
-                containerColor = ThemeCardBgTranslucent,
-                modifier = Modifier.border(1.dp, ThemeGlassBorder, RoundedCornerShape(28.dp))
-            )
-        }
-
-        // TDEE informational popup overlay
-        if (showTdeeHelper) {
-            AlertDialog(
-                onDismissRequest = { showTdeeHelper = false },
-                title = {
-                    Text(
-                        text = "What you burn in a day",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = ThemeTextPrimary
-                    )
-                },
+                onDismissRequest = { showBurnInfo = false },
+                containerColor = colors.cardBg,
+                title = { Text("What you burn in a day", style = MaterialTheme.typography.titleLarge, color = colors.textPrimary) },
                 text = {
                     Text(
-                        text = "Total Daily Energy Expenditure (TDEE) is the total calories your body burns in 24 hours. " +
-                            "It is calculated by multiplying your resting metabolic speed (BMR) with your physical baseline activity multiplier. " +
-                            "Superfit uses your TDEE as the starting energy budget from which we subtract/add calories to meet your targets.",
-                        fontSize = 13.sp,
-                        color = ThemeTextSecondary,
-                        lineHeight = 18.sp
+                        "This is roughly what your body uses in a day: what it burns at rest, plus everyday moving. " +
+                            "Your target starts here, then goes down to lose fat or up to build muscle. " +
+                            "Workouts you log or connect are added on top.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
                     )
                 },
                 confirmButton = {
-                    Button(
-                        onClick = { showTdeeHelper = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
-                    ) {
-                        Text("Got it", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { showBurnInfo = false }) {
+                        Text("Got it", style = MaterialTheme.typography.labelLarge, color = colors.primaryAccent)
                     }
-                },
-                containerColor = ThemeCardBgTranslucent,
-                modifier = Modifier.border(1.dp, ThemeGlassBorder, RoundedCornerShape(28.dp))
+                }
             )
         }
     }
