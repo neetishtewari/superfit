@@ -358,7 +358,6 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
                 CircularProgressIndicator(progress = { p }, color = SuperfitTheme.colors.primaryAccent)
                 Spacer(Modifier.height(14.dp))
                 Text("Making your video… ${(p * 100).toInt()}%", color = SuperfitTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text("With ${monthName(month)}'s music", color = SuperfitTheme.colors.textSecondary, fontSize = 13.sp)
             }
         }
     }
