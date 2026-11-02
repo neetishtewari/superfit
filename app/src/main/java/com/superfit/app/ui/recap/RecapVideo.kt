@@ -89,7 +89,9 @@ object RecapVideo {
         require(cards > 0)
         val cardMs = RecapAutoplay.videoCardMs(cards)
         val totalMs = cardMs * cards
-        val audio = runCatching { encodeAudio(context, music, totalMs) }.getOrNull()
+        onProgress(0.01f)
+        // The music comes first and takes a few seconds, so it gets the first tenth of the bar.
+        val audio = runCatching { encodeAudio(context, music, totalMs) { onProgress(0.01f + 0.09f * it) } }.getOrNull()
         onProgress(0.1f)
         out.delete()
         val muxer = MediaMuxer(out.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
@@ -245,8 +247,9 @@ object RecapVideo {
     }
 
     /** The month's track, decoded, looped to [totalMs], faded in and out, and encoded as AAC. */
-    private fun encodeAudio(context: Context, music: Int, totalMs: Long): Encoded {
+    private fun encodeAudio(context: Context, music: Int, totalMs: Long, onProgress: (Float) -> Unit): Encoded {
         val (pcm, rate, channels) = decode(context, music)
+        onProgress(0.4f)
         val total = (totalMs * rate / 1000).toInt() * channels
         val fadeIn = rate * channels / 4
         val fadeOut = rate * channels * 3 / 2
@@ -288,6 +291,7 @@ object RecapVideo {
                             buf.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(looped, pos, n)
                             codec.queueInputBuffer(idx, 0, n * 2, pts, 0)
                             pos += n
+                            onProgress(0.4f + 0.6f * pos / total)
                         }
                     }
                 }

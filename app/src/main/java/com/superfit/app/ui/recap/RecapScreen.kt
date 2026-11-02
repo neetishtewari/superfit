@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -358,7 +359,7 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
             }
             if (cards.size > stories) {
                 TextButton(onClick = { go(cards.size - 1) }) {
-                    Text("Get more from Superfit", color = SuperfitTheme.colors.textSecondary, fontWeight = FontWeight.Bold)
+                    Text("Setup tips", color = SuperfitTheme.colors.textSecondary, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         }
@@ -391,31 +392,35 @@ private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth, onSh
         onDispose { onLayer(null) }
     }
     var busy by remember { mutableStateOf(false) }
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        CapturableStory(layer, Modifier.fillMaxWidth().then(tapModifier)) { RecapStory(card, words, month) }
-        Button(
-            onClick = {
-                busy = true
-                onSharing(true)
-                scope.launch {
-                    try {
-                        shareImage(context, layer.toImageBitmap().asAndroidBitmap())
-                        AppAnalytics.cardShared("recap_${card.id}")
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        busy = false
-                        onSharing(false)
+    // The card shrinks to leave room for its Share button on shorter screens, keeping its 9:16 shape.
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val cardWidth = if (constraints.hasBoundedHeight) minOf(maxWidth, ((maxHeight - 66.dp) * 9f / 16f).coerceAtLeast(120.dp)) else maxWidth
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            CapturableStory(layer, Modifier.width(cardWidth).then(tapModifier)) { RecapStory(card, words, month) }
+            Button(
+                onClick = {
+                    busy = true
+                    onSharing(true)
+                    scope.launch {
+                        try {
+                            shareImage(context, layer.toImageBitmap().asAndroidBitmap())
+                            AppAnalytics.cardShared("recap_${card.id}")
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            busy = false
+                            onSharing(false)
+                        }
                     }
-                }
-            },
-            enabled = !busy,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = SuperfitTheme.colors.primaryAccent, contentColor = Color.White)
-        ) {
-            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Share this card", fontWeight = FontWeight.Bold)
+                },
+                enabled = !busy,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(containerColor = SuperfitTheme.colors.primaryAccent, contentColor = Color.White)
+            ) {
+                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Share this card", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
