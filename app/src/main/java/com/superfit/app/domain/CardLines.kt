@@ -31,7 +31,7 @@ object CardLines {
     """
 
     /** The facts the AI may use, one per line. Only what the coach already gets, plus effort minutes. */
-    fun facts(card: ShareCard.Activity, weekCount: Int?): String = buildList {
+    fun facts(card: ShareCard.Activity, weekCount: CardCount?): String = buildList {
         val w = card.workout
         val v = card.voice
         if (w != null) {
@@ -52,11 +52,7 @@ object CardLines {
         card.heart?.effortMinutes?.takeIf { it.isNotEmpty() }?.let { m ->
             add("Effort minutes: " + m.entries.joinToString(", ") { "${it.key.label.lowercase(Locale.US)} ${it.value}" })
         }
-        if (card.walksToday != null) {
-            add("Walks today so far, this one included: ${card.walksToday}")
-        } else {
-            weekCount?.takeIf { it > 0 }?.let { add("Workouts this week so far, this one included (walks not counted): $it") }
-        }
+        weekCount?.takeIf { it.n > 0 }?.let { add("${it.plural.replaceFirstChar { c -> c.uppercase() }} this week so far, this one included: ${it.n}") }
         card.moment?.let { add("Stand-out: $it") }
         add("Time of day: ${card.dateLine}")
     }.joinToString("\n")
@@ -87,10 +83,9 @@ object CardLines {
         .trim()
 
     /** The one fair, true line every roast ends with. */
-    fun fairLine(moment: String?, weekCount: Int?, walksToday: Int? = null): String = when {
+    fun fairLine(moment: String?, weekCount: CardCount?): String = when {
         moment != null -> "Still: ${moment.replaceFirstChar { it.lowercase(Locale.getDefault()) }}."
-        walksToday != null -> if (walksToday >= 2) "Still: ${ordinal(walksToday)} walk today." else "Still showed up. That counts."
-        weekCount != null && weekCount >= 2 -> "Still: ${ordinal(weekCount)} workout this week."
+        weekCount != null && weekCount.n >= 2 -> "Still: ${weekCount.phrase()}."
         else -> "Still showed up. That counts."
     }
 
@@ -114,4 +109,21 @@ object CardLines {
 
     /** The style the coach line is written in: Roast me users get the supportive voice, since Roast is its own chip. */
     fun coachStyle(current: CoachStyle): CoachStyle = if (current == CoachStyle.ROAST) CoachStyle.SUPPORTIVE else current
+}
+
+/** "3rd run this week": runs, walks, swims and rides are counted apart from other workouts. */
+data class CardCount(val n: Int, val noun: String) {
+    val plural: String get() = noun + "s"
+    fun phrase(): String = "${CardLines.ordinal(n)} $noun this week"
+
+    companion object {
+        /** The kind a workout title is counted as; voice-logged and other workouts are "workout". */
+        fun nounFor(title: String?): String = when (title) {
+            "Run" -> "run"
+            "Walk" -> "walk"
+            "Swim" -> "swim"
+            "Ride" -> "ride"
+            else -> "workout"
+        }
+    }
 }

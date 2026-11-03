@@ -61,9 +61,8 @@ sealed interface ShareCard {
         /** The fair, true line a roast ends with. */
         val fairLine: String? = null,
         /** Workouts this week up to this one (walks not counted), for the AI lines' facts. */
-        val weekCount: Int? = null,
-        /** On a walk card: walks so far today, this one included. Walks never count as workouts. */
-        val walksToday: Int? = null
+        /** How many of this kind (runs, walks, swims, rides or other workouts) so far this week, this one included. */
+        val weekCount: CardCount? = null
     ) : ShareCard {
         val showMoment: Boolean get() = CardChip.STANDOUT in chips && moment != null
         val shownHeart: HeartLine? get() = heart?.takeIf { CardChip.HEART in chips }

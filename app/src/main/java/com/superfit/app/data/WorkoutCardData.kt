@@ -56,16 +56,10 @@ object WorkoutCardData {
         val imported = safe("imported workouts") { repository.getImportedWorkoutViews(bmr) }.orEmpty()
         val voiceLogs = safe("voice workouts") { repository.getAllWorkoutEntries() }.orEmpty()
         val start = card.workout?.startTime ?: card.voice!!.timestamp
-        val weekCount = weekCount(start, imported, voiceLogs, zone)
+        val weekCount = weekCount(start, card.workout?.title, imported, voiceLogs, zone)
         val journey = profile?.let { safe("journey") { journey(app, repository, it, zone) } }
 
-        // A walk card talks about walks: the workout count leaves walks out.
-        val walksToday = card.workout?.takeIf { it.title == "Walk" }?.let { walk ->
-            val day = Instant.ofEpochMilli(walk.startTime).atZone(zone).toLocalDate()
-            imported.count { it.title == "Walk" && it.startTime <= walk.startTime && Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() == day }
-                .coerceAtLeast(1)
-        }
-        var out = card.copy(journey = journey, weekCount = if (walksToday != null) null else weekCount, walksToday = walksToday)
+        var out = card.copy(journey = journey, weekCount = weekCount)
         val workout = card.workout
         if (workout != null) {
             val primary = workout.merged.primary
@@ -84,9 +78,9 @@ object WorkoutCardData {
             if (entry.workoutType == "Strength" || ActivityPatterns.exercises(entry.description).isNotEmpty()) {
                 safe("strength card") { strength(app, entry, imported, voiceLogs, zone) }?.let { out = ShareCards.withStrength(out, it) }
             }
-            out = out.copy(moment = if (weekCount >= 3) "${CardLines.ordinal(weekCount)} workout this week" else null)
+            out = out.copy(moment = if (weekCount.n >= 3) weekCount.phrase().replaceFirstChar { it.uppercase() } else null)
         }
-        return out.copy(fairLine = CardLines.fairLine(out.moment, out.weekCount, walksToday))
+        return out.copy(fairLine = CardLines.fairLine(out.moment, weekCount))
     }
 
     /**
@@ -101,7 +95,7 @@ object WorkoutCardData {
         val key = listOf(LINES_VERSION, chip.key, cardKey(card), style.name).joinToString("|")
         prefs.savedLine(key)?.let { return it }
         val facts = CardLines.facts(card, card.weekCount)
-        // v3: walk cards got their own count (walks today) instead of the workout count.
+        // v3: runs, walks, swims and rides are counted apart from other workouts.
         val system = (if (chip == CardChip.COACH) CardLines.COACH_SYSTEM else CardLines.ROAST_SYSTEM).trimIndent() + style.instruction()
         val maxWords = if (chip == CardChip.COACH) CardLines.COACH_MAX_WORDS else CardLines.ROAST_MAX_WORDS
         repeat(2) {
@@ -124,13 +118,17 @@ object WorkoutCardData {
     private fun cardKey(card: ShareCard.Activity): String =
         card.workout?.merged?.primary?.id ?: card.voice?.let { "voice_${it.id}_${it.timestamp}" } ?: card.dateLine
 
-    /** Workouts in the week (Monday on) of [start], up to and including it. Walks don't count. */
-    private fun weekCount(start: Long, imported: List<WorkoutView>, voice: List<WorkoutEntryEntity>, zone: ZoneId): Int {
+    /**
+     * How many of this kind the user did in the week (Monday on) of [start], up to and including it:
+     * runs, walks, swims and rides each count apart; voice logs and every other type count as workouts.
+     */
+    private fun weekCount(start: Long, title: String?, imported: List<WorkoutView>, voice: List<WorkoutEntryEntity>, zone: ZoneId): CardCount {
+        val noun = CardCount.nounFor(title)
         val monday = Instant.ofEpochMilli(start).atZone(zone).toLocalDate().with(DayOfWeek.MONDAY)
         val from = monday.atStartOfDay(zone).toInstant().toEpochMilli()
-        val i = imported.count { it.title != "Walk" && it.startTime in from..start }
-        val v = voice.count { it.timestamp in from..start }
-        return i + v
+        val i = imported.count { CardCount.nounFor(it.title) == noun && it.startTime in from..start }
+        val v = if (noun == "workout") voice.count { it.timestamp in from..start } else 0
+        return CardCount((i + v).coerceAtLeast(1), noun)
     }
 
     /** "Day 34 of my journey", with goal progress only when the user allows weight on cards. Null without a goal. */

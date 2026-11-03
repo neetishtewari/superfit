@@ -27,15 +27,17 @@ class CardLinesTest {
 
     @Test
     fun roastEndsOnSomethingTrue() {
-        assertEquals("Still: fastest 5 km in a month.", CardLines.fairLine("Fastest 5 km in a month", 1))
-        assertEquals("Still: 3rd workout this week.", CardLines.fairLine(null, 3))
-        assertEquals("Still showed up. That counts.", CardLines.fairLine(null, 1))
+        assertEquals("Still: fastest 5 km in a month.", CardLines.fairLine("Fastest 5 km in a month", CardCount(1, "run")))
+        assertEquals("Still: 3rd workout this week.", CardLines.fairLine(null, CardCount(3, "workout")))
+        assertEquals("Still showed up. That counts.", CardLines.fairLine(null, CardCount(1, "workout")))
     }
 
     @Test
-    fun walkCardsCountWalksNotWorkouts() {
-        assertEquals("Still: 3rd walk today.", CardLines.fairLine(null, null, walksToday = 3))
-        assertEquals("Still showed up. That counts.", CardLines.fairLine(null, null, walksToday = 1))
+    fun eachKindIsCountedApart() {
+        assertEquals("Still: 3rd walk this week.", CardLines.fairLine(null, CardCount(3, CardCount.nounFor("Walk"))))
+        assertEquals("Still: 2nd swim this week.", CardLines.fairLine(null, CardCount(2, CardCount.nounFor("Swim"))))
+        assertEquals("workout", CardCount.nounFor("HIIT"))
+        assertEquals("workout", CardCount.nounFor(null))
     }
 
     @Test
