@@ -112,8 +112,13 @@ class ShareCardsTest {
     @Test
     fun strengthCardIsNamedAfterTheWorkout() {
         val w = ImportedWorkoutEntity(
-            id = "s", sourcePackage = "com.sec.android.app.shealth", exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
-            startTime = sixFortyTwo, endTime = sixFortyTwo + 50 * 60_000L, avgHeartRate = 130, detailsRead = true
+            id = "s",
+            sourcePackage = "com.sec.android.app.shealth",
+            exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+            startTime = sixFortyTwo,
+            endTime = sixFortyTwo + 50 * 60_000L,
+            avgHeartRate = 130,
+            detailsRead = true
         )
         val card = ShareCards.activity(WorkoutDisplay.view(MergedWorkout(w, listOf("s")), "Samsung Health", 1700.0), utc)
         assertEquals("STRENGTH WORKOUT", card.heading)

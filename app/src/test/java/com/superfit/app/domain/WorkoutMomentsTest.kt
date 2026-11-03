@@ -11,6 +11,7 @@ import org.junit.Test
 class WorkoutMomentsTest {
 
     private val utc = ZoneOffset.UTC
+
     // A Wednesday.
     private val today = LocalDate.of(2026, 11, 4)
     private var n = 0
