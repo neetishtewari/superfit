@@ -116,10 +116,11 @@ private val BadgeBackground: Color @Composable get() = LocalCardPalette.current.
 private val BadgeBorder: Color @Composable get() = LocalCardPalette.current.badgeBorder
 
 /** The colours the user can pick in the preview. */
-val CardAccents = listOf(NeonMint, ElectricCyan, HyperViolet, SolarAmber)
+val CardOrange = Color(0xFFFF7A1A)
+val CardAccents = listOf(CardOrange, NeonMint, ElectricCyan, HyperViolet)
 
-/** Personal bests default to violet, everything else to mint, as in the approved mock-ups. */
-fun defaultAccent(card: ShareCard): Color = if (card is ShareCard.Best) HyperViolet else NeonMint
+/** Orange by default (Neetish, 2026-11-03); the user can pick another. */
+fun defaultAccent(card: ShareCard): Color = CardOrange
 
 /** A share card, laid out at 360 x 640 dp (Story size, 9:16). */
 @Composable

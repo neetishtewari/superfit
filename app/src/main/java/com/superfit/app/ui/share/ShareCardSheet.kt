@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -100,7 +101,7 @@ const val CARD_HEIGHT_PX = 1920
 private val CardDensity = Density(density = 3f, fontScale = 1f)
 
 private const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
-private val accentNames = listOf("Mint", "Cyan", "Violet", "Amber")
+private val accentNames = listOf("Orange", "Mint", "Cyan", "Violet")
 
 // Whether the photo hint was seen; the rest of the saved share choices live in ShareCardPrefs.
 private const val KEY_HINT_SHOWN = "photo_hint_shown"
@@ -122,7 +123,8 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     val cardPrefs = remember { ShareCardPrefs(prefs) }
     var accent by remember(card) { mutableStateOf(defaultAccent(card)) }
     var busy by remember { mutableStateOf(false) }
-    var light by remember { mutableStateOf(false) }
+    // Light background by default (Neetish, 2026-11-03).
+    var light by remember { mutableStateOf(true) }
     // The user's photo lives only in memory while the sheet is open; it is never saved or uploaded.
     var photo by remember(card) { mutableStateOf<ImageBitmap?>(null) }
     var frame by remember(card) { mutableStateOf(PhotoFrame()) }
@@ -272,50 +274,86 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                         }
                     }
                 }
-                if (card is ShareCard.Daily) {
-                    preview(Modifier.fillMaxWidth(0.7f))
-                } else {
-                    // Photo and card options sit beside the preview, so they're seen without scrolling.
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (current == null) {
-                                OptionPill("Add photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
-                                    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                }
-                            } else {
-                                OptionPill("Remove photo", Icons.Filled.Close, on = false, accent = accent) {
-                                    photo = null
-                                    frame = PhotoFrame()
-                                    showHint = false
-                                }
-                            }
-                            if (available.isNotEmpty()) {
-                                Text(
-                                    "Add to card",
-                                    color = SuperfitTheme.colors.textSecondary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 6.dp)
-                                )
-                                available.forEach { chip ->
-                                    val on = chip in chips
-                                    OptionPill(
-                                        if (writing == chip) "${chip.label}…" else chip.label,
-                                        if (on) Icons.Filled.Check else null,
-                                        on = on,
-                                        accent = accent
-                                    ) {
-                                        val next = CardChip.toggle(chips, chip)
-                                        if (chip == failed) failed = null
-                                        if (onPhoto) chipsPhoto = next else chipsPlain = next
-                                    }
-                                }
-                            }
+                // A big preview with small colour and background choices beside it.
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    preview(Modifier.fillMaxWidth(0.74f))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CardAccents.forEachIndexed { i, color ->
+                            val picked = color == accent
+                            Box(
+                                Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .then(if (picked) Modifier.border(2.dp, SuperfitTheme.colors.textPrimary, CircleShape) else Modifier)
+                                    .clickable { accent = color }
+                                    .semantics { contentDescription = "${accentNames[i]}${if (picked) ", chosen" else ""}" }
+                            )
                         }
-                        preview(Modifier.weight(1.45f))
+                        Spacer(Modifier.height(6.dp))
+                        if (current == null) {
+                            // Dark or light background; a photo card always keeps its dark fade.
+                            MiniChoice("Dark", !light, accent) { light = false }
+                            MiniChoice("Light", light, accent) { light = true }
+                        } else {
+                            Text("Stats", color = SuperfitTheme.colors.textSecondary, fontSize = 10.sp)
+                            MiniChoice("Top", frame.statsTop, accent) { frame = frame.copy(statsTop = true) }
+                            MiniChoice("Bottom", !frame.statsTop, accent) { frame = frame.copy(statsTop = false) }
+                        }
                     }
                 }
                 if (showHint && current != null) {
                     Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
+                }
+                if (card !is ShareCard.Daily) {
+                    if (current == null) {
+                        OptionPill("Add your photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
+                            pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                    } else {
+                        OptionPill("Remove photo", Icons.Filled.Close, on = false, accent = accent, highlight = false, centered = true) {
+                            photo = null
+                            frame = PhotoFrame()
+                            showHint = false
+                        }
+                    }
+                }
+                if (available.isNotEmpty()) {
+                    Text("Add to card", color = SuperfitTheme.colors.textSecondary, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+                    // One row, so every option is seen at once.
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        available.forEach { chip ->
+                            val on = chip in chips
+                            val label = if (chip == CardChip.HEART) "Heart" else chip.label
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (on) accent else SuperfitTheme.colors.fieldBg)
+                                    .clickable {
+                                        val next = CardChip.toggle(chips, chip)
+                                        if (chip == failed) failed = null
+                                        if (onPhoto) chipsPhoto = next else chipsPlain = next
+                                    }
+                                    .padding(horizontal = 2.dp, vertical = 10.dp)
+                                    .semantics { contentDescription = "${chip.label}${if (on) ", on" else ", off"}" },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (writing == chip) "$label…" else label,
+                                    color = if (on) Color.Black else SuperfitTheme.colors.textPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    }
                 }
                 failed?.takeIf { it in chips }?.let { chip ->
                     Text(
@@ -342,28 +380,6 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                             }
                             .padding(vertical = 4.dp)
                     )
-                }
-                if (current == null) {
-                    // Dark or light background; a photo card always keeps its dark fade.
-                    ChoicePills(listOf(false to "Dark", true to "Light"), light, accent) { light = it }
-                } else {
-                    ChoicePills(listOf(false to "Stats at bottom", true to "Stats at top"), frame.statsTop, accent) {
-                        frame = frame.copy(statsTop = it)
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    CardAccents.forEachIndexed { i, color ->
-                        val picked = color == accent
-                        Box(
-                            Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .then(if (picked) Modifier.border(3.dp, SuperfitTheme.colors.textPrimary, CircleShape) else Modifier)
-                                .clickable { accent = color }
-                                .semantics { contentDescription = "${accentNames[i]}${if (picked) ", chosen" else ""}" }
-                        )
-                    }
                 }
             }
             Button(
@@ -412,7 +428,15 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
 
 /** One full-width choice beside the preview: filled with the accent when on; [highlight] draws the eye to "Add photo". */
 @Composable
-private fun OptionPill(label: String, icon: ImageVector?, on: Boolean, accent: Color, highlight: Boolean = false, onClick: () -> Unit) {
+private fun OptionPill(
+    label: String,
+    icon: ImageVector?,
+    on: Boolean,
+    accent: Color,
+    highlight: Boolean = false,
+    centered: Boolean = highlight,
+    onClick: () -> Unit
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -420,46 +444,43 @@ private fun OptionPill(label: String, icon: ImageVector?, on: Boolean, accent: C
             .background(if (on) accent else SuperfitTheme.colors.fieldBg)
             .then(if (highlight) Modifier.border(1.5.dp, accent, RoundedCornerShape(12.dp)) else Modifier)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = if (highlight) 14.dp else 10.dp)
             .semantics { contentDescription = if (highlight) label else "$label${if (on) ", on" else ", off"}" },
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (centered) Arrangement.Center else Arrangement.Start
     ) {
         icon?.let {
-            Icon(it, contentDescription = null, tint = if (on) Color.Black else accent, modifier = Modifier.size(16.dp))
+            Icon(it, contentDescription = null, tint = if (on) Color.Black else accent, modifier = Modifier.size(if (highlight) 20.dp else 16.dp))
             Spacer(Modifier.width(6.dp))
         }
         Text(
             label,
             color = if (on) Color.Black else SuperfitTheme.colors.textPrimary,
-            fontSize = 13.sp,
+            fontSize = if (highlight) 15.sp else 13.sp,
             fontWeight = if (on || highlight) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1
         )
     }
 }
 
-/** Two or more side-by-side choices, the picked one filled with the card's accent. */
+/** A small stacked choice beside the preview (Dark / Light, stats Top / Bottom). */
 @Composable
-private fun <T> ChoicePills(options: List<Pair<T, String>>, selected: T, accent: Color, onPick: (T) -> Unit) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(10.dp))
-    ) {
-        options.forEach { (value, label) ->
-            val picked = value == selected
-            Text(
-                label,
-                color = if (picked) Color.Black else SuperfitTheme.colors.textPrimary,
-                fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .background(if (picked) accent else Color.Transparent)
-                    .clickable { onPick(value) }
-                    .padding(horizontal = 18.dp, vertical = 8.dp)
-            )
-        }
-    }
+private fun MiniChoice(label: String, picked: Boolean, accent: Color, onPick: () -> Unit) {
+    Text(
+        label,
+        color = if (picked) Color.Black else SuperfitTheme.colors.textPrimary,
+        fontSize = 11.sp,
+        fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
+        maxLines = 1,
+        modifier = Modifier
+            .width(52.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (picked) accent else SuperfitTheme.colors.fieldBg)
+            .clickable(onClick = onPick)
+            .padding(vertical = 6.dp)
+            .semantics { contentDescription = "$label${if (picked) ", chosen" else ""}" },
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+    )
 }
 
 @Composable
