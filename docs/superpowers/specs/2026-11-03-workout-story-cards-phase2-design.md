@@ -69,11 +69,11 @@ The app's first in-app nudge, built so later nudges can use the same slot.
   Closing three in a row without sharing pauses it for a week, so it never nags.
 - Only for workouts worth showing: 15+ minutes, or any with a stand-out line, or a voice-logged
   strength session.
-- **Never for walks** (Neetish 11:11Z): Samsung Health and many watches and bands record every walk
-  over about 10 minutes on their own, and these don't go to Strava by default either. Health Connect
-  doesn't reliably say whether a walk was started by hand, so walks are left out entirely. A walk
-  that sets a personal best is already covered by the existing "New personal best" card. Walks can
-  still be shared from the workout list as today.
+- **Walks only from 30 minutes** (Neetish 11:11Z, 11:17Z): Samsung Health and many watches and bands
+  record every walk over about 10 minutes on their own, and these don't go to Strava by default
+  either. Health Connect doesn't reliably say whether a walk was started by hand, so shorter walks
+  never get the card; walks of 30+ minutes do. A walk that sets a personal best is already covered by
+  the existing "New personal best" card. Any walk can still be shared from the workout list.
 - Settings > Sharing: **Show "ready to share" on Home** switch (on by default).
 - Never a system notification; nothing new in Android notification settings.
 
