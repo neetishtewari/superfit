@@ -112,5 +112,12 @@ New `share_ready_shown`, `share_ready_closed`.
 
 ## Data safety
 
-No new permissions. Coach and roast lines send workout facts (type, minutes, effort minutes, counts)
-to the AI the same way the existing coach does; no new data types.
+No new permissions. Coach and roast lines send workout facts to the AI the same way the existing
+coach does: the coach already receives each imported workout's line with its average heart rate
+(`ImportedWorkouts.coachEntry` uses `detailLine`). Phase 2 sends only what that already covers plus
+derived effort minutes (e.g. "hard 10 min"); no raw heart-rate samples and no peak value. Before
+release, re-check the Data safety form and the Health Connect declaration still describe this.
+
+AI lines are checked before they go on a card: any number in the line that isn't one of the facts the
+app supplied (minutes, reps, km, counts) is rejected and the chip retries once, then falls back to
+the card without the line.
