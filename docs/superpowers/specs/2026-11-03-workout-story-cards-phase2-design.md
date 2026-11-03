@@ -67,8 +67,13 @@ The app's first in-app nudge, built so later nudges can use the same slot.
   today's workout: thumbnail of the card, "Your HIIT card is ready", **Share** and a close button.
 - Only for today's workouts, one at a time (the newest), gone at midnight or when shared or closed.
   Closing three in a row without sharing pauses it for a week, so it never nags.
-- Only for workouts worth showing: 15+ minutes, or any with a stand-out line, a personal best, or a
-  voice-logged strength session.
+- Only for workouts worth showing: 15+ minutes, or any with a stand-out line, or a voice-logged
+  strength session.
+- **Never for walks** (Neetish 11:11Z): Samsung Health and many watches and bands record every walk
+  over about 10 minutes on their own, and these don't go to Strava by default either. Health Connect
+  doesn't reliably say whether a walk was started by hand, so walks are left out entirely. A walk
+  that sets a personal best is already covered by the existing "New personal best" card. Walks can
+  still be shared from the workout list as today.
 - Settings > Sharing: **Show "ready to share" on Home** switch (on by default).
 - Never a system notification; nothing new in Android notification settings.
 
