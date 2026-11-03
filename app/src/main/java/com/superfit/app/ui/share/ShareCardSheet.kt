@@ -80,7 +80,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.WorkoutCardData
+import com.superfit.app.domain.CardChip
+import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
@@ -98,10 +101,7 @@ private val CardDensity = Density(density = 3f, fontScale = 1f)
 private const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
 private val accentNames = listOf("Mint", "Cyan", "Violet", "Amber")
 
-// Share screen choices that are remembered: the words switch and whether the photo hint was seen.
-private const val SHARE_PREFS = "share_card_prefs"
-private const val KEY_LINE_PHOTO = "line_on_photo"
-private const val KEY_LINE_PLAIN = "line_on_plain"
+// Whether the photo hint was seen; the rest of the saved share choices live in ShareCardPrefs.
 private const val KEY_HINT_SHOWN = "photo_hint_shown"
 
 // Longest side of a loaded photo: room to zoom in on a 1080 x 1920 card, about 20 MB at most.
@@ -117,7 +117,8 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
-    val prefs = remember { context.getSharedPreferences(SHARE_PREFS, Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences(ShareCardPrefs.FILE, Context.MODE_PRIVATE) }
+    val cardPrefs = remember { ShareCardPrefs(prefs) }
     var accent by remember(card) { mutableStateOf(defaultAccent(card)) }
     var busy by remember { mutableStateOf(false) }
     var light by remember { mutableStateOf(false) }
@@ -133,13 +134,57 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
             detailed = withContext(Dispatchers.IO) { WorkoutCardData.enrich(context, card) }
         }
     }
-    // "Just numbers" or "With one line", remembered separately for photo and plain cards.
-    var lineOnPhoto by remember { mutableStateOf(prefs.getBoolean(KEY_LINE_PHOTO, false)) }
-    var lineOnPlain by remember { mutableStateOf(prefs.getBoolean(KEY_LINE_PLAIN, true)) }
-    val withLine = if (photo != null) lineOnPhoto else lineOnPlain
+    // What's added to a workout card, kept apart for photo and plain cards, each starting from its default.
+    var savedPlain by remember { mutableStateOf(cardPrefs.defaults(photo = false)) }
+    var savedPhoto by remember { mutableStateOf(cardPrefs.defaults(photo = true)) }
+    var chipsPlain by remember(card) { mutableStateOf(savedPlain) }
+    var chipsPhoto by remember(card) { mutableStateOf(savedPhoto) }
+    val onPhoto = photo != null
+    val chips = if (onPhoto) chipsPhoto else chipsPlain
+    val style = remember { CoachStyle.current }
+    // The AI lines are written only when their chip is picked, then kept for this card.
+    var coachLine by remember(card) { mutableStateOf<String?>(null) }
+    var roastLine by remember(card) { mutableStateOf<String?>(null) }
+    var writing by remember(card) { mutableStateOf<CardChip?>(null) }
+    var failed by remember(card) { mutableStateOf<CardChip?>(null) }
+    var retries by remember(card) { mutableStateOf(0) }
     val base = detailed ?: card
-    val shown = if (base is ShareCard.Activity) base.copy(showMoment = withLine) else base
-    val hasMoment = (shown as? ShareCard.Activity)?.moment != null
+    val activityBase = base as? ShareCard.Activity
+    val wantsAi = when {
+        CardChip.COACH in chips && coachLine == null -> CardChip.COACH
+        CardChip.ROAST in chips && roastLine == null -> CardChip.ROAST
+        else -> null
+    }
+    LaunchedEffect(wantsAi, retries, activityBase) {
+        val ask = wantsAi ?: return@LaunchedEffect
+        val target = activityBase ?: return@LaunchedEffect
+        // Wait for the heart-rate and week details before writing, so the line can use them.
+        if (card is ShareCard.Activity && card.workout != null && detailed == null) return@LaunchedEffect
+        if (failed == ask && retries == 0) return@LaunchedEffect
+        writing = ask
+        val line = try {
+            withContext(Dispatchers.IO) { WorkoutCardData.aiLine(context, target, ask) }
+        } finally {
+            writing = null
+        }
+        if (line == null) {
+            failed = ask
+        } else {
+            failed = null
+            if (ask == CardChip.COACH) coachLine = line else roastLine = line
+        }
+        retries = 0
+    }
+    val available = activityBase?.let { a ->
+        CardChip.order(style).filter {
+            when (it) {
+                CardChip.STANDOUT -> a.moment != null
+                CardChip.JOURNEY -> a.journey != null
+                else -> true
+            }
+        }
+    }.orEmpty()
+    val shown = activityBase?.copy(chips = chips, coachLine = coachLine, roastLine = roastLine) ?: base
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -232,15 +277,38 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                     frame = frame.copy(statsTop = it)
                 }
             }
-            if (hasMoment) {
-                ChoicePills(listOf(false to "Just numbers", true to "With one line"), withLine, accent) {
-                    if (current != null) {
-                        lineOnPhoto = it
-                        prefs.edit().putBoolean(KEY_LINE_PHOTO, it).apply()
-                    } else {
-                        lineOnPlain = it
-                        prefs.edit().putBoolean(KEY_LINE_PLAIN, it).apply()
-                    }
+            if (available.isNotEmpty()) {
+                Text("Add to card", color = SuperfitTheme.colors.textSecondary, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+                AddChips(available, chips, writing, accent) { chip ->
+                    val next = CardChip.toggle(chips, chip)
+                    if (chip == failed) failed = null
+                    if (onPhoto) chipsPhoto = next else chipsPlain = next
+                }
+                failed?.takeIf { it in chips }?.let { chip ->
+                    Text(
+                        "Couldn't write the ${if (chip == CardChip.COACH) "coach line" else "roast"} just now. Tap to try again.",
+                        color = SuperfitTheme.colors.textSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { retries++ }
+                    )
+                }
+                val saved = if (onPhoto) savedPhoto else savedPlain
+                if (chips != saved) {
+                    Text(
+                        "Make this my default for ${if (onPhoto) "photo" else "plain"} cards",
+                        color = accent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clickable {
+                                cardPrefs.setDefaults(onPhoto, chips)
+                                if (onPhoto) savedPhoto = chips else savedPlain = chips
+                                Toast.makeText(context, "Saved. Change it any time in Settings > Sharing.", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(vertical = 4.dp)
+                    )
                 }
             }
             if (card !is ShareCard.Daily) {
@@ -298,7 +366,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                 },
                                 photo = photo != null,
                                 adjusted = photo != null && frame.adjusted,
-                                words = if (activity?.moment != null && withLine) "line" else "numbers",
+                                chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } },
                                 statsPlace = if (frame.statsTop) "top" else "bottom",
                                 heartLine = activity?.heart != null
                             )
@@ -318,6 +386,34 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Share", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+/** Things the user can add to a workout card; each turns on or off, Coach and Roast never together. */
+@Composable
+private fun AddChips(options: List<CardChip>, picked: Set<CardChip>, writing: CardChip?, accent: Color, onToggle: (CardChip) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        options.forEach { chip ->
+            val on = chip in picked
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (on) accent else SuperfitTheme.colors.fieldBg)
+                    .clickable { onToggle(chip) }
+                    .padding(vertical = 10.dp)
+                    .semantics { contentDescription = "${chip.label}${if (on) ", on" else ", off"}" },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (writing == chip) "${chip.label}…" else chip.label,
+                    color = if (on) Color.Black else SuperfitTheme.colors.textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1
+                )
             }
         }
     }

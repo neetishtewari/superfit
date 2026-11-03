@@ -129,13 +129,13 @@ object MonthlyRecapData {
         return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, body)
     }
 
-    private fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"
+    fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"
 
     /**
      * What each voice-logged strength session worked and how long it took, as the user said it.
      * Asked of the AI once per log (in one batch) and kept, so a month is never tagged twice.
      */
-    private suspend fun strengthTags(context: Context, logs: List<WorkoutEntryEntity>): Map<String, Pair<Set<BodyArea>, Int?>> {
+    suspend fun strengthTags(context: Context, logs: List<WorkoutEntryEntity>): Map<String, Pair<Set<BodyArea>, Int?>> {
         val prefs = getUserSharedPrefs(context)
         val saved = runCatching { JSONObject(prefs.getString(KEY_STRENGTH_TAGS, null) ?: "{}") }.getOrElse { JSONObject() }
         fun read(key: String): Pair<Set<BodyArea>, Int?>? = saved.optJSONObject(key)?.let { o ->

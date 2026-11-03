@@ -74,7 +74,7 @@ object AppAnalytics {
         type: String,
         photo: Boolean? = null,
         adjusted: Boolean? = null,
-        words: String? = null,
+        chips: String? = null,
         statsPlace: String? = null,
         heartLine: Boolean? = null
     ) = log(
@@ -83,7 +83,7 @@ object AppAnalytics {
             "type" to type,
             photo?.let { "photo" to if (it) "yes" else "no" },
             adjusted?.let { "adjusted" to if (it) "yes" else "no" },
-            words?.let { "words" to it },
+            chips?.let { "chips" to it },
             statsPlace?.let { "stats_place" to it },
             heartLine?.let { "heart_line" to if (it) "yes" else "no" }
         ).toTypedArray()

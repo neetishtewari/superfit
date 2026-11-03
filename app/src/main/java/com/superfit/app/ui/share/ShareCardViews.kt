@@ -62,6 +62,8 @@ import com.superfit.app.domain.HeartLine
 import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
+import com.superfit.app.domain.StrengthCardDetail
+import com.superfit.app.domain.WeekMark
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
@@ -426,21 +428,11 @@ private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
             EffortLegend(heart, TextSoft)
         }
     }
-    momentOf(card)?.let {
+    card.strength?.let {
         Spacer(Modifier.height(18.dp))
-        Text(
-            it,
-            color = TextMain,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(TileBackground)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        )
+        StrengthBlock(it, accent, TextMain, TextSoft, TileBackground, compact = false)
     }
+    CardExtras(card, TextMain, TextSoft, TileBackground, compact = false)
     Spacer(Modifier.weight(1f))
     card.stats.chunked(2).forEach { row ->
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -713,21 +705,11 @@ private fun PhotoStats(card: ShareCard, accent: Color) {
                     }
                 }
             }
-            momentOf(card)?.let {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    it,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                )
+            card.strength?.let {
+                Spacer(Modifier.height(10.dp))
+                StrengthBlock(it, accent, Color.White, PhotoSoft, Color.White.copy(alpha = 0.14f), compact = true)
             }
+            CardExtras(card, Color.White, PhotoSoft, Color.White.copy(alpha = 0.14f), compact = true)
         }
         is ShareCard.Best -> {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -766,8 +748,113 @@ private fun PhotoStats(card: ShareCard, accent: Color) {
     }
 }
 
-/** The stand-out line, only when there is one and the user chose "With one line". */
+/** The stand-out line, only when there is one and the user added it. */
 private fun momentOf(card: ShareCard.Activity): String? = card.moment?.takeIf { card.showMoment && it.isNotBlank() }
+
+private val CoachLabel = Color(0xFF9D86FF)
+private val RoastLabel = Color(0xFFF2A33A)
+
+/** What the user added to a workout card: the stand-out line, the coach line or roast, the journey line. */
+@Composable
+private fun CardExtras(card: ShareCard.Activity, main: Color, soft: Color, tile: Color, compact: Boolean) {
+    val gap = if (compact) 10.dp else 16.dp
+    val size = if (compact) 14.sp else 16.sp
+    val tileShape = RoundedCornerShape(if (compact) 10.dp else 12.dp)
+    val tilePad = Modifier.padding(horizontal = if (compact) 12.dp else 14.dp, vertical = if (compact) 8.dp else 10.dp)
+    momentOf(card)?.let {
+        Spacer(Modifier.height(gap))
+        Text(
+            it,
+            color = main,
+            fontSize = size,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clip(tileShape).background(tile).then(tilePad)
+        )
+    }
+    val said = card.shownCoach?.let { "AI COACH" to it } ?: card.shownRoast?.let { "ROAST" to it }
+    said?.let { (label, line) ->
+        Spacer(Modifier.height(gap))
+        Column(
+            Modifier.fillMaxWidth().clip(tileShape).background(tile).then(tilePad),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(label, color = if (label == "ROAST") RoastLabel else CoachLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text(line, color = main, fontSize = size, lineHeight = size * 1.35f, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            if (label == "ROAST") {
+                card.fairLine?.let { Text(it, color = soft, fontSize = if (compact) 12.sp else 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        }
+    }
+    card.shownJourney?.let {
+        Spacer(Modifier.height(gap))
+        Text(it, color = soft, fontSize = if (compact) 12.sp else 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** A voice-logged strength workout: exercises, body areas this week, and the week's training days. */
+@Composable
+private fun StrengthBlock(detail: StrengthCardDetail, accent: Color, main: Color, soft: Color, tile: Color, compact: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
+        if (detail.exercises.isNotEmpty()) {
+            val list = detail.exercises.joinToString(" · ") { (name, reps) -> "$reps $name" } +
+                if (detail.moreExercises > 0) " · +${detail.moreExercises} more" else ""
+            Text(list, color = if (compact) main else soft, fontSize = if (compact) 13.sp else 15.sp, maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            StrengthCardDetail.SHOWN.forEach { area ->
+                val today = area in detail.today
+                val week = area in detail.thisWeek
+                val name = area.label.replaceFirstChar { it.uppercase() }
+                Text(
+                    if (today || week) name else "$name · not this week",
+                    color = if (today) {
+                        Color.Black
+                    } else if (week) {
+                        main
+                    } else {
+                        soft.copy(alpha = 0.7f)
+                    },
+                    fontSize = if (compact) 10.sp else 11.sp,
+                    fontWeight = if (today) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(if (today) accent else tile)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+        WeekStrip(detail, accent, main, soft, compact)
+    }
+}
+
+/** Monday to Sunday: green dot for cardio days, violet for strength, the workout's day ringed. */
+@Composable
+private fun WeekStrip(detail: StrengthCardDetail, accent: Color, main: Color, soft: Color, compact: Boolean) {
+    val letters = listOf("M", "T", "W", "T", "F", "S", "S")
+    val dot = if (compact) 18.dp else 22.dp
+    Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        detail.week.take(7).forEachIndexed { i, mark ->
+            val fill = when (mark) {
+                WeekMark.STRENGTH -> CoachLabel
+                WeekMark.CARDIO -> accent
+                WeekMark.NONE -> Color.Transparent
+            }
+            Box(
+                Modifier
+                    .size(dot)
+                    .clip(RoundedCornerShape(50))
+                    .background(fill)
+                    .border(if (i == detail.dayIndex) 2.dp else 1.dp, if (i == detail.dayIndex) main else soft.copy(alpha = 0.5f), RoundedCornerShape(50)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(letters[i], color = if (mark == WeekMark.NONE) soft else Color.Black, fontSize = if (compact) 9.sp else 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 
 /** Effort colours. Max is a hot orange: red is kept for delete buttons only. */
 fun effortColor(effort: Effort): Color = when (effort) {
