@@ -40,7 +40,15 @@ sealed interface ShareCard {
         val bigValue: String,
         val bigUnit: String,
         val subtitle: String?,
-        val stats: List<CardStat>
+        val stats: List<CardStat>,
+        /** The Health Connect workout behind the card, so the share screen can read its heart rate. */
+        val workout: WorkoutView? = null,
+        /** Heart rate through the workout; null when there are too few readings. */
+        val heart: HeartLine? = null,
+        /** The one line that stands out about this workout, when something does. */
+        val moment: String? = null,
+        /** The user's "With one line" choice; the line shows only when there is one. */
+        val showMoment: Boolean = false
     ) : ShareCard
 
     data class Best(
@@ -130,12 +138,27 @@ object ShareCards {
         }
         return ShareCard.Activity(
             dateLine = "${start.format(dayFormat)} · ${start.format(clock)}",
-            heading = "${partOfDay(w.startTime, zone)} ${w.noun}".uppercase(Locale.getDefault()),
+            // The workout's own name; only a workout of no known kind is named by the time of day.
+            heading = (if (w.title == "Workout") "${partOfDay(w.startTime, zone)} workout" else w.title).uppercase(Locale.getDefault()),
             bigValue = w.distanceKm?.let { String.format(Locale.US, "%.2f", it) } ?: "${w.minutes}",
             bigUnit = if (hasDistance) "km" else "min",
             subtitle = null,
-            stats = stats
+            stats = stats,
+            workout = w
         )
+    }
+
+    /** Adds the heart-rate line (and its peak, next to the average) and the stand-out line. */
+    fun withDetails(card: ShareCard.Activity, heart: HeartLine?, moment: String?): ShareCard.Activity {
+        val stats = if (heart == null || card.stats.any { it.label == "PEAK" }) {
+            card.stats
+        } else {
+            val peak = CardStat("PEAK", "${heart.peakBpm}", "bpm")
+            val at = card.stats.indexOfFirst { it.label == "AVG HEART RATE" }
+                .let { if (it >= 0) it + 1 else card.stats.indexOfFirst { s -> s.label == "BURNED" }.takeIf { i -> i >= 0 } ?: card.stats.size }
+            card.stats.toMutableList().apply { add(at, peak) }
+        }
+        return card.copy(stats = stats, heart = heart, moment = moment)
     }
 
     /** A voice-logged workout has what the user said and its calories, nothing more. */

@@ -65,8 +65,29 @@ object AppAnalytics {
     fun workoutLogged() = log("workout_logged", "method" to "voice")
     fun workoutsConnected() = log("workouts_connected")
 
-    /** [type]: day, activity or best. */
-    fun cardShared(type: String) = log("share_card_shared", "type" to type)
+    /**
+     * [type]: day, activity, best, roast or a recap card. For workout and best cards also: whether a
+     * photo was used and zoomed/moved, numbers only or with the stand-out line, where the stats sat,
+     * and whether the heart-rate line was on it.
+     */
+    fun cardShared(
+        type: String,
+        photo: Boolean? = null,
+        adjusted: Boolean? = null,
+        words: String? = null,
+        statsPlace: String? = null,
+        heartLine: Boolean? = null
+    ) = log(
+        "share_card_shared",
+        *listOfNotNull(
+            "type" to type,
+            photo?.let { "photo" to if (it) "yes" else "no" },
+            adjusted?.let { "adjusted" to if (it) "yes" else "no" },
+            words?.let { "words" to it },
+            statsPlace?.let { "stats_place" to it },
+            heartLine?.let { "heart_line" to if (it) "yes" else "no" }
+        ).toTypedArray()
+    )
 
     /** The monthly recap played through to its last story card. */
     fun recapWatched(cards: Int) = log("recap_watched", "cards" to "$cards")

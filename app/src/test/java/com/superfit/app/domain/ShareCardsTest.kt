@@ -93,11 +93,35 @@ class ShareCardsTest {
     @Test
     fun runCardShowsDistanceTimePaceHeartRateAndCalories() {
         val card = ShareCards.activity(run(8.66, 48), utc)
-        assertEquals("MORNING RUN", card.heading)
+        assertEquals("RUN", card.heading)
         assertEquals("8.66", card.bigValue)
         assertEquals("km", card.bigUnit)
         assertEquals(listOf("TIME", "PACE", "AVG HEART RATE", "BURNED"), card.stats.map { it.label })
         assertEquals("48:00", card.stats[0].value)
+    }
+
+    @Test
+    fun heartLineAddsPeakNextToAverage() {
+        val heart = HeartLine(listOf(0.5f), listOf(150), emptyList(), peakBpm = 171, peakIndex = 0, effortMinutes = emptyMap())
+        val card = ShareCards.withDetails(ShareCards.activity(run(null, 40), utc), heart, "Hardest run since August")
+        assertEquals(listOf("AVG HEART RATE", "PEAK", "BURNED"), card.stats.map { it.label })
+        assertEquals("171", card.stats[1].value)
+        assertEquals("Hardest run since August", card.moment)
+    }
+
+    @Test
+    fun strengthCardIsNamedAfterTheWorkout() {
+        val w = ImportedWorkoutEntity(
+            id = "s",
+            sourcePackage = "com.sec.android.app.shealth",
+            exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+            startTime = sixFortyTwo,
+            endTime = sixFortyTwo + 50 * 60_000L,
+            avgHeartRate = 130,
+            detailsRead = true
+        )
+        val card = ShareCards.activity(WorkoutDisplay.view(MergedWorkout(w, listOf("s")), "Samsung Health", 1700.0), utc)
+        assertEquals("STRENGTH WORKOUT", card.heading)
     }
 
     @Test
