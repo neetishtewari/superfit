@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import com.superfit.app.domain.BodyArea
+import com.superfit.app.domain.BodyTrend
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.GoalForecast
@@ -13,6 +15,8 @@ import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RecapSetup
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
+import com.superfit.app.domain.StrengthSession
+import com.superfit.app.domain.StrengthSessions
 import com.superfit.app.widget.WidgetPin
 import java.time.Instant
 import java.time.LocalDate
@@ -29,7 +33,11 @@ object MonthlyRecapData {
 
     private const val KEY_OPENED = "recap_opened_" // + yyyy-MM -> the date it was first opened
     private const val KEY_NOTIFIED = "recap_notified_month"
-    private const val KEY_WORDS = "recap_words_" // + yyyy-MM_STYLE -> JSON
+
+    private const val KEY_STRENGTH_TAGS = "recap_strength_tags"
+
+    // v2: the calorie and new activity cards need their own words, so saved months are written again once.
+    private const val KEY_WORDS = "recap_words_v3_" // + yyyy-MM_STYLE -> JSON
     private const val LAST_HOME_DAY = 10
     private const val DAYS_AFTER_OPENING = 2
 
@@ -103,15 +111,49 @@ object MonthlyRecapData {
             today = asOf,
             fallbackCurrentKg = profile.weightKg
         )
-        val strengthDates = workouts.filter { it.workoutType == "Strength" }.map { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() } +
-            views.filter { it.title == "Strength workout" }.map { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
+        val strengthLogs = workouts.filter { it.workoutType == "Strength" }
+        val tags = strengthTags(context, strengthLogs.filter { YearMonth.from(Instant.ofEpochMilli(it.timestamp).atZone(zone)) == month })
+        val strength = strengthLogs.map { w ->
+            val t = tags[tagKey(w)]
+            StrengthSession(Instant.ofEpochMilli(w.timestamp).atZone(zone).toLocalDate(), t?.second, t?.first.orEmpty())
+        } + views.filter { it.title == "Strength workout" }.map { v ->
+            StrengthSession(Instant.ofEpochMilli(v.startTime).atZone(zone).toLocalDate(), v.minutes.toInt().takeIf { it > 0 })
+        }
         val hc = repository.healthConnectManager
         val setup = RecapSetup(
             healthConnect = !hc.isAvailable() || runCatching { hc.hasAllPermissions() }.getOrDefault(true),
             mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
             widget = !WidgetPin.canPin(context) || WidgetPin.isPlaced(context)
         )
-        return MonthlyRecap.build(month, days, nutrition, strengthDates, weighIns, journey, goalSet, setup, zone)
+        val body = BodyTrend.month(BodyImporter.mine(context), month, zone)
+        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, body)
+    }
+
+    private fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"
+
+    /**
+     * What each voice-logged strength session worked and how long it took, as the user said it.
+     * Asked of the AI once per log (in one batch) and kept, so a month is never tagged twice.
+     */
+    private suspend fun strengthTags(context: Context, logs: List<WorkoutEntryEntity>): Map<String, Pair<Set<BodyArea>, Int?>> {
+        val prefs = getUserSharedPrefs(context)
+        val saved = runCatching { JSONObject(prefs.getString(KEY_STRENGTH_TAGS, null) ?: "{}") }.getOrElse { JSONObject() }
+        fun read(key: String): Pair<Set<BodyArea>, Int?>? = saved.optJSONObject(key)?.let { o ->
+            o.optString("a").split(',').mapNotNull { BodyArea.of(it) }.toSet() to o.optInt("m", 0).takeIf { it > 0 }
+        }
+        val todo = logs.filter { !saved.has(tagKey(it)) }.take(60)
+        if (todo.isNotEmpty()) {
+            val json = runCatching {
+                GeminiClient.generateContent(prompt = StrengthSessions.prompt(todo.map { it.description }), systemInstructionText = StrengthSessions.TAG_INSTRUCTION, isJson = true)
+            }.getOrNull()
+            if (json != null) {
+                StrengthSessions.parse(json, todo.size).forEachIndexed { i, r ->
+                    if (r != null) saved.put(tagKey(todo[i]), JSONObject().put("a", r.first.joinToString(",") { it.key }).put("m", r.second ?: 0))
+                }
+                prefs.edit().putString(KEY_STRENGTH_TAGS, saved.toString()).apply()
+            }
+        }
+        return logs.mapNotNull { w -> read(tagKey(w))?.let { tagKey(w) to it } }.toMap()
     }
 
     /**

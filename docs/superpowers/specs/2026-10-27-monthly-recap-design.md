@@ -19,7 +19,7 @@ Cards are chosen each month from what actually happened. A card with no data is 
 **Your activity** (led by what changed)
 6. **You got faster.** Only if run or walk pace improved.
 7. **You kept moving.** Kilometres, steps and a calendar of the days you moved.
-8. **Strength.** Sessions logged. With none: "Already lifting? Tap the mic and say it", because many people train but never log it.
+8. **Strength.** Sessions logged. With none: "Next month's side quest: two strength sessions a week." (works inside a shared picture or video, where nothing can be tapped).
 
 **Last, not shareable**
 9. **Get more from Superfit.** Only what's missing: Health Connect permissions, the mic, the widget, or logging fewer than about half the days. Each line has a one-tap fix. Skipped when everything is set up. This replaces the separate Home tips idea (dropped 2026-10-27).

@@ -28,13 +28,18 @@ sealed interface RecapCard {
         override val id = "goal"
     }
 
+    /** Body fat, muscle and resting burn from the smart scale, start of the month against its end. */
+    data class Body(val change: BodyChange, val lose: Boolean) : RecapCard {
+        override val id = "body"
+    }
+
     data class Needle(val helped: List<RecapFact>, val held: List<RecapFact>) : RecapCard {
         override val id = "needle"
     }
 
-    /** The most-logged food. [verdict] is how good a choice it usually was, when the AI rated those meals. */
-    data class OnRepeat(val food: String, val times: Int, val verdict: FoodVerdict?) : RecapCard {
-        override val id = "repeat"
+    /** The month's top 5 foods by calories added, the biggest treat against them and the most-logged food. */
+    data class Calories(val sources: CalorieSources, val daysInMonth: Int) : RecapCard {
+        override val id = "calories"
     }
 
     /** Average share of the protein goal (0-100) overall, Mon-Fri and Sat-Sun; carbs as % of calories; fibre a day. */
@@ -56,8 +61,24 @@ sealed interface RecapCard {
         override val id = "moving"
     }
 
-    data class Strength(val sessions: Int, val prevSessions: Int, val km: Double) : RecapCard {
+    /** [detail] adds how often, how long and what was trained, from whatever the user said when logging. */
+    data class Strength(val sessions: Int, val prevSessions: Int, val km: Double, val detail: StrengthDetail? = null) : RecapCard {
         override val id = "strength"
+    }
+
+    /** Walks or runs at the same pace or faster than last month, with a lower heart rate. */
+    data class Heart(val change: HeartChange) : RecapCard {
+        override val id = "heart"
+    }
+
+    /** Reps logged by voice this month and last. */
+    data class Reps(val totals: RepTotals) : RecapCard {
+        override val id = "reps"
+    }
+
+    /** The usual workout hour and the biggest step day of the week. */
+    data class Rhythm(val rhythm: MovingRhythm) : RecapCard {
+        override val id = "rhythm"
     }
 
     /** Not shareable: only what's missing, each with a one-tap fix in the app. */
@@ -85,18 +106,19 @@ object MonthlyRecap {
     private const val MEAL_DAYS = 5
 
     /** Story order: goal first, then meals, then activity; "Get more from Superfit" always last. */
-    val ORDER = listOf("goal", "needle", "repeat", "macros", "choices", "faster", "moving", "strength", "setup")
+    val ORDER = listOf("goal", "body", "needle", "calories", "macros", "choices", "faster", "heart", "moving", "rhythm", "strength", "reps", "setup")
 
     fun build(
         month: YearMonth,
         days: Map<LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity>,
-        strengthDates: List<LocalDate>,
+        strength: List<StrengthSession>,
         weighIns: List<Pair<LocalDate, Double>>,
         journey: JourneyForecast?,
         goalSet: Boolean,
         setup: RecapSetup,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: ZoneId = ZoneId.systemDefault(),
+        body: BodyChange? = null
     ): MonthRecap? {
         val first = month.atDay(1)
         val last = month.atEndOfMonth()
@@ -109,20 +131,25 @@ object MonthlyRecap {
         val monthMeals = meals.filter { dateOf(it.timestamp, zone).let { d -> !d.isBefore(first) && !d.isAfter(last) } }
         val loggedDates = logged.map { it.date }.toSet()
         val lose = journey?.let { it.targetKg < it.startKg } ?: true
-        val strengthNow = strengthDates.count { !it.isBefore(first) && !it.isAfter(last) }
-        val strengthPrev = strengthDates.count { !it.isBefore(first.minusMonths(1)) && it.isBefore(first) }
+        val strengthMonth = strength.filter { !it.date.isBefore(first) && !it.date.isAfter(last) }
+        val strengthNow = strengthMonth.size
+        val strengthPrev = strength.count { !it.date.isBefore(first.minusMonths(1)) && it.date.isBefore(first) }
 
         val cards = buildList {
             if (goalSet && journey != null) add(goal(journey, weighIns, first, last))
+            body?.takeIf { it.notable }?.let { add(RecapCard.Body(it, lose)) }
             needle(monthDays, prev, lose)?.let { add(it) }
             if (logged.size >= MEAL_DAYS) {
-                onRepeat(monthMeals)?.let { add(it) }
+                CalorieSourcesEngine.build(monthMeals)?.takeIf { it.top.size >= 3 }?.let { add(RecapCard.Calories(it, month.lengthOfMonth())) }
                 macros(logged, monthMeals.filter { dateOf(it.timestamp, zone) in loggedDates })?.let { add(it) }
                 choices(monthMeals)?.let { add(it) }
             }
             faster(monthDays, prev)?.let { add(it) }
             moving(monthDays, prev, month)?.let { add(it) }
-            if (strengthNow > 0 || active.isNotEmpty()) add(RecapCard.Strength(strengthNow, strengthPrev, monthDays.sumOf { it.workoutKm }))
+            ActivityPatterns.heart(monthDays.flatMap { it.workouts }, prev.flatMap { it.workouts }, minNow = 3, minBefore = 3)?.let { add(RecapCard.Heart(it)) }
+            ActivityPatterns.rhythm(monthDays)?.let { add(RecapCard.Rhythm(it)) }
+            if (strengthNow > 0 || active.isNotEmpty()) add(RecapCard.Strength(strengthNow, strengthPrev, monthDays.sumOf { it.workoutKm }, StrengthSessions.detail(strengthMonth, month.lengthOfMonth())))
+            ActivityPatterns.reps(monthDays.flatMap { it.workouts }, prev.flatMap { it.workouts }, minTotal = 100)?.let { add(RecapCard.Reps(it)) }
             setup(setup, logged.size, month.lengthOfMonth())?.let { add(it) }
         }
         return MonthRecap(month, logged.size, cards.sortedBy { ORDER.indexOf(it.id) })
@@ -157,6 +184,7 @@ object MonthlyRecap {
             }
         }
         if (logged.size >= 20) helped += RecapFact("Logging every day", "${logged.size} of ${month.size} days fully logged")
+        ActivityPatterns.moveDayPlates(month)?.let { helped += RecapFact("Better meals on move days", "rated ${it.activeRating} vs ${it.restRating} on rest days") }
         val activeNow = month.count { it.active }
         val activePrev = prev.count { it.active }
         if (activeNow >= 15 || (activePrev > 0 && activeNow >= activePrev + 4)) {
@@ -178,16 +206,6 @@ object MonthlyRecap {
         if (logged.size in MIN_DAYS until FULL_DAYS) held += RecapFact("Gaps in the log", "${logged.size} of ${month.size} days fully logged")
         if (helped.isEmpty() && held.isEmpty()) return null
         return RecapCard.Needle(helped.take(2), held.take(2))
-    }
-
-    /** The food logged in the most meals, by the meal's own item names (not a list of foods). */
-    fun onRepeat(meals: List<NutritionEntryEntity>): RecapCard.OnRepeat? {
-        val byFood = meals.flatMap { meal -> foodNames(meal).distinct().map { it to meal } }.groupBy({ it.first }, { it.second })
-        val (food, withIt) = byFood.maxByOrNull { it.value.size } ?: return null
-        if (withIt.size < 3) return null
-        val verdicts = withIt.mapNotNull { m -> MealTags.decode(m.qualityTags)?.let { FoodVerdict.of(it, DietScoreEngine.mealRating(m, it), PersonalNutrition.isApproved(m, it), Treats.kcalOf(m, it)) } }
-        val verdict = verdicts.groupingBy { it }.eachCount().maxByOrNull { it.value }?.takeIf { it.value * 2 > verdicts.size }?.key
-        return RecapCard.OnRepeat(food.replaceFirstChar { it.titlecase(Locale.getDefault()) }, withIt.size, verdict)
     }
 
     fun macros(logged: List<DayTotals>, meals: List<NutritionEntryEntity>): RecapCard.Macros? {
@@ -212,7 +230,8 @@ object MonthlyRecap {
         val rated = meals.mapNotNull { m -> MealTags.decode(m.qualityTags)?.takeIf { !it.estimated }?.let { m to DietScoreEngine.mealRating(m, it) } }
         fun names(list: List<Pair<NutritionEntryEntity, Int>>) = list.map { mealName(it.first) }.distinctBy { it.lowercase() }
         val good = names(rated.filter { it.second >= 8 }.sortedByDescending { it.second }).take(3)
-        val rethink = names(rated.filter { it.second <= 4 }.sortedBy { it.second }).take(2)
+        // A small taste (a teaspoon of cake) is portion control, never a choice to rethink.
+        val rethink = names(rated.filter { it.second <= 4 && it.first.calories >= CalorieSourcesEngine.SMALL_TASTE_KCAL }.sortedBy { it.second }).take(2)
         if (good.isEmpty() && rethink.isEmpty()) return null
         return RecapCard.Choices(good, rethink)
     }
@@ -259,13 +278,6 @@ object MonthlyRecap {
 
     /** "6:42" for 402 seconds a km. */
     fun pace(seconds: Long): String = String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
-
-    private fun foodNames(meal: NutritionEntryEntity): List<String> {
-        val items = MealItems.decode(meal.items)?.items.orEmpty().map { it.name.trim().lowercase(Locale.getDefault()) }.filter { it.isNotEmpty() }
-        if (items.isNotEmpty()) return items
-        val type = MealTags.decode(meal.qualityTags)?.foodType?.trim().orEmpty()
-        return if (type.isNotEmpty()) listOf(type.lowercase(Locale.getDefault())) else emptyList()
-    }
 
     private fun fibreOf(meal: NutritionEntryEntity): Double? =
         MealItems.decode(meal.items)?.let { mi -> mi.items.sumOf { it.fiber * it.qty } }?.takeIf { it > 0 }

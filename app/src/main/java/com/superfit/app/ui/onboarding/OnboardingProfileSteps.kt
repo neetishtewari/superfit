@@ -1,486 +1,286 @@
 package com.superfit.app.ui.onboarding
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
-import android.view.View
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import androidx.health.connect.client.PermissionController
-import com.superfit.app.data.HealthConnectManager
-import com.superfit.app.data.UserProfileEntity
-import com.superfit.app.domain.PhysiologyEngine
-import com.superfit.app.theme.*
+import com.superfit.app.domain.HeightUnits
+import com.superfit.app.domain.OnboardingTargets
+import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.components.GoalPicker
+import com.superfit.app.ui.components.PrimaryButton
+import com.superfit.app.ui.components.SuperfitCard
 import com.superfit.app.ui.components.SuperfitField
+import com.superfit.app.ui.components.SuperfitLogo
 import kotlin.math.roundToInt
 
-// 1. Welcome Step View (Step 0)
+// Step 1 of 6: what Superfit is, in one glance.
 @Composable
-internal fun WelcomeStep(
-    isDarkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit,
-    onNext: () -> Unit
-) {
-    Text(
-        text = "Easiest way to track your fitness & get personalized insights",
-        fontSize = 24.sp,
-        fontWeight = FontWeight.Bold,
-        color = ThemeTextPrimary,
-        lineHeight = 30.sp
+internal fun WelcomeStep(onNext: () -> Unit) {
+    SuperfitLogo(size = 56, modifier = Modifier.padding(top = 8.dp))
+    StepTitle(
+        title = "The easiest way to eat well and get fit",
+        subtitle = "Tell Superfit what you ate, or snap your plate. Your AI coach does the counting."
     )
-
-    // Upfront Appearance Customizer segmented toggle slider
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Choose Appearance",
-            fontSize = 12.sp,
-            color = ThemeTextTertiary,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                .border(1.dp, ThemeGlassBorder, RoundedCornerShape(12.dp))
-        ) {
-            val themeSliderOffset by animateFloatAsState(
-                targetValue = if (isDarkTheme) 0f else 1f,
-                label = "ThemeSliderPill"
-            )
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val halfWidth = maxWidth / 2
-                Box(
-                    modifier = Modifier
-                        .offset(x = halfWidth * themeSliderOffset)
-                        .width(halfWidth)
-                        .fillMaxHeight()
-                        .padding(3.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(HyperViolet)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable { onThemeChange(true) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Dark",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable { onThemeChange(false) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Light",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+        FeatureRow(icon = Icons.Default.Mic, title = "Log by voice or photo", desc = "Say it in your own words, in your own language.")
+        FeatureRow(icon = Icons.Default.Shield, title = "Private by design", desc = "Never sold or used for ads. Delete it any time.")
+        FeatureRow(icon = Icons.Default.Star, title = "Free, no ads", desc = "Every feature. No paywall.")
     }
-
-    // Simplified High-Impact Bullet highlights
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-        FeatureItemBullet(icon = "🎙️", title = "Log by voice or photo", desc = "Say what you ate in your own words, or snap your plate.")
-        FeatureItemBullet(icon = "🔒", title = "Private by design", desc = "Your data is never sold or used for ads. Delete it any time.")
-        FeatureItemBullet(icon = "💸", title = "Free, no ads", desc = "Every feature, no paywall.")
-    }
-
-    Button(
-        onClick = onNext,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(12.dp)),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues()
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd))),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Get Started", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-    }
+    PrimaryButton(text = "Get started", onClick = onNext)
 }
 
-// 2. Physiology Metrics Step View (Step 1)
+// Step 3 of 6: age, sex, height and weight for the resting-calorie formula.
 @Composable
-internal fun PhysiologyStep(
+internal fun AboutYouStep(
     uiState: OnboardingUiState,
     viewModel: OnboardingViewModel,
-    validationError: String?,
-    onOpenCheatSheet: () -> Unit,
+    errors: AboutYouErrors,
     onNext: () -> Unit
 ) {
-    Text(
-        text = "Physiological Profile",
-        fontSize = 22.sp,
-        fontWeight = FontWeight.Bold,
-        color = ThemeTextPrimary
-    )
-    Text(
-        text = "Enter your core physical metrics. We use these to calculate your baseline resting metabolism.",
-        fontSize = 13.sp,
-        color = ThemeTextTertiary,
-        lineHeight = 18.sp
+    val colors = SuperfitTheme.colors
+    StepTitle(
+        title = "About you",
+        subtitle = "We use these to work out how many calories your body burns at rest."
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(ThemeCardBgTranslucent)
-            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(20.dp))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Sex Toggle Segment
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(text = "Biological Sex", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(ThemeTextPrimary.copy(alpha = 0.03f))
-                    .border(1.dp, ThemeGlassBorder, RoundedCornerShape(10.dp))
-            ) {
-                val sexSliderOffset by animateFloatAsState(
-                    targetValue = if (uiState.isMale) 0f else 1f,
-                    label = "SexSliderPill"
-                )
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val halfWidth = maxWidth / 2
-                    Box(
-                        modifier = Modifier
-                            .offset(x = halfWidth * sexSliderOffset)
-                            .width(halfWidth)
-                            .fillMaxHeight()
-                            .padding(2.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(NeonGreen)
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable { viewModel.onSexChanged(true) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "Male", color = if (uiState.isMale) Color.White else ThemeTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable { viewModel.onSexChanged(false) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "Female", color = if (!uiState.isMale) Color.White else ThemeTextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-
-        // Age field
-        SuperfitField(
-            value = uiState.age,
-            onValueChange = { viewModel.onAgeChanged(it) },
-            label = { Text("Age (Years)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Height field strictly in Centimeters with Live Foot/Inches conversion text below it
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Height", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
-                Text(
-                    text = "Foot/Inches Helper",
-                    fontSize = 12.sp,
-                    color = HyperViolet,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable { onOpenCheatSheet() }
+    SuperfitCard {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FieldLabel("Sex (used only for the calorie formula)")
+                ChoiceGrid(
+                    options = listOf(true to "Male", false to "Female"),
+                    selected = uiState.isMale,
+                    onSelect = { viewModel.onSexChanged(it) }
                 )
             }
+
             SuperfitField(
-                value = uiState.height,
-                onValueChange = { viewModel.onHeightChanged(it) },
-                placeholder = { Text("e.g. 175") },
-                label = { Text("Height (cm)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                value = uiState.age,
+                onValueChange = { viewModel.onAgeChanged(it) },
+                label = { Text("Age") },
+                trailingIcon = { UnitSuffix("years") },
+                isError = errors.age,
+                supportingText = fieldError(errors.age, "Enter your age"),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth()
             )
-            // Live Feet/Inches equivalent readout calculation
-            val heightDouble = uiState.height.toDoubleOrNull()
-            val ftInReadout = if (heightDouble != null && heightDouble > 0) {
-                val totalInches = heightDouble / 2.54
-                val feet = (totalInches / 12).toInt()
-                val inches = Math.round(totalInches % 12).toInt()
-                val displayInches = if (inches == 12) 0 else inches
-                val displayFeet = if (inches == 12) feet + 1 else feet
-                "Equivalent: $displayFeet ft $displayInches in"
-            } else {
-                "Equivalent: - ft - in"
+
+            HeightInput(uiState = uiState, onHeightCm = { viewModel.onHeightChanged(it) }, isError = errors.height)
+
+            SuperfitField(
+                value = uiState.weight,
+                onValueChange = { viewModel.onWeightChanged(it) },
+                label = { Text("Weight") },
+                trailingIcon = { UnitSuffix("kg") },
+                isError = errors.weight,
+                supportingText = fieldError(errors.weight, "Enter your weight"),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (uiState.filledFromHealthConnect) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.primaryAccent, modifier = Modifier.size(16.dp))
+                    Text("Height and weight from Health Connect", style = MaterialTheme.typography.bodySmall, color = colors.primaryAccent)
+                }
             }
-            Text(text = ftInReadout, color = com.superfit.app.theme.ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
-
-        // Weight field
-        SuperfitField(
-            value = uiState.weight,
-            onValueChange = { viewModel.onWeightChanged(it) },
-            label = { Text("Weight (kg)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 
-    if (validationError != null) {
-        Text(text = validationError, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    PrimaryButton(text = "Continue", onClick = onNext)
+}
+
+/** Which "About you" boxes still need a number. */
+internal data class AboutYouErrors(val age: Boolean = false, val height: Boolean = false, val weight: Boolean = false) {
+    val any: Boolean get() = age || height || weight
+}
+
+/** The line under a box that still needs a number, or nothing. */
+private fun fieldError(show: Boolean, message: String): (@Composable () -> Unit)? {
+    if (!show) return null
+    return { Text(message) }
+}
+
+@Composable
+private fun UnitSuffix(text: String) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = SuperfitTheme.colors.textSecondary, modifier = Modifier.padding(end = 12.dp))
+}
+
+/** Height typed in cm, or in feet and inches; it is always saved in cm. */
+@Composable
+private fun HeightInput(uiState: OnboardingUiState, onHeightCm: (String) -> Unit, isError: Boolean) {
+    var useFeet by rememberSaveable { mutableStateOf(false) }
+    val cm = uiState.height.toDoubleOrNull()?.takeIf { it > 0 }
+    var feet by remember { mutableStateOf("") }
+    var inches by remember { mutableStateOf("") }
+    // When switching to feet, or when Health Connect fills the height in, show it in feet and inches.
+    LaunchedEffect(useFeet, uiState.filledFromHealthConnect) {
+        if (useFeet && cm != null) {
+            val (f, i) = HeightUnits.feetInches(cm)
+            feet = f.toString()
+            inches = i.toString()
+        }
     }
 
-    Button(
-        onClick = onNext,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(12.dp)),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues()
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd))),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FieldLabel("Height", modifier = Modifier.weight(1f))
+            Row(modifier = Modifier.width(150.dp)) {
+                ChoiceGrid(options = listOf(false to "cm", true to "ft in"), selected = useFeet, onSelect = { useFeet = it })
+            }
+        }
+        if (!useFeet) {
+            val other = cm?.let { HeightUnits.feetInches(it) }?.let { (f, i) -> "cm · $f ft $i in" } ?: "cm"
+            SuperfitField(
+                value = uiState.height,
+                onValueChange = onHeightCm,
+                placeholder = { Text("e.g. 170") },
+                trailingIcon = { UnitSuffix(other) },
+                isError = isError,
+                supportingText = fieldError(isError, "Enter your height"),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            val update = { f: String, i: String ->
+                val ft = f.toIntOrNull() ?: 0
+                val inch = i.toIntOrNull() ?: 0
+                onHeightCm(if (ft == 0 && inch == 0) "" else HeightUnits.cm(ft, inch).toString())
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SuperfitField(
+                    value = feet,
+                    onValueChange = {
+                        feet = it.take(1)
+                        update(feet, inches)
+                    },
+                    placeholder = { Text("5") },
+                    trailingIcon = { UnitSuffix("ft") },
+                    isError = isError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f)
+                )
+                SuperfitField(
+                    value = inches,
+                    onValueChange = {
+                        inches = it.take(2)
+                        update(feet, inches)
+                    },
+                    placeholder = { Text("7") },
+                    trailingIcon = { UnitSuffix("in") },
+                    isError = isError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            if (isError) Text("Enter your height", style = MaterialTheme.typography.bodySmall, color = SuperfitTheme.colors.errorColor)
         }
     }
 }
 
-// 3. Baseline Activity & Goal selection (Step 2)
+// Step 4 of 6: the goal first, then how active a normal week is.
 @Composable
-internal fun ActivityGoalsStep(
+internal fun GoalStep(
     uiState: OnboardingUiState,
     viewModel: OnboardingViewModel,
-    onOpenTdeePopup: () -> Unit,
+    onOpenBurnInfo: () -> Unit,
     onNext: () -> Unit
 ) {
-    Text(
-        text = "Baseline Activity",
-        fontSize = 22.sp,
-        fontWeight = FontWeight.Bold,
-        color = ThemeTextPrimary
-    )
-    Text(
-        text = "Configure your baseline activity level and goals. We use these to calculate your target calorie budget.",
-        fontSize = 13.sp,
-        color = ThemeTextTertiary,
-        lineHeight = 18.sp
+    val colors = SuperfitTheme.colors
+    val plan = uiState.plan()
+    StepTitle(title = "Your goal", subtitle = "We'll set your daily calories and protein from this.")
+
+    GoalPicker(
+        selected = uiState.goal,
+        onSelect = { goal -> viewModel.onGoalChanged(goal.key, goal.calorieOffset) },
+        selectedDetail = "${"%,d".format(plan.targets.calories.roundToInt())} kcal · ${plan.targets.proteinG.roundToInt()} g protein a day"
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(ThemeCardBgTranslucent)
-            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(20.dp))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Activity Slider
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val multiplierDesc = when (uiState.activityMultiplier) {
-                1.2 -> "Sedentary (No formal exercise)"
-                1.375 -> "Lightly Active (1-3 days/week)"
-                1.55 -> "Moderately Active (3-5 days/week)"
-                1.725 -> "Very Active (6-7 days/week)"
-                else -> "Active Athlete"
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Activity Level", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
-                Text(text = "${uiState.activityMultiplier}", fontSize = 12.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
-            }
-            Text(text = multiplierDesc, fontSize = 14.sp, color = ThemeTextPrimary, fontWeight = FontWeight.Bold)
-
-            val values = listOf(1.2, 1.375, 1.55, 1.725)
-            Slider(
-                value = values.indexOf(uiState.activityMultiplier).toFloat().coerceAtLeast(0f),
-                onValueChange = { index ->
-                    val idx = index.toInt().coerceIn(0, values.size - 1)
-                    viewModel.onActivityMultiplierChanged(values[idx])
-                },
-                valueRange = 0f..3f,
-                steps = 2,
-                colors = SliderDefaults.colors(
-                    activeTrackColor = NeonGreen,
-                    thumbColor = NeonGreen,
-                    inactiveTrackColor = Color.DarkGray
-                )
-            )
-        }
-
-        // Live Mifflin-St Jeor TDEE, used for the goal target line and the ticker below
-        val ageVal = uiState.age.toIntOrNull() ?: 28
-        val heightVal = uiState.height.toDoubleOrNull() ?: 175.0
-        val weightVal = uiState.weight.toDoubleOrNull() ?: 75.0
-        val bmr = if (uiState.isMale) {
-            10.0 * weightVal + 6.25 * heightVal - 5.0 * ageVal + 5.0
-        } else {
-            10.0 * weightVal + 6.25 * heightVal - 5.0 * ageVal - 161.0
-        }
-        val tdeeVal = bmr * uiState.activityMultiplier
-
-        val goalTargets = PhysiologyEngine.calculateMacroTargets(
-            profile = UserProfileEntity(
-                age = ageVal,
-                heightCm = heightVal,
-                weightKg = weightVal,
-                isMale = uiState.isMale,
-                activityMultiplier = uiState.activityMultiplier,
-                goal = uiState.goal,
-                calorieOffset = uiState.calorieOffset
-            ),
-            tdee = tdeeVal,
-            advice = null
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FieldLabel("How active is a normal week?")
+        ChoiceGrid(
+            options = ActivityLevels.map { it.multiplier to it.label },
+            selected = ActivityLevels.closest(uiState.activityMultiplier),
+            onSelect = { viewModel.onActivityMultiplierChanged(it) }
         )
-
-        // Goals Cards selection list
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(text = "Your goal", fontSize = 12.sp, color = ThemeTextTertiary, fontWeight = FontWeight.SemiBold)
-
-            GoalPicker(
-                selected = uiState.goal,
-                onSelect = { goal -> viewModel.onGoalChanged(goal.key, goal.calorieOffset) },
-                selectedDetail = "Your target: ${"%,d".format(goalTargets.calories.roundToInt())} kcal · ${goalTargets.proteinG.roundToInt()} g protein"
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Brush.linearGradient(listOf(com.superfit.app.theme.ElectricCyan.copy(alpha = 0.06f), HyperViolet.copy(alpha = 0.06f))))
-                .border(1.dp, com.superfit.app.theme.ElectricCyan.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Daily TDEE", color = com.superfit.app.theme.ElectricCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "What is this?",
-                        fontSize = 12.sp,
-                        color = HyperViolet,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.clickable { onOpenTdeePopup() }
-                    )
-                }
-                Text(text = "${Math.round(tdeeVal)} kcal", fontSize = 20.sp, fontWeight = FontWeight.Black, color = ThemeTextPrimary)
-            }
-        }
+        Text(
+            ActivityLevels.describe(uiState.activityMultiplier),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary
+        )
     }
 
-    Button(
-        onClick = onNext,
+    Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(12.dp)),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onOpenBurnInfo)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd))),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        }
+        Text(
+            "You burn about ${"%,d".format(plan.tdee.roundToInt())} kcal a day",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textPrimary
+        )
+        Spacer(Modifier.width(6.dp))
+        Icon(Icons.Default.Info, contentDescription = "What does this mean?", tint = colors.textSecondary, modifier = Modifier.size(18.dp))
     }
+
+    Spacer(Modifier.height(4.dp))
+    PrimaryButton(text = "Continue", onClick = onNext)
 }
+
+/** The four everyday activity levels, in plain words. Same multipliers as before. */
+internal data class ActivityLevel(val multiplier: Double, val label: String, val description: String)
+
+internal object ActivityLevels : List<ActivityLevel> by listOf(
+    ActivityLevel(1.2, "Mostly sitting", "Desk job, little exercise."),
+    ActivityLevel(1.375, "1-3 workouts", "Light exercise 1 to 3 days a week."),
+    ActivityLevel(1.55, "3-5 workouts", "Exercise 3 to 5 days a week."),
+    ActivityLevel(1.725, "6-7 workouts", "Hard exercise most days.")
+) {
+    fun closest(multiplier: Double): Double = minBy { kotlin.math.abs(it.multiplier - multiplier) }.multiplier
+    fun describe(multiplier: Double): String = first { it.multiplier == closest(multiplier) }.description
+}
+
+/** The targets for what's been entered so far; sensible stand-ins while boxes are still empty. */
+internal fun OnboardingUiState.plan(): OnboardingTargets = OnboardingTargets.of(
+    age = age.toIntOrNull()?.takeIf { it > 0 } ?: 30,
+    heightCm = height.toDoubleOrNull()?.takeIf { it > 0 } ?: 170.0,
+    weightKg = weight.toDoubleOrNull()?.takeIf { it > 0 } ?: 70.0,
+    isMale = isMale,
+    activityMultiplier = activityMultiplier,
+    goal = goal,
+    calorieOffset = calorieOffset
+)

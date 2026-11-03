@@ -67,6 +67,9 @@ object AppAnalytics {
 
     /** [type]: day, activity or best. */
     fun cardShared(type: String) = log("share_card_shared", "type" to type)
+
+    /** The monthly recap played through to its last story card. */
+    fun recapWatched(cards: Int) = log("recap_watched", "cards" to "$cards")
     fun screenOpened(screen: String) = log("screen_opened", "screen" to screen)
     fun goalSet(withDate: Boolean) = log("goal_set", "target_date" to if (withDate) "yes" else "no")
     fun weighIn() = log("weigh_in")

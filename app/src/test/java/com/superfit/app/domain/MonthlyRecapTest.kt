@@ -48,7 +48,7 @@ class MonthlyRecapTest {
     private fun recap(
         days: Map<LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity> = emptyList(),
-        strength: List<LocalDate> = emptyList(),
+        strength: List<StrengthSession> = emptyList(),
         setup: RecapSetup = allSet
     ) = MonthlyRecap.build(october, days, meals, strength, emptyList(), journey = null, goalSet = false, setup = setup, zone = utc)
 
@@ -61,20 +61,45 @@ class MonthlyRecapTest {
     @Test
     fun cardsComeInStoryOrderAndEmptyOnesAreLeftOut() {
         val days = month { d -> day(d) }
-        val meals = (1..20).map { meal(october.atDay(it), if (it % 2 == 0) "dal" else "poha", 8) }
+        val meals = (1..21).map { meal(october.atDay(it), listOf("dal", "poha", "upma")[it % 3], 8) }
         val r = recap(days, meals, setup = allSet.copy(widget = false))!!
         val ids = r.cards.map { it.id }
-        assertEquals(listOf("needle", "repeat", "macros", "choices", "moving", "strength", "setup"), ids)
+        assertEquals(listOf("needle", "calories", "macros", "choices", "moving", "strength", "setup"), ids)
         assertTrue(ids.none { it == "goal" || it == "faster" })
     }
 
     @Test
-    fun onRepeatIsTheMostLoggedFoodWithItsUsualVerdict() {
-        val meals = (1..12).map { meal(october.atDay(it), "dal", 8) } + (1..4).map { meal(october.atDay(it), "samosa", 3) }
-        val card = MonthlyRecap.onRepeat(meals)!!
-        assertEquals("Dal", card.food)
-        assertEquals(12, card.times)
-        assertEquals(FoodVerdict.GREAT, card.verdict)
+    fun caloriesCardRanksFoodsByCaloriesNotByCount() {
+        val days = month { d -> day(d) }
+        val chai = (1..20).map { meal(october.atDay(it), "chai", 7, "Chai").copy(calories = 70.0) }
+        val pizza = (1..4).map { meal(october.atDay(it), "pizza", 3, "Pizza").copy(calories = 800.0) }
+        val dal = (1..10).map { meal(october.atDay(it), "dal", 8, "Dal").copy(calories = 300.0) }
+        val r = recap(days, chai + pizza + dal)!!
+        val card = r.cards.filterIsInstance<RecapCard.Calories>().single()
+        assertEquals(listOf("Pizza", "Dal", "Chai"), card.sources.top.map { it.name })
+        assertEquals("Chai", card.sources.mostLogged?.name)
+    }
+
+    @Test
+    fun walksAtTheSamePaceWithALowerHeartRateMakeAHeartCard() {
+        fun walk(bpm: Long) = ActivityFact("Walk", 60, 5.0, 250.0, 720, isRun = false, avgHeartRate = bpm)
+        val days = (1..30).associate { i ->
+            val sep = october.atDay(1).minusDays(i.toLong())
+            sep to day(sep, workouts = if (i % 5 == 0) listOf(walk(120)) else emptyList())
+        } + month { d -> day(d, workouts = if (d.dayOfMonth % 5 == 0) listOf(walk(112)) else emptyList()) }
+        val card = recap(days)!!.cards.filterIsInstance<RecapCard.Heart>().single()
+        assertEquals(8, card.change.bpmDrop)
+        assertEquals("walk", card.change.activity)
+    }
+
+    @Test
+    fun aSmallTasteIsNeverAChoiceToRethink() {
+        val meals = listOf(
+            meal(october.atDay(1), "dal", 9, "Dal, roti and salad"),
+            meal(october.atDay(2), "cake", 2, "1 tsp birthday cake").copy(calories = 40.0)
+        )
+        val card = MonthlyRecap.choices(meals)!!
+        assertTrue(card.rethink.isEmpty())
     }
 
     @Test
@@ -122,6 +147,44 @@ class MonthlyRecapTest {
     }
 
     @Test
+    fun strengthCardSaysHowOftenHowLongAndWhatWasTrained() {
+        val days = month { d -> day(d) }
+        val sessions = listOf(
+            StrengthSession(october.atDay(2), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(october.atDay(9), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(october.atDay(16), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(october.atDay(23), 40, setOf(BodyArea.UPPER))
+        )
+        val d = recap(days, strength = sessions)!!.cards.filterIsInstance<RecapCard.Strength>().single().detail!!
+        assertEquals(160, d.minutes)
+        assertEquals("about once a week", d.perWeekText())
+        assertEquals("4 upper body", StrengthSessions.areasText(d))
+        assertEquals(BodyArea.LOWER, d.missing)
+    }
+
+    @Test
+    fun bothHalvesTrainedIsNotFlagged() {
+        val d = StrengthSessions.detail(
+            listOf(
+                StrengthSession(october.atDay(1), null, setOf(BodyArea.UPPER)),
+                StrengthSession(october.atDay(4), null, setOf(BodyArea.LOWER)),
+                StrengthSession(october.atDay(8), null, emptySet())
+            ),
+            31
+        )!!
+        assertNull(d.missing)
+        assertEquals(0, d.timedSessions)
+        assertEquals(2, d.taggedSessions)
+    }
+
+    @Test
+    fun strengthTagsAreReadFromTheAiAnswer() {
+        val r = StrengthSessions.parse("""{"logs":[{"n":1,"areas":["upper","core"],"minutes":45},{"n":2,"areas":[],"minutes":null}]}""", 2)
+        assertEquals(setOf(BodyArea.UPPER, BodyArea.CORE) to 45, r[0])
+        assertEquals(emptySet<BodyArea>() to null, r[1])
+    }
+
+    @Test
     fun setupListsOnlyWhatIsMissingAndIsSkippedWhenAllSet() {
         assertNull(MonthlyRecap.setup(allSet, loggedDays = 25, daysInMonth = 31))
         val card = MonthlyRecap.setup(allSet.copy(mic = false), loggedDays = 9, daysInMonth = 31)!!
@@ -156,5 +219,17 @@ class MonthlyRecapTest {
         val prompt = RecapWriter.prompt(r)
         assertTrue(!prompt.contains("setup"))
         assertTrue(RecapWriter.SYSTEM_INSTRUCTION.contains("Never use the word \"roast\""))
+    }
+
+    @Test
+    fun bodyCardOnlyWhenTheScaleSawAChange() {
+        val days = month { d -> if (d.dayOfMonth <= 20) day(d) else null }
+        fun build(body: BodyChange?) = MonthlyRecap.build(october, days, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = utc, body = body)
+        val moved = BodyChange(26.0, 24.8, 58.0, 58.2, null, null, 80.0, 78.6)
+        val flat = BodyChange(26.0, 25.8, 58.0, 58.1, null, null, 80.0, 79.9)
+        val card = build(moved)!!.cards.filterIsInstance<RecapCard.Body>().single()
+        assertEquals("Body fat down 1.2 points", RecapWriter.plain(card).title)
+        assertTrue(build(flat)!!.cards.none { it is RecapCard.Body })
+        assertTrue(build(null)!!.cards.none { it is RecapCard.Body })
     }
 }

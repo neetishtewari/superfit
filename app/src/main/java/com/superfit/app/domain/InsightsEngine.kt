@@ -1,7 +1,10 @@
 package com.superfit.app.domain
 
+import com.superfit.app.data.NutritionEntryEntity
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
@@ -15,16 +18,26 @@ data class ActivityFact(
     val distanceKm: Double?,
     val kcal: Double,
     val paceSecondsPerKm: Long?,
-    val isRun: Boolean
+    val isRun: Boolean,
+    /** Average heart rate, when a watch or phone recorded it. */
+    val avgHeartRate: Long? = null,
+    /** Hour of day the workout started (0-23); null for voice logs, whose time is when they were said. */
+    val startHour: Int? = null,
+    /** Total reps of a voice-logged workout, 0 when none were given. */
+    val reps: Int = 0
 ) {
+    val isWalk: Boolean get() = title == "Walk"
+
     companion object {
-        fun of(view: WorkoutView): ActivityFact = ActivityFact(
+        fun of(view: WorkoutView, zone: ZoneId = ZoneId.systemDefault()): ActivityFact = ActivityFact(
             title = view.title,
             minutes = view.minutes,
             distanceKm = view.distanceKm,
             kcal = view.exerciseKcal ?: 0.0,
             paceSecondsPerKm = view.paceSecondsPerKm,
-            isRun = view.title == "Run"
+            isRun = view.title == "Run",
+            avgHeartRate = view.avgHeartRate?.takeIf { it in 40..220 },
+            startHour = runCatching { Instant.ofEpochMilli(view.startTime).atZone(zone).hour }.getOrNull()
         )
     }
 }
@@ -41,7 +54,9 @@ data class DayTotals(
     val proteinG: Double,
     val proteinTargetG: Double,
     val steps: Int,
-    val workouts: List<ActivityFact>
+    val workouts: List<ActivityFact>,
+    /** Average of the AI's 1-10 meal ratings that day; null when no meal was rated. */
+    val mealRating: Double? = null
 ) {
     val logged: Boolean get() = meals >= 2
     val net: Double get() = kcalEaten - kcalTarget
@@ -83,7 +98,9 @@ data class WeekReport(
     val working: List<Insight>,
     val watch: List<Insight>,
     /** Eaten minus target for each of the 7 days; null on days that aren't fully logged. */
-    val dailyNet: List<Pair<LocalDate, Double?>>
+    val dailyNet: List<Pair<LocalDate, Double?>>,
+    /** The foods that added the most calories over the 7 days; null with too little logged. */
+    val calories: CalorieSources? = null
 )
 
 /**
@@ -92,7 +109,14 @@ data class WeekReport(
  */
 object InsightsEngine {
 
-    fun weekReport(days: Map<LocalDate, DayTotals>, today: LocalDate, loseGoal: Boolean = true): WeekReport {
+    fun weekReport(
+        days: Map<LocalDate, DayTotals>,
+        today: LocalDate,
+        loseGoal: Boolean = true,
+        meals: List<NutritionEntryEntity> = emptyList(),
+        zone: ZoneId = ZoneId.systemDefault(),
+        body: BodyChange? = null
+    ): WeekReport {
         val to = today.minusDays(1)
         val from = to.minusDays(6)
         val week = range(days, from, to)
@@ -100,8 +124,17 @@ object InsightsEngine {
         val thisWeek = stats(week)
         val lastWeek = stats(prev)
 
-        val working = workingFindings(days, week, thisWeek, lastWeek, today, loseGoal).take(2)
-        val watch = watchFindings(days, week, thisWeek, today, loseGoal).take(2)
+        val weekMeals = meals.filter { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate().let { d -> !d.isBefore(from) && !d.isAfter(to) } }
+        val calories = if (thisWeek.loggedDays >= 3) CalorieSourcesEngine.build(weekMeals) else null
+        val treat = calories?.let { treatFinding(it) }
+        // Smart scale: only when it measures body fat, muscle or resting burn and one of them moved.
+        val bodyLine = body?.takeIf { it.notable }?.let { BodyTrend.finding(it, loseGoal) }
+        val bodyWatch = bodyLine?.takeIf { BodyTrend.isWatch(it) }
+
+        // The treat line, the body line and the activity patterns join the usual findings; good news is never crowded out.
+        val extras = listOfNotNull(treat?.takeIf { it.id != "treat_top" }, bodyLine?.takeIf { bodyWatch == null }) + activityFindings(days, week, prev, today)
+        val working = workingFindings(days, week, thisWeek, lastWeek, today, loseGoal).take(2) + extras.take(2)
+        val watch = (listOfNotNull(treat?.takeIf { it.id == "treat_top" }, bodyWatch) + watchFindings(days, week, thisWeek, today, loseGoal)).take(2)
 
         return WeekReport(
             from = from,
@@ -111,8 +144,74 @@ object InsightsEngine {
             verdict = verdict(working.firstOrNull(), watch.firstOrNull()),
             working = working,
             watch = watch,
-            dailyNet = week.map { it.date to (if (it.logged) it.net else null) }
+            dailyNet = week.map { it.date to (if (it.logged) it.net else null) },
+            calories = calories?.takeIf { it.top.isNotEmpty() }
         )
+    }
+
+    /**
+     * The biggest treat against the top 5 calorie foods: good news when it stayed out of the top 5,
+     * an honest heads-up with the swap idea when it's in. Null when there's nothing to say.
+     */
+    fun treatFinding(c: CalorieSources, period: String = "week"): Insight? {
+        val b = c.biggestTreat
+        if (b == null) {
+            return if (c.surelyNoTreats) Insight("treat_none", "No treat foods this $period", "Everything you logged was everyday food.", "treats stayed off the plate") else null
+        }
+        val name = b.name
+        val rank = c.treatRank
+            ?: return Insight(
+                "treat_small",
+                "Treats stayed small",
+                "Your biggest treat, ${name.lowercase(Locale.getDefault())} (${kcal(b.treatKcal.toDouble())} kcal), wasn't in your top 5 calorie foods.",
+                "treats stayed small"
+            )
+        val detail = buildString {
+            append("${kcal(b.treatKcal.toDouble())} kcal in ${b.times} ${if (b.times == 1) "sitting" else "sittings"}")
+            c.outweighs?.let { append(", more than all your ${it.name.lowercase(Locale.getDefault())}") }
+            append(".")
+            c.swap?.let { sw ->
+                append(" Swap idea: ${sw.alternative.lowercase(Locale.getDefault())}")
+                if (sw.kcalSaved >= 30) append(", about ${sw.kcalSaved} kcal less each time")
+                append(".")
+            }
+        }
+        return Insight("treat_top", "$name is your #$rank calorie food", detail, "${name.lowercase(Locale.getDefault())} made your top 5 calorie foods")
+    }
+
+    /** Fitter heart, rep totals and better meals on move days, when the data clearly shows them. */
+    private fun activityFindings(days: Map<LocalDate, DayTotals>, week: List<DayTotals>, prev: List<DayTotals>, today: LocalDate): List<Insight> = buildList {
+        val first = week.first().date
+        val before = range(days, first.minusDays(28), first.minusDays(1))
+        ActivityPatterns.heart(week.flatMap { it.workouts }, before.flatMap { it.workouts })?.let { h ->
+            add(
+                Insight(
+                    "heart",
+                    "Fitter heart",
+                    "${cap(h.activity)}s at ${pace(h.paceNow)} /km (was ${pace(h.pacePrev)}) with your heart ${h.bpmDrop} beats a minute lower than the 4 weeks before.",
+                    "your heart is getting fitter"
+                )
+            )
+        }
+        ActivityPatterns.reps(week.flatMap { it.workouts }, prev.flatMap { it.workouts })?.let { r ->
+            if (r.prev == 0 || r.total > r.prev) {
+                val title = r.top?.let { "${String.format(Locale.US, "%,d", it.second)} ${it.first}" } ?: "${String.format(Locale.US, "%,d", r.total)} reps"
+                val detail = when {
+                    r.prev > 0 && r.top != null -> "${String.format(Locale.US, "%,d", r.total)} reps in all, up from ${String.format(Locale.US, "%,d", r.prev)} last week."
+                    r.prev > 0 -> "Up from ${String.format(Locale.US, "%,d", r.prev)} last week."
+                    else -> "Logged by voice this week."
+                }
+                add(Insight("reps", title, detail, "you put in ${String.format(Locale.US, "%,d", r.total)} reps"))
+            }
+        }
+        ActivityPatterns.moveDayPlates(range(days, today.minusDays(28), today.minusDays(1)))?.let { m ->
+            val protein = if (m.activeProteinPct != null && m.restProteinPct != null && m.activeProteinPct - m.restProteinPct >= 10) {
+                " Protein ${m.activeProteinPct}% of goal vs ${m.restProteinPct}%."
+            } else {
+                ""
+            }
+            add(Insight("plates", "Better meals on move days", "Meals rated ${m.activeRating} on active days vs ${m.restRating} on rest days, last 4 weeks.$protein", "you ate better on days you moved"))
+        }
     }
 
     fun stats(days: List<DayTotals>): WeekStats = WeekStats(

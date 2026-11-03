@@ -1,5 +1,8 @@
 package com.superfit.app.ui.recap
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +22,9 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,15 +37,47 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.superfit.app.R
-import com.superfit.app.domain.FoodVerdict
+import com.superfit.app.domain.ActivityPatterns
+import com.superfit.app.domain.BodyArea
+import com.superfit.app.domain.BodyChange
 import com.superfit.app.domain.MonthlyRecap
+import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
+import com.superfit.app.domain.StrengthSessions
 import com.superfit.app.theme.Manrope
 import java.time.YearMonth
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+/**
+ * How far the card's numbers and bars have grown, 0-1. The playing recap counts them up as each card
+ * comes on screen; everywhere else (and every shared picture) shows them in full.
+ */
+val LocalRecapReveal = compositionLocalOf { RecapReveal.Full }
+
+enum class RecapReveal { Full, Waiting, Playing }
+
+/** Set while the video is made: the exact count-up point to draw, frame by frame. */
+val LocalRecapVideoReveal = compositionLocalOf<Float?> { null }
+
+/** 0 to 1 over a second once the card is playing; 1 straight away when it isn't animated. */
+@Composable
+private fun revealFraction(): Float {
+    val reveal = LocalRecapReveal.current
+    val progress = remember { Animatable(if (reveal == RecapReveal.Full) 1f else 0f) }
+    LaunchedEffect(reveal) {
+        when (reveal) {
+            RecapReveal.Full -> progress.snapTo(1f)
+            RecapReveal.Playing -> progress.animateTo(1f, tween(1_100, easing = FastOutSlowInEasing))
+            RecapReveal.Waiting -> Unit
+        }
+    }
+    return LocalRecapVideoReveal.current ?: progress.value
+}
 
 /** A recap card's own colours: background, main text, soft text and the accent for bars and numbers. */
 private data class StoryPalette(val bg: Color, val text: Color, val soft: Color, val accent: Color, val track: Color)
@@ -52,11 +90,11 @@ private val Orange = StoryPalette(Color(0xFFF2A33A), Color(0xFF14201B), Color(0x
 private val Paper = StoryPalette(Color(0xFFF4F7F6), Color(0xFF14201B), Color(0xFF55635C), Color(0xFF0E9F75), Color(0x2214201B))
 
 private fun paletteFor(card: RecapCard): StoryPalette = when (card) {
-    is RecapCard.Goal, is RecapCard.Choices -> Mint
-    is RecapCard.Needle, is RecapCard.Moving -> Night
-    is RecapCard.OnRepeat -> Cream
-    is RecapCard.Faster -> Sky
-    is RecapCard.Strength -> Orange
+    is RecapCard.Goal, is RecapCard.Choices, is RecapCard.Body -> Mint
+    is RecapCard.Needle, is RecapCard.Moving, is RecapCard.Rhythm -> Night
+    is RecapCard.Calories -> Cream
+    is RecapCard.Faster, is RecapCard.Heart -> Sky
+    is RecapCard.Strength, is RecapCard.Reps -> Orange
     else -> Paper
 }
 
@@ -65,12 +103,16 @@ fun monthName(month: YearMonth): String = month.month.getDisplayName(DateTextSty
 private fun kicker(card: RecapCard): String = when (card) {
     is RecapCard.Goal -> "Goal"
     is RecapCard.Needle -> "What moved the needle"
-    is RecapCard.OnRepeat -> "On repeat"
+    is RecapCard.Calories -> "Your plate"
     is RecapCard.Macros -> "Your macros"
     is RecapCard.Choices -> "Choices that stood out"
     is RecapCard.Faster -> "Pace"
     is RecapCard.Moving -> "Movement"
     is RecapCard.Strength -> "Strength"
+    is RecapCard.Body -> "Body"
+    is RecapCard.Heart -> "Heart"
+    is RecapCard.Reps -> "Reps"
+    is RecapCard.Rhythm -> "Rhythm"
     is RecapCard.Setup -> "Setup"
 }
 
@@ -120,6 +162,8 @@ fun RecapStory(card: RecapCard, words: RecapWords, month: YearMonth, modifier: M
                 autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 17.sp)
             )
         }
+        // Keeps the longest lines clear of the badge.
+        Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
@@ -162,22 +206,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             card.helped.forEach { FactRow(it.title, it.detail, p.accent, p) }
             card.held.forEach { FactRow(it.title, it.detail, Color(0xFFF2A33A), p) }
         }
-        is RecapCard.OnRepeat -> {
-            BasicText(
-                card.food,
-                maxLines = 2,
-                style = TextStyle(color = p.text, fontFamily = Manrope, fontWeight = FontWeight.ExtraBold, lineHeight = 1.05.em),
-                autoSize = TextAutoSize.StepBased(minFontSize = 28.sp, maxFontSize = 60.sp)
-            )
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("×${card.times}", color = p.accent, fontFamily = Manrope, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-                card.verdict?.let {
-                    Spacer(Modifier.width(12.dp))
-                    Pill(verdictWord(it), p)
-                }
-            }
-        }
+        is RecapCard.Calories -> CalorieMoment(card, p)
         is RecapCard.Macros -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             MacroRow("Protein", "${card.proteinPct}% of goal", card.proteinPct / 100f, p)
             if (card.weekdayProteinPct != null && card.weekendProteinPct != null) {
@@ -218,10 +247,35 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
         }
         is RecapCard.Strength -> {
             Big("${card.sessions}", if (card.sessions == 1) "session" else "sessions", p)
+            card.detail?.takeIf { card.sessions > 0 }?.let { d ->
+                Small(
+                    listOfNotNull(d.perWeekText(), if (d.timedSessions > 0) "${d.minutes} min${if (d.timedSessions < card.sessions) "+" else ""}" else null).joinToString(" · "),
+                    p,
+                    bold = true
+                )
+                if (d.areas.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(StrengthSessions.areasText(d), color = p.text, fontFamily = Manrope, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                d.missing?.let { m ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No ${m.label} logged. Add a ${if (m == BodyArea.LOWER) "leg" else "upper body"} day, or say it when you log it.",
+                        color = Color.White,
+                        fontFamily = Manrope,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF14201B))
+                            .padding(horizontal = 12.dp, vertical = 9.dp)
+                    )
+                }
+            }
             if (card.sessions == 0) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Already lifting? Tap the mic and say it, like \"30 minutes of weights\".",
+                    "Next month's side quest: two strength sessions a week.",
                     color = Color.White,
                     fontFamily = Manrope,
                     fontSize = 12.sp,
@@ -233,23 +287,121 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
                 )
             }
         }
+        is RecapCard.Body -> BodyMoment(card.change, p)
+        is RecapCard.Heart -> {
+            Big("−${card.change.bpmDrop}", "bpm", p)
+            Small(
+                "${card.change.activity.replaceFirstChar { it.titlecase(Locale.getDefault()) }}s at ${MonthlyRecap.pace(card.change.paceNow)} /km · ${card.change.bpmNow} bpm, was ${card.change.bpmPrev}",
+                p,
+                bold = true
+            )
+        }
+        is RecapCard.Reps -> {
+            Big(String.format(Locale.US, "%,d", card.totals.total), "reps", p)
+            Small(
+                listOfNotNull(
+                    card.totals.top?.let { String.format(Locale.US, "%,d %s", it.second, it.first) },
+                    card.totals.prev.takeIf { it > 0 }?.let { String.format(Locale.US, "last month %,d", it) }
+                ).joinToString(" · "),
+                p,
+                bold = true
+            )
+        }
+        is RecapCard.Rhythm -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            val r = card.rhythm
+            if (r.hour != null) {
+                Big(ActivityPatterns.hourLabel(r.hour), "person", p, countUp = false)
+                Small("${r.workoutsNearHour} of ${r.workoutsTimed} workouts started around then", p, bold = true)
+            }
+            r.bestDay?.let { d ->
+                FactRow(
+                    "${d.getDisplayName(DateTextStyle.FULL, Locale.getDefault())}s are your big step day",
+                    String.format(Locale.US, "%,d steps on average, %,d on a usual day", r.bestDaySteps, r.avgSteps),
+                    p.accent,
+                    p
+                )
+            }
+        }
         is RecapCard.Setup -> Unit
     }
 }
 
-private fun verdictWord(v: FoodVerdict): String = when (v) {
-    FoodVerdict.GREAT -> "Great pick"
-    FoodVerdict.GOOD -> "Solid pick"
-    FoodVerdict.PORTION -> "Watch the portion"
-    FoodVerdict.TREAT -> "A treat"
-    FoodVerdict.SMALL_TREAT -> "A small treat"
-    FoodVerdict.AVOID -> "Ease off"
+/** The scale's own measures, start of the month to the end; good moves in the card's colour, the rest amber. */
+@Composable
+private fun BodyMoment(c: BodyChange, p: StoryPalette) {
+    fun signed(v: Double) = (if (v > 0) "+" else "−") + RecapWriter.fmt(abs(v))
+    when {
+        c.fatMoved -> Big(signed(c.fat!!), "pts body fat", p)
+        c.leanMoved -> Big(signed(c.lean!!), "kg muscle", p)
+        else -> Big(signed(c.bmr!!), "kcal at rest", p)
+    }
+    Spacer(Modifier.height(14.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val amber = Color(0xFFB86E00)
+        c.fat?.let { FactRow("Body fat", "${RecapWriter.fmt(c.fatFrom!!)}% → ${RecapWriter.fmt(c.fatTo!!)}%", if (it <= 0) p.accent else amber, p) }
+        c.lean?.let { FactRow("Muscle", "${RecapWriter.fmt(c.leanFrom!!)} → ${RecapWriter.fmt(c.leanTo!!)} kg", if (it >= 0) p.accent else amber, p) }
+        c.bmr?.let {
+            FactRow(
+                "Resting burn",
+                String.format(Locale.US, "%,d → %,d kcal a day", c.bmrFrom!!.roundToInt(), c.bmrTo!!.roundToInt()),
+                // A lower resting burn is normal while losing weight: never shown as a warning.
+                if (it >= 0) p.accent else p.soft,
+                p
+            )
+        }
+    }
+}
+
+/** Top 5 foods by calories: a strip of their shares, then each with how often; treats in amber. */
+@Composable
+private fun CalorieMoment(card: RecapCard.Calories, p: StoryPalette) {
+    val c = card.sources
+    val treatColor = Color(0xFFB86E00)
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .clip(RoundedCornerShape(50))
+                .background(p.track)
+        ) {
+            c.top.forEachIndexed { i, f ->
+                Box(
+                    Modifier
+                        .weight(f.kcal.coerceAtLeast(1).toFloat())
+                        .fillMaxHeight()
+                        .background(if (f.isTreat) treatColor else p.accent.copy(alpha = 1f - i * 0.15f))
+                )
+            }
+            val rest = (c.totalKcal - c.top.sumOf { it.kcal }).coerceAtLeast(0)
+            if (rest > 0) Spacer(Modifier.weight(rest.toFloat()))
+        }
+        Spacer(Modifier.height(2.dp))
+        c.top.forEach { f ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${f.name} · ${f.times}×",
+                    color = if (f.isTreat) treatColor else p.text,
+                    fontFamily = Manrope,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(String.format(Locale.US, "%,d", f.kcal), color = p.text, fontFamily = Manrope, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+        Small("kcal · ${c.top.sumOf { it.pct }}% of everything you logged", p, bold = true)
+    }
 }
 
 @Composable
-private fun Big(value: String, unit: String, p: StoryPalette) {
+private fun Big(value: String, unit: String, p: StoryPalette, countUp: Boolean = true) {
+    val f = revealFraction()
+    val shown = RecapAutoplay.parse(value)?.takeIf { countUp && RecapAutoplay.worthCounting(it) }?.let { RecapAutoplay.format(it, f) } ?: value
     Row(verticalAlignment = Alignment.Bottom) {
-        Text(value, color = p.text, fontFamily = Manrope, fontSize = 76.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 1.em)
+        Text(shown, color = p.text, fontFamily = Manrope, fontSize = 76.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 1.em)
         Spacer(Modifier.width(6.dp))
         Text(unit, color = p.text, fontFamily = Manrope, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
     }
@@ -261,22 +413,8 @@ private fun Small(text: String, p: StoryPalette, bold: Boolean = false) {
 }
 
 @Composable
-private fun Pill(text: String, p: StoryPalette) {
-    Text(
-        text,
-        color = p.bg,
-        fontFamily = Manrope,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.ExtraBold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(p.accent)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    )
-}
-
-@Composable
 private fun Bar(fraction: Float, p: StoryPalette, modifier: Modifier = Modifier) {
+    val grown = fraction * revealFraction()
     Box(
         modifier
             .fillMaxWidth()
@@ -287,7 +425,7 @@ private fun Bar(fraction: Float, p: StoryPalette, modifier: Modifier = Modifier)
         Box(
             Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(fraction.coerceIn(0.03f, 1f))
+                .fillMaxWidth(grown.coerceIn(0.03f, 1f))
                 .clip(RoundedCornerShape(50))
                 .background(p.accent)
         )

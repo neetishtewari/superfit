@@ -26,32 +26,35 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.superfit.app.theme.BrandGreenDeep
 import com.superfit.app.theme.SuperfitTheme
 import java.time.YearMonth
 
-/** "Your October is ready": on Home from the 1st, and at the top of Progress for the first week. */
+// Warm amber with dark text, like the recap's own amber cards, so it stands apart from the green app.
+private val RecapAmber = Color(0xFFF2A33A)
+private val RecapInk = Color(0xFF14201B)
+
+/** "Your October review is ready": on Home from the 1st, and at the top of Progress for the first week. */
 @Composable
 fun RecapReadyCard(month: YearMonth, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(BrandGreenDeep)
+            .background(RecapAmber)
             .clickable(onClick = onOpen)
             .padding(start = 18.dp, top = 16.dp, bottom = 16.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = RecapInk, modifier = Modifier.size(28.dp))
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text("Your ${monthName(month)} is ready", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text("Your month in a few cards worth sharing.", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
+            Text("Your ${monthName(month)} review is ready", color = RecapInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("Your month in a few cards worth sharing.", color = RecapInk.copy(alpha = 0.8f), fontSize = 13.sp)
         }
         Button(
             onClick = onOpen,
             shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = BrandGreenDeep)
+            colors = ButtonDefaults.buttonColors(containerColor = RecapInk, contentColor = Color.White)
         ) { Text("Open", fontWeight = FontWeight.Bold) }
     }
 }

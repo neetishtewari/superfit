@@ -46,19 +46,19 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
     fun authenticate(onSuccess: () -> Unit) {
         errorMessage = null
         if (email.isBlank() || password.isBlank()) {
-            errorMessage = "Email and Password cannot be empty."
+            errorMessage = AuthMessages.EMPTY_FIELDS
             return
         }
 
         if (!isLoginMode && password != confirmPassword) {
-            errorMessage = "Passwords do not match."
+            errorMessage = AuthMessages.PASSWORDS_DIFFER
             return
         }
 
         isLoading = true
 
         if (isLoginMode) {
-            auth.signInWithEmailAndPassword(email, password)
+            auth.signInWithEmailAndPassword(email.trim(), password)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         viewModelScope.launch {
@@ -74,16 +74,11 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                     } else {
                         isLoading = false
-                        val rawError = task.exception?.localizedMessage ?: "Login failed. Please check credentials."
-                        errorMessage = if (rawError.contains("API key not valid", ignoreCase = true) || rawError.contains("API_KEY_INVALID", ignoreCase = true)) {
-                            "Invalid API Key. Please replace the mock google-services.json in the app/ directory with your real Firebase config."
-                        } else {
-                            rawError
-                        }
+                        errorMessage = friendly(task.exception, creatingAccount = false)
                     }
                 }
         } else {
-            auth.createUserWithEmailAndPassword(email, password)
+            auth.createUserWithEmailAndPassword(email.trim(), password)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         viewModelScope.launch {
@@ -100,12 +95,7 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                         }
                     } else {
                         isLoading = false
-                        val rawError = task.exception?.localizedMessage ?: "Registration failed."
-                        errorMessage = if (rawError.contains("API key not valid", ignoreCase = true) || rawError.contains("API_KEY_INVALID", ignoreCase = true)) {
-                            "Invalid API Key. Please replace the mock google-services.json in the app/ directory with your real Firebase config."
-                        } else {
-                            rawError
-                        }
+                        errorMessage = friendly(task.exception, creatingAccount = true)
                     }
                 }
         }
@@ -117,16 +107,15 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
 
     fun resetPassword(emailAddress: String, onComplete: (Boolean, String?) -> Unit) {
         if (emailAddress.isBlank()) {
-            onComplete(false, "Please enter your email address.")
+            onComplete(false, AuthMessages.NEED_EMAIL)
             return
         }
-        auth.sendPasswordResetEmail(emailAddress)
+        auth.sendPasswordResetEmail(emailAddress.trim())
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    onComplete(true, "Password reset email sent to $emailAddress.")
+                    onComplete(true, AuthMessages.resetSent(emailAddress.trim()))
                 } else {
-                    val rawError = task.exception?.localizedMessage ?: "Failed to send reset email."
-                    onComplete(false, rawError)
+                    onComplete(false, friendly(task.exception, creatingAccount = false))
                 }
             }
     }
@@ -150,13 +139,15 @@ class LoginViewModel(private val repository: DataRepository) : ViewModel() {
                     }
                 } else {
                     isLoading = false
-                    val rawError = task.exception?.localizedMessage ?: "Google sign in failed."
-                    errorMessage = if (rawError.contains("API key not valid", ignoreCase = true) || rawError.contains("API_KEY_INVALID", ignoreCase = true)) {
-                        "Invalid API Key. Please replace the mock google-services.json in the app/ directory with your real Firebase config."
-                    } else {
-                        rawError
-                    }
+                    errorMessage = friendly(task.exception, creatingAccount = false)
                 }
             }
     }
+
+    private fun friendly(e: Exception?, creatingAccount: Boolean): String = AuthMessages.forFirebase(
+        errorCode = (e as? com.google.firebase.auth.FirebaseAuthException)?.errorCode,
+        message = e?.message,
+        isNetwork = e is com.google.firebase.FirebaseNetworkException,
+        creatingAccount = creatingAccount
+    )
 }

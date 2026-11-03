@@ -178,11 +178,12 @@ object FoodQualityEngine {
                 rated = tags != null,
                 approvalKey = PersonalNutrition.key(tags?.foodType?.takeIf { it.isNotBlank() } ?: foodName),
                 approved = approved,
-                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved, Treats.kcalOf(newest, it)) } ?: FoodVerdict.GOOD
+                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved) } ?: FoodVerdict.GOOD
             )
         }.sortedWith(
-            compareByDescending<FoodItemRating> { it.weeklyFrequency * 5 + it.daysLoggedCount * 10 }
-                .thenByDescending { it.cleanlinessScore }
+            // Biggest calorie sources first: pizza twice a week can outweigh chai twice a day.
+            compareByDescending<FoodItemRating> { it.avgCalories.toLong() * it.weeklyFrequency }
+                .thenByDescending { it.weeklyFrequency }
         )
 
         // Top clean foods logged

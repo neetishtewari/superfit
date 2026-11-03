@@ -81,15 +81,14 @@ class OnboardingViewModel(
             val weight = repository.healthConnectManager.readLatestWeight()
 
             if (height == null && weight == null) {
-                _uiState.value = _uiState.value.copy(
-                    isAutofilling = false,
-                    error = "Could not find height or weight records in Health Connect."
-                )
+                // Nothing saved there yet: the boxes stay empty for the person to fill in.
+                _uiState.value = _uiState.value.copy(isAutofilling = false)
             } else {
                 _uiState.value = _uiState.value.copy(
                     height = height?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: _uiState.value.height,
                     weight = weight?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: _uiState.value.weight,
-                    isAutofilling = false
+                    isAutofilling = false,
+                    filledFromHealthConnect = true
                 )
             }
         }
@@ -102,15 +101,15 @@ class OnboardingViewModel(
         val weightDouble = state.weight.toDoubleOrNull()
 
         if (ageInt == null || ageInt <= 0) {
-            _uiState.value = _uiState.value.copy(error = "Please enter a valid age.")
+            _uiState.value = _uiState.value.copy(error = "Go back and enter your age.")
             return
         }
         if (heightDouble == null || heightDouble <= 0) {
-            _uiState.value = _uiState.value.copy(error = "Please enter a valid height in cm.")
+            _uiState.value = _uiState.value.copy(error = "Go back and enter your height.")
             return
         }
         if (weightDouble == null || weightDouble <= 0) {
-            _uiState.value = _uiState.value.copy(error = "Please enter a valid weight in kg.")
+            _uiState.value = _uiState.value.copy(error = "Go back and enter your weight.")
             return
         }
 
@@ -135,7 +134,7 @@ class OnboardingViewModel(
                 repository.saveProfile(profile)
                 onSuccess()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = "Failed to save profile: ${e.localizedMessage}")
+                _uiState.value = _uiState.value.copy(error = "Couldn't save your plan. Please try again.")
             }
         }
     }
@@ -152,5 +151,7 @@ data class OnboardingUiState(
     val hasHealthConnectPermissions: Boolean = false,
     val grantedPermissions: Set<String> = emptySet(),
     val isAutofilling: Boolean = false,
+    // True once Health Connect filled in height or weight, so "About you" can say where they came from.
+    val filledFromHealthConnect: Boolean = false,
     val error: String? = null
 )
