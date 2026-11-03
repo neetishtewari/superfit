@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.BottomSheetDefaults
@@ -46,7 +45,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -70,6 +68,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
@@ -228,52 +227,121 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val current = photo
-                if (current == null) {
-                    CapturableCard(shown, accent, null, light, frame, layer, Modifier.fillMaxWidth(0.7f))
-                } else {
-                    // Pinch to zoom, drag to move, double-tap to reset. Grid lines show while a finger
-                    // is down; they sit on top of the preview, outside the picture that gets shared.
-                    Box(
-                        Modifier
-                            .fillMaxWidth(0.7f)
-                            .pointerInput(current) {
-                                awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false)
-                                    touching = true
-                                    do {
-                                        val event = awaitPointerEvent()
-                                    } while (event.changes.any { it.pressed })
-                                    touching = false
-                                }
-                            }
-                            .pointerInput(current) {
-                                detectTapGestures(onDoubleTap = { frame = frame.reset() })
-                            }
-                            .pointerInput(current) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    showHint = false
-                                    val w = size.width.toFloat()
-                                    val h = size.height.toFloat()
-                                    if (w > 0f && h > 0f) {
-                                        frame = frame.moved(zoom, pan.x / w, pan.y / h, current.width, current.height, CARD_WIDTH_PX, CARD_HEIGHT_PX)
+                val preview: @Composable (Modifier) -> Unit = { m ->
+                    if (current == null) {
+                        CapturableCard(shown, accent, null, light, frame, layer, m)
+                    } else {
+                        // Pinch to zoom, drag to move, double-tap to reset. Grid lines show while a finger
+                        // is down; they sit on top of the preview, outside the picture that gets shared.
+                        Box(
+                            m
+                                .pointerInput(current) {
+                                    awaitEachGesture {
+                                        awaitFirstDown(requireUnconsumed = false)
+                                        touching = true
+                                        do {
+                                            val event = awaitPointerEvent()
+                                        } while (event.changes.any { it.pressed })
+                                        touching = false
                                     }
                                 }
-                            }
-                    ) {
-                        CapturableCard(shown, accent, current, light, frame, layer, Modifier.fillMaxWidth())
-                        if (touching) {
-                            Canvas(Modifier.matchParentSize()) {
-                                val line = Color.White.copy(alpha = 0.45f)
-                                for (i in 1..2) {
-                                    drawLine(line, Offset(size.width * i / 3f, 0f), Offset(size.width * i / 3f, size.height), strokeWidth = 1.dp.toPx())
-                                    drawLine(line, Offset(0f, size.height * i / 3f), Offset(size.width, size.height * i / 3f), strokeWidth = 1.dp.toPx())
+                                .pointerInput(current) {
+                                    detectTapGestures(onDoubleTap = { frame = frame.reset() })
+                                }
+                                .pointerInput(current) {
+                                    detectTransformGestures { _, pan, zoom, _ ->
+                                        showHint = false
+                                        val w = size.width.toFloat()
+                                        val h = size.height.toFloat()
+                                        if (w > 0f && h > 0f) {
+                                            frame = frame.moved(zoom, pan.x / w, pan.y / h, current.width, current.height, CARD_WIDTH_PX, CARD_HEIGHT_PX)
+                                        }
+                                    }
+                                }
+                        ) {
+                            CapturableCard(shown, accent, current, light, frame, layer, Modifier.fillMaxWidth())
+                            if (touching) {
+                                Canvas(Modifier.matchParentSize()) {
+                                    val line = Color.White.copy(alpha = 0.45f)
+                                    for (i in 1..2) {
+                                        drawLine(line, Offset(size.width * i / 3f, 0f), Offset(size.width * i / 3f, size.height), strokeWidth = 1.dp.toPx())
+                                        drawLine(line, Offset(0f, size.height * i / 3f), Offset(size.width, size.height * i / 3f), strokeWidth = 1.dp.toPx())
+                                    }
                                 }
                             }
                         }
                     }
-                    if (showHint) {
-                        Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
+                }
+                if (card is ShareCard.Daily) {
+                    preview(Modifier.fillMaxWidth(0.7f))
+                } else {
+                    // Photo and card options sit beside the preview, so they're seen without scrolling.
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (current == null) {
+                                OptionPill("Add photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
+                                    pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                }
+                            } else {
+                                OptionPill("Remove photo", Icons.Filled.Close, on = false, accent = accent) {
+                                    photo = null
+                                    frame = PhotoFrame()
+                                    showHint = false
+                                }
+                            }
+                            if (available.isNotEmpty()) {
+                                Text(
+                                    "Add to card",
+                                    color = SuperfitTheme.colors.textSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 6.dp)
+                                )
+                                available.forEach { chip ->
+                                    val on = chip in chips
+                                    OptionPill(
+                                        if (writing == chip) "${chip.label}…" else chip.label,
+                                        if (on) Icons.Filled.Check else null,
+                                        on = on,
+                                        accent = accent
+                                    ) {
+                                        val next = CardChip.toggle(chips, chip)
+                                        if (chip == failed) failed = null
+                                        if (onPhoto) chipsPhoto = next else chipsPlain = next
+                                    }
+                                }
+                            }
+                        }
+                        preview(Modifier.weight(1.45f))
                     }
+                }
+                if (showHint && current != null) {
+                    Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
+                }
+                failed?.takeIf { it in chips }?.let { chip ->
+                    Text(
+                        "Couldn't write the ${if (chip == CardChip.COACH) "coach line" else "roast"} just now. Tap to try again.",
+                        color = SuperfitTheme.colors.textSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { retries++ }
+                    )
+                }
+                val saved = if (onPhoto) savedPhoto else savedPlain
+                if (available.isNotEmpty() && chips != saved) {
+                    Text(
+                        "Make this my default for ${if (onPhoto) "photo" else "plain"} cards",
+                        color = accent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clickable {
+                                cardPrefs.setDefaults(onPhoto, chips)
+                                if (onPhoto) savedPhoto = chips else savedPlain = chips
+                                Toast.makeText(context, "Saved. Change it any time in Settings > Sharing.", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(vertical = 4.dp)
+                    )
                 }
                 if (current == null) {
                     // Dark or light background; a photo card always keeps its dark fade.
@@ -281,65 +349,6 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 } else {
                     ChoicePills(listOf(false to "Stats at bottom", true to "Stats at top"), frame.statsTop, accent) {
                         frame = frame.copy(statsTop = it)
-                    }
-                }
-                if (available.isNotEmpty()) {
-                    Text("Add to card", color = SuperfitTheme.colors.textSecondary, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
-                    AddChips(available, chips, writing, accent) { chip ->
-                        val next = CardChip.toggle(chips, chip)
-                        if (chip == failed) failed = null
-                        if (onPhoto) chipsPhoto = next else chipsPlain = next
-                    }
-                    failed?.takeIf { it in chips }?.let { chip ->
-                        Text(
-                            "Couldn't write the ${if (chip == CardChip.COACH) "coach line" else "roast"} just now. Tap to try again.",
-                            color = SuperfitTheme.colors.textSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { retries++ }
-                        )
-                    }
-                    val saved = if (onPhoto) savedPhoto else savedPlain
-                    if (chips != saved) {
-                        Text(
-                            "Make this my default for ${if (onPhoto) "photo" else "plain"} cards",
-                            color = accent,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .clickable {
-                                    cardPrefs.setDefaults(onPhoto, chips)
-                                    if (onPhoto) savedPhoto = chips else savedPlain = chips
-                                    Toast.makeText(context, "Saved. Change it any time in Settings > Sharing.", Toast.LENGTH_SHORT).show()
-                                }
-                                .padding(vertical = 4.dp)
-                        )
-                    }
-                }
-                if (card !is ShareCard.Daily) {
-                    if (current == null) {
-                        OutlinedButton(
-                            onClick = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Add your photo")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = {
-                                photo = null
-                                frame = PhotoFrame()
-                                showHint = false
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Remove photo")
-                        }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -401,35 +410,31 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     }
 }
 
-/** Things the user can add to a workout card; each turns on or off, Coach and Roast never together. */
-@OptIn(ExperimentalLayoutApi::class)
+/** One full-width choice beside the preview: filled with the accent when on; [highlight] draws the eye to "Add photo". */
 @Composable
-private fun AddChips(options: List<CardChip>, picked: Set<CardChip>, writing: CardChip?, accent: Color, onToggle: (CardChip) -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
+private fun OptionPill(label: String, icon: ImageVector?, on: Boolean, accent: Color, highlight: Boolean = false, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (on) accent else SuperfitTheme.colors.fieldBg)
+            .then(if (highlight) Modifier.border(1.5.dp, accent, RoundedCornerShape(12.dp)) else Modifier)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .semantics { contentDescription = if (highlight) label else "$label${if (on) ", on" else ", off"}" },
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        options.forEach { chip ->
-            val on = chip in picked
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (on) accent else SuperfitTheme.colors.fieldBg)
-                    .clickable { onToggle(chip) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-                    .semantics { contentDescription = "${chip.label}${if (on) ", on" else ", off"}" },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (writing == chip) "${chip.label}…" else chip.label,
-                    color = if (on) Color.Black else SuperfitTheme.colors.textPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1
-                )
-            }
+        icon?.let {
+            Icon(it, contentDescription = null, tint = if (on) Color.Black else accent, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
         }
+        Text(
+            label,
+            color = if (on) Color.Black else SuperfitTheme.colors.textPrimary,
+            fontSize = 13.sp,
+            fontWeight = if (on || highlight) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1
+        )
     }
 }
 
