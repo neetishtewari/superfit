@@ -399,7 +399,11 @@ private fun ValueWithUnit(value: String, unit: String?, valueSize: TextUnit, uni
 
 @Composable
 private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
-    Spacer(Modifier.height(36.dp))
+    // With a coach line, roast or strength detail the card tightens up so everything fits the picture.
+    val busy = card.shownCoach != null || card.shownRoast != null || card.strength != null ||
+        (momentOf(card) != null && card.shownJourney != null)
+    val big = if (busy) 72.sp else 92.sp
+    Spacer(Modifier.height(if (busy) 16.dp else 36.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
@@ -412,17 +416,17 @@ private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
     }
     Spacer(Modifier.height(8.dp))
     Row(verticalAlignment = Alignment.Bottom) {
-        Text(card.bigValue, color = TextMain, fontSize = 92.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 92.sp, maxLines = 1)
+        Text(card.bigValue, color = TextMain, fontSize = big, fontWeight = FontWeight.ExtraBold, lineHeight = big, maxLines = 1)
         Spacer(Modifier.width(8.dp))
-        Text(card.bigUnit, color = accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 14.dp))
+        Text(card.bigUnit, color = accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = if (busy) 10.dp else 14.dp))
     }
     card.subtitle?.let {
         Spacer(Modifier.height(10.dp))
-        Text(it, color = TextMain, fontSize = 17.sp, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(it, color = TextMain, fontSize = 17.sp, lineHeight = 24.sp, maxLines = if (busy) 2 else 3, overflow = TextOverflow.Ellipsis)
     }
     card.shownHeart?.let { heart ->
-        Spacer(Modifier.height(22.dp))
-        HeartLineGraph(heart, accent, TextMain, Modifier.fillMaxWidth().height(70.dp))
+        Spacer(Modifier.height(if (busy) 14.dp else 22.dp))
+        HeartLineGraph(heart, accent, TextMain, Modifier.fillMaxWidth().height(if (busy) 52.dp else 70.dp))
         if (heart.effortMinutes.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             EffortLegend(heart, TextSoft)
@@ -434,17 +438,18 @@ private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
     }
     CardExtras(card, TextMain, TextSoft, TileBackground, compact = false)
     Spacer(Modifier.weight(1f))
-    card.stats.chunked(2).forEach { row ->
+    val perRow = if (busy) 3 else 2
+    card.stats.chunked(perRow).forEach { row ->
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             row.forEach { stat ->
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stat.label, color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp)
-                    ValueWithUnit(stat.value, stat.unit, valueSize = 26.sp, unitSize = 13.sp)
+                    Text(if (busy) shortLabel(stat.label) else stat.label, color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp, maxLines = 1)
+                    ValueWithUnit(stat.value, stat.unit, valueSize = if (busy) 22.sp else 26.sp, unitSize = if (busy) 12.sp else 13.sp)
                 }
             }
-            if (row.size == 1) Spacer(Modifier.weight(1f))
+            repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(if (busy) 14.dp else 20.dp))
     }
     Spacer(Modifier.height(6.dp))
 }
@@ -757,8 +762,8 @@ private val RoastLabel = Color(0xFFF2A33A)
 /** What the user added to a workout card: the stand-out line, the coach line or roast, the journey line. */
 @Composable
 private fun CardExtras(card: ShareCard.Activity, main: Color, soft: Color, tile: Color, compact: Boolean) {
-    val gap = if (compact) 10.dp else 16.dp
-    val size = if (compact) 14.sp else 16.sp
+    val gap = if (compact) 10.dp else 12.dp
+    val size = if (compact) 14.sp else 15.sp
     val tileShape = RoundedCornerShape(if (compact) 10.dp else 12.dp)
     val tilePad = Modifier.padding(horizontal = if (compact) 12.dp else 14.dp, vertical = if (compact) 8.dp else 10.dp)
     momentOf(card)?.let {
