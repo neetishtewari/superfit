@@ -52,7 +52,11 @@ object CardLines {
         card.heart?.effortMinutes?.takeIf { it.isNotEmpty() }?.let { m ->
             add("Effort minutes: " + m.entries.joinToString(", ") { "${it.key.label.lowercase(Locale.US)} ${it.value}" })
         }
-        weekCount?.takeIf { it > 0 }?.let { add("Workouts this week so far, this one included (walks not counted): $it") }
+        if (card.walksToday != null) {
+            add("Walks today so far, this one included: ${card.walksToday}")
+        } else {
+            weekCount?.takeIf { it > 0 }?.let { add("Workouts this week so far, this one included (walks not counted): $it") }
+        }
         card.moment?.let { add("Stand-out: $it") }
         add("Time of day: ${card.dateLine}")
     }.joinToString("\n")
@@ -83,8 +87,9 @@ object CardLines {
         .trim()
 
     /** The one fair, true line every roast ends with. */
-    fun fairLine(moment: String?, weekCount: Int?): String = when {
+    fun fairLine(moment: String?, weekCount: Int?, walksToday: Int? = null): String = when {
         moment != null -> "Still: ${moment.replaceFirstChar { it.lowercase(Locale.getDefault()) }}."
+        walksToday != null -> if (walksToday >= 2) "Still: ${ordinal(walksToday)} walk today." else "Still showed up. That counts."
         weekCount != null && weekCount >= 2 -> "Still: ${ordinal(weekCount)} workout this week."
         else -> "Still showed up. That counts."
     }

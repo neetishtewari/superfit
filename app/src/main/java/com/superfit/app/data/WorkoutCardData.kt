@@ -44,7 +44,7 @@ object WorkoutCardData {
     private const val TAG = "WorkoutCardData"
     private const val MAX_SAMPLES = 20_000
     private const val DAY = 86_400_000L
-    private const val LINES_VERSION = "v2"
+    private const val LINES_VERSION = "v3"
 
     suspend fun enrich(context: Context, card: ShareCard.Activity): ShareCard.Activity {
         if (card.workout == null && card.voice == null) return card
@@ -59,7 +59,13 @@ object WorkoutCardData {
         val weekCount = weekCount(start, imported, voiceLogs, zone)
         val journey = profile?.let { safe("journey") { journey(app, repository, it, zone) } }
 
-        var out = card.copy(journey = journey, weekCount = weekCount)
+        // A walk card talks about walks: the workout count leaves walks out.
+        val walksToday = card.workout?.takeIf { it.title == "Walk" }?.let { walk ->
+            val day = Instant.ofEpochMilli(walk.startTime).atZone(zone).toLocalDate()
+            imported.count { it.title == "Walk" && it.startTime <= walk.startTime && Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() == day }
+                .coerceAtLeast(1)
+        }
+        var out = card.copy(journey = journey, weekCount = if (walksToday != null) null else weekCount, walksToday = walksToday)
         val workout = card.workout
         if (workout != null) {
             val primary = workout.merged.primary
@@ -80,7 +86,7 @@ object WorkoutCardData {
             }
             out = out.copy(moment = if (weekCount >= 3) "${CardLines.ordinal(weekCount)} workout this week" else null)
         }
-        return out.copy(fairLine = CardLines.fairLine(out.moment, weekCount))
+        return out.copy(fairLine = CardLines.fairLine(out.moment, out.weekCount, walksToday))
     }
 
     /**
@@ -95,6 +101,7 @@ object WorkoutCardData {
         val key = listOf(LINES_VERSION, chip.key, cardKey(card), style.name).joinToString("|")
         prefs.savedLine(key)?.let { return it }
         val facts = CardLines.facts(card, card.weekCount)
+        // v3: walk cards got their own count (walks today) instead of the workout count.
         val system = (if (chip == CardChip.COACH) CardLines.COACH_SYSTEM else CardLines.ROAST_SYSTEM).trimIndent() + style.instruction()
         val maxWords = if (chip == CardChip.COACH) CardLines.COACH_MAX_WORDS else CardLines.ROAST_MAX_WORDS
         repeat(2) {
