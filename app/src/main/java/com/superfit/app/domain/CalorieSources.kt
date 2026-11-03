@@ -109,8 +109,11 @@ object CalorieSourcesEngine {
         )
     }
 
-    /** One part of a meal: a food, its share of the meal's calories and whether it was the treat. */
-    data class MealPart(val key: String, val name: String, val kcal: Double, val treat: Boolean)
+    /**
+     * One part of a meal: a food, its share of the meal's calories and whether it was the treat.
+     * [treatFood] is true for treat food in any amount; [treat] only from [SMALL_TASTE_KCAL].
+     */
+    data class MealPart(val key: String, val name: String, val kcal: Double, val treat: Boolean, val treatFood: Boolean = treat)
 
     /**
      * Splits a meal into its foods, sharing the meal's logged calories by each item's own calories
@@ -134,7 +137,8 @@ object CalorieSourcesEngine {
 
         if (items.isEmpty()) {
             val name = shortName(meal.foodText)
-            return listOf(MealPart(key(name), name, meal.calories, meal.calories >= SMALL_TASTE_KCAL && isTreat(name, single = true)))
+            val treatFood = isTreat(name, single = true)
+            return listOf(MealPart(key(name), name, meal.calories, meal.calories >= SMALL_TASTE_KCAL && treatFood, treatFood))
         }
         val weights = items.map { (it.kcal * it.qty).coerceAtLeast(0.0) }
         val sum = weights.sum()
@@ -143,7 +147,8 @@ object CalorieSourcesEngine {
             val share = if (sum > 0) weights[i] / sum else 1.0 / items.size
             val name = item.name.trim().replaceFirstChar { it.titlecase(Locale.getDefault()) }
             val kcal = meal.calories * share
-            MealPart(key(item.name), name, kcal, kcal >= SMALL_TASTE_KCAL && isTreat(item.name, single))
+            val treatFood = isTreat(item.name, single)
+            MealPart(key(item.name), name, kcal, kcal >= SMALL_TASTE_KCAL && treatFood, treatFood)
         }
     }
 
