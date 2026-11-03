@@ -44,6 +44,7 @@ object WorkoutCardData {
     private const val TAG = "WorkoutCardData"
     private const val MAX_SAMPLES = 20_000
     private const val DAY = 86_400_000L
+    private const val LINES_VERSION = "v2"
 
     suspend fun enrich(context: Context, card: ShareCard.Activity): ShareCard.Activity {
         if (card.workout == null && card.voice == null) return card
@@ -90,7 +91,8 @@ object WorkoutCardData {
         if (chip != CardChip.COACH && chip != CardChip.ROAST) return null
         val prefs = ShareCardPrefs.of(context.applicationContext)
         val style = if (chip == CardChip.COACH) CardLines.coachStyle(CoachStyle.current) else CoachStyle.ROAST
-        val key = listOf(chip.key, cardKey(card), style.name).joinToString("|")
+        // LINES_VERSION goes up when the prompts change, so older saved lines are written again.
+        val key = listOf(LINES_VERSION, chip.key, cardKey(card), style.name).joinToString("|")
         prefs.savedLine(key)?.let { return it }
         val facts = CardLines.facts(card, card.weekCount)
         val system = (if (chip == CardChip.COACH) CardLines.COACH_SYSTEM else CardLines.ROAST_SYSTEM).trimIndent() + style.instruction()
