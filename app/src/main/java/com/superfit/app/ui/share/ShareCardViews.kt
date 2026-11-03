@@ -29,35 +29,44 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.superfit.app.R
 import com.superfit.app.domain.CardStat
+import com.superfit.app.domain.Effort
+import com.superfit.app.domain.HeartLine
+import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
+import kotlin.math.roundToInt
 
 /** A share card's own colours, whatever theme the app is in: dark by default, or light if the user picks it. */
 private data class CardPalette(
@@ -112,11 +121,18 @@ fun defaultAccent(card: ShareCard): Color = if (card is ShareCard.Best) HyperVio
 
 /** A share card, laid out at 360 x 640 dp (Story size, 9:16). */
 @Composable
-fun ShareCardView(card: ShareCard, accent: Color, modifier: Modifier = Modifier, photo: ImageBitmap? = null, light: Boolean = false) {
+fun ShareCardView(
+    card: ShareCard,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    photo: ImageBitmap? = null,
+    light: Boolean = false,
+    frame: PhotoFrame = PhotoFrame()
+) {
     // The daily card has no photo option; workout and personal-best cards can sit on the user's photo.
     if (photo != null && card !is ShareCard.Daily) {
         CompositionLocalProvider(LocalCardPalette provides DarkCard) {
-            PhotoCardView(card, accent, photo, modifier)
+            PhotoCardView(card, accent, photo, frame, modifier)
         }
         return
     }
@@ -402,6 +418,29 @@ private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
         Spacer(Modifier.height(10.dp))
         Text(it, color = TextMain, fontSize = 17.sp, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
+    card.heart?.let { heart ->
+        Spacer(Modifier.height(22.dp))
+        HeartLineGraph(heart, accent, TextMain, Modifier.fillMaxWidth().height(70.dp))
+        if (heart.effortMinutes.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            EffortLegend(heart, TextSoft)
+        }
+    }
+    momentOf(card)?.let {
+        Spacer(Modifier.height(18.dp))
+        Text(
+            it,
+            color = TextMain,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(TileBackground)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        )
+    }
     Spacer(Modifier.weight(1f))
     card.stats.chunked(2).forEach { row ->
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -522,106 +561,281 @@ private fun BestGlow(accent: Color) {
 
 /** A workout or personal-best card on the user's own photo, with the numbers on a dark fade. */
 @Composable
-private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, modifier: Modifier) {
+private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, frame: PhotoFrame, modifier: Modifier) {
     Box(
         modifier = modifier
             .size(360.dp, 640.dp)
+            .clipToBounds()
             .background(Color.Black)
     ) {
-        Image(bitmap = photo, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        FramedPhoto(photo, frame)
+        // A soft fade behind the header, and a deep one behind the stats wherever they sit.
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(170.dp)
                 .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.4f), Color.Transparent)))
         )
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(440.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color(0x0008080C),
-                        0.4f to Color(0xBF08080C),
-                        1f to Color(0xEB08080C)
+        if (frame.statsTop) {
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(440.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color(0xEB08080C),
+                            0.6f to Color(0xBF08080C),
+                            1f to Color(0x0008080C)
+                        )
                     )
-                )
-        )
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(170.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))))
+            )
+        } else {
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(440.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color(0x0008080C),
+                            0.4f to Color(0xBF08080C),
+                            1f to Color(0xEB08080C)
+                        )
+                    )
+            )
+        }
         Box(Modifier.padding(start = 22.dp, top = SAFE_TOP)) {
             CardHeader(card.dateLine, dateColor = Color.White)
         }
-        Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(start = 22.dp, end = 22.dp, bottom = 96.dp)
-        ) {
-            when (card) {
-                is ShareCard.Activity -> {
-                    Text(card.heading, color = PhotoSoft, fontSize = 12.sp, letterSpacing = 2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    BigNumber(card.bigValue, card.bigUnit, accent)
-                    card.subtitle?.let {
-                        Text(it, color = Color.White, fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (card.stats.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            card.stats.take(3).forEach { stat ->
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(shortLabel(stat.label), color = PhotoSoft, fontSize = 10.sp, letterSpacing = 1.sp, maxLines = 1)
-                                    ValueWithUnit(stat.value, stat.unit, valueSize = 20.sp, unitSize = 11.sp)
-                                }
-                            }
+        if (frame.statsTop) {
+            Column(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, end = 22.dp, top = SAFE_TOP + 56.dp)
+            ) {
+                PhotoStats(card, accent)
+            }
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, end = 22.dp, bottom = 96.dp)
+            ) {
+                PhotoBrandRow()
+            }
+        } else {
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, end = 22.dp, bottom = 96.dp)
+            ) {
+                PhotoStats(card, accent)
+                Spacer(Modifier.height(16.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Color.White.copy(alpha = 0.2f))
+                )
+                Spacer(Modifier.height(14.dp))
+                PhotoBrandRow()
+            }
+        }
+    }
+}
+
+/** The user's photo, zoomed and moved as they set it; at scale 1 it just covers the card. */
+@Composable
+private fun FramedPhoto(photo: ImageBitmap, frame: PhotoFrame) {
+    Canvas(Modifier.fillMaxSize()) {
+        val cardW = size.width
+        val cardH = size.height
+        val f = frame.clamped(photo.width, photo.height, cardW.roundToInt(), cardH.roundToInt())
+        val (w, h) = PhotoFrame.drawnSize(photo.width, photo.height, cardW.roundToInt(), cardH.roundToInt(), f.scale)
+        val left = (cardW - w) / 2f + f.offsetX * cardW
+        val top = (cardH - h) / 2f + f.offsetY * cardH
+        drawImage(
+            image = photo,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(photo.width, photo.height),
+            dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
+            dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+            filterQuality = FilterQuality.High
+        )
+    }
+}
+
+@Composable
+private fun PhotoBrandRow() {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        BrandBadge(background = Color(0x9908080C), border = Color.White.copy(alpha = 0.22f))
+        Text("Get it on Google Play", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun PhotoStats(card: ShareCard, accent: Color) {
+    when (card) {
+        is ShareCard.Activity -> {
+            Text(card.heading, color = PhotoSoft, fontSize = 12.sp, letterSpacing = 2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            BigNumber(card.bigValue, card.bigUnit, accent)
+            card.subtitle?.let {
+                Text(it, color = Color.White, fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            card.heart?.let { heart ->
+                Spacer(Modifier.height(10.dp))
+                // Distance cards have no room for PEAK among three stats, so the dot carries it.
+                val labelPeak = card.stats.take(3).none { it.label == "PEAK" }
+                HeartLineGraph(heart, accent, Color.White, Modifier.fillMaxWidth().height(48.dp), labelPeak = labelPeak)
+                if (heart.effortMinutes.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    EffortLegend(heart, PhotoSoft)
+                }
+            }
+            if (card.stats.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    card.stats.take(3).forEach { stat ->
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(shortLabel(stat.label), color = PhotoSoft, fontSize = 10.sp, letterSpacing = 1.sp, maxLines = 1)
+                            ValueWithUnit(stat.value, stat.unit, valueSize = 20.sp, unitSize = 11.sp)
                         }
                     }
                 }
-                is ShareCard.Best -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            when {
-                                card.podium -> "TOP 3"
-                                card.isNew -> "NEW PERSONAL BEST"
-                                else -> "PERSONAL BEST"
-                            },
-                            color = accent,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 2.sp,
-                            maxLines = 1
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        card.label,
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    BigNumber(card.bigValue, card.bigUnit, accent)
-                    card.detail?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, fontSize = 14.sp) }
-                    card.previous?.let { prev ->
-                        Spacer(Modifier.height(6.dp))
-                        Text("Previous best $prev" + (card.gain?.let { "  ($it)" } ?: ""), color = PhotoSoft, fontSize = 13.sp)
-                    }
-                }
-                is ShareCard.Daily -> Unit
             }
-            Spacer(Modifier.height(16.dp))
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(Color.White.copy(alpha = 0.2f))
+            momentOf(card)?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    it,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.14f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+        is ShareCard.Best -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    when {
+                        card.podium -> "TOP 3"
+                        card.isNew -> "NEW PERSONAL BEST"
+                        else -> "PERSONAL BEST"
+                    },
+                    color = accent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp,
+                    maxLines = 1
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                card.label,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                BrandBadge(background = Color(0x9908080C), border = Color.White.copy(alpha = 0.22f))
-                Text("Get it on Google Play", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            BigNumber(card.bigValue, card.bigUnit, accent)
+            card.detail?.takeIf { it.isNotBlank() }?.let { Text(it, color = Color.White, fontSize = 14.sp) }
+            card.previous?.let { prev ->
+                Spacer(Modifier.height(6.dp))
+                Text("Previous best $prev" + (card.gain?.let { "  ($it)" } ?: ""), color = PhotoSoft, fontSize = 13.sp)
+            }
+        }
+        is ShareCard.Daily -> Unit
+    }
+}
+
+/** The stand-out line, only when there is one and the user chose "With one line". */
+private fun momentOf(card: ShareCard.Activity): String? = card.moment?.takeIf { card.showMoment && it.isNotBlank() }
+
+/** Effort colours. Max is a hot orange: red is kept for delete buttons only. */
+fun effortColor(effort: Effort): Color = when (effort) {
+    Effort.EASY -> ElectricCyan
+    Effort.STEADY -> NeonMint
+    Effort.HARD -> Color(0xFFF2A33A)
+    Effort.MAX -> Color(0xFFFF6A3D)
+}
+
+/** Heart rate through the workout, coloured by effort, with a dot on the peak. */
+@Composable
+private fun HeartLineGraph(heart: HeartLine, accent: Color, dotColor: Color, modifier: Modifier, labelPeak: Boolean = false) {
+    val measurer = rememberTextMeasurer()
+    val labelStyle = TextStyle(color = dotColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    Canvas(modifier) {
+        if (heart.bpm.isEmpty()) return@Canvas
+        val top = if (labelPeak) 16.dp.toPx() else 6.dp.toPx()
+        val bottom = size.height - 4.dp.toPx()
+        val low = heart.bpm.min()
+        val high = heart.bpm.max()
+        val range = (high - low).coerceAtLeast(10)
+        fun point(i: Int) = Offset(
+            heart.x[i] * size.width,
+            bottom - (heart.bpm[i] - low).toFloat() / range * (bottom - top)
+        )
+        val stroke = 2.5.dp.toPx()
+        if (heart.bpm.size == 1) {
+            drawCircle(accent, radius = stroke, center = point(0))
+        }
+        for (i in 0 until heart.bpm.size - 1) {
+            val color = if (heart.efforts.isEmpty()) {
+                accent
+            } else {
+                effortColor(maxOf(heart.efforts[i], heart.efforts[i + 1]))
+            }
+            drawLine(color, point(i), point(i + 1), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
+        val peak = point(heart.peakIndex.coerceIn(0, heart.bpm.size - 1))
+        drawCircle(dotColor, radius = 4.dp.toPx(), center = peak)
+        if (labelPeak) {
+            val text = measurer.measure("${heart.peakBpm}", labelStyle)
+            val x = (peak.x - text.size.width / 2f).coerceIn(0f, size.width - text.size.width)
+            drawText(text, topLeft = Offset(x, (peak.y - 6.dp.toPx() - text.size.height).coerceAtLeast(0f)))
+        }
+    }
+}
+
+/** "EASY 5 · STEADY 9 · HARD 10 · MAX 4 MIN", each with its colour. */
+@Composable
+private fun EffortLegend(heart: HeartLine, textColor: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        val bands = heart.effortMinutes.entries.toList()
+        bands.forEachIndexed { i, (effort, minutes) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(effortColor(effort))
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    "${effort.label.uppercase()} $minutes" + if (i == bands.lastIndex) " MIN" else "",
+                    color = textColor,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.sp,
+                    maxLines = 1
+                )
             }
         }
     }

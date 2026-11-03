@@ -12,9 +12,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -61,6 +68,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -72,6 +80,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.superfit.app.data.WorkoutCardData
+import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
 import java.io.File
@@ -88,6 +98,15 @@ private val CardDensity = Density(density = 3f, fontScale = 1f)
 private const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
 private val accentNames = listOf("Mint", "Cyan", "Violet", "Amber")
 
+// Share screen choices that are remembered: the words switch and whether the photo hint was seen.
+private const val SHARE_PREFS = "share_card_prefs"
+private const val KEY_LINE_PHOTO = "line_on_photo"
+private const val KEY_LINE_PLAIN = "line_on_plain"
+private const val KEY_HINT_SHOWN = "photo_hint_shown"
+
+// Longest side of a loaded photo: room to zoom in on a 1080 x 1920 card, about 20 MB at most.
+private const val MAX_PHOTO_EDGE = 2560
+
 /**
  * Preview of a share card with colour choices. Share draws the picture on the phone and opens
  * the Android share sheet; nothing is uploaded.
@@ -98,17 +117,41 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
+    val prefs = remember { context.getSharedPreferences(SHARE_PREFS, Context.MODE_PRIVATE) }
     var accent by remember(card) { mutableStateOf(defaultAccent(card)) }
     var busy by remember { mutableStateOf(false) }
     var light by remember { mutableStateOf(false) }
     // The user's photo lives only in memory while the sheet is open; it is never saved or uploaded.
     var photo by remember(card) { mutableStateOf<ImageBitmap?>(null) }
+    var frame by remember(card) { mutableStateOf(PhotoFrame()) }
+    var touching by remember { mutableStateOf(false) }
+    var showHint by remember { mutableStateOf(false) }
+    // A workout card gets its heart-rate line and stand-out line once they've been read.
+    var detailed by remember(card) { mutableStateOf<ShareCard.Activity?>(null) }
+    LaunchedEffect(card) {
+        if (card is ShareCard.Activity && card.workout != null) {
+            detailed = withContext(Dispatchers.IO) { WorkoutCardData.enrich(context, card) }
+        }
+    }
+    // "Just numbers" or "With one line", remembered separately for photo and plain cards.
+    var lineOnPhoto by remember { mutableStateOf(prefs.getBoolean(KEY_LINE_PHOTO, false)) }
+    var lineOnPlain by remember { mutableStateOf(prefs.getBoolean(KEY_LINE_PLAIN, true)) }
+    val withLine = if (photo != null) lineOnPhoto else lineOnPlain
+    val base = detailed ?: card
+    val shown = if (base is ShareCard.Activity) base.copy(showMoment = withLine) else base
+    val hasMoment = (shown as? ShareCard.Activity)?.moment != null
+
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             scope.launch {
                 val loaded = withContext(Dispatchers.IO) { loadPhoto(context, uri) }
                 if (loaded != null) {
                     photo = loaded.asImageBitmap()
+                    frame = PhotoFrame()
+                    if (!prefs.getBoolean(KEY_HINT_SHOWN, false)) {
+                        showHint = true
+                        prefs.edit().putBoolean(KEY_HINT_SHOWN, true).apply()
+                    }
                 } else {
                     Toast.makeText(context, "Couldn't open that photo.", Toast.LENGTH_SHORT).show()
                 }
@@ -133,31 +176,75 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CapturableCard(card, accent, photo, light, layer, Modifier.fillMaxWidth(0.7f))
-            if (photo == null) {
-                // Dark or light background; a photo card always keeps its dark fade.
-                Row(
+            val current = photo
+            if (current == null) {
+                CapturableCard(shown, accent, null, light, frame, layer, Modifier.fillMaxWidth(0.7f))
+            } else {
+                // Pinch to zoom, drag to move, double-tap to reset. Grid lines show while a finger
+                // is down; they sit on top of the preview, outside the picture that gets shared.
+                Box(
                     Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(10.dp))
+                        .fillMaxWidth(0.7f)
+                        .pointerInput(current) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                touching = true
+                                do {
+                                    val event = awaitPointerEvent()
+                                } while (event.changes.any { it.pressed })
+                                touching = false
+                            }
+                        }
+                        .pointerInput(current) {
+                            detectTapGestures(onDoubleTap = { frame = frame.reset() })
+                        }
+                        .pointerInput(current) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                showHint = false
+                                val w = size.width.toFloat()
+                                val h = size.height.toFloat()
+                                if (w > 0f && h > 0f) {
+                                    frame = frame.moved(zoom, pan.x / w, pan.y / h, current.width, current.height, CARD_WIDTH_PX, CARD_HEIGHT_PX)
+                                }
+                            }
+                        }
                 ) {
-                    listOf(false to "Dark", true to "Light").forEach { (isLight, label) ->
-                        val picked = light == isLight
-                        Text(
-                            label,
-                            color = if (picked) Color.Black else SuperfitTheme.colors.textPrimary,
-                            fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 13.sp,
-                            modifier = Modifier
-                                .background(if (picked) accent else Color.Transparent)
-                                .clickable { light = isLight }
-                                .padding(horizontal = 18.dp, vertical = 8.dp)
-                        )
+                    CapturableCard(shown, accent, current, light, frame, layer, Modifier.fillMaxWidth())
+                    if (touching) {
+                        Canvas(Modifier.matchParentSize()) {
+                            val line = Color.White.copy(alpha = 0.45f)
+                            for (i in 1..2) {
+                                drawLine(line, Offset(size.width * i / 3f, 0f), Offset(size.width * i / 3f, size.height), strokeWidth = 1.dp.toPx())
+                                drawLine(line, Offset(0f, size.height * i / 3f), Offset(size.width, size.height * i / 3f), strokeWidth = 1.dp.toPx())
+                            }
+                        }
+                    }
+                }
+                if (showHint) {
+                    Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
+                }
+            }
+            if (current == null) {
+                // Dark or light background; a photo card always keeps its dark fade.
+                ChoicePills(listOf(false to "Dark", true to "Light"), light, accent) { light = it }
+            } else {
+                ChoicePills(listOf(false to "Stats at bottom", true to "Stats at top"), frame.statsTop, accent) {
+                    frame = frame.copy(statsTop = it)
+                }
+            }
+            if (hasMoment) {
+                ChoicePills(listOf(false to "Just numbers", true to "With one line"), withLine, accent) {
+                    if (current != null) {
+                        lineOnPhoto = it
+                        prefs.edit().putBoolean(KEY_LINE_PHOTO, it).apply()
+                    } else {
+                        lineOnPlain = it
+                        prefs.edit().putBoolean(KEY_LINE_PLAIN, it).apply()
                     }
                 }
             }
             if (card !is ShareCard.Daily) {
-                if (photo == null) {
+                if (current == null) {
                     OutlinedButton(
                         onClick = { pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                         shape = RoundedCornerShape(12.dp)
@@ -167,7 +254,14 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                         Text("Add your photo")
                     }
                 } else {
-                    OutlinedButton(onClick = { photo = null }, shape = RoundedCornerShape(12.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            photo = null
+                            frame = PhotoFrame()
+                            showHint = false
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
                         Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Remove photo")
@@ -195,12 +289,18 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                         try {
                             val bitmap = layer.toImageBitmap().asAndroidBitmap()
                             shareImage(context, bitmap)
+                            val activity = shown as? ShareCard.Activity
                             com.superfit.app.data.AppAnalytics.cardShared(
-                                when (card) {
+                                type = when (card) {
                                     is ShareCard.Daily -> if (card.roast) "roast" else "day"
                                     is ShareCard.Activity -> "activity"
                                     is ShareCard.Best -> "best"
-                                }
+                                },
+                                photo = photo != null,
+                                adjusted = photo != null && frame.adjusted,
+                                words = if (activity?.moment != null && withLine) "line" else "numbers",
+                                statsPlace = if (frame.statsTop) "top" else "bottom",
+                                heartLine = activity?.heart != null
                             )
                             onShared()
                         } catch (e: Exception) {
@@ -223,9 +323,41 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     }
 }
 
+/** Two or more side-by-side choices, the picked one filled with the card's accent. */
 @Composable
-private fun CapturableCard(card: ShareCard, accent: Color, photo: ImageBitmap?, light: Boolean, layer: GraphicsLayer, modifier: Modifier) {
-    CapturableStory(layer, modifier) { ShareCardView(card, accent, photo = photo, light = light) }
+private fun <T> ChoicePills(options: List<Pair<T, String>>, selected: T, accent: Color, onPick: (T) -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(10.dp))
+    ) {
+        options.forEach { (value, label) ->
+            val picked = value == selected
+            Text(
+                label,
+                color = if (picked) Color.Black else SuperfitTheme.colors.textPrimary,
+                fontWeight = if (picked) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .background(if (picked) accent else Color.Transparent)
+                    .clickable { onPick(value) }
+                    .padding(horizontal = 18.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CapturableCard(
+    card: ShareCard,
+    accent: Color,
+    photo: ImageBitmap?,
+    light: Boolean,
+    frame: PhotoFrame,
+    layer: GraphicsLayer,
+    modifier: Modifier
+) {
+    CapturableStory(layer, modifier) { ShareCardView(card, accent, photo = photo, light = light, frame = frame) }
 }
 
 /**
@@ -285,21 +417,24 @@ suspend fun shareImage(context: Context, bitmap: Bitmap) {
 }
 
 /**
- * Reads a gallery photo at roughly card size (about 1080 x 1920), turned the right way up.
- * Returns null if it can't be read.
+ * Reads a gallery photo turned the right way up, with its longest side at most [MAX_PHOTO_EDGE] so
+ * it stays sharp when zoomed in without using too much memory. Returns null if it can't be read.
  */
 private fun loadPhoto(context: Context, uri: Uri): Bitmap? = try {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-            val shrink = maxOf(1, minOf(info.size.width / CARD_WIDTH_PX, info.size.height / CARD_HEIGHT_PX))
-            decoder.setTargetSize(info.size.width / shrink, info.size.height / shrink)
+            val longest = maxOf(info.size.width, info.size.height)
+            if (longest > MAX_PHOTO_EDGE) {
+                val shrink = longest / MAX_PHOTO_EDGE.toDouble()
+                decoder.setTargetSize((info.size.width / shrink).roundToInt().coerceAtLeast(1), (info.size.height / shrink).roundToInt().coerceAtLeast(1))
+            }
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
         }
     } else {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         var sample = 1
-        while (bounds.outWidth / (sample * 2) >= CARD_WIDTH_PX && bounds.outHeight / (sample * 2) >= CARD_HEIGHT_PX) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_PHOTO_EDGE) sample *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
     }

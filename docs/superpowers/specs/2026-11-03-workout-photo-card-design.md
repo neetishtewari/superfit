@@ -1,6 +1,6 @@
 # Workout card with heart rate, and a photo you can adjust
 
-Date: 2026-11-03. Status: design, awaiting Neetish's approval. Release target: 1.0.49 (code 53).
+Date: 2026-11-03. Status: approved by Neetish 2026-11-03; built in 1.0.49. Release target: 1.0.49 (code 53).
 Plan page: https://claude.ai/artifact/HCk4cqJ5iY6dVMU3uGtXfU (section "Design to approve").
 
 ## Why
@@ -47,7 +47,7 @@ For workouts imported from Health Connect. Voice-logged workouts are unchanged i
 - The card shows a small line of the heart rate across the workout (smoothed down to about 60
   points), with the peak marked by a dot. The line is coloured by effort, so one picture shows both
   the shape and how hard it was:
-  - Easy below 70% of max heart rate, Steady 70-80%, Hard 80-90%, Max 90% and up.
+  - Easy below 70% of max heart rate, Steady 70-80%, Hard 80-90%, Max 90% and up. Max is drawn in a hot orange, not red: red is kept for delete only.
   - Max heart rate is estimated from the user's age (208 - 0.7 x age). If age is missing, the line
     is drawn in one colour without effort bands.
 - A tiny legend under the line gives the minutes in each effort band ("Easy 5 · Steady 9 · Hard 10
