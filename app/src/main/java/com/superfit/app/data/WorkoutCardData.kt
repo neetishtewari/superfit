@@ -10,6 +10,7 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.superfit.app.domain.ActivityPatterns
 import com.superfit.app.domain.CardChip
+import com.superfit.app.domain.CardCount
 import com.superfit.app.domain.CardLines
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.GeminiClient
