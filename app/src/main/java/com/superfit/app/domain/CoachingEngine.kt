@@ -226,7 +226,7 @@ class CoachingEngine {
             val findings = report.findings + followUps(report, past, today) + plans
             if (findings.isEmpty()) return gettingStarted(report)
             // A plan the user made with the coach always comes before a generic habit.
-            val candidates = findings + listOfNotNull(habitFor(past, today).takeIf { plans.isEmpty() })
+            val candidates = findings + listOfNotNull(habitFor(past, today, report.keptHabits).takeIf { plans.isEmpty() })
 
             return candidates.maxBy { f ->
                 var score = f.priority
@@ -239,12 +239,16 @@ class CoachingEngine {
             }
         }
 
-        /** The next everyday habit the user hasn't heard in a while; it competes harder after a few days without one. */
-        fun habitFor(past: List<CoachMemoryEntry>, today: LocalDate): CoachFinding? {
+        /**
+         * The next everyday habit the user hasn't heard in a while; it competes harder after a few days
+         * without one. Habits the logs show they already keep ([kept], e.g. walks after meals) are skipped.
+         */
+        fun habitFor(past: List<CoachMemoryEntry>, today: LocalDate, kept: Set<String> = emptySet()): CoachFinding? {
             val lastHabit = past.firstOrNull { it.focusKind == FindingKind.HABIT }?.date
             val recentIds = past.map { it.focusId }.toSet()
-            val habit = HABITS.firstOrNull { it.id !in recentIds }
-                ?: HABITS[Math.floorMod(today.toEpochDay(), HABITS.size.toLong()).toInt()]
+            val open = HABITS.filter { it.id !in kept }.ifEmpty { return null }
+            val habit = open.firstOrNull { it.id !in recentIds }
+                ?: open[Math.floorMod(today.toEpochDay(), open.size.toLong()).toInt()]
             val due = lastHabit == null || ChronoUnit.DAYS.between(lastHabit, today) > REST_DAYS
             return habit.copy(priority = if (due) HABIT_PRIORITY_DUE else HABIT_PRIORITY)
         }
