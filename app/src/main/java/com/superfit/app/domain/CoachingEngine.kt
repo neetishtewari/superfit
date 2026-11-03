@@ -249,9 +249,9 @@ class CoachingEngine {
             return habit.copy(priority = if (due) HABIT_PRIORITY_DUE else HABIT_PRIORITY)
         }
 
-        /** The day of the latest logged treat, so treats can come back as soon as there's a new one. */
+        /** The day of the latest real-sized treat, so treats can come back as soon as there's a new one. */
         fun lastTreatDay(nutrition: List<NutritionEntryEntity>): LocalDate? =
-            nutrition.filter { CoachPatternEngine.treatCategoryOf(it) != null }
+            nutrition.filter { Treats.isRealTreat(it) }
                 .maxOfOrNull { it.timestamp }
                 ?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
 
