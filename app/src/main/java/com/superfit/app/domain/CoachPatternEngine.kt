@@ -75,7 +75,9 @@ data class CoachReport(
     val loggedDaysLastWeek: Int,
     val today: TodaySnapshot,
     /** What the user's targets mean for them, e.g. protein per kg of body weight. */
-    val targetMeanings: List<String>
+    val targetMeanings: List<String>,
+    /** Everyday habit tips ([CoachingEngine.HABITS]) the logs show the user already keeps. */
+    val keptHabits: Set<String> = emptySet()
 )
 
 /**
@@ -125,12 +127,13 @@ object CoachPatternEngine {
         checkProtein(completeLastWeek, lastWeek, targets, weightKg, goal, zone, findings, checked)
         checkCalories(completeLastWeek, days.take(28), targets, maintenanceCalories, goal, findings, checked)
         checkWeight(today, weights, goal, targetWeightKg, zone, findings, checked)
-        checkTreats(today, byDate, zone, goal, days.take(7).any { it.status == DayLogStatus.BLANK }, findings, checked)
+        checkTreats(today, byDate, lastWeek, targets.calories, zone, goal, lastWeek.any { it.status == DayLogStatus.BLANK }, findings, checked)
         checkVegAndFruit(completeLastWeek, findings, checked)
         checkFibre(completeLastWeek, targets, findings, checked)
         checkSteps(today, activity, weightKg, findings, checked)
         checkSleep(today, sleep, findings, checked)
         checkWorkouts(today, workouts, zone, findings, checked)
+        val keptHabits = checkKeptHabits(today, workouts, zone, findings)
 
         val todayEntries = byDate[today].orEmpty()
         val proteinSoFar = todayEntries.sumOf { it.proteinG }
@@ -139,7 +142,8 @@ object CoachPatternEngine {
             proteinSoFar = proteinSoFar.roundToInt(),
             proteinStillNeeded = (targets.proteinG - proteinSoFar).coerceAtLeast(0.0).roundToInt(),
             mealsLogged = todayEntries.map { slotOf(it.timestamp, zone) }.distinct().sorted(),
-            treatsToday = todayEntries.mapNotNull { treatCategoryOf(it) }.distinct(),
+            treatsToday = Treats.occasions(todayEntries.groupBy { slotOf(it.timestamp, zone) }.values.toList())
+                .flatten().mapNotNull { treatCategoryOf(it) }.distinct(),
             hour = now.hour
         )
 
@@ -151,7 +155,8 @@ object CoachPatternEngine {
             completeDaysLastWeek = completeLastWeek.size,
             loggedDaysLastWeek = loggedLastWeek.size,
             today = todaySnapshot,
-            targetMeanings = targetMeanings(targets, weightKg, goal, maintenanceCalories)
+            targetMeanings = targetMeanings(targets, weightKg, goal, maintenanceCalories),
+            keptHabits = keptHabits
         )
     }
 
@@ -574,28 +579,32 @@ object CoachPatternEngine {
         }
     }
 
+    /**
+     * Treats are only worth raising when they cost something: they push fully logged days over the
+     * calorie target, or they have become a big part of what the user eats. Two or three treats in a
+     * week that still lands well under target are left alone, so the coach isn't always on about them.
+     */
     private fun checkTreats(
         today: LocalDate,
         byDate: Map<LocalDate, List<NutritionEntryEntity>>,
+        lastWeek: List<DayLog>,
+        calorieTarget: Double,
         zone: ZoneId,
         goal: String,
         hasBlankDays: Boolean,
         out: MutableList<CoachFinding>,
         checked: MutableSet<String>
     ) {
-        // A "treat meal" is one meal sitting (day + meal time) with at least one treat food in it,
-        // so a pizza and a beer at the same dinner count once.
-        data class TreatMeal(val date: LocalDate, val categories: Set<String>)
+        // A "treat meal" is one meal sitting (day + meal time) with a treat's worth of treat food in it,
+        // so a pizza and a beer at the same dinner count once and a square of chocolate not at all.
+        // Small bites across the day count once when they add up (see Treats).
+        data class TreatMeal(val date: LocalDate, val categories: Set<String>, val kcal: Double)
 
         fun treatMeals(fromDaysAgo: Int, toDaysAgo: Int): List<TreatMeal> =
             (toDaysAgo..fromDaysAgo).flatMap { offset ->
                 val date = today.minusDays(offset.toLong())
-                byDate[date].orEmpty()
-                    .groupBy { slotOf(it.timestamp, zone) }
-                    .values.mapNotNull { meal ->
-                        val cats = meal.mapNotNull { treatCategoryOf(it) }.toSet()
-                        if (cats.isEmpty()) null else TreatMeal(date, cats)
-                    }
+                Treats.occasions(byDate[date].orEmpty().groupBy { slotOf(it.timestamp, zone) }.values.toList())
+                    .map { meal -> TreatMeal(date, meal.mapNotNull { treatCategoryOf(it) }.toSet(), meal.sumOf { Treats.kcalOf(it) }) }
             }
 
         val anyLogs = (0..27).any { byDate[today.minusDays(it.toLong())].orEmpty().isNotEmpty() }
@@ -607,6 +616,29 @@ object CoachPatternEngine {
         val previousWeeks = listOf(treatMeals(13, 7), treatMeals(20, 14), treatMeals(27, 21))
         val minimumNote = if (hasBlankDays) " That's only what was logged, so the real number may be higher." else ""
 
+        // What the treats cost: their share of the week's calories, and fully logged days over target.
+        val weekKcal = (0..6).sumOf { d -> byDate[today.minusDays(d.toLong())].orEmpty().sumOf { it.calories } }
+        val treatShare = if (weekKcal > 0) thisWeek.sumOf { it.kcal } / weekKcal else 0.0
+        val sharePct = (treatShare * 100).roundToInt()
+        val complete = lastWeek.filter { it.status == DayLogStatus.COMPLETE }
+        val judged = complete.size >= 3
+        val treatDates = thisWeek.map { it.date }.toSet()
+        val overWithTreats = complete.count { it.date in treatDates && it.calories > calorieTarget * 1.05 }
+        val avg = if (complete.isEmpty()) 0.0 else complete.map { it.calories }.average()
+        val wellUnder = judged && avg <= calorieTarget * 0.95 && overWithTreats <= 1
+        val pushingOver = overWithTreats >= 2 || (judged && avg > calorieTarget * 1.05)
+        val dominating = thisWeek.size >= 5 || treatShare >= 0.25
+        // Without enough full days to judge calories, only a clearly high count is worth raising.
+        val worthRaising = dominating || pushingOver || (!judged && thisWeek.size >= 4)
+
+        // Change the words from day to day so the same subject doesn't read the same each time.
+        val pick = Math.floorMod(today.toEpochDay(), 3L).toInt()
+        val costLine = when {
+            dominating -> "Treats and junk food made up about $sharePct% of your calories this week, so they're a big part of how you eat right now."
+            overWithTreats >= 2 -> "On $overWithTreats of your fully logged days with a treat, you went over your ${num(calorieTarget.roundToInt())} kcal target."
+            else -> "They add up to about $sharePct% of your calories this week."
+        }
+
         // The same treat turning into a habit.
         val lastTwoWeeks = treatMeals(13, 0)
         val habit = lastTwoWeeks.flatMap { meal -> meal.categories.map { it to meal.date } }
@@ -614,19 +646,32 @@ object CoachPatternEngine {
             .mapValues { (_, dates) -> dates.distinct().sortedDescending() }
             .filter { (_, dates) -> dates.size >= 3 }
             .maxByOrNull { it.value.size }
-        if (habit != null) {
+        if (habit != null && worthRaising) {
             val (category, dates) = habit
             val span = java.time.temporal.ChronoUnit.DAYS.between(dates.last(), today).toInt() + 1
+            val name = category.replaceFirstChar { it.uppercase() }
             out += CoachFinding(
                 id = "treats_habit",
                 area = "treats",
                 kind = FindingKind.CONCERN,
                 priority = 82,
-                fact = "${category.replaceFirstChar { it.uppercase() }} showed up on ${dates.size} days in the last $span days (${dates.take(4).sorted().joinToString(", ") { fmt(it) }}).$minimumNote",
-                meaning = "Once in a while is a treat. This often, it's becoming a habit, and habits are what move your results${goalPhrase(goal)}.",
-                suggestion = "Keep $category to once a week and pick a lighter swap for the other times."
+                fact = listOf(
+                    "$name showed up on ${dates.size} days in the last $span days (${dates.take(4).sorted().joinToString(", ") { fmt(it) }}).",
+                    "$name has become a regular: ${dates.size} days out of the last $span.",
+                    "${dates.size} days of $category in the last $span days."
+                )[pick] + " $costLine$minimumNote",
+                meaning = listOf(
+                    "Once in a while is a treat. This often, it's becoming a habit, and habits are what move your results${goalPhrase(goal)}.",
+                    "A splurge now and then is fine. A daily one quietly decides your results${goalPhrase(goal)}.",
+                    "It's no longer an occasional treat, it's part of the routine, and routines are what show up${goalPhrase(goal)}."
+                )[pick],
+                suggestion = listOf(
+                    "Keep $category to once a week and pick a lighter swap for the other times.",
+                    "Have $category on one day you choose this week, and something lighter you enjoy on the others.",
+                    "Make $category a weekend thing and keep weekdays lighter."
+                )[pick]
             )
-        } else {
+        } else if (worthRaising) {
             // A category that turns up every single week for the last three weeks.
             val everyWeek = thisWeek.flatMap { it.categories }.distinct().firstOrNull { cat ->
                 (listOf(thisWeek) + previousWeeks.take(2)).all { week -> week.any { cat in it.categories } }
@@ -637,14 +682,14 @@ object CoachPatternEngine {
                     area = "treats",
                     kind = FindingKind.CONCERN,
                     priority = 55,
-                    fact = "${everyWeek.replaceFirstChar { it.uppercase() }} came up every week for the last 3 weeks.",
+                    fact = "${everyWeek.replaceFirstChar { it.uppercase() }} came up every week for the last 3 weeks. $costLine",
                     meaning = "It has become a fixed part of your week, and every week it slows your progress towards your goal.",
                     suggestion = "Try a smaller portion or a lighter swap one week, and see how much you miss it."
                 )
             }
         }
 
-        if (thisWeek.size > WEEKLY_TREAT_ALLOWANCE) {
+        if (thisWeek.size > WEEKLY_TREAT_ALLOWANCE && worthRaising) {
             val counts = thisWeek.flatMap { it.categories }.groupingBy { it }.eachCount()
                 .entries.sortedByDescending { it.value }
                 .joinToString(", ") { (cat, n) -> if (n > 1) "$cat ×$n" else cat }
@@ -653,10 +698,22 @@ object CoachPatternEngine {
                 id = "treats_high",
                 area = "treats",
                 kind = FindingKind.CONCERN,
-                priority = if (thisWeek.size >= 4) 84 else 72,
-                fact = "${thisWeek.size} treat meals in the last 7 days ($counts). The three weeks before had ${prev.joinToString(", ")}.$minimumNote",
-                meaning = "Up to $WEEKLY_TREAT_ALLOWANCE treat meals a week fit easily into your plan. Beyond that they start to show${goalPhrase(goal)}.",
-                suggestion = "Keep the rest of this week treat-free and you're back within your $WEEKLY_TREAT_ALLOWANCE."
+                priority = if (dominating || thisWeek.size >= 4) 84 else 72,
+                fact = listOf(
+                    "${thisWeek.size} treat meals in the last 7 days ($counts).",
+                    "${thisWeek.size} splurges this week ($counts).",
+                    "Junk food or sweets came up ${thisWeek.size} times this week ($counts)."
+                )[pick] + " $costLine The three weeks before had ${prev.joinToString(", ")}.$minimumNote",
+                meaning = if (dominating) {
+                    "When treats are this big a part of the week, they decide your results more than anything else you eat${goalPhrase(goal)}."
+                } else {
+                    "A couple of treats a week fit easily into your plan. It's the extra ones that push you over and start to show${goalPhrase(goal)}."
+                },
+                suggestion = listOf(
+                    "Keep the rest of this week treat-free and you're back on track.",
+                    "Pick one splurge for the weekend and keep the weekdays clean.",
+                    "Next time a craving hits, try something lighter you like: fruit with curd, roasted chana or a square of dark chocolate."
+                )[pick]
             )
         } else if (thisWeek.isEmpty() && previousWeeks[0].size > WEEKLY_TREAT_ALLOWANCE) {
             out += CoachFinding(
@@ -808,6 +865,58 @@ object CoachPatternEngine {
         }
     }
 
+    /**
+     * Healthy routines the user already keeps, from the start times of workouts their phone or watch
+     * recorded (Health Connect), so the coach can cheer them on instead of suggesting them. Voice-logged
+     * workouts are left out because their time is when they were said, not when they happened.
+     * Returns the ids of the everyday habit tips ([CoachingEngine.HABITS]) they already do.
+     */
+    private fun checkKeptHabits(today: LocalDate, workouts: List<WorkoutEntryEntity>, zone: ZoneId, out: MutableList<CoachFinding>): Set<String> {
+        val week = (0..6).map { today.minusDays(it.toLong()) }.toSet()
+        val recorded = workouts.filter { it.description.contains("(from ") }
+            .map { Instant.ofEpochMilli(it.timestamp).atZone(zone) to it }
+            .filter { (at, _) -> at.toLocalDate() in week }
+        fun walkDays(from: LocalTime, to: LocalTime) = recorded
+            .filter { (at, w) -> w.description.startsWith("Walk") && at.toLocalTime() >= from && at.toLocalTime() < to }
+            .map { it.first.toLocalDate() }.distinct().size
+        val kept = mutableSetOf<String>()
+
+        val afterLunch = walkDays(LocalTime.of(12, 30), LocalTime.of(16, 0))
+        val afterDinner = walkDays(LocalTime.of(19, 30), LocalTime.of(23, 30))
+        if (afterLunch >= 3 || afterDinner >= 3) {
+            kept += "habit_walk_after_meals"
+            val both = afterLunch >= 3 && afterDinner >= 3
+            val meal = if (afterLunch >= afterDinner) "lunch" else "dinner"
+            out += CoachFinding(
+                id = "kept_walk_after_meals",
+                area = "kept_walk_after_meals",
+                kind = FindingKind.WIN,
+                priority = 48,
+                fact = if (both) {
+                    "You walked after lunch on $afterLunch days and after dinner on $afterDinner days this week."
+                } else {
+                    "You went for a walk after $meal on ${maxOf(afterLunch, afterDinner)} of the last 7 days."
+                },
+                meaning = "A walk after eating helps your body handle the meal's sugar and adds easy steps. It's one of the best small habits there is.",
+                suggestion = if (both) "Keep both walks going, even 10 minutes counts." else "Keep it going, and try a 10-minute walk after ${if (meal == "lunch") "dinner" else "lunch"} too."
+            )
+        }
+
+        val mornings = recorded.filter { (at, _) -> at.hour in 5..9 }.map { it.first.toLocalDate() }.distinct().size
+        if (mornings >= 4) {
+            out += CoachFinding(
+                id = "kept_morning_move",
+                area = "kept_morning_move",
+                kind = FindingKind.WIN,
+                priority = 45,
+                fact = "You moved in the morning on $mornings of the last 7 days.",
+                meaning = "A morning routine is the hardest habit to build and the easiest to keep once it's there. It sets up the whole day.",
+                suggestion = "Protect that morning slot, and pair it with a protein breakfast."
+            )
+        }
+        return kept
+    }
+
     private fun checkWorkouts(
         today: LocalDate,
         workouts: List<WorkoutEntryEntity>,
@@ -940,11 +1049,16 @@ object CoachPatternEngine {
     // Food matching
     // ---------------------------------------------------------------------------------------
 
-    /** Treat category of a logged meal from the AI's tags; null when it isn't a treat or isn't tagged yet. */
+    /**
+     * Treat category of a logged meal from the AI's tags, whatever the amount ([Treats] decides whether
+     * it counts); null when it has no treat food or isn't rated yet. For a meal with a sweet on the
+     * side it names the sweet ("gulab jamun"), not the meal ("thali").
+     */
     fun treatCategoryOf(entry: NutritionEntryEntity): String? {
         val tags = MealTags.decode(entry.qualityTags) ?: return null
-        if (!PersonalNutrition.countsAsTreat(entry, tags)) return null
-        return tags.foodType.ifBlank { "treat" }
+        if (Treats.kcalOf(entry, tags) <= 0.0) return null
+        return tags.treatItems?.firstOrNull()?.trim()?.lowercase()?.ifBlank { null }
+            ?: tags.foodType.ifBlank { "treat" }
     }
 
     fun hasVegOrFruit(entry: NutritionEntryEntity): Boolean =

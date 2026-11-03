@@ -3,6 +3,7 @@ package com.superfit.app.domain
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WeightEntryEntity
+import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
@@ -45,7 +46,8 @@ class CoachPatternEngineTest {
         nutrition: List<NutritionEntryEntity>,
         activity: List<ActivityTelemetryEntity> = emptyList(),
         goal: String = "LOSE_WEIGHT",
-        weights: List<WeightEntryEntity> = emptyList()
+        weights: List<WeightEntryEntity> = emptyList(),
+        workouts: List<WorkoutEntryEntity> = emptyList()
     ) = CoachPatternEngine.analyze(
         today = today,
         now = LocalTime.of(18, 0),
@@ -54,7 +56,7 @@ class CoachPatternEngineTest {
         targets = targets,
         maintenanceCalories = 2500.0,
         nutrition = nutrition,
-        workouts = emptyList(),
+        workouts = workouts,
         activity = activity,
         sleep = emptyList(),
         weights = weights,
@@ -177,10 +179,31 @@ class CoachPatternEngineTest {
     }
 
     @Test
-    fun `burgers on three days become a habit`() {
-        val logs = (1..8).flatMap { d -> if (d in setOf(1, 4, 7)) fullDay(d, 130.0, dinner = "veg burger", dinnerTags = treat("burger")) else fullDay(d, 130.0) }
+    fun `burgers on three days that push past the target become a habit`() {
+        val logs = (1..8).flatMap { d ->
+            if (d in setOf(1, 4, 7)) fullDay(d, 130.0, kcal = 2600.0, dinner = "veg burger", dinnerTags = treat("burger")) else fullDay(d, 130.0)
+        }
         val finding = analyze(logs).findings.first { it.id == "treats_habit" }
-        assertTrue(finding.fact, finding.fact.startsWith("Burger showed up on 3 days"))
+        assertTrue(finding.fact, finding.fact.contains("3 days"))
+        assertTrue(finding.fact, finding.fact.contains("went over your 2,000 kcal target"))
+    }
+
+    @Test
+    fun `treats that still leave the week well under target are left alone`() {
+        // Three small-ish treats, but every day still lands at 1,700 kcal against a 2,000 target.
+        val logs = (1..6).flatMap { fullDay(it, 130.0, kcal = 1500.0) } + listOf(
+            meal(1, 16, "2 biscuits and a cake slice", 200.0, tags = treat("cake")),
+            meal(3, 16, "kulfi", 200.0, tags = treat("kulfi")),
+            meal(5, 16, "gulab jamun", 200.0, tags = treat("gulab jamun"))
+        )
+        assertTrue(analyze(logs).findings.none { it.area == "treats" })
+    }
+
+    @Test
+    fun `treats that take over the week are raised even under target`() {
+        val logs = (1..6).flatMap { d -> fullDay(d, 130.0, kcal = 1800.0, dinner = "pizza", dinnerTags = treat("pizza")) }
+        val finding = analyze(logs).findings.first { it.id == "treats_high" }
+        assertTrue(finding.fact, finding.fact.contains("% of your calories"))
     }
 
     @Test
@@ -192,7 +215,41 @@ class CoachPatternEngineTest {
             meal(5, 17, "samosa", 300.0, tags = treat("samosa"))
         )
         val finding = analyze(logs).findings.first { it.id == "treats_high" }
-        assertTrue(finding.fact, finding.fact.startsWith("3 treat meals"))
+        assertTrue(finding.fact, Regex("^(3 treat meals|3 splurges|Junk food or sweets came up 3 times)").containsMatchIn(finding.fact))
+    }
+
+    // ---- Habits they already keep -------------------------------------------------------------
+
+    private fun walk(daysAgo: Int, hour: Int, minute: Int = 0) = WorkoutEntryEntity(
+        description = "Walk, 1.2 km · 15 min (from Samsung Health)",
+        caloriesBurned = 50.0,
+        workoutType = "Cardio",
+        setsCount = 0,
+        repsCount = 0,
+        timestamp = today.minusDays(daysAgo.toLong()).atTime(hour, minute).toInstant(zone).toEpochMilli()
+    )
+
+    @Test
+    fun `walks after lunch are cheered and not suggested again`() {
+        val logs = (1..6).flatMap { fullDay(it, 130.0) }
+        val report = analyze(logs, workouts = listOf(walk(1, 13, 45), walk(2, 14), walk(4, 13, 30), walk(5, 9)))
+        val win = report.findings.first { it.id == "kept_walk_after_meals" }
+        assertEquals(FindingKind.WIN, win.kind)
+        assertTrue(win.fact, win.fact.contains("after lunch on 3 of the last 7 days"))
+        assertTrue("habit_walk_after_meals" in report.keptHabits)
+
+        // Walks at other times, or typed in by voice, aren't a meal habit.
+        val voice = walk(1, 14).copy(description = "walked 2 km")
+        assertTrue(analyze(logs, workouts = listOf(walk(1, 10), walk(2, 11), walk(3, 18), voice)).keptHabits.isEmpty())
+    }
+
+    @Test
+    fun `a square of dark chocolate every day is not a treat habit`() {
+        val square = treat("dark chocolate")
+        val logs = (1..6).flatMap { d -> fullDay(d, 130.0) } + (0..6).map { d -> meal(d, 16, "1 square dark chocolate", 55.0, tags = square) }
+        val report = analyze(logs)
+        assertTrue(report.findings.none { it.area == "treats" })
+        assertTrue(report.today.treatsToday.isEmpty())
     }
 
     @Test

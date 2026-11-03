@@ -107,7 +107,7 @@ class DietScoreEngineTest {
     @Test
     fun `a food marked fine for me is never a treat`() {
         val chocolate = MealTags(2, fried = false, addedSugar = true, vegFruitServings = 0.0, fiberG = 2.0, treat = true, foodType = "dark chocolate", rating = 4)
-        val week = (1..6).flatMap { goodDay(it) } + (1..5).map { meal(it, 16, 120.0, 2.0, chocolate, "2 squares dark chocolate") }
+        val week = (1..6).flatMap { goodDay(it) } + (1..5).map { meal(it, 16, 280.0, 4.0, chocolate, "half a bar of dark chocolate") }
         assertEquals(5, score(week)!!.treatMeals)
 
         PersonalNutrition.approvedFoods = setOf("dark chocolate")
@@ -115,6 +115,15 @@ class DietScoreEngineTest {
         assertEquals(0, s.treatMeals)
         assertEquals(10, s.part("treats").points)
         assertEquals(7, DietScoreEngine.mealRating(week.last(), chocolate))
+    }
+
+    @Test
+    fun `a square of dark chocolate a day is not a treat`() {
+        val square = MealTags(2, fried = false, addedSugar = true, vegFruitServings = 0.0, fiberG = 1.0, treat = true, foodType = "dark chocolate", rating = 6)
+        val week = (1..6).flatMap { goodDay(it) }
+        assertEquals(0, score(week + (1..6).map { meal(it, 16, 55.0, 1.0, square, "1 square dark chocolate") })!!.treatMeals)
+        // Three small bites on one day add up to one treat.
+        assertEquals(1, score(week + listOf(11, 15, 19).map { h -> meal(3, h, 60.0, 1.0, square, "a biscuit") })!!.treatMeals)
     }
 
     @Test

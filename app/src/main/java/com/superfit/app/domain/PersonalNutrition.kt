@@ -110,9 +110,6 @@ object PersonalNutrition {
         return (type != null && type.isNotEmpty() && type in approvedFoods) || key(entry.foodText) in approvedFoods
     }
 
-    /** A treat that counts: the AI called it one and the user hasn't marked it "Fine for me". */
-    fun countsAsTreat(entry: NutritionEntryEntity, tags: MealTags): Boolean = tags.treat && !isApproved(entry, tags)
-
     /** A food the AI said to avoid until the goal is reached, and the user hasn't marked "Fine for me". */
     fun countsAsAvoid(entry: NutritionEntryEntity, tags: MealTags): Boolean = tags.verdict == FoodVerdict.AVOID.key && !isApproved(entry, tags)
 }

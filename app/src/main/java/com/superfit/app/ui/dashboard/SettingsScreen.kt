@@ -833,6 +833,9 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsGroupLabel("Sharing")
+            com.superfit.app.ui.share.SharingSettingsCard()
+
             SettingsGroupLabel("Privacy")
             // Anonymous usage and crash reports (see AppAnalytics)
             Card(

@@ -76,6 +76,8 @@ class CoachingEngineTest {
         assertEquals("protein_low", next.id)
         val after = CoachingEngine.habitFor(listOf(said(1, focus.id, FindingKind.HABIT)), today)
         assertTrue(after != null && after.id != focus.id)
+        // A habit the user already keeps is never suggested.
+        assertTrue(CoachingEngine.habitFor(emptyList(), today, kept = setOf("habit_walk_after_meals"))?.id != "habit_walk_after_meals")
     }
 
     @Test

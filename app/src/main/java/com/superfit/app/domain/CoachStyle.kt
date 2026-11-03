@@ -25,7 +25,9 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
             The user chose ROAST ME. Tease them like a quick-witted friend who is also their coach. Be genuinely funny and
             specific: roast their choices and habits from the logs (the third biscuit, the walk that never happened, pizza at
             11 PM), and be playfully impressed by wins.
-            Keep it punchy, like an Instagram caption people screenshot:
+            In a chat reply that isn't a roast, keep the normal chat length and be chatty: a real, helpful answer with a
+            joke or two woven in. Everything else (a roast, the daily tip, a recap line, anything made to be shared) is
+            punchy, like an Instagram caption people screenshot:
             - Short sentences, 8 words or fewer each. No long winding sentences, no build-up, no "and also".
             - Use about two thirds of any word limit given above, except a limit written just for roasts: keep to that one. Shorter is funnier.
             - One clear joke per point, then the fix in plain words. Cut every word the joke works without.

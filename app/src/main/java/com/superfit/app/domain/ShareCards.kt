@@ -47,9 +47,28 @@ sealed interface ShareCard {
         val heart: HeartLine? = null,
         /** The one line that stands out about this workout, when something does. */
         val moment: String? = null,
-        /** The user's "With one line" choice; the line shows only when there is one. */
-        val showMoment: Boolean = false
-    ) : ShareCard
+        /** What the user picked to add (stand-out line, coach line or roast, journey). */
+        val chips: Set<CardChip> = emptySet(),
+        /** The voice-logged workout behind the card, for its strength card and AI lines. */
+        val voice: WorkoutEntryEntity? = null,
+        /** Reps, exercises, body areas and the week, for a voice-logged strength workout. */
+        val strength: StrengthCardDetail? = null,
+        /** "Day 34 of my journey", when a goal is set. */
+        val journey: String? = null,
+        /** The AI coach's line and the roast, once written (only when their chip is picked). */
+        val coachLine: String? = null,
+        val roastLine: String? = null,
+        /** The fair, true line a roast ends with. */
+        val fairLine: String? = null,
+        /** Workouts this week up to this one (walks not counted), for the AI lines' facts. */
+        val weekCount: Int? = null
+    ) : ShareCard {
+        val showMoment: Boolean get() = CardChip.STANDOUT in chips && moment != null
+        val shownHeart: HeartLine? get() = heart?.takeIf { CardChip.HEART in chips }
+        val shownCoach: String? get() = coachLine?.takeIf { CardChip.COACH in chips }
+        val shownRoast: String? get() = roastLine?.takeIf { CardChip.ROAST in chips }
+        val shownJourney: String? get() = journey?.takeIf { CardChip.JOURNEY in chips }
+    }
 
     data class Best(
         override val dateLine: String,
@@ -148,6 +167,26 @@ object ShareCards {
         )
     }
 
+    /**
+     * A voice-logged strength workout leads with its reps (or minutes) and says what was worked;
+     * calories move into the stats.
+     */
+    fun withStrength(card: ShareCard.Activity, detail: StrengthCardDetail): ShareCard.Activity {
+        val kcal = card.voice?.caloriesBurned?.roundToInt()?.takeIf { it > 0 }
+        val (big, unit) = when {
+            detail.reps != null -> "${detail.reps}" to "reps"
+            detail.minutes != null -> "${detail.minutes}" to "min"
+            else -> return card.copy(strength = detail, heading = "STRENGTH")
+        }
+        val stats = buildList {
+            if (detail.reps != null) detail.minutes?.let { add(CardStat("TIME", "$it", "min")) }
+            kcal?.let { add(CardStat("BURNED", "$it", "kcal")) }
+        }
+        // The exercise list replaces the words they said when it could be read from them.
+        val subtitle = if (detail.exercises.isNotEmpty()) null else card.subtitle
+        return card.copy(strength = detail, heading = "STRENGTH", bigValue = big, bigUnit = unit, stats = stats, subtitle = subtitle)
+    }
+
     /** Adds the heart-rate line (and its peak, next to the average) and the stand-out line. */
     fun withDetails(card: ShareCard.Activity, heart: HeartLine?, moment: String?): ShareCard.Activity {
         val stats = if (heart == null || card.stats.any { it.label == "PEAK" }) {
@@ -170,7 +209,8 @@ object ShareCards {
             bigValue = "${e.caloriesBurned.roundToInt()}",
             bigUnit = "kcal",
             subtitle = e.description,
-            stats = emptyList()
+            stats = emptyList(),
+            voice = e
         )
     }
 
