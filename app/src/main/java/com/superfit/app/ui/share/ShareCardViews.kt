@@ -420,7 +420,7 @@ private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
         Spacer(Modifier.height(10.dp))
         Text(it, color = TextMain, fontSize = 17.sp, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
-    card.heart?.let { heart ->
+    card.shownHeart?.let { heart ->
         Spacer(Modifier.height(22.dp))
         HeartLineGraph(heart, accent, TextMain, Modifier.fillMaxWidth().height(70.dp))
         if (heart.effortMinutes.isNotEmpty()) {
@@ -684,7 +684,7 @@ private fun PhotoStats(card: ShareCard, accent: Color) {
             card.subtitle?.let {
                 Text(it, color = Color.White, fontSize = 15.sp, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            card.heart?.let { heart ->
+            card.shownHeart?.let { heart ->
                 Spacer(Modifier.height(10.dp))
                 // Distance cards have no room for PEAK among three stats, so the dot carries it.
                 val labelPeak = card.stats.take(3).none { it.label == "PEAK" }

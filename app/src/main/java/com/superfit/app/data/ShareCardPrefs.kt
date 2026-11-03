@@ -17,7 +17,8 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         val key = if (photo) KEY_CHIPS_PHOTO else KEY_CHIPS_PLAIN
         prefs.getString(key, null)?.let { return CardChip.parse(it) }
         val oldLine = prefs.getBoolean(if (photo) OLD_LINE_PHOTO else OLD_LINE_PLAIN, !photo)
-        return if (oldLine) setOf(CardChip.STANDOUT) else emptySet()
+        // The heart-rate graph starts on, as in 1.0.49; the user can switch it off.
+        return if (oldLine) setOf(CardChip.HEART, CardChip.STANDOUT) else setOf(CardChip.HEART)
     }
 
     fun setDefaults(photo: Boolean, chips: Set<CardChip>) {

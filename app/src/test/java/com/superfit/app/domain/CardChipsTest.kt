@@ -25,8 +25,8 @@ class CardChipsTest {
 
     @Test
     fun roastMeUsersSeeRoastBeforeCoach() {
-        assertEquals(listOf(CardChip.STANDOUT, CardChip.ROAST, CardChip.COACH, CardChip.JOURNEY), CardChip.order(CoachStyle.ROAST))
-        assertEquals(CardChip.COACH, CardChip.order(CoachStyle.SUPPORTIVE)[1])
+        assertEquals(listOf(CardChip.HEART, CardChip.STANDOUT, CardChip.ROAST, CardChip.COACH, CardChip.JOURNEY), CardChip.order(CoachStyle.ROAST))
+        assertEquals(CardChip.COACH, CardChip.order(CoachStyle.SUPPORTIVE)[2])
     }
 
     @Test

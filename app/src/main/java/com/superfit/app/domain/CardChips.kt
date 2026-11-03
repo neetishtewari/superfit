@@ -1,7 +1,8 @@
 package com.superfit.app.domain
 
-/** What the user can add to a workout card. Nothing is on a card unless the user picks it. */
+/** What the user can add to a workout card. Only the heart-rate graph starts on (see ShareCardPrefs). */
 enum class CardChip(val key: String, val label: String) {
+    HEART("heart", "Heart rate"),
     STANDOUT("standout", "Stand-out"),
     COACH("coach", "Coach"),
     ROAST("roast", "Roast"),
@@ -28,7 +29,7 @@ enum class CardChip(val key: String, val label: String) {
 
         /** Chip order on the share screen; Roast me users see Roast before Coach. */
         fun order(style: CoachStyle): List<CardChip> =
-            if (style == CoachStyle.ROAST) listOf(STANDOUT, ROAST, COACH, JOURNEY) else entries.toList()
+            if (style == CoachStyle.ROAST) listOf(HEART, STANDOUT, ROAST, COACH, JOURNEY) else entries.toList()
     }
 }
 

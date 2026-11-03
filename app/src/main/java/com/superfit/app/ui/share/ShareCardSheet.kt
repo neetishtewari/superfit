@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -178,6 +180,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     val available = activityBase?.let { a ->
         CardChip.order(style).filter {
             when (it) {
+                CardChip.HEART -> a.heart != null
                 CardChip.STANDOUT -> a.moment != null
                 CardChip.JOURNEY -> a.journey != null
                 else -> true
@@ -368,7 +371,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                 adjusted = photo != null && frame.adjusted,
                                 chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } },
                                 statsPlace = if (frame.statsTop) "top" else "bottom",
-                                heartLine = activity?.heart != null
+                                heartLine = activity?.shownHeart != null
                             )
                             onShared()
                         } catch (e: Exception) {
@@ -392,18 +395,22 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
 }
 
 /** Things the user can add to a workout card; each turns on or off, Coach and Roast never together. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddChips(options: List<CardChip>, picked: Set<CardChip>, writing: CardChip?, accent: Color, onToggle: (CardChip) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         options.forEach { chip ->
             val on = chip in picked
             Box(
                 Modifier
-                    .weight(1f)
                     .clip(RoundedCornerShape(50))
                     .background(if (on) accent else SuperfitTheme.colors.fieldBg)
                     .clickable { onToggle(chip) }
-                    .padding(vertical = 10.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
                     .semantics { contentDescription = "${chip.label}${if (on) ", on" else ", off"}" },
                 contentAlignment = Alignment.Center
             ) {

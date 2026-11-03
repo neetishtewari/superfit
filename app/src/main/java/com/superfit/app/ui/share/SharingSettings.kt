@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -87,20 +89,24 @@ fun SharingSettingsCard() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DefaultRow(title: String, order: List<CardChip>, picked: Set<CardChip>, onToggle: (CardChip) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, fontSize = 12.sp, color = SuperfitTheme.colors.textSecondary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             order.forEach { chip ->
                 val on = chip in picked
                 Box(
                     Modifier
-                        .weight(1f)
                         .clip(RoundedCornerShape(50))
                         .background(if (on) NeonMint else SuperfitTheme.colors.fieldBg)
                         .clickable { onToggle(chip) }
-                        .padding(vertical = 8.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                         .semantics { contentDescription = "$title, ${chip.label}${if (on) ", on" else ", off"}" },
                     contentAlignment = Alignment.Center
                 ) {

@@ -64,6 +64,7 @@ sealed interface ShareCard {
         val weekCount: Int? = null
     ) : ShareCard {
         val showMoment: Boolean get() = CardChip.STANDOUT in chips && moment != null
+        val shownHeart: HeartLine? get() = heart?.takeIf { CardChip.HEART in chips }
         val shownCoach: String? get() = coachLine?.takeIf { CardChip.COACH in chips }
         val shownRoast: String? get() = roastLine?.takeIf { CardChip.ROAST in chips }
         val shownJourney: String? get() = journey?.takeIf { CardChip.JOURNEY in chips }
