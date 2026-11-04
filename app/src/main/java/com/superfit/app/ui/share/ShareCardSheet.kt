@@ -82,11 +82,14 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.superfit.app.data.RoastCardData
 import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.WorkoutCardData
 import com.superfit.app.domain.CardChip
 import com.superfit.app.domain.CoachStyle
+import com.superfit.app.domain.DayChip
 import com.superfit.app.domain.PhotoFrame
+import com.superfit.app.domain.RoastCard
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
 import java.io.File
@@ -188,7 +191,35 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
             }
         }
     }.orEmpty()
-    val shown = activityBase?.copy(chips = chips, coachLine = coachLine, roastLine = roastLine) ?: base
+    // A "Roast my day" card: the roast (a fresh one from Try another), its chips, journey line and photo version.
+    val roastCard = (card as? ShareCard.Daily)?.takeIf { it.roast }
+    var dayChips by remember(card) { mutableStateOf(DayChip.DEFAULTS) }
+    var roastText by remember(card) { mutableStateOf((card as? ShareCard.Daily)?.coachLine) }
+    var shortRoast by remember(roastText) { mutableStateOf<String?>(null) }
+    var dayJourney by remember(card) { mutableStateOf<String?>(null) }
+    var picked by remember(roastText) { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(roastText) {
+        val text = roastText ?: return@LaunchedEffect
+        if (roastCard == null) return@LaunchedEffect
+        picked = withContext(Dispatchers.IO) { RoastCardData.pick(context, text, roastCard.pool) }
+    }
+    var againLeft by remember(card) { mutableStateOf(0) }
+    var againBusy by remember(card) { mutableStateOf(false) }
+    LaunchedEffect(card) {
+        if (roastCard != null) {
+            againLeft = RoastCardData.againLeft(context)
+            dayJourney = withContext(Dispatchers.IO) { WorkoutCardData.dayJourney(context) }
+        }
+    }
+    val onPhotoNow = photo != null
+    LaunchedEffect(onPhotoNow, roastText) {
+        val text = roastText ?: return@LaunchedEffect
+        if (roastCard == null || !onPhotoNow || shortRoast != null || text.length <= RoastCard.PHOTO_MAX_CHARS) return@LaunchedEffect
+        shortRoast = withContext(Dispatchers.IO) { RoastCardData.short(context, text, roastCard.pool) }
+    }
+    val shown = activityBase?.copy(chips = chips, coachLine = coachLine, roastLine = roastLine)
+        ?: roastCard?.copy(coachLine = roastText, chips = dayChips, journey = dayJourney, shortRoast = shortRoast, picked = picked)
+        ?: base
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -309,17 +340,15 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 if (showHint && current != null) {
                     Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
                 }
-                if (card !is ShareCard.Daily) {
-                    if (current == null) {
-                        OptionPill("Add your photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
-                            pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        }
-                    } else {
-                        OptionPill("Remove photo", Icons.Filled.Close, on = false, accent = accent, highlight = false, centered = true) {
-                            photo = null
-                            frame = PhotoFrame()
-                            showHint = false
-                        }
+                if (current == null) {
+                    OptionPill("Add your photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
+                        pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                } else {
+                    OptionPill("Remove photo", Icons.Filled.Close, on = false, accent = accent, highlight = false, centered = true) {
+                        photo = null
+                        frame = PhotoFrame()
+                        showHint = false
                     }
                 }
                 if (available.isNotEmpty()) {
@@ -353,6 +382,55 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                 )
                             }
                         }
+                    }
+                }
+                if (roastCard != null) {
+                    val dayAvailable = DayChip.entries.filter { it != DayChip.JOURNEY || dayJourney != null }
+                    Text("On the card", color = SuperfitTheme.colors.textSecondary, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        dayAvailable.forEach { chip ->
+                            SheetChip(chip.label, chip in dayChips, accent, Modifier.weight(1f)) { dayChips = DayChip.toggle(dayChips, chip) }
+                        }
+                    }
+                    val roastShown = shown as? ShareCard.Daily
+                    if (picked != null && roastShown?.shownRoast != null && DayChip.NUMBERS in dayChips && roastShown.roastTiles.isEmpty()) {
+                        Text(
+                            "This roast doesn't talk about any of today's numbers, so none are shown.",
+                            color = SuperfitTheme.colors.textSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (DayChip.ROAST in dayChips && roastText != null) {
+                        Text(
+                            when {
+                                againBusy -> "Writing another roast…"
+                                againLeft > 0 -> "Try another roast · $againLeft left today"
+                                else -> "No more fresh roasts today"
+                            },
+                            color = if (againLeft > 0 && !againBusy) accent else SuperfitTheme.colors.textSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clickable(enabled = againLeft > 0 && !againBusy) {
+                                    val old = roastText ?: return@clickable
+                                    againBusy = true
+                                    scope.launch {
+                                        val fresh = try {
+                                            withContext(Dispatchers.IO) { RoastCardData.again(context, old, roastCard.pool) }
+                                        } finally {
+                                            againBusy = false
+                                        }
+                                        againLeft = RoastCardData.againLeft(context)
+                                        if (fresh != null) {
+                                            roastText = fresh
+                                        } else {
+                                            Toast.makeText(context, "Couldn't write another roast just now.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                                .padding(vertical = 4.dp)
+                        )
                     }
                 }
                 failed?.takeIf { it in chips }?.let { chip ->
@@ -398,7 +476,8 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                 },
                                 photo = photo != null,
                                 adjusted = photo != null && frame.adjusted,
-                                chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } },
+                                chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } }
+                                    ?: roastCard?.let { dayChips.joinToString(",") { it.key } },
                                 statsPlace = if (frame.statsTop) "top" else "bottom",
                                 heartLine = activity?.shownHeart != null
                             )
@@ -423,6 +502,29 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 Text("Share", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
+    }
+}
+
+/** One on/off choice in a row of equal chips, filled with the accent when on. */
+@Composable
+private fun SheetChip(label: String, on: Boolean, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (on) accent else SuperfitTheme.colors.fieldBg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 10.dp)
+            .semantics { contentDescription = "$label${if (on) ", on" else ", off"}" },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (on) Color.Black else SuperfitTheme.colors.textPrimary,
+            fontSize = 12.sp,
+            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 
