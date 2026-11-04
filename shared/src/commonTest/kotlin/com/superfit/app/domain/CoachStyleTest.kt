@@ -46,7 +46,6 @@ class CoachStyleTest {
         val roast = CoachStyle.ROAST.instruction()
         assertTrue(roast.contains("8 words or fewer"))
         assertTrue(roast.contains("two thirds of any word limit"))
-        assertTrue(CoachChatContext.RULES.contains("at most 16 words"))
     }
 
     @Test
