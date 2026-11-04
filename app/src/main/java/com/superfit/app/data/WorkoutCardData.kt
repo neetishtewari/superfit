@@ -10,6 +10,7 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.superfit.app.domain.ActivityPatterns
 import com.superfit.app.domain.CardChip
+import com.superfit.app.domain.CardCount
 import com.superfit.app.domain.CardLines
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.GeminiClient
@@ -44,7 +45,7 @@ object WorkoutCardData {
     private const val TAG = "WorkoutCardData"
     private const val MAX_SAMPLES = 20_000
     private const val DAY = 86_400_000L
-    private const val LINES_VERSION = "v2"
+    private const val LINES_VERSION = "v3"
 
     suspend fun enrich(context: Context, card: ShareCard.Activity): ShareCard.Activity {
         if (card.workout == null && card.voice == null) return card
@@ -56,7 +57,7 @@ object WorkoutCardData {
         val imported = safe("imported workouts") { repository.getImportedWorkoutViews(bmr) }.orEmpty()
         val voiceLogs = safe("voice workouts") { repository.getAllWorkoutEntries() }.orEmpty()
         val start = card.workout?.startTime ?: card.voice!!.timestamp
-        val weekCount = weekCount(start, imported, voiceLogs, zone)
+        val weekCount = weekCount(start, card.workout?.title, imported, voiceLogs, zone)
         val journey = profile?.let { safe("journey") { journey(app, repository, it, zone) } }
 
         var out = card.copy(journey = journey, weekCount = weekCount)
@@ -78,7 +79,7 @@ object WorkoutCardData {
             if (entry.workoutType == "Strength" || ActivityPatterns.exercises(entry.description).isNotEmpty()) {
                 safe("strength card") { strength(app, entry, imported, voiceLogs, zone) }?.let { out = ShareCards.withStrength(out, it) }
             }
-            out = out.copy(moment = if (weekCount >= 3) "${CardLines.ordinal(weekCount)} workout this week" else null)
+            out = out.copy(moment = if (weekCount.n >= 3) weekCount.phrase().replaceFirstChar { it.uppercase() } else null)
         }
         return out.copy(fairLine = CardLines.fairLine(out.moment, weekCount))
     }
@@ -95,6 +96,7 @@ object WorkoutCardData {
         val key = listOf(LINES_VERSION, chip.key, cardKey(card), style.name).joinToString("|")
         prefs.savedLine(key)?.let { return it }
         val facts = CardLines.facts(card, card.weekCount)
+        // v3: runs, walks, swims and rides are counted apart from other workouts.
         val system = (if (chip == CardChip.COACH) CardLines.COACH_SYSTEM else CardLines.ROAST_SYSTEM).trimIndent() + style.instruction()
         val maxWords = if (chip == CardChip.COACH) CardLines.COACH_MAX_WORDS else CardLines.ROAST_MAX_WORDS
         repeat(2) {
@@ -117,13 +119,25 @@ object WorkoutCardData {
     private fun cardKey(card: ShareCard.Activity): String =
         card.workout?.merged?.primary?.id ?: card.voice?.let { "voice_${it.id}_${it.timestamp}" } ?: card.dateLine
 
-    /** Workouts in the week (Monday on) of [start], up to and including it. Walks don't count. */
-    private fun weekCount(start: Long, imported: List<WorkoutView>, voice: List<WorkoutEntryEntity>, zone: ZoneId): Int {
+    /**
+     * How many of this kind the user did in the week (Monday on) of [start], up to and including it:
+     * runs, walks, swims and rides each count apart; voice logs and every other type count as workouts.
+     */
+    private fun weekCount(start: Long, title: String?, imported: List<WorkoutView>, voice: List<WorkoutEntryEntity>, zone: ZoneId): CardCount {
+        val noun = CardCount.nounFor(title)
         val monday = Instant.ofEpochMilli(start).atZone(zone).toLocalDate().with(DayOfWeek.MONDAY)
         val from = monday.atStartOfDay(zone).toInstant().toEpochMilli()
-        val i = imported.count { it.title != "Walk" && it.startTime in from..start }
-        val v = voice.count { it.timestamp in from..start }
-        return i + v
+        val i = imported.count { CardCount.nounFor(it.title) == noun && it.startTime in from..start }
+        val v = if (noun == "workout") voice.count { it.timestamp in from..start } else 0
+        return CardCount((i + v).coerceAtLeast(1), noun)
+    }
+
+    /** The journey line for a roast card ("Day 34 of my journey"), or null when no goal is set. */
+    suspend fun dayJourney(context: Context): String? {
+        val app = context.applicationContext
+        val repository = DataRepository(app, HealthConnectManager(app))
+        val profile = safe("profile") { repository.getProfile() } ?: return null
+        return safe("journey") { journey(app, repository, profile, ZoneId.systemDefault()) }
     }
 
     /** "Day 34 of my journey", with goal progress only when the user allows weight on cards. Null without a goal. */

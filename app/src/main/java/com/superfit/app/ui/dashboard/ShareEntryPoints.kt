@@ -48,7 +48,8 @@ fun dailyShareCard(state: DashboardUiState.Success, coaching: CoachingInsightSta
         dietScore = state.dietQualityMetrics.overallScore.takeIf { state.dietQualityMetrics.hasEnoughData },
         steps = state.activity.steps,
         workout = ShareCards.dayWorkout(state.importedWorkouts, state.workoutList),
-        coachLine = (coaching as? CoachingInsightState.Success)?.insight?.headline
+        coachLine = (coaching as? CoachingInsightState.Success)?.insight?.headline,
+        sleepSeconds = state.sleep?.sleepDurationSeconds ?: 0L
     )
 
 /** "New personal best: Longest run, 12.40 km" with Share and a close button. Shows once per best. */
