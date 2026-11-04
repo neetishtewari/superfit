@@ -38,8 +38,10 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -50,6 +52,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
@@ -166,9 +169,12 @@ private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier)
         ) {
             CardHeader(card.dateLine)
             when (card) {
-                is ShareCard.Daily -> card.asDay.let { if (it.roast) RoastBody(it, accent) else DailyBody(it, accent) }
-                is ShareCard.Activity -> ActivityBody(card, accent)
-                is ShareCard.Best -> BestBody(card, accent)
+                is ShareCard.Daily -> card.asDay.let { day ->
+                    // The roast shrinks its own text to fit; the day's numbers scale down like the others.
+                    if (day.roast) RoastBody(day, accent) else FitBody { DailyBody(day, accent) }
+                }
+                is ShareCard.Activity -> FitBody { ActivityBody(card, accent) }
+                is ShareCard.Best -> FitBody { BestBody(card, accent) }
             }
             CardFooter(showDivider = card !is ShareCard.Daily, roasted = roasted(card))
         }
@@ -196,6 +202,55 @@ private fun CardHeader(dateLine: String, dateColor: Color = TextDate) {
         Text(dateLine, color = dateColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
     }
 }
+
+/**
+ * The card's middle, between the header and the footer. The footer is laid out first, so the
+ * Superfit badge and "Get it on Google Play" always stay on the picture; a body with more on it than
+ * fits is scaled down a little (smaller text and spacing) instead of pushing them off.
+ */
+@Composable
+private fun ColumnScope.FitBody(content: @Composable ColumnScope.() -> Unit) {
+    FitToSpace(
+        Modifier
+            .weight(1f)
+            .fillMaxWidth()
+    ) {
+        Column(Modifier.fillMaxSize(), content = content)
+    }
+}
+
+/**
+ * Shows [content] at full size when it fits the height it's given, else laid out wider and scaled
+ * down to fit, so it still fills the width. Scales to at most [MIN_FIT_SCALE] and clips past that.
+ */
+@Composable
+private fun FitToSpace(modifier: Modifier, content: @Composable () -> Unit) {
+    Layout(content = content, modifier = modifier.clipToBounds()) { measurables, constraints ->
+        val child = measurables.first()
+        val width = constraints.maxWidth
+        val maxHeight = constraints.maxHeight
+        val natural = child.maxIntrinsicHeight(width)
+        if (natural <= maxHeight) {
+            val placeable = child.measure(constraints.copy(minWidth = width))
+            layout(width, placeable.height.coerceIn(constraints.minHeight, maxHeight)) { placeable.place(0, 0) }
+        } else {
+            val scale = (maxHeight.toFloat() / natural).coerceAtLeast(MIN_FIT_SCALE)
+            val placeable = child.measure(Constraints.fixed((width / scale).roundToInt(), (maxHeight / scale).roundToInt()))
+            layout(width, maxHeight) {
+                placeable.placeWithLayer(0, 0) {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
+            }
+        }
+    }
+}
+
+private const val MIN_FIT_SCALE = 0.7f
+
+/** Room for the numbers on a photo card, between the header and the Superfit row. */
+private val PHOTO_STATS_MAX = 310.dp
 
 /** A card with a roast on it says who wrote it. */
 private fun roasted(card: ShareCard): Boolean = (card as? ShareCard.Daily)?.shownRoast != null
@@ -635,7 +690,13 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, fr
                     .fillMaxWidth()
                     .padding(start = 22.dp, end = 22.dp, top = SAFE_TOP + 56.dp)
             ) {
-                PhotoStats(card, accent)
+                FitToSpace(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = PHOTO_STATS_MAX)
+                ) {
+                    Column { PhotoStats(card, accent) }
+                }
             }
             Box(
                 Modifier
@@ -652,7 +713,13 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, fr
                     .fillMaxWidth()
                     .padding(start = 22.dp, end = 22.dp, bottom = 96.dp)
             ) {
-                PhotoStats(card, accent)
+                FitToSpace(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = PHOTO_STATS_MAX)
+                ) {
+                    Column { PhotoStats(card, accent) }
+                }
                 Spacer(Modifier.height(16.dp))
                 Box(
                     Modifier
