@@ -46,3 +46,23 @@ workout share cards and the PDF report. Nothing is held back for a later version
 - Dev app on the phone: log, edit and delete a meal, a workout and a weight. Each should appear, change
   and disappear under its new id in Firestore (`users/{uid}/nutrition`, `workouts`, `weights`).
 - Sign out and back in on the dev app: history comes back once, with no duplicates.
+
+## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
+
+Each step gets a security review before merge, on top of the release checklist's security section.
+
+Steps 1-2 (reviewed 4 Nov): no new permissions, secrets or network calls. Cloud ids are random
+(`kotlin.uuid`, secure random) but aren't secrets; access still rests on `firestore.rules`, which only
+lets a signed-in user read and write `users/{their uid}`. New build plugins come from the official
+Gradle and Google repositories.
+
+For the iPhone app, before TestFlight:
+- App Check with App Attest (Apple's version of Play Integrity), enforced for AI Logic like Android.
+- The iPhone Firebase API key restricted to the iPhone bundle id in Google Cloud.
+- Sign-in tokens stay in the Keychain (Firebase does this by default); nothing personal in UserDefaults.
+- No AI or other secret keys in the app; AI goes through Firebase AI Logic as on Android.
+- App Transport Security left on (HTTPS only), no exceptions.
+- Apple Health data used only for the app's features, never for ads, and described honestly in the
+  App Store privacy answers and the Health permission text.
+- The widget and app share data through an App Group, readable only by Superfit.
+- Same Firestore rules for both apps; any rules change is reviewed and deployed once.
