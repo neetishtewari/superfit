@@ -132,6 +132,14 @@ object WorkoutCardData {
         return CardCount((i + v).coerceAtLeast(1), noun)
     }
 
+    /** The journey line for a roast card ("Day 34 of my journey"), or null when no goal is set. */
+    suspend fun dayJourney(context: Context): String? {
+        val app = context.applicationContext
+        val repository = DataRepository(app, HealthConnectManager(app))
+        val profile = safe("profile") { repository.getProfile() } ?: return null
+        return safe("journey") { journey(app, repository, profile, ZoneId.systemDefault()) }
+    }
+
     /** "Day 34 of my journey", with goal progress only when the user allows weight on cards. Null without a goal. */
     private suspend fun journey(context: Context, repository: DataRepository, profile: UserProfileEntity, zone: ZoneId): String? {
         val prefs = getUserSharedPrefs(context)

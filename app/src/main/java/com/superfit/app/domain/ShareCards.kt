@@ -31,8 +31,27 @@ sealed interface ShareCard {
         val tiles: List<CardStat>,
         val coachLine: String?,
         // "Roast my day": the coach line is the AI coach's roast of the day.
-        val roast: Boolean = false
-    ) : ShareCard
+        val roast: Boolean = false,
+        /** Every number the day has, sleep included, to pick the ones a roast talks about. */
+        val pool: List<CardStat> = tiles,
+        /** What's on a roast card: the roast, the numbers that back it up, the journey line. */
+        val chips: Set<DayChip> = DayChip.DEFAULTS,
+        /** "Day 34 of my journey", when a goal is set. */
+        val journey: String? = null,
+        /** A short version of a long roast, for a photo card; null until written. */
+        val shortRoast: String? = null
+    ) : ShareCard {
+        /** The roast, when this is a roast card and the Roast chip is on. */
+        val shownRoast: String? get() = coachLine?.takeIf { roast && DayChip.ROAST in chips && it.isNotBlank() }
+
+        /** A roast card with the roast off is just the day's numbers. */
+        val asDay: Daily get() = if (roast && shownRoast == null) copy(roast = false, coachLine = null) else this
+
+        /** The numbers under a roast: only the ones it talks about, and only when Numbers is on. */
+        val roastTiles: List<CardStat> get() = if (DayChip.NUMBERS in chips) RoastCard.matching(shownRoast, pool) else emptyList()
+
+        val shownJourney: String? get() = journey?.takeIf { roast && DayChip.JOURNEY in chips }
+    }
 
     data class Activity(
         override val dateLine: String,
@@ -105,7 +124,8 @@ object ShareCards {
         dietScore: Int?,
         steps: Int,
         workout: DayWorkout?,
-        coachLine: String?
+        coachLine: String?,
+        sleepSeconds: Long = 0
     ): ShareCard.Daily {
         val tiles = buildList {
             // A day with no meals logged is a blank day, not a day of eating nothing.
@@ -126,10 +146,16 @@ object ShareCards {
             if (steps > 0) add(CardStat("STEPS", NumberFormat.getIntegerInstance().format(steps)))
             if (workout != null) add(CardStat("WORKOUT", workout.value, note = workout.note))
         }
+        // Sleep isn't on the day card, but a roast about oversleeping can show it.
+        val sleep = sleepSeconds.takeIf { it >= 60 * 60 }?.let {
+            val minutes = (it / 60).toInt()
+            CardStat("SLEEP", "${minutes / 60}h ${minutes % 60}m", note = "last night")
+        }
         return ShareCard.Daily(
             dateLine = date.format(dayFormat),
             streakDays = streakDays,
             tiles = tiles,
+            pool = tiles + listOfNotNull(sleep),
             coachLine = coachLine?.let(::plain)?.takeIf { it.isNotBlank() }
         )
     }
@@ -307,18 +333,21 @@ object ShareCards {
         return if (parts[0].length <= 90 && !rest.isNullOrEmpty()) parts[0] to rest else text to null
     }
 
-    /** Whole sentences that fit in [ROAST_MAX]; a first sentence that's too long is cut at a word. */
-    fun fitRoast(text: String): String {
-        if (text.length <= ROAST_MAX) return text
+    /** Until the short version is written, a photo shows the roast's opening sentences that fit. */
+    fun photoRoast(text: String): String = fitRoast(text, RoastCard.PHOTO_MAX_CHARS)
+
+    /** Whole sentences that fit in [max]; a first sentence that's too long is cut at a word. */
+    fun fitRoast(text: String, max: Int = ROAST_MAX): String {
+        if (text.length <= max) return text
         val sentences = Regex("""(?<=[.!?])\s+""").split(text)
         val kept = StringBuilder()
         for (s in sentences) {
             val next = if (kept.isEmpty()) s else "$kept $s"
-            if (next.length > ROAST_MAX) break
+            if (next.length > max) break
             kept.clear().append(next)
         }
         if (kept.isNotEmpty()) return kept.toString()
-        return text.take(ROAST_MAX - 1).substringBeforeLast(' ').trimEnd(',', ';', ':', '-', '—') + "…"
+        return text.take(max - 1).substringBeforeLast(' ').trimEnd(',', ';', ':', '-', '—') + "…"
     }
 
     private fun plain(text: String): String = text.replace("**", "").trim()

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -132,8 +133,8 @@ fun ShareCardView(
     light: Boolean = false,
     frame: PhotoFrame = PhotoFrame()
 ) {
-    // The daily card has no photo option; workout and personal-best cards can sit on the user's photo.
-    if (photo != null && card !is ShareCard.Daily) {
+    // Every card can sit on the user's photo.
+    if (photo != null) {
         CompositionLocalProvider(LocalCardPalette provides DarkCard) {
             PhotoCardView(card, accent, photo, frame, modifier)
         }
@@ -165,11 +166,11 @@ private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier)
         ) {
             CardHeader(card.dateLine)
             when (card) {
-                is ShareCard.Daily -> if (card.roast) RoastBody(card, accent) else DailyBody(card, accent)
+                is ShareCard.Daily -> card.asDay.let { if (it.roast) RoastBody(it, accent) else DailyBody(it, accent) }
                 is ShareCard.Activity -> ActivityBody(card, accent)
                 is ShareCard.Best -> BestBody(card, accent)
             }
-            CardFooter(showDivider = card !is ShareCard.Daily)
+            CardFooter(showDivider = card !is ShareCard.Daily, roasted = roasted(card))
         }
     }
 }
@@ -196,8 +197,11 @@ private fun CardHeader(dateLine: String, dateColor: Color = TextDate) {
     }
 }
 
+/** A card with a roast on it says who wrote it. */
+private fun roasted(card: ShareCard): Boolean = (card as? ShareCard.Daily)?.shownRoast != null
+
 @Composable
-private fun CardFooter(showDivider: Boolean) {
+private fun CardFooter(showDivider: Boolean, roasted: Boolean = false) {
     if (showDivider) {
         Box(
             Modifier
@@ -209,7 +213,16 @@ private fun CardFooter(showDivider: Boolean) {
     Spacer(Modifier.height(16.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         BrandBadge(background = BadgeBackground, border = BadgeBorder)
-        Text("Get it on Google Play", color = TextDate, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        FooterNote(roasted, TextMain, TextDate)
+    }
+}
+
+/** "Get it on Google Play", with "Roasted by Superfit" above it on a roast. */
+@Composable
+private fun FooterNote(roasted: Boolean, main: Color, soft: Color) {
+    Column(horizontalAlignment = Alignment.End) {
+        if (roasted) Text("🔥 Roasted by Superfit", color = main, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text("Get it on Google Play", color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -295,9 +308,10 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
  */
 @Composable
 private fun ColumnScope.RoastBody(card: ShareCard.Daily, accent: Color) {
-    val roast = card.coachLine.orEmpty()
+    val roast = card.shownRoast.orEmpty()
     val (headline, rest) = ShareCards.splitRoast(roast)
-    val tiles = if (roast.length <= ROAST_WITH_TILES) card.tiles.take(2) else emptyList()
+    // Only the numbers the roast talks about, and only when Numbers is on.
+    val tiles = card.roastTiles
     val bodySize = if (rest != null) 17.sp else 22.sp
     Spacer(Modifier.height(20.dp))
     Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
@@ -340,11 +354,12 @@ private fun ColumnScope.RoastBody(card: ShareCard.Daily, accent: Color) {
             if (tiles.size == 1) Spacer(Modifier.weight(1f))
         }
     }
+    card.shownJourney?.let {
+        Spacer(Modifier.height(12.dp))
+        Text(it, color = TextSoft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
     Spacer(Modifier.height(16.dp))
 }
-
-/** A longer roast gets the whole card; the protein and Diet Quality tiles would squeeze it too small. */
-private const val ROAST_WITH_TILES = 260
 
 private fun secondBar(accent: Color): Color = if (accent == ElectricCyan) NeonMint else ElectricCyan
 
@@ -628,7 +643,7 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, fr
                     .fillMaxWidth()
                     .padding(start = 22.dp, end = 22.dp, bottom = 96.dp)
             ) {
-                PhotoBrandRow()
+                PhotoBrandRow(roasted(card))
             }
         } else {
             Column(
@@ -646,7 +661,7 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, fr
                         .background(Color.White.copy(alpha = 0.2f))
                 )
                 Spacer(Modifier.height(14.dp))
-                PhotoBrandRow()
+                PhotoBrandRow(roasted(card))
             }
         }
     }
@@ -674,10 +689,10 @@ private fun FramedPhoto(photo: ImageBitmap, frame: PhotoFrame) {
 }
 
 @Composable
-private fun PhotoBrandRow() {
+private fun PhotoBrandRow(roasted: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         BrandBadge(background = Color(0x9908080C), border = Color.White.copy(alpha = 0.22f))
-        Text("Get it on Google Play", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        FooterNote(roasted, Color.White, Color.White.copy(alpha = 0.85f))
     }
 }
 
@@ -750,7 +765,58 @@ private fun PhotoStats(card: ShareCard, accent: Color) {
                 Text("Previous best $prev" + (card.gain?.let { "  ($it)" } ?: ""), color = PhotoSoft, fontSize = 13.sp)
             }
         }
-        is ShareCard.Daily -> Unit
+        is ShareCard.Daily -> PhotoDay(card.asDay, accent)
+    }
+}
+
+/**
+ * A day or roast card on the user's photo. A roast shows its short version (written when the photo
+ * goes on) so it reads over the picture, with the numbers it talks about and the journey line.
+ */
+@Composable
+private fun PhotoDay(card: ShareCard.Daily, accent: Color) {
+    val tileBg = Color.White.copy(alpha = 0.14f)
+    val roast = card.shownRoast
+    val tiles = if (roast != null) card.roastTiles else card.tiles.take(4)
+    if (roast != null) {
+        Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Spacer(Modifier.height(8.dp))
+        BasicText(
+            text = card.shortRoast ?: ShareCards.photoRoast(roast),
+            style = TextStyle(color = Color.White, fontSize = 24.sp, lineHeight = 1.3.em, fontWeight = FontWeight.ExtraBold),
+            autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = 24.sp, stepSize = 0.5.sp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 190.dp)
+        )
+    } else {
+        Text("MY DAY", color = PhotoSoft, fontSize = 12.sp, letterSpacing = 2.sp)
+        if (card.streakDays > 0) BigNumber("${card.streakDays}", "day streak", accent) else BigNumber("Day 1", "", accent)
+        card.coachLine?.let {
+            Text(it, color = Color.White, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+    if (tiles.isNotEmpty()) {
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            tiles.forEach { stat ->
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(tileBg)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(shortLabel(stat.label), color = PhotoSoft, fontSize = 10.sp, letterSpacing = 1.sp, maxLines = 1)
+                    ValueWithUnit(stat.value, stat.unit, valueSize = 18.sp, unitSize = 11.sp)
+                }
+            }
+        }
+    }
+    card.shownJourney?.let {
+        Spacer(Modifier.height(10.dp))
+        Text(it, color = PhotoSoft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

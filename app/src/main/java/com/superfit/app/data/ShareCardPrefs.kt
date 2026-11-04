@@ -30,6 +30,13 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_SHOW_WEIGHT, false)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_WEIGHT, value).apply()
 
+    /** Fresh roasts from "Try another" used on [day] ("2026-11-04"). */
+    fun roastsAgain(day: String): Int = if (prefs.getString(KEY_AGAIN_DAY, null) == day) prefs.getInt(KEY_AGAIN_COUNT, 0) else 0
+
+    fun countRoastAgain(day: String) {
+        prefs.edit().putString(KEY_AGAIN_DAY, day).putInt(KEY_AGAIN_COUNT, roastsAgain(day) + 1).apply()
+    }
+
     fun savedLine(key: String): String? = lines().optString(key, "").takeIf { it.isNotBlank() }
 
     /** Keeps the newest [MAX_LINES] lines. */
@@ -51,6 +58,8 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         private const val KEY_CHIPS_PLAIN = "chips_plain"
         private const val KEY_SHOW_WEIGHT = "show_weight"
         private const val KEY_LINES = "ai_lines"
+        private const val KEY_AGAIN_DAY = "roast_again_day"
+        private const val KEY_AGAIN_COUNT = "roast_again_count"
         private const val OLD_LINE_PHOTO = "line_on_photo"
         private const val OLD_LINE_PLAIN = "line_on_plain"
         private const val MAX_LINES = 40
