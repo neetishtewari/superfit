@@ -61,7 +61,7 @@ Each step gets a security review before merge, on top of the release checklist's
 
 Step 3b (reviewed 4 Nov): the JSON reader only parses text the app already parsed (AI answers,
 its own saved data); no network, files or permissions. It has no recursion limit, like org.json, so
-a deeply nested AI answer could run out of stack; that would be caught like any bad answer today.
+an absurdly deeply nested AI answer could run out of stack, exactly as it could with org.json today.
 
 Step 3a (reviewed 4 Nov): code moved without changes, apart from one maths call swapped for its
 Kotlin version. No new permissions, network calls, secrets or libraries.
