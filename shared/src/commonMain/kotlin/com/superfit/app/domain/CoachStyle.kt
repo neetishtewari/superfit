@@ -75,7 +75,7 @@ enum class CoachStyle(val label: String, val blurb: String, private val voice: S
                 "Ghosted at $logged / $target kcal. Snacks don't log themselves.",
             "🔥 Plot hole in your log" to
                 "Cancelled mid-season at $logged / $target kcal. Finish the story."
-        )[Math.floorMod(day, 3)]
+        )[day.mod(3)]
     }
 
     /** Shown when the day's log is complete but the AI tip couldn't be written. */

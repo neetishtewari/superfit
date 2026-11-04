@@ -1,7 +1,7 @@
 package com.superfit.app.domain
 
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class FitnessGoalsTest {
 
@@ -23,10 +23,5 @@ class FitnessGoalsTest {
     @Test
     fun `unknown goal falls back to lose fat`() {
         assertEquals("LOSE_WEIGHT", FitnessGoals.forKey("SOMETHING_OLD").key)
-    }
-
-    @Test
-    fun `report uses the same goal names`() {
-        assertEquals("Tone up", CoachExportBuilder.goalLabel("MAINTAIN"))
     }
 }

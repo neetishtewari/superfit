@@ -22,6 +22,11 @@ tested on the dev app first.
 3. **Move the brains.** Move the Android-free logic (coaching patterns, Diet Quality, streaks,
    calories, recap, meal items) into `shared`. Replace `org.json` with kotlinx.serialization and
    `java.time` with kotlinx-datetime where needed. Existing unit tests move with the code.
+   Done in small pieces, each its own pull request:
+   - 3a: files that need nothing from Android or Java (number input, goals, photo framing, heart
+     zones, coach styles), with their tests.
+   - 3b: files that need `org.json` swapped for kotlinx.serialization.
+   - 3c: files that need `java.time` swapped for kotlinx-datetime, and the database entities they read.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
    iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
@@ -50,6 +55,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3a (reviewed 4 Nov): code moved without changes, apart from one maths call swapped for its
+Kotlin version. No new permissions, network calls, secrets or libraries.
 
 Steps 1-2 (reviewed 4 Nov): no new permissions, secrets or network calls. Cloud ids are random
 (`kotlin.uuid`, secure random) but aren't secrets; access still rests on `firestore.rules`, which only
