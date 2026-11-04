@@ -1,0 +1,68 @@
+# iPhone groundwork
+
+Approved by Neetish on 4 Nov 2026 ("lets start the groundwork"). Background: `notes/superfit-on-ios.md`
+and the growth review (https://claude.ai/artifact/CTtuwaPTo3AvjPygxjcwrs).
+
+The goal is to get the Android app ready to share most of its code with an iPhone app (Kotlin
+Multiplatform). Users don't notice anything. Each step ships in a normal Android release and is
+tested on the dev app first.
+
+## Steps
+
+1. **Cloud ids for entries** (this change). Every meal, workout and weight gets a `cloudId`, which
+   becomes its name in the cloud backup. New entries get a random id (`kotlin.uuid`, which also
+   works on iPhone). Existing entries keep their old number as their cloud id, so their backups
+   still match and nothing is uploaded again. A restore gives entries new local numbers and skips
+   any whose cloud id the phone already has. Two devices on one account no longer overwrite each
+   other's entries. Database version 8 to 9.
+2. **Shared module.** Add a `shared` Kotlin Multiplatform module next to `app` (Android and JVM
+   targets for now; JVM only runs the shared tests in CI). Kotlin goes from 2.0.21 to 2.2.21, which
+   the Android multiplatform library plugin needs. `CloudIds` is the first shared file. The app
+   builds and behaves exactly as before.
+3. **Move the brains.** Move the Android-free logic (coaching patterns, Diet Quality, streaks,
+   calories, recap, meal items) into `shared`. Replace `org.json` with kotlinx.serialization and
+   `java.time` with kotlinx-datetime where needed. Existing unit tests move with the code.
+4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
+5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
+   iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
+
+## Launch goal
+
+Neetish, 4 Nov 2026: the iPhone app launches at par with the Android app. Everything Android has at
+that point ships on iPhone too, including the home-screen widget, the recap video with music,
+workout share cards and the PDF report. Nothing is held back for a later version.
+
+## Not in scope
+
+- Live sync between two devices that are both in use. The backup still restores onto a new device;
+  this change only stops the two from overwriting each other.
+- Renaming the cloud documents of existing entries.
+
+## Testing for step 1
+
+- Migration test: databases from versions 1 to 3 upgrade to 9, and existing meals get their number as their cloud id.
+- DAO tests: a restore skips an entry already on the phone with the same cloud id, and adds another
+  device's entry even when both devices numbered it the same.
+- Dev app on the phone: log, edit and delete a meal, a workout and a weight. Each should appear, change
+  and disappear under its new id in Firestore (`users/{uid}/nutrition`, `workouts`, `weights`).
+- Sign out and back in on the dev app: history comes back once, with no duplicates.
+
+## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
+
+Each step gets a security review before merge, on top of the release checklist's security section.
+
+Steps 1-2 (reviewed 4 Nov): no new permissions, secrets or network calls. Cloud ids are random
+(`kotlin.uuid`, secure random) but aren't secrets; access still rests on `firestore.rules`, which only
+lets a signed-in user read and write `users/{their uid}`. New build plugins come from the official
+Gradle and Google repositories.
+
+For the iPhone app, before TestFlight:
+- App Check with App Attest (Apple's version of Play Integrity), enforced for AI Logic like Android.
+- The iPhone Firebase API key restricted to the iPhone bundle id in Google Cloud.
+- Sign-in tokens stay in the Keychain (Firebase does this by default); nothing personal in UserDefaults.
+- No AI or other secret keys in the app; AI goes through Firebase AI Logic as on Android.
+- App Transport Security left on (HTTPS only), no exceptions.
+- Apple Health data used only for the app's features, never for ads, and described honestly in the
+  App Store privacy answers and the Health permission text.
+- The widget and app share data through an App Group, readable only by Superfit.
+- Same Firestore rules for both apps; any rules change is reviewed and deployed once.

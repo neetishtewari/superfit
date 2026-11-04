@@ -29,6 +29,10 @@ jobs:
       - name: Unit tests
         run: ./gradlew --stacktrace testDebugUnitTest
 
+      # Code shared with the future iPhone app; its tests run on the JVM.
+      - name: Shared code tests
+        run: ./gradlew --stacktrace :shared:jvmTest
+
       - name: Build debug APK
         run: ./gradlew --stacktrace assembleDebug
 

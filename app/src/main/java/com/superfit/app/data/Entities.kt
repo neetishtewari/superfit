@@ -1,6 +1,7 @@
 package com.superfit.app.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "user_profile")
@@ -20,9 +21,11 @@ data class UserProfileEntity(
     val fitnessLevel: String = "INTERMEDIATE"
 )
 
-@Entity(tableName = "weight_entries")
+@Entity(tableName = "weight_entries", indices = [Index(value = ["cloudId"], unique = true)])
 data class WeightEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    // The entry's name in the cloud backup, the same on every phone and never reused (see CloudIds).
+    val cloudId: String = CloudIds.newId(),
     val weightKg: Double,
     val timestamp: Long,
     val note: String = ""
@@ -65,9 +68,11 @@ data class SleepTelemetryEntity(
     val readinessScore: Int
 )
 
-@Entity(tableName = "nutrition_entries")
+@Entity(tableName = "nutrition_entries", indices = [Index(value = ["cloudId"], unique = true)])
 data class NutritionEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    // The entry's name in the cloud backup, the same on every phone and never reused (see CloudIds).
+    val cloudId: String = CloudIds.newId(),
     val foodText: String,
     val calories: Double,
     val proteinG: Double,
@@ -81,9 +86,11 @@ data class NutritionEntryEntity(
     val items: String? = null
 )
 
-@Entity(tableName = "workout_entries")
+@Entity(tableName = "workout_entries", indices = [Index(value = ["cloudId"], unique = true)])
 data class WorkoutEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    // The entry's name in the cloud backup, the same on every phone and never reused (see CloudIds).
+    val cloudId: String = CloudIds.newId(),
     val description: String,
     val caloriesBurned: Double,
     val workoutType: String, // "Cardio" or "Strength"

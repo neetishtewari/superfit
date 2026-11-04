@@ -114,6 +114,9 @@ kapt {
 }
 
 dependencies {
+  // Code shared with the future iPhone app (see docs/superpowers/specs/2026-11-04-iphone-groundwork.md)
+  implementation(project(":shared"))
+
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
   androidTestImplementation(composeBom)
