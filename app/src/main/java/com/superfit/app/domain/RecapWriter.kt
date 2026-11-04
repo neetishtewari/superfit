@@ -1,10 +1,10 @@
 package com.superfit.app.domain
 
+import com.superfit.app.json.JSONObject
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import org.json.JSONObject
 
 /** The words on one recap card: a short title above the big number and a line under it. */
 data class RecapWords(val title: String, val line: String)

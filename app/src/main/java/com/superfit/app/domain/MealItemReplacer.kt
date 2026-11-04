@@ -1,8 +1,8 @@
 package com.superfit.app.domain
 
-import org.json.JSONArray
-import org.json.JSONObject
-import org.json.JSONTokener
+import com.superfit.app.json.JSONArray
+import com.superfit.app.json.JSONObject
+import com.superfit.app.json.JSONTokener
 
 /** Asks the AI for the numbers of one food the user says an item really was. */
 class MealItemReplacer {

@@ -2,14 +2,14 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.json.JSONArray
+import com.superfit.app.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * How long a note matters. LASTING stays until the user removes it (vegetarian on Tuesdays, a

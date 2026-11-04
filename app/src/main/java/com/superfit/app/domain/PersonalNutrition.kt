@@ -1,8 +1,8 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.json.JSONObject
 import kotlin.math.roundToInt
-import org.json.JSONObject
 
 /**
  * Numbers the user's own nutritionist gave, which they confirmed in Settings. Each one that is set

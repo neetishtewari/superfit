@@ -25,7 +25,10 @@ tested on the dev app first.
    Done in small pieces, each its own pull request:
    - 3a: files that need nothing from Android or Java (number input, goals, photo framing, heart
      zones, coach styles), with their tests.
-   - 3b: files that need `org.json` swapped for kotlinx.serialization.
+   - 3b: a small shared JSON reader (`com.superfit.app.json`) that copies the parts of Android's
+     `org.json` the app uses, with the same forgiving rules, so the AI's answers and saved data read
+     exactly as before. The app's logic files switch to it; the files themselves move in 3c. It needs
+     no new library.
    - 3c: files that need `java.time` swapped for kotlinx-datetime, and the database entities they read.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -55,6 +58,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3b (reviewed 4 Nov): the JSON reader only parses text the app already parsed (AI answers,
+its own saved data); no network, files or permissions. It has no recursion limit, like org.json, so
+a deeply nested AI answer could run out of stack; that would be caught like any bad answer today.
 
 Step 3a (reviewed 4 Nov): code moved without changes, apart from one maths call swapped for its
 Kotlin version. No new permissions, network calls, secrets or libraries.

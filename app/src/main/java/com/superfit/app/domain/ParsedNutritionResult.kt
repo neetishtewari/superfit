@@ -1,6 +1,6 @@
 package com.superfit.app.domain
 
-import org.json.JSONObject
+import com.superfit.app.json.JSONObject
 
 data class ParsedNutritionResult(
     val foodText: String,

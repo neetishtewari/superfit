@@ -1,7 +1,7 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import org.json.JSONObject
+import com.superfit.app.json.JSONObject
 
 class NutritionParser {
 

@@ -1,7 +1,7 @@
 package com.superfit.app.domain
 
 import android.graphics.Bitmap
-import org.json.JSONObject
+import com.superfit.app.json.JSONObject
 
 /** Sends a meal photo or a nutrition-label photo to Gemini. The photo is never stored. */
 class FoodPhotoParser {
