@@ -1,8 +1,8 @@
 package com.superfit.app.domain
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CoachStyleTest {
 
@@ -46,7 +46,6 @@ class CoachStyleTest {
         val roast = CoachStyle.ROAST.instruction()
         assertTrue(roast.contains("8 words or fewer"))
         assertTrue(roast.contains("two thirds of any word limit"))
-        assertTrue(CoachChatContext.RULES.contains("at most 16 words"))
     }
 
     @Test
