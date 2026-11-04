@@ -15,14 +15,22 @@ tested on the dev app first.
    still match and nothing is uploaded again. A restore gives entries new local numbers and skips
    any whose cloud id the phone already has. Two devices on one account no longer overwrite each
    other's entries. Database version 8 to 9.
-2. **Shared module.** Add a `shared` Kotlin Multiplatform module next to `app`, Android target only
-   at first. The app builds and behaves exactly as before.
+2. **Shared module.** Add a `shared` Kotlin Multiplatform module next to `app` (Android and JVM
+   targets for now; JVM only runs the shared tests in CI). Kotlin goes from 2.0.21 to 2.2.21, which
+   the Android multiplatform library plugin needs. `CloudIds` is the first shared file. The app
+   builds and behaves exactly as before.
 3. **Move the brains.** Move the Android-free logic (coaching patterns, Diet Quality, streaks,
    calories, recap, meal items) into `shared`. Replace `org.json` with kotlinx.serialization and
    `java.time` with kotlinx-datetime where needed. Existing unit tests move with the code.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
    iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
+
+## Launch goal
+
+Neetish, 4 Nov 2026: the iPhone app launches at par with the Android app. Everything Android has at
+that point ships on iPhone too, including the home-screen widget, the recap video with music,
+workout share cards and the PDF report. Nothing is held back for a later version.
 
 ## Not in scope
 

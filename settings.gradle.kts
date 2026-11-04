@@ -31,3 +31,4 @@ plugins {
 
 rootProject.name = "Superfit"
 include(":app")
+include(":shared")
