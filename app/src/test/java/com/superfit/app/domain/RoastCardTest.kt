@@ -70,4 +70,19 @@ class RoastCardTest {
         assertTrue(short.length <= RoastCard.PHOTO_MAX_CHARS)
         assertTrue(short.startsWith("You logged three breakfasts"))
     }
+
+    @Test
+    fun theAiPickIsReadSafely() {
+        assertEquals(listOf("DIET QUALITY", "PROTEIN"), RoastCard.parsePick("Diet Quality, PROTEIN, steps", pool))
+        assertEquals(emptyList<String>(), RoastCard.parsePick("NONE", pool))
+        assertNull(RoastCard.parsePick("I think the snacks", pool))
+        assertNull(RoastCard.parsePick(null, pool))
+    }
+
+    @Test
+    fun theAiPickWinsOverWordMatching() {
+        val day = ShareCard.Daily("Tue 4 Nov", 3, listOf(protein, diet), "Three samosas before noon.", roast = true, pool = pool)
+        assertTrue(day.roastTiles.isEmpty())
+        assertEquals(listOf(diet, protein), day.copy(picked = listOf("DIET QUALITY", "PROTEIN")).roastTiles)
+    }
 }

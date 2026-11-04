@@ -197,6 +197,12 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     var roastText by remember(card) { mutableStateOf((card as? ShareCard.Daily)?.coachLine) }
     var shortRoast by remember(roastText) { mutableStateOf<String?>(null) }
     var dayJourney by remember(card) { mutableStateOf<String?>(null) }
+    var picked by remember(roastText) { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(roastText) {
+        val text = roastText ?: return@LaunchedEffect
+        if (roastCard == null) return@LaunchedEffect
+        picked = withContext(Dispatchers.IO) { RoastCardData.pick(context, text, roastCard.pool) }
+    }
     var againLeft by remember(card) { mutableStateOf(0) }
     var againBusy by remember(card) { mutableStateOf(false) }
     LaunchedEffect(card) {
@@ -212,7 +218,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
         shortRoast = withContext(Dispatchers.IO) { RoastCardData.short(context, text, roastCard.pool) }
     }
     val shown = activityBase?.copy(chips = chips, coachLine = coachLine, roastLine = roastLine)
-        ?: roastCard?.copy(coachLine = roastText, chips = dayChips, journey = dayJourney, shortRoast = shortRoast)
+        ?: roastCard?.copy(coachLine = roastText, chips = dayChips, journey = dayJourney, shortRoast = shortRoast, picked = picked)
         ?: base
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -387,7 +393,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                         }
                     }
                     val roastShown = shown as? ShareCard.Daily
-                    if (roastShown?.shownRoast != null && DayChip.NUMBERS in dayChips && roastShown.roastTiles.isEmpty()) {
+                    if (picked != null && roastShown?.shownRoast != null && DayChip.NUMBERS in dayChips && roastShown.roastTiles.isEmpty()) {
                         Text(
                             "This roast doesn't talk about any of today's numbers, so none are shown.",
                             color = SuperfitTheme.colors.textSecondary,

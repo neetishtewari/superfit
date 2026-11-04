@@ -92,6 +92,27 @@ object RoastCard {
         - No hashtags, no emojis, no quotes. Plain text only, no markdown.
     """
 
+    const val PICK_SYSTEM = """
+        A roast of the user's day is going on a share card with up to 2 of today's numbers under it.
+        Pick the numbers the roast's joke is about, so they back it up. Food or meals in the roast
+        (any dish, snack, sweet or drink) relate to PROTEIN and DIET QUALITY; sleeping in or staying up
+        to SLEEP; sitting, walking or not moving to STEPS; exercise to WORKOUT.
+        Reply with the labels only, most relevant first, separated by commas, exactly as written in the list.
+        Reply NONE when the roast is about nothing on the list.
+    """
+
+    fun pickPrompt(roast: String, pool: List<CardStat>): String =
+        "Roast:\n$roast\n\nToday's numbers:\n" + pool.joinToString("\n") { "${it.label}: ${it.value}${it.unit?.let { u -> " $u" }.orEmpty()}" }
+
+    /** The labels from the AI's answer that are on [pool], at most [MAX_TILES]; empty for NONE; null for an answer that can't be read. */
+    fun parsePick(raw: String?, pool: List<CardStat>): List<String>? {
+        val text = raw?.trim()?.uppercase() ?: return null
+        if (text.startsWith("NONE")) return emptyList()
+        val labels = pool.map { it.label }
+        val found = text.split(',', '\n').map { it.trim().trim('.', '*', '"', '-', ' ') }.filter { it in labels }.distinct()
+        return found.take(MAX_TILES).ifEmpty { null }
+    }
+
     fun shortPrompt(roast: String, facts: String): String = "Roast:\n$roast\n\nFacts:\n$facts"
 
     fun againPrompt(roast: String, facts: String): String = "Last roast:\n$roast\n\nFacts about today:\n$facts"

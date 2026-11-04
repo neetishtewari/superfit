@@ -28,6 +28,28 @@ object RoastCardData {
         return line
     }
 
+    /**
+     * Which of the day's numbers the roast is about, asked of the AI because a roast names real foods
+     * ("three samosas") that no word list can catch. Kept per roast; null when the AI can't be reached.
+     */
+    suspend fun pick(context: Context, roast: String, pool: List<CardStat>): List<String>? {
+        if (pool.isEmpty()) return emptyList()
+        val prefs = ShareCardPrefs.of(context.applicationContext)
+        val key = "pick|" + (roast + pool.joinToString { it.label }).hashCode()
+        prefs.savedLine(key)?.let { saved -> return if (saved == "NONE") emptyList() else saved.split(',') }
+        val raw = try {
+            GeminiClient.generateContent(prompt = RoastCard.pickPrompt(roast, pool), systemInstructionText = RoastCard.PICK_SYSTEM.trimIndent(), isJson = false)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Picking the roast's numbers failed", e)
+            return null
+        }
+        val picked = RoastCard.parsePick(raw, pool) ?: return null
+        prefs.saveLine(key, picked.joinToString(",").ifEmpty { "NONE" })
+        return picked
+    }
+
     /** How many fresh roasts are left today. */
     fun againLeft(context: Context): Int =
         (RoastCard.AGAIN_PER_DAY - ShareCardPrefs.of(context.applicationContext).roastsAgain(LocalDate.now().toString())).coerceAtLeast(0)

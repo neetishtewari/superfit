@@ -39,7 +39,9 @@ sealed interface ShareCard {
         /** "Day 34 of my journey", when a goal is set. */
         val journey: String? = null,
         /** A short version of a long roast, for a photo card; null until written. */
-        val shortRoast: String? = null
+        val shortRoast: String? = null,
+        /** The numbers the AI says the roast is about, by label; null until it answers (word matching till then). */
+        val picked: List<String>? = null
     ) : ShareCard {
         /** The roast, when this is a roast card and the Roast chip is on. */
         val shownRoast: String? get() = coachLine?.takeIf { roast && DayChip.ROAST in chips && it.isNotBlank() }
@@ -48,7 +50,11 @@ sealed interface ShareCard {
         val asDay: Daily get() = if (roast && shownRoast == null) copy(roast = false, coachLine = null) else this
 
         /** The numbers under a roast: only the ones it talks about, and only when Numbers is on. */
-        val roastTiles: List<CardStat> get() = if (DayChip.NUMBERS in chips) RoastCard.matching(shownRoast, pool) else emptyList()
+        val roastTiles: List<CardStat> get() = when {
+            DayChip.NUMBERS !in chips || shownRoast == null -> emptyList()
+            picked != null -> picked.mapNotNull { label -> pool.firstOrNull { it.label == label } }.take(RoastCard.MAX_TILES)
+            else -> RoastCard.matching(shownRoast, pool)
+        }
 
         val shownJourney: String? get() = journey?.takeIf { roast && DayChip.JOURNEY in chips }
     }
