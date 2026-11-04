@@ -37,8 +37,9 @@ class EntryDaoTest {
         db.close()
     }
 
-    private fun meal(id: Long, text: String, timestamp: Long) = NutritionEntryEntity(
+    private fun meal(id: Long, text: String, timestamp: Long, cloudId: String = CloudIds.newId()) = NutritionEntryEntity(
         id = id,
+        cloudId = cloudId,
         foodText = text,
         calories = 100.0,
         proteinG = 1.0,
@@ -66,9 +67,33 @@ class EntryDaoTest {
     }
 
     @Test
+    fun restoreSkipsEntriesAlreadyOnThePhoneByCloudId() = runBlocking {
+        db.nutritionDao().insertEntry(meal(0, "eggs", 1, cloudId = "abc"))
+        // The cloud copy comes back with a new local number but the same cloud id.
+        db.nutritionDao().insertEntriesIfMissing(listOf(meal(0, "eggs from the cloud", 1, cloudId = "abc")))
+        assertEquals(listOf("eggs"), db.nutritionDao().getAllEntries().map { it.foodText })
+    }
+
+    @Test
+    fun restoreAddsAnotherDevicesEntryEvenWithTheSameLocalNumber() = runBlocking {
+        val localId = db.nutritionDao().insertEntry(meal(0, "eggs", 1))
+        // Another phone also called its meal number 1, but its cloud id is different.
+        db.nutritionDao().insertEntriesIfMissing(listOf(meal(0, "poha", 2, cloudId = "other-phone")))
+        val all = db.nutritionDao().getAllEntries().sortedBy { it.timestamp }
+        assertEquals(listOf("eggs", "poha"), all.map { it.foodText })
+        assertNotEquals(localId, all.last().id)
+    }
+
+    @Test
+    fun newEntriesGetDistinctCloudIds() {
+        assertNotEquals(meal(0, "eggs", 1).cloudId, meal(0, "eggs", 1).cloudId)
+    }
+
+    @Test
     fun editingAMealReplacesItsTotalsAndItems() = runBlocking {
         val id = db.nutritionDao().insertEntry(meal(0, "2 roti", 1))
-        val edited = meal(id, "3 roti", 1).copy(calories = 360.0, items = "{\"v\":1}")
+        val edited = db.nutritionDao().getAllEntries().single()
+            .copy(foodText = "3 roti", calories = 360.0, items = "{\"v\":1}")
         db.nutritionDao().updateEntry(edited)
         val all = db.nutritionDao().getAllEntries()
         assertEquals(1, all.size)

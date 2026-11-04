@@ -86,7 +86,7 @@ class SuperfitDatabaseMigrationTest {
         try {
             // Opening the database runs the migrations and Room's schema validation.
             val db = database.openHelper.writableDatabase
-            assertEquals(8, db.version)
+            assertEquals(9, db.version)
 
             db.query("SELECT weightKg, startingWeightKg, fitnessLevel FROM user_profile WHERE id = 0").use { cursor ->
                 assertEquals(1, cursor.count)
@@ -98,6 +98,11 @@ class SuperfitDatabaseMigrationTest {
             db.query("SELECT COUNT(*) FROM nutrition_entries").use { cursor ->
                 cursor.moveToFirst()
                 assertEquals(1, cursor.getInt(0))
+            }
+            // Existing meals keep their number as their cloud id, the name their backup already has.
+            db.query("SELECT id, cloudId FROM nutrition_entries").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(cursor.getLong(0).toString(), cursor.getString(1))
             }
             // Meals logged before quality tags existed have none until the AI tags them.
             db.query("SELECT qualityTags FROM nutrition_entries").use { cursor ->

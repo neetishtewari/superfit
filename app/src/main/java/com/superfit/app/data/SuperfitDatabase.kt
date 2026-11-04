@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         HabitEntryEntity::class,
         ImportedWorkoutEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class SuperfitDatabase : RoomDatabase() {
@@ -152,6 +152,19 @@ abstract class SuperfitDatabase : RoomDatabase() {
             }
         }
 
+        // A cloud id for every meal, workout and weight, so two devices on one account never
+        // overwrite each other's backups. Existing entries keep their number as their cloud id,
+        // because that is the name their backup already has.
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (table in listOf("nutrition_entries", "workout_entries", "weight_entries")) {
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `cloudId` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("UPDATE `$table` SET `cloudId` = CAST(`id` AS TEXT)")
+                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_${table}_cloudId` ON `$table` (`cloudId`)")
+                }
+            }
+        }
+
         val ALL_MIGRATIONS: Array<Migration> = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -161,7 +174,8 @@ abstract class SuperfitDatabase : RoomDatabase() {
             MIGRATION_2_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
-            MIGRATION_7_8
+            MIGRATION_7_8,
+            MIGRATION_8_9
         )
 
         fun getDatabase(context: Context): SuperfitDatabase {
