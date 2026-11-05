@@ -207,10 +207,11 @@ fun GoalProgressCard(
             }
 
             // Pace Indicator if available
-            if (metrics.weeklyPaceKg != null) {
+            val weeklyPaceKg = metrics.weeklyPaceKg
+            if (weeklyPaceKg != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                val paceStr = String.format("%.2f", metrics.weeklyPaceKg)
-                val paceLabel = if (metrics.weeklyPaceKg < 0) "$paceStr kg/week" else "+$paceStr kg/week"
+                val paceStr = String.format("%.2f", weeklyPaceKg)
+                val paceLabel = if (weeklyPaceKg < 0) "$paceStr kg/week" else "+$paceStr kg/week"
                 Text(
                     text = "Current pace: $paceLabel",
                     fontSize = 12.sp,

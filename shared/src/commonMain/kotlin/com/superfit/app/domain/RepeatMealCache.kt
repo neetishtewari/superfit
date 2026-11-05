@@ -1,7 +1,7 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.util.Locale
+import kotlin.math.roundToLong
 
 object RepeatMealCache {
 
@@ -30,7 +30,7 @@ object RepeatMealCache {
      */
     fun normalize(text: String): String {
         return text.trim()
-            .lowercase(Locale.ROOT)
+            .lowercase()
             .map { c -> if (c in '०'..'९') '0' + (c - '०') else c }
             .joinToString("")
             .replace(Regex("[^\\p{L}\\p{M}\\p{Nd}\\s]"), " ")
@@ -162,6 +162,6 @@ object RepeatMealCache {
     }
 
     private fun roundOneDecimal(value: Double): Double {
-        return Math.round(value * 10.0) / 10.0
+        return (value * 10.0).roundToLong() / 10.0
     }
 }

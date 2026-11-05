@@ -2,7 +2,6 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.json.JSONObject
-import java.util.Locale
 
 /**
  * What kind of food a logged meal is, judged by the AI when the meal is logged. Diet Quality and
@@ -60,8 +59,8 @@ data class MealTags(
         "p=$processing",
         "fr=${if (fried) 1 else 0}",
         "sg=${if (addedSugar) 1 else 0}",
-        "vf=${String.format(Locale.US, "%.1f", vegFruitServings)}",
-        "fb=${String.format(Locale.US, "%.1f", fiberG)}",
+        "vf=${Decimals.one(vegFruitServings)}",
+        "fb=${Decimals.one(fiberG)}",
         "tr=${if (treat) 1 else 0}",
         "ty=${clean(foodType, 30)}"
     ).plus(
@@ -72,7 +71,7 @@ data class MealTags(
             swap?.let { "sv=${it.kcalSaved}" },
             swap?.let { "sb=${clean(it.benefit, 80)}" },
             rating?.let { "r=$it" },
-            if (fruitServings > 0) "fs=${String.format(Locale.US, "%.1f", fruitServings)}" else null,
+            if (fruitServings > 0) "fs=${Decimals.one(fruitServings)}" else null,
             if (vegKinds > 0) "vk=$vegKinds" else null,
             adviceVersion?.let { "av=${clean(it, 8)}" },
             verdict?.let { "vd=${clean(it, 10)}" },
