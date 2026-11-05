@@ -1,6 +1,6 @@
 package com.superfit.app.domain
 
-import org.json.JSONObject
+import com.superfit.app.json.JSONObject
 
 /** What the user said, split into the part about food and the part about exercise. "" when absent. */
 data class RoutedLog(val food: String, val exercise: String) {

@@ -1,12 +1,13 @@
 package com.superfit.app.domain
 
-import org.json.JSONObject
+import com.superfit.app.json.JSONArray
+import com.superfit.app.json.JSONObject
 
 /** The weekly note at the top of Diet Quality: one thing going well and at most two to change. */
 data class DietNote(val good: String, val fixes: List<String>) {
     fun encode(): String = JSONObject().apply {
         put("good", good)
-        put("fixes", org.json.JSONArray(fixes))
+        put("fixes", JSONArray(fixes))
     }.toString()
 
     companion object {

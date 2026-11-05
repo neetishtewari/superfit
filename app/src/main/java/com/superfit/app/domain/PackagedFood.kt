@@ -1,6 +1,6 @@
 package com.superfit.app.domain
 
-import org.json.JSONObject
+import com.superfit.app.json.JSONObject
 
 data class Nutrients(val kcal: Double, val protein: Double, val carbs: Double, val fat: Double, val fiber: Double) {
     fun times(f: Double): Nutrients = Nutrients(kcal * f, protein * f, carbs * f, fat * f, fiber * f)

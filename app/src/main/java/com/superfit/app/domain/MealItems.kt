@@ -1,11 +1,11 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.json.JSONArray
+import com.superfit.app.json.JSONObject
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToLong
-import org.json.JSONArray
-import org.json.JSONObject
 
 /** How much oil or sugar went in compared with the AI's estimate. */
 enum class Level(val factor: Double) { LOW(0.5), NORMAL(1.0), HIGH(1.5) }

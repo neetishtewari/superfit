@@ -1,12 +1,12 @@
 package com.superfit.app.domain
 
+import com.superfit.app.json.JSONArray
+import com.superfit.app.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * One message in the coach chat. Saved on the phone and backed up with the user's account, so

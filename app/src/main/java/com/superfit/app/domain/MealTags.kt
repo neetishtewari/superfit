@@ -1,8 +1,8 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.json.JSONObject
 import java.util.Locale
-import org.json.JSONObject
 
 /**
  * What kind of food a logged meal is, judged by the AI when the meal is logged. Diet Quality and
