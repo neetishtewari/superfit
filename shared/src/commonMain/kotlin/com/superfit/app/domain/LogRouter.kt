@@ -41,7 +41,7 @@ class LogRouter {
     suspend fun route(input: String): RoutedLog = route(SpokenInput(input))
 
     suspend fun route(input: SpokenInput): RoutedLog = parse(
-        GeminiClient.generateContent(
+        Ai.generate(
             prompt = prompt(input),
             systemInstructionText = SYSTEM_INSTRUCTION,
             isJson = true

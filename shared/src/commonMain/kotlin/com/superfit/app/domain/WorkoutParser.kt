@@ -21,7 +21,7 @@ class WorkoutParser {
             throw IllegalArgumentException("Workout input cannot be empty")
         }
 
-        val jsonText = GeminiClient.generateContent(
+        val jsonText = Ai.generate(
             prompt = "Workout input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true

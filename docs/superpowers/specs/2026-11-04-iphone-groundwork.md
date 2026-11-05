@@ -66,7 +66,12 @@ tested on the dev app first.
      nobody's finished recap is rewritten.
    - 3n: the "Share my report" numbers (averages, weigh-ins, day-by-day meals and workouts) move
      to `shared`. The PDF drawing itself stays Android-only for now; the iPhone draws its own.
-   - 3o onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3o: reading meals and workouts, deciding meal vs workout, meal tagging, changing one meal
+     item and the nutritionist's note move to `shared`. They ask the AI through a small shared
+     `Ai` interface; Android plugs in its Firebase AI Logic client (GeminiClient) at start-up, the
+     iPhone app will plug in Firebase's iPhone SDK. Photo reading, coach chat and the model
+     failover stay in the app for now.
+   - 3p onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -96,6 +101,11 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3o (reviewed 6 Nov): prompts and answer reading moved without changes. The AI is still
+reached only through Firebase AI Logic with App Check, the same models and the same retries; the
+new interface only passes text in and out. No keys or secrets in shared code, no new libraries,
+permissions or network calls. Logging from shared code goes to Logcat as before.
 
 Step 3n (reviewed 6 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets. The report is still built on the phone and only leaves it when the user

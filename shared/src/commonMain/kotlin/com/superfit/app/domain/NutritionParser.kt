@@ -5,7 +5,7 @@ import com.superfit.app.json.JSONObject
 
 class NutritionParser {
 
-    internal val systemInstructionText =
+    val systemInstructionText =
         "You are an expert clinical nutrition AI. Parse the user's natural language meal description and estimate " +
             "the total calories (kcal), protein (grams), carbohydrates (grams), and fats (grams).\n" +
             "You must return a raw JSON object with the following fields and types:\n" +
@@ -50,12 +50,12 @@ class NutritionParser {
         // Newest first, so a meal the user corrected wins over older logs of the same words.
         val cached = RepeatMealCache.findRepeatMeal(input, history.sortedByDescending { it.timestamp })
         if (cached != null) {
-            android.util.Log.d("NutritionParser", "Instant local repeat cache hit for '$input' -> ${cached.foodText} (${cached.calories} kcal)")
+            AppLog.d("NutritionParser", "Instant local repeat cache hit for '$input' -> ${cached.foodText} (${cached.calories} kcal)")
             return cached
         }
 
         // 2. Cascade across Gemini models (2.5-flash -> 2.0-flash -> 1.5-flash)
-        val jsonText = GeminiClient.generateContent(
+        val jsonText = Ai.generate(
             prompt = PersonalNutrition.promptContext() + spokenNote(spoken) + "Meal input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true
@@ -76,7 +76,7 @@ class NutritionParser {
          * Tells the AI the meal was spoken. A food that sounds like a misheard word goes in as the
          * item with the sound-alike as an alternative, so the person sees an "Is it…?" choice.
          */
-        internal fun spokenNote(spoken: SpokenInput?): String {
+        fun spokenNote(spoken: SpokenInput?): String {
             if (spoken == null) return ""
             return buildString {
                 append(

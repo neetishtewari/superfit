@@ -13,7 +13,7 @@ class MealItemReplacer {
      */
     suspend fun replace(item: MealItem, newName: String, rest: List<MealItem>): List<MealItem> {
         val others = rest.joinToString(", ") { it.label() }.ifEmpty { "nothing else" }
-        val response = GeminiClient.generateContent(
+        val response = Ai.generate(
             prompt = PersonalNutrition.promptContext() +
                 "The user is correcting one food in a meal. If they don't say an amount, it is " +
                 "${item.qty} ${item.unit}. The rest of the meal ($others) is already logged; don't include it.\n" +
@@ -22,7 +22,7 @@ class MealItemReplacer {
             isJson = true
         )
         return parse(response, item) ?: run {
-            android.util.Log.w("MealItemReplacer", "Unreadable answer for '$newName': ${response.take(500)}")
+            AppLog.w("MealItemReplacer", "Unreadable answer for '$newName': ${response.take(500)}")
             throw UnreadableAnswer()
         }
     }
