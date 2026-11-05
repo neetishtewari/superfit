@@ -41,7 +41,11 @@ tested on the dev app first.
      moves to `shared`. Scale readings now carry their time as milliseconds; the app converts Health
      Connect times at the edge. Saved readings already stored milliseconds, so nothing on the phone
      changes.
-   - 3g onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3g: workout merging (one workout from several apps' copies) and workout display (names, pace,
+     exercise calories) move to `shared`. Health Connect's exercise type numbers are copied into
+     `ExerciseTypes`, with an app test that checks every one against the Health Connect library;
+     on iPhone, HealthKit types will map onto the same numbers.
+   - 3h onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -71,6 +75,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3g (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
+network calls or secrets.
 
 Step 3f (reviewed 5 Nov): code moved without behaviour changes; the saved scale readings keep
 the same format. No new libraries, permissions, network calls or secrets. Body data still stays on

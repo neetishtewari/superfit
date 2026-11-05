@@ -1,7 +1,6 @@
 package com.superfit.app.domain
 
-import androidx.health.connect.client.records.ExerciseSessionRecord as E
-import java.util.Locale
+import com.superfit.app.domain.ExerciseTypes as E
 import kotlin.math.roundToLong
 
 /** An imported workout ready to show: names, pace and exercise calories worked out. */
@@ -21,15 +20,15 @@ data class WorkoutView(
     /** "8.66 km · 52 min · 6:00 /km · 148 bpm" with whatever the app shared. */
     val detailLine: String
         get() = listOfNotNull(
-            distanceKm?.let { String.format(Locale.US, "%.2f km", it) },
+            distanceKm?.let { "${Decimals.fixed(it, 2)} km" },
             "$minutes min",
-            paceSecondsPerKm?.let { "%d:%02d /km".format(Locale.US, it / 60, it % 60) },
-            speedKmh?.let { String.format(Locale.US, "%.1f km/h", it) },
+            paceSecondsPerKm?.let { "${it / 60}:${(it % 60).toString().padStart(2, '0')} /km" },
+            speedKmh?.let { "${Decimals.one(it)} km/h" },
             avgHeartRate?.let { "$it bpm" }
         ).joinToString(" · ")
 
     /** Lower-case name for sentences, e.g. "from your run". */
-    val noun: String get() = title.lowercase(Locale.getDefault())
+    val noun: String get() = title.lowercase()
 }
 
 object WorkoutDisplay {
@@ -55,49 +54,49 @@ object WorkoutDisplay {
 
     /** Names for Health Connect's own exercise types; anything else is a "Workout". */
     fun title(type: Int): String = when (type) {
-        E.EXERCISE_TYPE_RUNNING, E.EXERCISE_TYPE_RUNNING_TREADMILL -> "Run"
-        E.EXERCISE_TYPE_WALKING -> "Walk"
-        E.EXERCISE_TYPE_HIKING -> "Hike"
-        E.EXERCISE_TYPE_BIKING, E.EXERCISE_TYPE_BIKING_STATIONARY -> "Ride"
-        E.EXERCISE_TYPE_SWIMMING_POOL, E.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> "Swim"
-        E.EXERCISE_TYPE_STRENGTH_TRAINING, E.EXERCISE_TYPE_WEIGHTLIFTING -> "Strength workout"
-        E.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> "HIIT"
-        E.EXERCISE_TYPE_YOGA -> "Yoga"
-        E.EXERCISE_TYPE_PILATES -> "Pilates"
-        E.EXERCISE_TYPE_ELLIPTICAL -> "Elliptical"
-        E.EXERCISE_TYPE_ROWING, E.EXERCISE_TYPE_ROWING_MACHINE -> "Row"
-        E.EXERCISE_TYPE_STAIR_CLIMBING, E.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE -> "Stair climb"
-        E.EXERCISE_TYPE_DANCING -> "Dance"
-        E.EXERCISE_TYPE_BADMINTON -> "Badminton"
-        E.EXERCISE_TYPE_TENNIS -> "Tennis"
-        E.EXERCISE_TYPE_CRICKET -> "Cricket"
-        E.EXERCISE_TYPE_SOCCER -> "Football"
-        E.EXERCISE_TYPE_BASKETBALL -> "Basketball"
-        E.EXERCISE_TYPE_BOXING -> "Boxing"
-        E.EXERCISE_TYPE_MARTIAL_ARTS -> "Martial arts"
-        E.EXERCISE_TYPE_CALISTHENICS -> "Calisthenics"
-        E.EXERCISE_TYPE_STRETCHING -> "Stretching"
-        E.EXERCISE_TYPE_EXERCISE_CLASS -> "Exercise class"
-        E.EXERCISE_TYPE_BOOT_CAMP -> "Boot camp"
-        E.EXERCISE_TYPE_GYMNASTICS -> "Gymnastics"
-        E.EXERCISE_TYPE_SQUASH -> "Squash"
-        E.EXERCISE_TYPE_TABLE_TENNIS -> "Table tennis"
-        E.EXERCISE_TYPE_VOLLEYBALL -> "Volleyball"
-        E.EXERCISE_TYPE_SURFING -> "Surfing"
-        E.EXERCISE_TYPE_PADDLING -> "Paddling"
-        E.EXERCISE_TYPE_SKIING -> "Skiing"
-        E.EXERCISE_TYPE_ROCK_CLIMBING -> "Climbing"
-        E.EXERCISE_TYPE_GOLF -> "Golf"
+        E.RUNNING, E.RUNNING_TREADMILL -> "Run"
+        E.WALKING -> "Walk"
+        E.HIKING -> "Hike"
+        E.BIKING, E.BIKING_STATIONARY -> "Ride"
+        E.SWIMMING_POOL, E.SWIMMING_OPEN_WATER -> "Swim"
+        E.STRENGTH_TRAINING, E.WEIGHTLIFTING -> "Strength workout"
+        E.HIGH_INTENSITY_INTERVAL_TRAINING -> "HIIT"
+        E.YOGA -> "Yoga"
+        E.PILATES -> "Pilates"
+        E.ELLIPTICAL -> "Elliptical"
+        E.ROWING, E.ROWING_MACHINE -> "Row"
+        E.STAIR_CLIMBING, E.STAIR_CLIMBING_MACHINE -> "Stair climb"
+        E.DANCING -> "Dance"
+        E.BADMINTON -> "Badminton"
+        E.TENNIS -> "Tennis"
+        E.CRICKET -> "Cricket"
+        E.SOCCER -> "Football"
+        E.BASKETBALL -> "Basketball"
+        E.BOXING -> "Boxing"
+        E.MARTIAL_ARTS -> "Martial arts"
+        E.CALISTHENICS -> "Calisthenics"
+        E.STRETCHING -> "Stretching"
+        E.EXERCISE_CLASS -> "Exercise class"
+        E.BOOT_CAMP -> "Boot camp"
+        E.GYMNASTICS -> "Gymnastics"
+        E.SQUASH -> "Squash"
+        E.TABLE_TENNIS -> "Table tennis"
+        E.VOLLEYBALL -> "Volleyball"
+        E.SURFING -> "Surfing"
+        E.PADDLING -> "Paddling"
+        E.SKIING -> "Skiing"
+        E.ROCK_CLIMBING -> "Climbing"
+        E.GOLF -> "Golf"
         else -> "Workout"
     }
 
     private val FOOT_TYPES = setOf(
-        E.EXERCISE_TYPE_RUNNING,
-        E.EXERCISE_TYPE_RUNNING_TREADMILL,
-        E.EXERCISE_TYPE_WALKING,
-        E.EXERCISE_TYPE_HIKING
+        E.RUNNING,
+        E.RUNNING_TREADMILL,
+        E.WALKING,
+        E.HIKING
     )
-    private val WHEEL_TYPES = setOf(E.EXERCISE_TYPE_BIKING, E.EXERCISE_TYPE_BIKING_STATIONARY)
+    private val WHEEL_TYPES = setOf(E.BIKING, E.BIKING_STATIONARY)
 
     /**
      * A day's exercise calories: imported workouts (exercise part only) plus voice-logged ones.
