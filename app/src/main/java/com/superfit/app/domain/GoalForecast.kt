@@ -8,6 +8,7 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toKotlinLocalDate
 
 enum class ForecastStatus { ON_TRACK, AT_RISK, OFF_TRACK, REACHED, NOT_ENOUGH_DATA }
@@ -210,7 +211,7 @@ object GoalForecast {
         if (lose) {
             InsightsEngine.weekendSplit(month)?.let { (weekendAvg, share) ->
                 if (weekendAvg >= 300 && share >= 0.3) {
-                    val weekdayAvg = month.filter { it.logged && it.date.dayOfWeek.value <= 5 }.map { -it.net }.average()
+                    val weekdayAvg = month.filter { it.logged && it.date.dayOfWeek.isoDayNumber <= 5 }.map { -it.net }.average()
                     add(
                         Insight(
                             "weekend",

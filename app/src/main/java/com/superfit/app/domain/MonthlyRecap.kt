@@ -1,7 +1,6 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -9,6 +8,7 @@ import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 
@@ -193,7 +193,7 @@ object MonthlyRecap {
             helped += RecapFact("Moving most days", if (activePrev > 0 && activeNow > activePrev) "$activeNow active days, up from $activePrev" else "$activeNow active days")
         }
         if (lose && logged.size >= MEAL_DAYS) {
-            val weekdays = logged.filter { it.date.dayOfWeek.value <= 5 }
+            val weekdays = logged.filter { it.date.dayOfWeek.isoDayNumber <= 5 }
             InsightsEngine.weekendSplit(month)?.let { (weekendAvg, share) ->
                 if (weekendAvg >= 300 && share >= 0.3) {
                     held += RecapFact("Weekends", "${InsightsEngine.kcal(weekendAvg)} kcal over target on Sat and Sun, after a weekday average of ${InsightsEngine.kcal(-weekdays.map { it.net }.average())} under")
@@ -214,7 +214,7 @@ object MonthlyRecap {
         val shares = logged.mapNotNull { d -> d.proteinShare?.let { d to it } }
         if (shares.size < MEAL_DAYS) return null
         fun pct(list: List<Pair<DayTotals, Double>>) = list.takeIf { it.size >= 2 }?.let { l -> (l.map { it.second }.average() * 100).roundToInt() }
-        val weekend = shares.filter { it.first.date.dayOfWeek == DayOfWeek.SATURDAY || it.first.date.dayOfWeek == DayOfWeek.SUNDAY }
+        val weekend = shares.filter { it.first.date.dayOfWeek == kotlinx.datetime.DayOfWeek.SATURDAY || it.first.date.dayOfWeek == kotlinx.datetime.DayOfWeek.SUNDAY }
         val kcal = meals.sumOf { it.calories }
         val fibreDays = meals.mapNotNull { m -> fibreOf(m)?.let { m.timestamp to it } }
         val fibre = if (fibreDays.size * 2 >= meals.size && meals.isNotEmpty()) (fibreDays.sumOf { it.second } / logged.size).roundToInt() else null

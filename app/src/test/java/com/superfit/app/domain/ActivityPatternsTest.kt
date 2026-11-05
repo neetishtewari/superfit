@@ -74,7 +74,7 @@ class ActivityPatternsTest {
         }
         val r = ActivityPatterns.rhythm(days)!!
         assertEquals(7, r.hour)
-        assertEquals(DayOfWeek.SUNDAY, r.bestDay)
+        assertEquals(kotlinx.datetime.DayOfWeek.SUNDAY, r.bestDay)
         assertEquals("7 am", ActivityPatterns.hourLabel(7))
     }
 }

@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.datetime.isoDayNumber
 
 /** The words on one recap card: a short title above the big number and a line under it. */
 data class RecapWords(val title: String, val line: String)
@@ -151,7 +152,7 @@ object RecapWriter {
 
     private fun num(v: Int) = String.format(Locale.US, "%,d", v)
 
-    private fun dayName(d: java.time.DayOfWeek) = d.getDisplayName(java.time.format.TextStyle.FULL, Locale.US) + "s"
+    private fun dayName(d: kotlinx.datetime.DayOfWeek) = java.time.DayOfWeek.of(d.isoDayNumber).getDisplayName(java.time.format.TextStyle.FULL, Locale.US) + "s"
 
     /** Reads the AI's words; any card it skipped or got wrong keeps the plain wording. */
     fun parse(json: String, recap: MonthRecap): Map<String, RecapWords> {

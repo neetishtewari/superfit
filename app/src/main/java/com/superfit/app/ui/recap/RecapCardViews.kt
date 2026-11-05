@@ -46,6 +46,7 @@ import com.superfit.app.domain.RecapCard
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
 import com.superfit.app.domain.StrengthSessions
+import com.superfit.app.domain.localWeekdayName
 import com.superfit.app.theme.Manrope
 import java.time.YearMonth
 import java.time.format.TextStyle as DateTextStyle
@@ -309,13 +310,13 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
         }
         is RecapCard.Rhythm -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             val r = card.rhythm
-            if (r.hour != null) {
-                Big(ActivityPatterns.hourLabel(r.hour), "person", p, countUp = false)
+            r.hour?.let { hour ->
+                Big(ActivityPatterns.hourLabel(hour), "person", p, countUp = false)
                 Small("${r.workoutsNearHour} of ${r.workoutsTimed} workouts started around then", p, bold = true)
             }
             r.bestDay?.let { d ->
                 FactRow(
-                    "${d.getDisplayName(DateTextStyle.FULL, Locale.getDefault())}s are your big step day",
+                    "${localWeekdayName(d)}s are your big step day",
                     String.format(Locale.US, "%,d steps on average, %,d on a usual day", r.bestDaySteps, r.avgSteps),
                     p.accent,
                     p
