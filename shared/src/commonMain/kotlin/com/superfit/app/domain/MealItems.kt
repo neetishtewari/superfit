@@ -3,7 +3,6 @@ package com.superfit.app.domain
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.json.JSONArray
 import com.superfit.app.json.JSONObject
-import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToLong
 
@@ -378,4 +377,4 @@ private fun roundWeight(w: Double): String = when {
 }
 
 private fun formatQty(qty: Double): String =
-    if (qty == Math.floor(qty)) qty.toLong().toString() else String.format(Locale.US, "%.1f", qty)
+    if (qty == kotlin.math.floor(qty)) qty.toLong().toString() else Decimals.one(qty)

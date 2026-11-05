@@ -2,6 +2,7 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.json.JSONObject
+import kotlin.concurrent.Volatile
 import kotlin.math.roundToInt
 
 /**
@@ -73,7 +74,7 @@ object PersonalNutrition {
     @Volatile var approvedFoods: Set<String> = emptySet()
 
     /** Short fingerprint of the advice, stored on each meal's rating so a change of advice re-rates recent meals. */
-    fun adviceVersion(): String = advice?.trim()?.takeIf { it.isNotEmpty() }?.let { Integer.toHexString(it.hashCode()).take(6) } ?: "0"
+    fun adviceVersion(): String = advice?.trim()?.takeIf { it.isNotEmpty() }?.let { it.hashCode().toUInt().toString(16).take(6) } ?: "0"
 
     /** The lines added to a meal-rating prompt so the rating fits this person. */
     fun promptContext(): String = buildString {

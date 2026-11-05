@@ -56,7 +56,7 @@ object WeightTrendEngine {
             100
         }
 
-        val now = System.currentTimeMillis()
+        val now = com.superfit.app.data.Now.millis()
         val daysElapsed = max(1L, (now - profile.startDateTimestamp) / (1000 * 3600 * 24))
 
         // Time-aware pace calculation

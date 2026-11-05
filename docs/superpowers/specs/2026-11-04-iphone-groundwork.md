@@ -32,7 +32,10 @@ tested on the dev app first.
    - 3c: the database entities (meals, workouts, weights, profile...) move to `shared`, since most
      logic reads them. Only Room's annotations come along; the DAOs and database stay in `app`
      until step 4. Same tables, so no database change.
-   - 3d onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3d: meal items, meal tags, personal nutrition, packaged food, repeat-meal cache and the
+     weight trend move to `shared` (they need no dates). `String.format("%.1f")` becomes
+     `Decimals.one`, which rounds the same way.
+   - 3e onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -62,6 +65,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3d (reviewed 5 Nov): code moved without behaviour changes; no new libraries, permissions,
+network calls or secrets.
 
 Step 3c (reviewed 5 Nov): entities move unchanged apart from the profile's start-date default,
 which now reads the clock through Kotlin instead of Java. Adds Room's annotation library (Google's,
