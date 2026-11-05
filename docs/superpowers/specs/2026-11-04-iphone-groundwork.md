@@ -61,7 +61,10 @@ tested on the dev app first.
      through `localMonthName`).
    - 3l: Journey's goal forecast (finish date, milestones, "what would speed it up") moves to
      `shared`; dates in the phone's language through `localMonthName`.
-   - 3m onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3m: the monthly recap (which cards appear, their numbers, and the words for the AI) moves to
+     `shared`, using kotlinx-datetime's YearMonth. The saved AI words keep the same key, so
+     nobody's finished recap is rewritten.
+   - 3n onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -91,6 +94,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3m (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
+network calls or secrets. The recap still makes one AI call a month through Firebase AI Logic,
+sending the same facts as before (numbers and logged food names; no photos or account details).
 
 Step 3l (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets. Weight data still stays on the phone and in the user's own cloud backup.

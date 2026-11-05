@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
 import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinYearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -20,6 +21,8 @@ class MonthlyRecapTest {
 
     private val utc = ZoneOffset.UTC
     private val october = YearMonth.of(2026, 10)
+    private val kOctober = october.toKotlinYearMonth()
+    private val kUtc = kotlinx.datetime.TimeZone.UTC
     private fun oct(day: Int) = kotlinx.datetime.LocalDate(2026, 10, day)
     private val allSet = RecapSetup(healthConnect = true, mic = true, widget = true)
 
@@ -52,7 +55,7 @@ class MonthlyRecapTest {
         meals: List<NutritionEntryEntity> = emptyList(),
         strength: List<StrengthSession> = emptyList(),
         setup: RecapSetup = allSet
-    ) = MonthlyRecap.build(october, days, meals, strength, emptyList(), journey = null, goalSet = false, setup = setup, zone = utc)
+    ) = MonthlyRecap.build(kOctober, days, meals, strength, emptyList(), journey = null, goalSet = false, setup = setup, zone = kUtc)
 
     @Test
     fun aMonthWithAlmostNothingLoggedHasNoRecap() {
@@ -196,8 +199,9 @@ class MonthlyRecapTest {
     @Test
     fun goalCardShowsThisMonthsChangeOutOfTheWholeGoal() {
         val weighIns = listOf(LocalDate.of(2026, 9, 1) to 86.0, LocalDate.of(2026, 9, 30) to 84.3, LocalDate.of(2026, 10, 12) to 83.7, LocalDate.of(2026, 10, 30) to 82.9)
-        val journey = GoalForecast.compute(86.0, 76.0, LocalDate.of(2026, 9, 1).toKotlinLocalDate(), weighIns.map { it.first.toKotlinLocalDate() to it.second }, emptyMap(), -500, null, LocalDate.of(2026, 11, 1).toKotlinLocalDate(), 82.9)
-        val card = MonthlyRecap.goal(journey, weighIns, october.atDay(1), october.atEndOfMonth())
+        val kWeighIns = weighIns.map { it.first.toKotlinLocalDate() to it.second }
+        val journey = GoalForecast.compute(86.0, 76.0, LocalDate.of(2026, 9, 1).toKotlinLocalDate(), kWeighIns, emptyMap(), -500, null, LocalDate.of(2026, 11, 1).toKotlinLocalDate(), 82.9)
+        val card = MonthlyRecap.goal(journey, kWeighIns, kOctober.firstDay, kOctober.lastDay)
         assertEquals(1.4, card.monthKg!!, 0.001)
         assertEquals(3.1, card.kgDone, 0.001)
         assertEquals(10.0, card.kgTotal, 0.001)
@@ -226,7 +230,7 @@ class MonthlyRecapTest {
     @Test
     fun bodyCardOnlyWhenTheScaleSawAChange() {
         val days = month { d -> if (d.dayOfMonth <= 20) day(d) else null }
-        fun build(body: BodyChange?) = MonthlyRecap.build(october, days, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = utc, body = body)
+        fun build(body: BodyChange?) = MonthlyRecap.build(kOctober, days, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = kUtc, body = body)
         val moved = BodyChange(26.0, 24.8, 58.0, 58.2, null, null, 80.0, 78.6)
         val flat = BodyChange(26.0, 25.8, 58.0, 58.1, null, null, 80.0, 79.9)
         val card = build(moved)!!.cards.filterIsInstance<RecapCard.Body>().single()

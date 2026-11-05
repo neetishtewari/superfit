@@ -1,16 +1,17 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.Instant
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.ZoneId
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.YearMonth
 import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.toJavaLocalDate
-import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 /** One fact on the "What moved the needle" card, e.g. "Protein on target" / "19 of 24 logged days". */
 data class RecapFact(val title: String, val detail: String)
@@ -101,6 +102,7 @@ data class RecapSetup(val healthConnect: Boolean, val mic: Boolean, val widget: 
  * Builds a month's recap from the logs, on the phone. Cards are chosen from what happened: a card
  * with no data is left out, so there is no fixed template. Blank days are unknown, never "ate less".
  */
+@OptIn(ExperimentalTime::class)
 object MonthlyRecap {
 
     const val FULL_DAYS = 10
@@ -112,37 +114,38 @@ object MonthlyRecap {
 
     fun build(
         month: YearMonth,
-        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
+        days: Map<LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity>,
         strength: List<StrengthSession>,
         weighIns: List<Pair<LocalDate, Double>>,
         journey: JourneyForecast?,
         goalSet: Boolean,
         setup: RecapSetup,
-        zone: ZoneId = ZoneId.systemDefault(),
+        zone: TimeZone = TimeZone.currentSystemDefault(),
         body: BodyChange? = null
     ): MonthRecap? {
-        val first = month.atDay(1)
-        val last = month.atEndOfMonth()
-        val monthDays = InsightsEngine.range(days, first.toKotlinLocalDate(), last.toKotlinLocalDate())
-        val prev = InsightsEngine.range(days, first.minusMonths(1).toKotlinLocalDate(), first.minusDays(1).toKotlinLocalDate())
+        val first = month.firstDay
+        val last = month.lastDay
+        val monthDays = InsightsEngine.range(days, first, last)
+        val prevFirst = first.minus(1, DateTimeUnit.MONTH)
+        val prev = InsightsEngine.range(days, prevFirst, first.minus(1, DateTimeUnit.DAY))
         val logged = monthDays.filter { it.logged }
         val active = monthDays.filter { it.active }
         if (logged.size < MIN_DAYS && active.size < MIN_DAYS) return null
 
-        val monthMeals = meals.filter { dateOf(it.timestamp, zone).let { d -> !d.isBefore(first) && !d.isAfter(last) } }
-        val loggedDates = logged.map { it.date.toJavaLocalDate() }.toSet()
+        val monthMeals = meals.filter { dateOf(it.timestamp, zone).let { d -> d >= first && d <= last } }
+        val loggedDates = logged.map { it.date }.toSet()
         val lose = journey?.let { it.targetKg < it.startKg } ?: true
-        val strengthMonth = strength.filter { it.date.toJavaLocalDate().let { d -> !d.isBefore(first) && !d.isAfter(last) } }
+        val strengthMonth = strength.filter { it.date >= first && it.date <= last }
         val strengthNow = strengthMonth.size
-        val strengthPrev = strength.count { it.date.toJavaLocalDate().let { d -> !d.isBefore(first.minusMonths(1)) && d.isBefore(first) } }
+        val strengthPrev = strength.count { it.date >= prevFirst && it.date < first }
 
         val cards = buildList {
             if (goalSet && journey != null) add(goal(journey, weighIns, first, last))
             body?.takeIf { it.notable }?.let { add(RecapCard.Body(it, lose)) }
             needle(monthDays, prev, lose)?.let { add(it) }
             if (logged.size >= MEAL_DAYS) {
-                CalorieSourcesEngine.build(monthMeals)?.takeIf { it.top.size >= 3 }?.let { add(RecapCard.Calories(it, month.lengthOfMonth())) }
+                CalorieSourcesEngine.build(monthMeals)?.takeIf { it.top.size >= 3 }?.let { add(RecapCard.Calories(it, month.numberOfDays)) }
                 macros(logged, monthMeals.filter { dateOf(it.timestamp, zone) in loggedDates })?.let { add(it) }
                 choices(monthMeals)?.let { add(it) }
             }
@@ -150,9 +153,9 @@ object MonthlyRecap {
             moving(monthDays, prev, month)?.let { add(it) }
             ActivityPatterns.heart(monthDays.flatMap { it.workouts }, prev.flatMap { it.workouts }, minNow = 3, minBefore = 3)?.let { add(RecapCard.Heart(it)) }
             ActivityPatterns.rhythm(monthDays)?.let { add(RecapCard.Rhythm(it)) }
-            if (strengthNow > 0 || active.isNotEmpty()) add(RecapCard.Strength(strengthNow, strengthPrev, monthDays.sumOf { it.workoutKm }, StrengthSessions.detail(strengthMonth, month.lengthOfMonth())))
+            if (strengthNow > 0 || active.isNotEmpty()) add(RecapCard.Strength(strengthNow, strengthPrev, monthDays.sumOf { it.workoutKm }, StrengthSessions.detail(strengthMonth, month.numberOfDays)))
             ActivityPatterns.reps(monthDays.flatMap { it.workouts }, prev.flatMap { it.workouts }, minTotal = 100)?.let { add(RecapCard.Reps(it)) }
-            setup(setup, logged.size, month.lengthOfMonth())?.let { add(it) }
+            setup(setup, logged.size, month.numberOfDays)?.let { add(it) }
         }
         return MonthRecap(month, logged.size, cards.sortedBy { ORDER.indexOf(it.id) })
     }
@@ -160,14 +163,14 @@ object MonthlyRecap {
     fun goal(journey: JourneyForecast, weighIns: List<Pair<LocalDate, Double>>, first: LocalDate, last: LocalDate): RecapCard.Goal {
         val dir = if (journey.targetKg < journey.startKg) -1.0 else 1.0
         val sorted = weighIns.sortedBy { it.first }
-        val before = sorted.lastOrNull { it.first.isBefore(first) } ?: sorted.firstOrNull { !it.first.isAfter(last) }
-        val end = sorted.lastOrNull { !it.first.isAfter(last) }
+        val before = sorted.lastOrNull { it.first < first } ?: sorted.firstOrNull { it.first <= last }
+        val end = sorted.lastOrNull { it.first <= last }
         val monthKg = if (before != null && end != null && before.first != end.first) (end.second - before.second) * dir else null
         return RecapCard.Goal(
             monthKg = monthKg?.let { round1(it) },
             kgDone = round1(journey.kgDone),
             kgTotal = round1(abs(journey.targetKg - journey.startKg)),
-            eta = journey.forecastDate?.toJavaLocalDate(),
+            eta = journey.forecastDate,
             reached = journey.status == ForecastStatus.REACHED,
             lose = dir < 0
         )
@@ -263,7 +266,7 @@ object MonthlyRecap {
             km = round1(km),
             avgSteps = if (stepDays.isEmpty()) 0 else stepDays.map { it.steps }.average().roundToInt(),
             activeDays = active,
-            daysInMonth = ym.lengthOfMonth(),
+            daysInMonth = ym.numberOfDays,
             prevActiveDays = prev.count { it.active }.takeIf { it > 0 }
         )
     }
@@ -279,18 +282,18 @@ object MonthlyRecap {
     }
 
     /** "6:42" for 402 seconds a km. */
-    fun pace(seconds: Long): String = String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
+    fun pace(seconds: Long): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 
     private fun fibreOf(meal: NutritionEntryEntity): Double? =
         MealItems.decode(meal.items)?.let { mi -> mi.items.sumOf { it.fiber * it.qty } }?.takeIf { it > 0 }
             ?: MealTags.decode(meal.qualityTags)?.takeIf { !it.estimated }?.fiberG
 
     private fun mealName(meal: NutritionEntryEntity): String {
-        val name = meal.foodText.trim().replaceFirstChar { it.titlecase(Locale.getDefault()) }
+        val name = meal.foodText.trim().replaceFirstChar { it.titlecase() }
         return if (name.length <= 40) name else name.take(39).substringBeforeLast(' ').trimEnd(',', ' ') + "…"
     }
 
     private fun round1(v: Double) = (v * 10).roundToInt() / 10.0
 
-    private fun dateOf(millis: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
+    private fun dateOf(millis: Long, zone: TimeZone): LocalDate = Instant.fromEpochMilliseconds(millis).toLocalDateTime(zone).date
 }
