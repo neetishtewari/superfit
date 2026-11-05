@@ -27,4 +27,14 @@ class DecimalsTest {
         assertEquals("0.13", Decimals.fixed(0.125, 2))
         assertEquals("1.50", Decimals.fixed(1.5, 2))
     }
+
+    @Test
+    fun groupsThousandsWithCommas() {
+        assertEquals("0", Decimals.grouped(0))
+        assertEquals("999", Decimals.grouped(999))
+        assertEquals("1,000", Decimals.grouped(1000))
+        assertEquals("23,410", Decimals.grouped(23410))
+        assertEquals("1,234,567", Decimals.grouped(1234567))
+        assertEquals("-12,000", Decimals.grouped(-12000))
+    }
 }

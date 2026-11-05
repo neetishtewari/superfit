@@ -10,6 +10,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.datetime.toJavaLocalDate
 
 /** One number on a card: "PROTEIN 132 g", with an optional bar and a small line under it. */
 data class CardStat(
@@ -248,7 +249,7 @@ object ShareCards {
     }
 
     fun best(b: PersonalBest, isNew: Boolean, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): ShareCard.Best {
-        val date = b.workout?.let { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() } ?: b.periodStart ?: today
+        val date = b.workout?.let { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() } ?: b.periodStart?.toJavaLocalDate() ?: today
         val dateLine = when (b.kind.period) {
             BestPeriod.WEEK -> "Week of " + date.format(shortDate)
             BestPeriod.MONTH -> date.format(monthFormat)

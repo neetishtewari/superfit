@@ -1,9 +1,8 @@
 package com.superfit.app.domain
 
 import com.superfit.app.json.JSONObject
-import java.time.LocalDate
-import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.datetime.LocalDate
 
 /** Which part of the body a strength session worked. */
 enum class BodyArea(val key: String, val label: String) {
@@ -13,7 +12,7 @@ enum class BodyArea(val key: String, val label: String) {
     FULL("full", "full body");
 
     companion object {
-        fun of(key: String): BodyArea? = entries.firstOrNull { it.key == key.trim().lowercase(Locale.US) }
+        fun of(key: String): BodyArea? = entries.firstOrNull { it.key == key.trim().lowercase() }
     }
 }
 

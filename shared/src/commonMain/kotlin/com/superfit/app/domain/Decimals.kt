@@ -31,6 +31,13 @@ object Decimals {
     /** "%.1f" */
     fun one(x: Double): String = fixed(x, 1)
 
+    /** A whole number with commas between thousands, like String.format(Locale.US, "%,d", n): "23,410". */
+    fun grouped(n: Long): String {
+        val digits = if (n < 0) (-n).toString() else n.toString()
+        val text = digits.reversed().chunked(3).joinToString(",").reversed()
+        return if (n < 0) "-$text" else text
+    }
+
     /** The number's digits without an exponent, or null when Kotlin writes it in E notation. */
     private fun plainDigits(x: Double): String? {
         val s = x.toString()
