@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinLocalDate
 
 enum class DayStatus {
     Deficit,
@@ -375,7 +376,7 @@ class HistoryViewModel(
                 today,
                 loseGoal,
                 allNutrition,
-                body = com.superfit.app.domain.BodyTrend.fourWeeks(scaleReadings, today)
+                body = com.superfit.app.domain.BodyTrend.fourWeeks(scaleReadings, today.toKotlinLocalDate())
             )
             goalTargetDate = GoalDatePref.get(sharedPrefs)
             val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
@@ -403,7 +404,7 @@ class HistoryViewModel(
                 mine = scaleReadings,
                 latestWeightKg = repository.getAllWeightEntries().maxByOrNull { it.timestamp }?.weightKg ?: profile.weightKg,
                 heightCm = profile.heightCm,
-                today = today
+                today = today.toKotlinLocalDate()
             )
             val hc = repository.healthConnectManager
             canAskBodyAccess = hc.isAvailable() && !hc.hasBodyPermissions()

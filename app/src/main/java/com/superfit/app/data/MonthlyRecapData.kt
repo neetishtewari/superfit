@@ -23,6 +23,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlinx.datetime.toKotlinTimeZone
 import org.json.JSONObject
 
 /**
@@ -125,7 +126,7 @@ object MonthlyRecapData {
             mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
             widget = !WidgetPin.canPin(context) || WidgetPin.isPlaced(context)
         )
-        val body = BodyTrend.month(BodyImporter.mine(context), month, zone)
+        val body = BodyTrend.month(BodyImporter.mine(context), month.year, month.monthValue, zone.toKotlinTimeZone())
         return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, body)
     }
 

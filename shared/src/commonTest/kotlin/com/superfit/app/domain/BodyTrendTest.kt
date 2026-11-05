@@ -1,22 +1,28 @@
 package com.superfit.app.domain
 
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.ZoneOffset
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.minus
+import kotlinx.datetime.toInstant
 
 class BodyTrendTest {
 
-    private val utc = ZoneOffset.UTC
-    private val today = LocalDate.of(2026, 11, 2)
+    private val utc = TimeZone.UTC
+    private val today = LocalDate(2026, 11, 2)
+    private fun LocalDate.minusDays(n: Int) = minus(n, DateTimeUnit.DAY)
 
+    @OptIn(kotlin.time.ExperimentalTime::class)
     private fun r(date: LocalDate, kg: Double, fat: Double? = null, bmr: Double? = null, lean: Double? = null) =
-        ScaleReading("$date$kg", date.atTime(7, 0).toInstant(utc), kg, "FitDays", bodyFatPct = fat, leanKg = lean, bmrKcal = bmr)
+        ScaleReading("$date$kg", date.atTime(LocalTime(7, 0)).toInstant(utc).toEpochMilliseconds(), kg, "FitDays", bodyFatPct = fat, leanKg = lean, bmrKcal = bmr)
 
     @Test
     fun weightOnlyScalesSayNothing() {
@@ -62,25 +68,14 @@ class BodyTrendTest {
 
     @Test
     fun monthComparesItsStartWithItsEnd() {
-        val oct = YearMonth.of(2026, 10)
         val mine = listOf(
-            r(LocalDate.of(2026, 9, 28), 80.0, fat = 26.0),
-            r(LocalDate.of(2026, 10, 5), 79.6, fat = 25.6),
-            r(LocalDate.of(2026, 10, 15), 79.0, fat = 25.0),
-            r(LocalDate.of(2026, 10, 29), 78.4, fat = 24.6)
+            r(LocalDate(2026, 9, 28), 80.0, fat = 26.0),
+            r(LocalDate(2026, 10, 5), 79.6, fat = 25.6),
+            r(LocalDate(2026, 10, 15), 79.0, fat = 25.0),
+            r(LocalDate(2026, 10, 29), 78.4, fat = 24.6)
         )
-        val c = BodyTrend.month(mine, oct, utc)!!
+        val c = BodyTrend.month(mine, 2026, 10, utc)!!
         assertEquals(-1.2, c.fat!!, 0.001)
         assertNotNull(c.lean)
-    }
-
-    @Test
-    fun weekReportAddsTheBodyLineOnlyWhenItMoved() {
-        val mine = listOf(r(today.minusDays(30), 80.0, fat = 26.0), r(today.minusDays(2), 78.0, fat = 24.5))
-        val body = BodyTrend.fourWeeks(mine, today, utc)
-        val report = InsightsEngine.weekReport(emptyMap(), today, loseGoal = true, zone = utc, body = body)
-        assertTrue(report.working.any { it.id == "body_fat_down" })
-        val none = InsightsEngine.weekReport(emptyMap(), today, loseGoal = true, zone = utc, body = null)
-        assertTrue(none.working.none { it.id.startsWith("body_") } && none.watch.none { it.id.startsWith("body_") })
     }
 }

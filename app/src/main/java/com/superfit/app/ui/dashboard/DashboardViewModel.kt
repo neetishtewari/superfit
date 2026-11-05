@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinLocalDate
 
 class DashboardViewModel(
     private val repository: DataRepository,
@@ -428,7 +429,7 @@ class DashboardViewModel(
             com.superfit.app.data.BodyImporter.mine(appContext),
             profile.weightKg,
             profile.heightCm,
-            today
+            today.toKotlinLocalDate()
         )
         val bodyText = if (body.hasScaleData) {
             listOfNotNull(

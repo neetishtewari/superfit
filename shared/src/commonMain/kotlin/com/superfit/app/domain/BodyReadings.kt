@@ -1,19 +1,27 @@
 package com.superfit.app.domain
 
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 /**
  * One step on a smart scale, as its app saved it to Health Connect: weight plus whatever else the
- * scale measured at the same moment. [id] is the weight record's Health Connect id.
+ * scale measured at the same moment. [id] is the weight record's Health Connect id; [timeMs] is
+ * when it was measured, in milliseconds since 1970.
  */
 data class ScaleReading(
     val id: String,
-    val time: Instant,
+    val timeMs: Long,
     val weightKg: Double,
     val source: String,
     val bodyFatPct: Double? = null,
@@ -23,7 +31,7 @@ data class ScaleReading(
 )
 
 /** A single body measurement from Health Connect, before it's matched to a weigh-in. */
-data class BodyValue(val time: Instant, val source: String, val value: Double)
+data class BodyValue(val timeMs: Long, val source: String, val value: Double)
 
 /** What we know of the user's own body from readings they accepted, to recognise their next one. */
 data class Baseline(val weightKg: Double?, val bodyFatPct: Double?)
@@ -35,6 +43,7 @@ enum class ReadingMatch { MINE, ASK, NOT_ME }
  * scale, and the Body card. Health Connect can't say which person in the scale app a reading belongs
  * to, so a reading far from the user's own weight or body fat is asked about instead of added.
  */
+@OptIn(ExperimentalTime::class)
 object BodyReadings {
 
     /** Further than this from the user's recent weight: ask. Whichever of the two is smaller. */
@@ -45,9 +54,10 @@ object BodyReadings {
     const val BODY_FAT_GAP = 4.0
 
     /** A body fat reading older than this no longer sets the calorie target. */
-    const val BODY_FAT_VALID_DAYS = 45L
+    const val BODY_FAT_VALID_DAYS = 45
 
-    private val PAIR_WINDOW: Duration = Duration.ofMinutes(10)
+    private const val PAIR_WINDOW_MS = 10 * 60_000L
+    private const val DAY_MS = 86_400_000L
 
     /** Puts body fat, lean mass, bone mass and BMR saved by the same app within minutes onto their weigh-in. */
     fun group(
@@ -56,10 +66,10 @@ object BodyReadings {
         lean: List<BodyValue>,
         bone: List<BodyValue>,
         bmr: List<BodyValue>
-    ): List<ScaleReading> = weights.sortedBy { it.time }.map { w ->
+    ): List<ScaleReading> = weights.sortedBy { it.timeMs }.map { w ->
         fun near(list: List<BodyValue>) = list
-            .filter { it.source == w.source && Duration.between(it.time, w.time).abs() <= PAIR_WINDOW }
-            .minByOrNull { Duration.between(it.time, w.time).abs() }?.value
+            .filter { it.source == w.source && abs(it.timeMs - w.timeMs) <= PAIR_WINDOW_MS }
+            .minByOrNull { abs(it.timeMs - w.timeMs) }?.value
         w.copy(bodyFatPct = near(bodyFat), leanKg = near(lean), boneKg = near(bone), bmrKcal = near(bmr))
     }
 
@@ -100,15 +110,15 @@ object BodyReadings {
         if (heightCm <= 0) null else weightKg / ((heightCm / 100.0) * (heightCm / 100.0))
 
     /** The Body card: latest of each measurement the user's scale sends, and the change over 4 weeks. */
-    fun summary(mine: List<ScaleReading>, latestWeightKg: Double?, heightCm: Double, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): BodySummary {
-        val sorted = mine.sortedBy { it.time }
-        val monthAgo = today.minusDays(28).atStartOfDay(zone).toInstant()
+    fun summary(mine: List<ScaleReading>, latestWeightKg: Double?, heightCm: Double, today: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): BodySummary {
+        val sorted = mine.sortedBy { it.timeMs }
+        val monthAgo = today.minus(28, DateTimeUnit.DAY).atStartOfDayIn(zone).toEpochMilliseconds()
 
         fun latest(f: (ScaleReading) -> Double?) = sorted.lastOrNull { f(it) != null }?.let { it to f(it)!! }
         fun change(f: (ScaleReading) -> Double?): Double? {
             val now = latest(f) ?: return null
-            val then = sorted.lastOrNull { f(it) != null && !it.time.isAfter(monthAgo) }
-                ?: sorted.firstOrNull { f(it) != null && it.time.isBefore(now.first.time) && Duration.between(it.time, now.first.time).toDays() >= 14 }
+            val then = sorted.lastOrNull { f(it) != null && it.timeMs <= monthAgo }
+                ?: sorted.firstOrNull { f(it) != null && it.timeMs < now.first.timeMs && (now.first.timeMs - it.timeMs) / DAY_MS >= 14 }
                 ?: return null
             return now.second - f(then)!!
         }
@@ -128,7 +138,7 @@ object BodyReadings {
             scaleBmr = latest { it.bmrKcal }?.second,
             bmi = weight?.let { bmi(it, heightCm) },
             source = sorted.lastOrNull { it.bodyFatPct != null }?.source,
-            measuredOn = fat?.first?.time?.atZone(zone)?.toLocalDate(),
+            measuredOn = fat?.first?.let { Instant.fromEpochMilliseconds(it.timeMs).toLocalDateTime(zone).date },
             insight = insight(weightChange, fatChange, leanChange)
         )
     }
@@ -180,8 +190,9 @@ object MeasuredBody {
 
     @Volatile var measuredOn: LocalDate? = null
 
-    fun currentBodyFat(today: LocalDate = LocalDate.now()): Double? {
+    @OptIn(ExperimentalTime::class)
+    fun currentBodyFat(today: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault())): Double? {
         val on = measuredOn ?: return null
-        return bodyFatPct?.takeIf { !on.isBefore(today.minusDays(BodyReadings.BODY_FAT_VALID_DAYS)) && it in 3.0..70.0 }
+        return bodyFatPct?.takeIf { on >= today.minus(BodyReadings.BODY_FAT_VALID_DAYS, DateTimeUnit.DAY) && it in 3.0..70.0 }
     }
 }
