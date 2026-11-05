@@ -39,7 +39,7 @@ object NutritionistNote {
     /** Daily targets the advice names, or null when it names none. */
     suspend fun readTargets(advice: String): AdviceTargets? {
         if (advice.isBlank()) return null
-        val json = GeminiClient.generateContent(
+        val json = Ai.generate(
             prompt = "Advice: \"${advice.take(1500)}\"",
             systemInstructionText = TARGETS_INSTRUCTION,
             isJson = true
@@ -70,7 +70,7 @@ object NutritionistNote {
 
     suspend fun write(metrics: DietQualityMetrics): DietNote? {
         if (!metrics.hasEnoughData) return null
-        val json = GeminiClient.generateContent(
+        val json = Ai.generate(
             prompt = PersonalNutrition.promptContext() + facts(metrics),
             systemInstructionText = NOTE_INSTRUCTION,
             isJson = true

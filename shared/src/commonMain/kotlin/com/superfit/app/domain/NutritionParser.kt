@@ -50,12 +50,12 @@ class NutritionParser {
         // Newest first, so a meal the user corrected wins over older logs of the same words.
         val cached = RepeatMealCache.findRepeatMeal(input, history.sortedByDescending { it.timestamp })
         if (cached != null) {
-            android.util.Log.d("NutritionParser", "Instant local repeat cache hit for '$input' -> ${cached.foodText} (${cached.calories} kcal)")
+            AppLog.d("NutritionParser", "Instant local repeat cache hit for '$input' -> ${cached.foodText} (${cached.calories} kcal)")
             return cached
         }
 
         // 2. Cascade across Gemini models (2.5-flash -> 2.0-flash -> 1.5-flash)
-        val jsonText = GeminiClient.generateContent(
+        val jsonText = Ai.generate(
             prompt = PersonalNutrition.promptContext() + spokenNote(spoken) + "Meal input: \"$input\"",
             systemInstructionText = systemInstructionText,
             isJson = true

@@ -9,7 +9,7 @@ class MealTagger {
     suspend fun tag(entries: List<NutritionEntryEntity>): Map<Long, MealTags> {
         if (entries.isEmpty()) return emptyMap()
         val list = entries.mapIndexed { i, e -> "${i + 1}. ${e.foodText} (${e.calories.toInt()} kcal)" + itemsNote(e) }.joinToString("\n")
-        val response = GeminiClient.generateContent(
+        val response = Ai.generate(
             prompt = PersonalNutrition.promptContext() + "Meals:\n$list",
             systemInstructionText = SYSTEM_INSTRUCTION,
             isJson = true
@@ -20,10 +20,10 @@ class MealTagger {
     /** Tags one saved meal. Null when the AI couldn't; the daily backfill tries again later. */
     suspend fun tagOne(entry: NutritionEntryEntity): MealTags? = try {
         tag(listOf(entry))[entry.id]
-    } catch (e: kotlinx.coroutines.CancellationException) {
+    } catch (e: kotlin.coroutines.cancellation.CancellationException) {
         throw e
     } catch (e: Exception) {
-        android.util.Log.w("MealTagger", "Tagging meal ${entry.id} failed", e)
+        AppLog.w("MealTagger", "Tagging meal ${entry.id} failed", e)
         null
     }
 
