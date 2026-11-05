@@ -29,7 +29,7 @@ object StreakEngine {
     fun fromMealTimestamps(
         mealTimestamps: List<Long>,
         zone: TimeZone = TimeZone.currentSystemDefault(),
-        today: LocalDate = Clock.System.todayIn(zone),
+        today: LocalDate = Clock.System.todayIn(zone)
     ): StreakStateEntity {
         val dates = mealTimestamps
             .map { Instant.fromEpochMilliseconds(it).toLocalDateTime(zone).date }
@@ -39,7 +39,7 @@ object StreakEngine {
 
     fun fromLoggedDates(
         loggedDates: Collection<LocalDate>,
-        today: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()),
+        today: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault())
     ): StreakStateEntity {
         val days = loggedDates.filter { it <= today }.distinct().sorted()
         if (days.isEmpty()) return StreakStateEntity(id = 0, graceDaysRemaining = 1)
@@ -68,7 +68,7 @@ object StreakEngine {
             masteryStreak = current,
             graceDaysRemaining = if (graceInUse) 0 else 1,
             lastLoggedDate = lastLogged.toString(),
-            lastGraceUsedDate = if (graceInUse) today.minus(1, DateTimeUnit.DAY).toString() else "",
+            lastGraceUsedDate = if (graceInUse) today.minus(1, DateTimeUnit.DAY).toString() else ""
         )
     }
 }
