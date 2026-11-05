@@ -16,7 +16,7 @@ data class UserProfileEntity(
     val calorieOffset: Int = -500,
     val startingWeightKg: Double = 75.0,
     val targetWeightKg: Double = 70.0,
-    val startDateTimestamp: Long = System.currentTimeMillis(),
+    val startDateTimestamp: Long = Now.millis(),
     // "BEGINNER", "INTERMEDIATE", "ADVANCED"
     val fitnessLevel: String = "INTERMEDIATE"
 )
