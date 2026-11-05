@@ -211,9 +211,11 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
         is RecapCard.Calories -> CalorieMoment(card, p)
         is RecapCard.Macros -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             MacroRow("Protein", "${card.proteinPct}% of goal", card.proteinPct / 100f, p)
-            if (card.weekdayProteinPct != null && card.weekendProteinPct != null) {
-                MacroRow("Weekdays", "${card.weekdayProteinPct}%", card.weekdayProteinPct / 100f, p)
-                MacroRow("Weekends", "${card.weekendProteinPct}%", card.weekendProteinPct / 100f, p)
+            val weekday = card.weekdayProteinPct
+            val weekend = card.weekendProteinPct
+            if (weekday != null && weekend != null) {
+                MacroRow("Weekdays", "$weekday%", weekday / 100f, p)
+                MacroRow("Weekends", "$weekend%", weekend / 100f, p)
             }
             card.carbsPct?.let { MacroRow("Carbs", "$it% of calories", it / 100f, p) }
             card.fibreG?.let { MacroRow("Fibre", "$it g a day", it / 30f, p) }
