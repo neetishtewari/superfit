@@ -1,15 +1,15 @@
 package com.superfit.app.domain
 
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
 import kotlinx.datetime.isoDayNumber
-import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 
 enum class ForecastStatus { ON_TRACK, AT_RISK, OFF_TRACK, REACHED, NOT_ENOUGH_DATA }
 
@@ -54,14 +54,13 @@ object GoalForecast {
 
     private const val KCAL_PER_KG = 7700.0
     private const val MIN_RATE = 0.05 // kg a week; slower than this is "not moving"
-    private val dayMonth = DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
 
     /**
      * When the journey started. Older profiles never saved a start date (it reads as 1 January 1970,
      * which showed "Day 20753"), so fall back to the first weigh-in, then the first logged meal.
      */
     fun startDate(profileStart: LocalDate?, weighIns: List<Pair<LocalDate, Double>>, firstLogged: LocalDate?, today: LocalDate): LocalDate {
-        val saved = profileStart?.takeIf { it.year >= 2020 && !it.isAfter(today) }
+        val saved = profileStart?.takeIf { it.year >= 2020 && it <= today }
         return saved ?: weighIns.minOfOrNull { it.first } ?: firstLogged ?: today
     }
 
@@ -70,7 +69,7 @@ object GoalForecast {
         targetKg: Double,
         startDate: LocalDate,
         weighIns: List<Pair<LocalDate, Double>>,
-        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
+        days: Map<LocalDate, DayTotals>,
         calorieOffset: Int,
         targetDate: LocalDate?,
         today: LocalDate,
@@ -83,18 +82,18 @@ object GoalForecast {
         val done = ((currentKg - startKg) * dir).coerceAtLeast(0.0)
         val toGo = ((targetKg - currentKg) * dir).coerceAtLeast(0.0)
         val percent = if (total < 0.01) 100 else ((done / total) * 100).roundToInt().coerceIn(0, 100)
-        val dayNumber = ChronoUnit.DAYS.between(startDate, today).coerceAtLeast(0) + 1
+        val dayNumber = startDate.daysUntil(today).coerceAtLeast(0).toLong() + 1
 
-        val recentWeigh = slope(sorted, today.minusDays(27), today)
-        val earlierWeigh = slope(sorted, today.minusDays(55), today.minusDays(28))
-        val recentEnergy = energyRate(days, today.minusDays(28), today.minusDays(1), calorieOffset)
-        val earlierEnergy = energyRate(days, today.minusDays(56), today.minusDays(29), calorieOffset)
+        val recentWeigh = slope(sorted, today.minus(27, DateTimeUnit.DAY), today)
+        val earlierWeigh = slope(sorted, today.minus(55, DateTimeUnit.DAY), today.minus(28, DateTimeUnit.DAY))
+        val recentEnergy = energyRate(days, today.minus(28, DateTimeUnit.DAY), today.minus(1, DateTimeUnit.DAY), calorieOffset)
+        val earlierEnergy = energyRate(days, today.minus(56, DateTimeUnit.DAY), today.minus(29, DateTimeUnit.DAY), calorieOffset)
         val fromWeighIns = recentWeigh != null
         val recent = (recentWeigh ?: recentEnergy)?.times(dir)
         val earlier = (if (fromWeighIns) earlierWeigh else earlierEnergy)?.times(dir)
 
-        val month = InsightsEngine.range(days, today.minusDays(28).toKotlinLocalDate(), today.minusDays(1).toKotlinLocalDate())
-        val prevMonth = InsightsEngine.range(days, today.minusDays(56).toKotlinLocalDate(), today.minusDays(29).toKotlinLocalDate())
+        val month = InsightsEngine.range(days, today.minus(28, DateTimeUnit.DAY), today.minus(1, DateTimeUnit.DAY))
+        val prevMonth = InsightsEngine.range(days, today.minus(56, DateTimeUnit.DAY), today.minus(29, DateTimeUnit.DAY))
         val slowing = slowingReasons(month, prevMonth, dir < 0)
         val lastWeighIn = sorted.lastOrNull()?.first
         val milestones = milestones(startKg, targetKg, currentKg, sorted, dir)
@@ -103,12 +102,12 @@ object GoalForecast {
             if (rate == null || rate < MIN_RATE || toGo <= 0) {
                 null
             } else {
-                today.plusDays(ceil(toGo / rate * 7).roundToLong())
+                today.plus(ceil(toGo / rate * 7).roundToLong(), DateTimeUnit.DAY)
             }
 
         val forecastDate = forecastFor(recent)
         val weeksLate = if (forecastDate != null && targetDate != null) {
-            ceil(ChronoUnit.DAYS.between(targetDate, forecastDate) / 7.0).toInt()
+            ceil(targetDate.daysUntil(forecastDate) / 7.0).toInt()
         } else {
             null
         }
@@ -128,15 +127,15 @@ object GoalForecast {
             ForecastStatus.REACHED -> "You've reached $goal kg."
             ForecastStatus.NOT_ENOUGH_DATA -> "Log a weekly weigh-in and most of your meals to see when you'll reach $goal kg."
             ForecastStatus.OFF_TRACK -> "At your current habits your weight isn't moving towards $goal kg."
-            else -> "At your current habits you'll reach $goal kg around ${forecastDate!!.format(dayMonth)}."
+            else -> "At your current habits you'll reach $goal kg around ${dayMonth(forecastDate!!)}."
         }
         val explanation = buildList {
             if (weeksLate != null && targetDate != null) {
                 add(
                     when {
-                        weeksLate > 0 -> "That's ${weeks(weeksLate)} later than your target date of ${targetDate.format(dayMonth)}."
-                        weeksLate < 0 -> "That's ${weeks(-weeksLate)} ahead of your target date of ${targetDate.format(dayMonth)}."
-                        else -> "Right on your target date of ${targetDate.format(dayMonth)}."
+                        weeksLate > 0 -> "That's ${weeks(weeksLate)} later than your target date of ${dayMonth(targetDate)}."
+                        weeksLate < 0 -> "That's ${weeks(-weeksLate)} ahead of your target date of ${dayMonth(targetDate)}."
+                        else -> "Right on your target date of ${dayMonth(targetDate)}."
                     }
                 )
             }
@@ -177,17 +176,17 @@ object GoalForecast {
             fixes = fixes,
             allFixesDate = allFixesDate,
             milestones = milestones,
-            daysSinceWeighIn = lastWeighIn?.let { ChronoUnit.DAYS.between(it, today) },
+            daysSinceWeighIn = lastWeighIn?.let { it.daysUntil(today).toLong() },
             weighIns = sorted
         )
     }
 
     /** Least-squares weight change in kg a week; needs 2+ weigh-ins at least 10 days apart. */
     fun slope(points: List<Pair<LocalDate, Double>>, from: LocalDate, to: LocalDate): Double? {
-        val p = points.filter { !it.first.isBefore(from) && !it.first.isAfter(to) }
+        val p = points.filter { it.first >= from && it.first <= to }
         if (p.size < 2) return null
-        if (ChronoUnit.DAYS.between(p.first().first, p.last().first) < 10) return null
-        val xs = p.map { ChronoUnit.DAYS.between(from, it.first).toDouble() }
+        if (p.first().first.daysUntil(p.last().first) < 10) return null
+        val xs = p.map { from.daysUntil(it.first).toDouble() }
         val ys = p.map { it.second }
         val mx = xs.average()
         val my = ys.average()
@@ -200,8 +199,8 @@ object GoalForecast {
      * Weight change a week implied by logged eating: (eaten - maintenance) / 7700. The day's target
      * already includes the goal's offset, so maintenance = target - offset. Needs 7+ logged days.
      */
-    fun energyRate(days: Map<kotlinx.datetime.LocalDate, DayTotals>, from: LocalDate, to: LocalDate, calorieOffset: Int): Double? {
-        val logged = InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()).filter { it.logged && it.kcalTarget > 0 }
+    fun energyRate(days: Map<LocalDate, DayTotals>, from: LocalDate, to: LocalDate, calorieOffset: Int): Double? {
+        val logged = InsightsEngine.range(days, from, to).filter { it.logged && it.kcalTarget > 0 }
         if (logged.size < 7) return null
         val balance = logged.map { it.net + calorieOffset }.average()
         return balance * 7 / KCAL_PER_KG
@@ -265,7 +264,7 @@ object GoalForecast {
     ): List<ForecastFix> = fixExtras(month, prev, lose).mapNotNull { (label, extraKcal) ->
         val newDate = forecastFor(rate + extraKcal / KCAL_PER_KG) ?: return@mapNotNull null
         if (current == null) return@mapNotNull ForecastFix(label, null, newDate)
-        val sooner = (ChronoUnit.DAYS.between(newDate, current) / 7.0).roundToInt()
+        val sooner = (newDate.daysUntil(current) / 7.0).roundToInt()
         if (sooner >= 1) ForecastFix(label, sooner, newDate) else null
     }
 
@@ -287,8 +286,11 @@ object GoalForecast {
 
     private fun weeks(n: Int) = if (n == 1) "1 week" else "$n weeks"
 
-    fun fmt(v: Double): String = String.format(Locale.US, "%.1f", v)
+    /** "5 November", month in the phone's language, as Java's "d MMMM" wrote it. */
+    private fun dayMonth(date: LocalDate): String = "${date.day} ${localMonthName(date.month)}"
+
+    fun fmt(v: Double): String = Decimals.one(v)
 
     /** "0.25", "0.5", "1" kg a week. */
-    fun rate(v: Double): String = String.format(Locale.US, "%.2f", v).trimEnd('0').trimEnd('.')
+    fun rate(v: Double): String = Decimals.fixed(v, 2).trimEnd('0').trimEnd('.')
 }

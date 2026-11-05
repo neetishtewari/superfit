@@ -196,7 +196,7 @@ class MonthlyRecapTest {
     @Test
     fun goalCardShowsThisMonthsChangeOutOfTheWholeGoal() {
         val weighIns = listOf(LocalDate.of(2026, 9, 1) to 86.0, LocalDate.of(2026, 9, 30) to 84.3, LocalDate.of(2026, 10, 12) to 83.7, LocalDate.of(2026, 10, 30) to 82.9)
-        val journey = GoalForecast.compute(86.0, 76.0, LocalDate.of(2026, 9, 1), weighIns, emptyMap(), -500, null, LocalDate.of(2026, 11, 1), 82.9)
+        val journey = GoalForecast.compute(86.0, 76.0, LocalDate.of(2026, 9, 1).toKotlinLocalDate(), weighIns.map { it.first.toKotlinLocalDate() to it.second }, emptyMap(), -500, null, LocalDate.of(2026, 11, 1).toKotlinLocalDate(), 82.9)
         val card = MonthlyRecap.goal(journey, weighIns, october.atDay(1), october.atEndOfMonth())
         assertEquals(1.4, card.monthKg!!, 0.001)
         assertEquals(3.1, card.kgDone, 0.001)

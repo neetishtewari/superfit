@@ -167,7 +167,7 @@ object MonthlyRecap {
             monthKg = monthKg?.let { round1(it) },
             kgDone = round1(journey.kgDone),
             kgTotal = round1(abs(journey.targetKg - journey.startKg)),
-            eta = journey.forecastDate,
+            eta = journey.forecastDate?.toJavaLocalDate(),
             reached = journey.status == ForecastStatus.REACHED,
             lose = dir < 0
         )
