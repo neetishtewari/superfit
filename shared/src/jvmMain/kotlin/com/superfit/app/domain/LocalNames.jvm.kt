@@ -4,8 +4,10 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.Month
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.number
 
-// On the JVM, kotlinx-datetime's DayOfWeek and Month are Java's own, so this is the old call.
-actual fun localWeekdayName(day: DayOfWeek): String = day.getDisplayName(TextStyle.FULL, Locale.getDefault())
+// Java's own names, the same call the app made before these moved to shared code.
+actual fun localWeekdayName(day: DayOfWeek): String = java.time.DayOfWeek.of(day.isoDayNumber).getDisplayName(TextStyle.FULL, Locale.getDefault())
 
-actual fun localMonthName(month: Month): String = month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+actual fun localMonthName(month: Month): String = java.time.Month.of(month.number).getDisplayName(TextStyle.FULL, Locale.getDefault())
