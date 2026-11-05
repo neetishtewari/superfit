@@ -3,6 +3,8 @@ package com.superfit.app.domain
 import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -51,7 +53,7 @@ class DietScoreEngineTest {
     )
 
     private fun score(entries: List<NutritionEntryEntity>, weeksAgo: Int = 0, goal: String = "LOSE_WEIGHT") =
-        DietScoreEngine.score(entries, today, proteinTargetG = 120.0, calorieTarget = 2000.0, zone = zone, weeksAgo = weeksAgo, goal = goal)
+        DietScoreEngine.score(entries, today.toKotlinLocalDate(), proteinTargetG = 120.0, calorieTarget = 2000.0, zone = TimeZone.UTC, weeksAgo = weeksAgo, goal = goal)
 
     private fun DietScore.part(key: String) = parts.first { it.key == key }
 

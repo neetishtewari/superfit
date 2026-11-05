@@ -5,15 +5,18 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 enum class MealSlot { BREAKFAST, LUNCH, SNACK, DINNER }
 
@@ -85,6 +88,7 @@ data class CoachReport(
  * them is a pattern. All counting happens here, in plain code; the AI only puts the result
  * into words.
  */
+@OptIn(ExperimentalTime::class)
 object CoachPatternEngine {
 
     const val LOOKBACK_DAYS = 35
@@ -106,11 +110,11 @@ object CoachPatternEngine {
         sleep: List<SleepTelemetryEntity>,
         weights: List<WeightEntryEntity> = emptyList(),
         targetWeightKg: Double? = null,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): CoachReport {
         val byDate = nutrition.groupBy { dateOf(it.timestamp, zone) }
         val rawDays = (1..LOOKBACK_DAYS).map { offset ->
-            val date = today.minusDays(offset.toLong())
+            val date = today.minus(offset, DateTimeUnit.DAY)
             date to byDate[date].orEmpty()
         }
         val typical = typicalDayCalories(rawDays.map { it.second }, targets.calories)
@@ -164,8 +168,8 @@ object CoachPatternEngine {
     // Day completeness
     // ---------------------------------------------------------------------------------------
 
-    fun slotOf(timestamp: Long, zone: ZoneId): MealSlot {
-        val hour = Instant.ofEpochMilli(timestamp).atZone(zone).hour
+    fun slotOf(timestamp: Long, zone: TimeZone): MealSlot {
+        val hour = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(zone).hour
         return when (hour) {
             in 4..10 -> MealSlot.BREAKFAST
             in 11..15 -> MealSlot.LUNCH
@@ -191,7 +195,7 @@ object CoachPatternEngine {
         entries: List<NutritionEntryEntity>,
         typicalCalories: Double,
         targetCalories: Double,
-        zone: ZoneId
+        zone: TimeZone
     ): DayLog {
         val calories = entries.sumOf { it.calories }
         val mainMeals = entries.map { slotOf(it.timestamp, zone) }.filter { it != MealSlot.SNACK }.toSet()
@@ -225,7 +229,7 @@ object CoachPatternEngine {
         lastWeek: List<DayLog>,
         lastTwoWeeks: List<DayLog>,
         completeDays: Int,
-        zone: ZoneId,
+        zone: TimeZone,
         out: MutableList<CoachFinding>
     ) {
         val blanks = lastWeek.filter { it.status == DayLogStatus.BLANK }
@@ -281,7 +285,7 @@ object CoachPatternEngine {
         targets: MacroTargets,
         weightKg: Double,
         goal: String,
-        zone: ZoneId,
+        zone: TimeZone,
         out: MutableList<CoachFinding>,
         checked: MutableSet<String>
     ) {
@@ -448,18 +452,18 @@ object CoachPatternEngine {
         weights: List<WeightEntryEntity>,
         goal: String,
         targetWeightKg: Double?,
-        zone: ZoneId,
+        zone: TimeZone,
         out: MutableList<CoachFinding>,
         checked: MutableSet<String>
     ) {
         if (weights.isEmpty()) return
         val readings = weights.map { dateOf(it.timestamp, zone) to it.weightKg }.sortedBy { it.first }
         val lastDate = readings.last().first
-        val daysSinceLast = java.time.temporal.ChronoUnit.DAYS.between(lastDate, today).toInt()
+        val daysSinceLast = lastDate.daysUntil(today)
         val trendMeaning = "Weight jumps around by a kilo or more from day to day with water and food, so I go by the trend over weeks, not single readings."
 
-        val recent = readings.filter { java.time.temporal.ChronoUnit.DAYS.between(it.first, today) <= 28 }
-        val span = if (recent.size >= 2) java.time.temporal.ChronoUnit.DAYS.between(recent.first().first, recent.last().first).toInt() else 0
+        val recent = readings.filter { it.first.daysUntil(today) <= 28 }
+        val span = if (recent.size >= 2) recent.first().first.daysUntil(recent.last().first) else 0
         if (recent.size < 3 || span < 14) {
             if (daysSinceLast >= 14) {
                 out += CoachFinding(
@@ -477,7 +481,7 @@ object CoachPatternEngine {
         checked += "weight"
 
         // Least-squares slope in kg per day.
-        val xs = recent.map { java.time.temporal.ChronoUnit.DAYS.between(recent.first().first, it.first).toDouble() }
+        val xs = recent.map { recent.first().first.daysUntil(it.first).toDouble() }
         val ys = recent.map { it.second }
         val xMean = xs.average()
         val yMean = ys.average()
@@ -589,7 +593,7 @@ object CoachPatternEngine {
         byDate: Map<LocalDate, List<NutritionEntryEntity>>,
         lastWeek: List<DayLog>,
         calorieTarget: Double,
-        zone: ZoneId,
+        zone: TimeZone,
         goal: String,
         hasBlankDays: Boolean,
         out: MutableList<CoachFinding>,
@@ -602,12 +606,12 @@ object CoachPatternEngine {
 
         fun treatMeals(fromDaysAgo: Int, toDaysAgo: Int): List<TreatMeal> =
             (toDaysAgo..fromDaysAgo).flatMap { offset ->
-                val date = today.minusDays(offset.toLong())
+                val date = today.minus(offset, DateTimeUnit.DAY)
                 Treats.occasions(byDate[date].orEmpty().groupBy { slotOf(it.timestamp, zone) }.values.toList())
                     .map { meal -> TreatMeal(date, meal.mapNotNull { treatCategoryOf(it) }.toSet(), meal.sumOf { Treats.kcalOf(it) }) }
             }
 
-        val anyLogs = (0..27).any { byDate[today.minusDays(it.toLong())].orEmpty().isNotEmpty() }
+        val anyLogs = (0..27).any { byDate[today.minus(it, DateTimeUnit.DAY)].orEmpty().isNotEmpty() }
         if (!anyLogs) return
         checked += "treats"
 
@@ -617,7 +621,7 @@ object CoachPatternEngine {
         val minimumNote = if (hasBlankDays) " That's only what was logged, so the real number may be higher." else ""
 
         // What the treats cost: their share of the week's calories, and fully logged days over target.
-        val weekKcal = (0..6).sumOf { d -> byDate[today.minusDays(d.toLong())].orEmpty().sumOf { it.calories } }
+        val weekKcal = (0..6).sumOf { d -> byDate[today.minus(d, DateTimeUnit.DAY)].orEmpty().sumOf { it.calories } }
         val treatShare = if (weekKcal > 0) thisWeek.sumOf { it.kcal } / weekKcal else 0.0
         val sharePct = (treatShare * 100).roundToInt()
         val complete = lastWeek.filter { it.status == DayLogStatus.COMPLETE }
@@ -632,7 +636,7 @@ object CoachPatternEngine {
         val worthRaising = dominating || pushingOver || (!judged && thisWeek.size >= 4)
 
         // Change the words from day to day so the same subject doesn't read the same each time.
-        val pick = Math.floorMod(today.toEpochDay(), 3L).toInt()
+        val pick = today.toEpochDays().toLong().mod(3L).toInt()
         val costLine = when {
             dominating -> "Treats and junk food made up about $sharePct% of your calories this week, so they're a big part of how you eat right now."
             overWithTreats >= 2 -> "On $overWithTreats of your fully logged days with a treat, you went over your ${num(calorieTarget.roundToInt())} kcal target."
@@ -648,7 +652,7 @@ object CoachPatternEngine {
             .maxByOrNull { it.value.size }
         if (habit != null && worthRaising) {
             val (category, dates) = habit
-            val span = java.time.temporal.ChronoUnit.DAYS.between(dates.last(), today).toInt() + 1
+            val span = dates.last().daysUntil(today) + 1
             val name = category.replaceFirstChar { it.uppercase() }
             out += CoachFinding(
                 id = "treats_habit",
@@ -765,7 +769,7 @@ object CoachPatternEngine {
         checked: MutableSet<String>
     ) {
         val stepsByDate = activity.mapNotNull { a -> parseDate(a.date)?.let { it to a.steps } }.toMap()
-        fun window(from: Int, to: Int) = (from..to).mapNotNull { stepsByDate[today.minusDays(it.toLong())] }.filter { it > 0 }
+        fun window(from: Int, to: Int) = (from..to).mapNotNull { stepsByDate[today.minus(it, DateTimeUnit.DAY)] }.filter { it > 0 }
 
         val recent = window(1, 7)
         if (recent.size < 4) return
@@ -816,7 +820,7 @@ object CoachPatternEngine {
 
         // Weekends consistently much quieter than weekdays.
         val month = (1..28).mapNotNull { offset ->
-            val date = today.minusDays(offset.toLong())
+            val date = today.minus(offset, DateTimeUnit.DAY)
             stepsByDate[date]?.takeIf { it > 0 }?.let { date to it }
         }
         val weekend = month.filter { it.first.dayOfWeek == DayOfWeek.SATURDAY || it.first.dayOfWeek == DayOfWeek.SUNDAY }.map { it.second }
@@ -837,7 +841,7 @@ object CoachPatternEngine {
     private fun checkSleep(today: LocalDate, sleep: List<SleepTelemetryEntity>, out: MutableList<CoachFinding>, checked: MutableSet<String>) {
         val byDate = sleep.mapNotNull { s -> parseDate(s.date)?.let { it to s.sleepDurationSeconds } }.toMap()
         // Sleep is stored against the morning it ended, so last night belongs to today.
-        val nights = (0..6).mapNotNull { byDate[today.minusDays(it.toLong())] }.filter { it > 0 }.map { it / 3600.0 }
+        val nights = (0..6).mapNotNull { byDate[today.minus(it, DateTimeUnit.DAY)] }.filter { it > 0 }.map { it / 3600.0 }
         if (nights.size < 4) return
         checked += "sleep"
         val avg = nights.average()
@@ -848,7 +852,7 @@ object CoachPatternEngine {
                 area = "sleep",
                 kind = FindingKind.CONCERN,
                 priority = 65,
-                fact = "You've averaged ${"%.1f".format(Locale.US, avg)} hours of sleep over the last ${nights.size} nights.",
+                fact = "You've averaged ${Decimals.one(avg)} hours of sleep over the last ${nights.size} nights.",
                 meaning = meaning,
                 suggestion = "Aim to be in bed 30 minutes earlier tonight, and keep screens away for the last half hour."
             )
@@ -858,7 +862,7 @@ object CoachPatternEngine {
                 area = "sleep",
                 kind = FindingKind.WIN,
                 priority = 30,
-                fact = "You've averaged ${"%.1f".format(Locale.US, avg)} hours of sleep over the last ${nights.size} nights.",
+                fact = "You've averaged ${Decimals.one(avg)} hours of sleep over the last ${nights.size} nights.",
                 meaning = meaning,
                 suggestion = "Keep the same bedtime tonight."
             )
@@ -871,18 +875,18 @@ object CoachPatternEngine {
      * workouts are left out because their time is when they were said, not when they happened.
      * Returns the ids of the everyday habit tips ([CoachingEngine.HABITS]) they already do.
      */
-    private fun checkKeptHabits(today: LocalDate, workouts: List<WorkoutEntryEntity>, zone: ZoneId, out: MutableList<CoachFinding>): Set<String> {
-        val week = (0..6).map { today.minusDays(it.toLong()) }.toSet()
+    private fun checkKeptHabits(today: LocalDate, workouts: List<WorkoutEntryEntity>, zone: TimeZone, out: MutableList<CoachFinding>): Set<String> {
+        val week = (0..6).map { today.minus(it, DateTimeUnit.DAY) }.toSet()
         val recorded = workouts.filter { it.description.contains("(from ") }
-            .map { Instant.ofEpochMilli(it.timestamp).atZone(zone) to it }
-            .filter { (at, _) -> at.toLocalDate() in week }
+            .map { Instant.fromEpochMilliseconds(it.timestamp).toLocalDateTime(zone) to it }
+            .filter { (at, _) -> at.date in week }
         fun walkDays(from: LocalTime, to: LocalTime) = recorded
-            .filter { (at, w) -> w.description.startsWith("Walk") && at.toLocalTime() >= from && at.toLocalTime() < to }
-            .map { it.first.toLocalDate() }.distinct().size
+            .filter { (at, w) -> w.description.startsWith("Walk") && at.time >= from && at.time < to }
+            .map { it.first.date }.distinct().size
         val kept = mutableSetOf<String>()
 
-        val afterLunch = walkDays(LocalTime.of(12, 30), LocalTime.of(16, 0))
-        val afterDinner = walkDays(LocalTime.of(19, 30), LocalTime.of(23, 30))
+        val afterLunch = walkDays(LocalTime(12, 30), LocalTime(16, 0))
+        val afterDinner = walkDays(LocalTime(19, 30), LocalTime(23, 30))
         if (afterLunch >= 3 || afterDinner >= 3) {
             kept += "habit_walk_after_meals"
             val both = afterLunch >= 3 && afterDinner >= 3
@@ -902,7 +906,7 @@ object CoachPatternEngine {
             )
         }
 
-        val mornings = recorded.filter { (at, _) -> at.hour in 5..9 }.map { it.first.toLocalDate() }.distinct().size
+        val mornings = recorded.filter { (at, _) -> at.hour in 5..9 }.map { it.first.date }.distinct().size
         if (mornings >= 4) {
             out += CoachFinding(
                 id = "kept_morning_move",
@@ -920,14 +924,14 @@ object CoachPatternEngine {
     private fun checkWorkouts(
         today: LocalDate,
         workouts: List<WorkoutEntryEntity>,
-        zone: ZoneId,
+        zone: TimeZone,
         out: MutableList<CoachFinding>,
         checked: MutableSet<String>
     ) {
         if (workouts.isEmpty()) return
         val dates = workouts.map { dateOf(it.timestamp, zone) }
         fun sessions(from: Int, to: Int): Int {
-            val range = (to..from).map { today.minusDays(it.toLong()) }.toSet()
+            val range = (to..from).map { today.minus(it, DateTimeUnit.DAY) }.toSet()
             return dates.filter { it in range }.distinct().size
         }
         val thisWeek = sessions(6, 0)
@@ -1018,7 +1022,7 @@ object CoachPatternEngine {
             "GAIN_MUSCLE" -> "this gives your training the building blocks to add muscle"
             else -> "this keeps your muscles and recovery well supported"
         }
-        return "Your ${target.roundToInt()}g target is about ${"%.1f".format(Locale.US, perKg)}g per kg of body weight; $why."
+        return "Your ${target.roundToInt()}g target is about ${Decimals.one(perKg)}g per kg of body weight; $why."
     }
 
     fun targetMeanings(targets: MacroTargets, weightKg: Double, goal: String, maintenanceCalories: Double?): List<String> {
@@ -1030,7 +1034,7 @@ object CoachPatternEngine {
         if (maintenanceCalories != null) {
             val gap = (maintenanceCalories - targets.calories).roundToInt()
             lines += when {
-                gap > 100 -> "Calorie target ${num(target)} kcal is about ${num(gap)} kcal below what you burn (~${num(maintenanceCalories.roundToInt())}), roughly ${"%.1f".format(Locale.US, gap * 7 / 7700.0)} kg of fat loss a week if the weekly average stays on target."
+                gap > 100 -> "Calorie target ${num(target)} kcal is about ${num(gap)} kcal below what you burn (~${num(maintenanceCalories.roundToInt())}), roughly ${Decimals.one(gap * 7 / 7700.0)} kg of fat loss a week if the weekly average stays on target."
                 gap < -100 -> "Calorie target ${num(target)} kcal is about ${num(-gap)} kcal above what you burn (~${num(maintenanceCalories.roundToInt())}), a small surplus for building muscle."
                 else -> "Calorie target ${num(target)} kcal is about what you burn, so your weight should hold steady."
             }
@@ -1068,17 +1072,18 @@ object CoachPatternEngine {
     // Helpers
     // ---------------------------------------------------------------------------------------
 
-    private val dayFormat = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+    private fun titleWord(name: String): String = name.take(3).lowercase().replaceFirstChar { it.uppercase() }
 
-    private fun fmt(date: LocalDate): String = date.format(dayFormat)
+    /** "Mon 3 Nov", always in English like the rest of what the coach hands the AI. */
+    private fun fmt(date: LocalDate): String = "${titleWord(date.dayOfWeek.name)} ${date.day} ${titleWord(date.month.name)}"
 
-    private fun dateOf(timestamp: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
+    private fun dateOf(timestamp: Long, zone: TimeZone): LocalDate = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(zone).date
 
     private fun parseDate(text: String): LocalDate? = runCatching { LocalDate.parse(text) }.getOrNull()
 
-    private fun fmtKg(value: Double): String = String.format(Locale.US, "%.1f", value)
+    private fun fmtKg(value: Double): String = Decimals.one(value)
 
-    private fun num(value: Int): String = String.format(Locale.US, "%,d", value)
+    private fun num(value: Int): String = Decimals.grouped(value.toLong())
 
     private fun goalPhrase(goal: String): String = when (goal) {
         "LOSE_WEIGHT" -> " on the scale"

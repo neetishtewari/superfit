@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinTimeZone
 
 enum class DayStatus {
     Deficit,
@@ -435,7 +436,7 @@ class HistoryViewModel(
             val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val yesterday = today.minusDays(1)
             val dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
-                com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday, proteinTarget, calculateTargetCalories(yesterday), zone, weeksAgo)?.score
+                com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday.toKotlinLocalDate(), proteinTarget, calculateTargetCalories(yesterday), zone.toKotlinTimeZone(), weeksAgo)?.score
             }
             val report = com.superfit.app.domain.CoachExportBuilder.build(
                 header = com.superfit.app.domain.CoachExportHeader(

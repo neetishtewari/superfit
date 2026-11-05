@@ -1,11 +1,15 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 enum class FoodCleanlinessTier {
     CLEANEST,
@@ -63,15 +67,16 @@ data class DietQualityMetrics(
     val estimatedShare: Double = 0.0
 )
 
+@OptIn(ExperimentalTime::class)
 object FoodQualityEngine {
 
     fun analyzeDietQuality(
         nutritionHistory: List<NutritionEntryEntity> = emptyList(),
         userGoal: String = "LOSE_WEIGHT", // "LOSE_WEIGHT", "GAIN_MUSCLE", "MAINTAIN"
-        zoneId: ZoneId = ZoneId.systemDefault(),
+        zoneId: TimeZone = TimeZone.currentSystemDefault(),
         proteinTargetG: Double = 120.0,
         calorieTarget: Double = 2000.0,
-        today: LocalDate = LocalDate.now(zoneId)
+        today: LocalDate = Clock.System.todayIn(zoneId)
     ): DietQualityMetrics {
         if (nutritionHistory.isEmpty()) {
             return DietQualityMetrics(
@@ -86,7 +91,7 @@ object FoodQualityEngine {
         }
 
         // Filter entries for rolling 7 days using timestamp
-        val cutoffTimestamp = System.currentTimeMillis() - (7 * 24 * 3600 * 1000L)
+        val cutoffTimestamp = Clock.System.now().toEpochMilliseconds() - (7 * 24 * 3600 * 1000L)
         val rolling7DaysEntries = nutritionHistory.filter { entry ->
             entry.timestamp >= cutoffTimestamp
         }
@@ -96,8 +101,8 @@ object FoodQualityEngine {
         // Calculate total distinct calendar days logged across the analysis window
         val distinctDays = entriesToAnalyze.map { entry ->
             runCatching {
-                Instant.ofEpochMilli(entry.timestamp).atZone(zoneId).toLocalDate()
-            }.getOrElse { LocalDate.now() }
+                Instant.fromEpochMilliseconds(entry.timestamp).toLocalDateTime(zoneId).date
+            }.getOrElse { Clock.System.todayIn(zoneId) }
         }.distinct()
         val totalDistinctDaysLogged = max(1, distinctDays.size)
 
@@ -126,8 +131,8 @@ object FoodQualityEngine {
             // Number of distinct calendar days this specific food was logged
             val foodDistinctDays = entries.map { entry ->
                 runCatching {
-                    Instant.ofEpochMilli(entry.timestamp).atZone(zoneId).toLocalDate()
-                }.getOrElse { LocalDate.now() }
+                    Instant.fromEpochMilliseconds(entry.timestamp).toLocalDateTime(zoneId).date
+                }.getOrElse { Clock.System.todayIn(zoneId) }
             }.distinct().size
 
             // Weekly frequency within the window

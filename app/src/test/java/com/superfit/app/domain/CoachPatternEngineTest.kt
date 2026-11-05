@@ -7,6 +7,9 @@ import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinLocalTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -49,8 +52,8 @@ class CoachPatternEngineTest {
         weights: List<WeightEntryEntity> = emptyList(),
         workouts: List<WorkoutEntryEntity> = emptyList()
     ) = CoachPatternEngine.analyze(
-        today = today,
-        now = LocalTime.of(18, 0),
+        today = today.toKotlinLocalDate(),
+        now = LocalTime.of(18, 0).toKotlinLocalTime(),
         weightKg = 80.0,
         goal = goal,
         targets = targets,
@@ -61,7 +64,7 @@ class CoachPatternEngineTest {
         sleep = emptyList(),
         weights = weights,
         targetWeightKg = 75.0,
-        zone = zone
+        zone = TimeZone.UTC
     )
 
     private fun weighIns(vararg pairs: Pair<Int, Double>) = pairs.map { (daysAgo, kg) ->
@@ -75,12 +78,12 @@ class CoachPatternEngineTest {
     @Test
     fun `a day with a forgotten meal is partial, a light day with every meal logged is complete`() {
         val forgotBreakfast = listOf(meal(1, 13, "rice and dal", 700.0), meal(1, 20, "roti sabzi", 800.0))
-        assertEquals(DayLogStatus.PARTIAL, CoachPatternEngine.buildDayLog(today.minusDays(1), forgotBreakfast, 2000.0, 2000.0, zone).status)
+        assertEquals(DayLogStatus.PARTIAL, CoachPatternEngine.buildDayLog(today.minusDays(1).toKotlinLocalDate(), forgotBreakfast, 2000.0, 2000.0, TimeZone.UTC).status)
 
         val lightButComplete = fullDay(1, protein = 90.0, kcal = 1300.0)
-        assertEquals(DayLogStatus.COMPLETE, CoachPatternEngine.buildDayLog(today.minusDays(1), lightButComplete, 2000.0, 2000.0, zone).status)
+        assertEquals(DayLogStatus.COMPLETE, CoachPatternEngine.buildDayLog(today.minusDays(1).toKotlinLocalDate(), lightButComplete, 2000.0, 2000.0, TimeZone.UTC).status)
 
-        assertEquals(DayLogStatus.BLANK, CoachPatternEngine.buildDayLog(today.minusDays(1), emptyList(), 2000.0, 2000.0, zone).status)
+        assertEquals(DayLogStatus.BLANK, CoachPatternEngine.buildDayLog(today.minusDays(1).toKotlinLocalDate(), emptyList(), 2000.0, 2000.0, TimeZone.UTC).status)
     }
 
     @Test
@@ -282,6 +285,9 @@ class CoachPatternEngineTest {
         val logs = listOf(1, 2, 5, 6).flatMap { fullDay(it, 130.0) }
         val report = analyze(logs)
         assertTrue(report.ids().contains("logging_gaps"))
+        // Days written the same way as before the move to shared code ("EEE d MMM", English).
+        val gaps = report.findings.first { it.id == "logging_gaps" }.fact
+        assertTrue(gaps, gaps.contains("(Sun 11 Oct, Sat 10 Oct, Wed 7 Oct)"))
         assertFalse(report.ids().contains("calories_very_low"))
         assertEquals(4, report.completeDaysLastWeek)
     }

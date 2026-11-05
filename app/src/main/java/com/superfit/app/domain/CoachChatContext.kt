@@ -10,6 +10,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.datetime.toJavaLocalDate
 
 /**
  * What the coach chat knows about the user when it answers: their own meals, days, workouts,
@@ -93,7 +94,7 @@ object CoachChatContext {
         }
 
     fun dayLines(days: List<DayLog>): String = days.joinToString("\n") { d ->
-        val day = d.date.format(dayFormat)
+        val day = d.date.toJavaLocalDate().format(dayFormat)
         when (d.status) {
             DayLogStatus.BLANK -> "- $day: nothing logged (unknown, not a day without food)"
             else -> {

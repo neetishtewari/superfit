@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinLocalTime
 
 class DashboardViewModel(
     private val repository: DataRepository,
@@ -444,8 +445,8 @@ class DashboardViewModel(
         val allNutrition = repository.getAllNutritionEntries()
         val coachWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr)
         val report = CoachPatternEngine.analyze(
-            today = today,
-            now = now,
+            today = today.toKotlinLocalDate(),
+            now = now.toKotlinLocalTime(),
             weightKg = profile.weightKg,
             goal = profile.goal,
             targets = macroTargets,

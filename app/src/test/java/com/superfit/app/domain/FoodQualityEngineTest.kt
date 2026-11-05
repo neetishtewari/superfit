@@ -1,7 +1,7 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.ZoneId
+import kotlinx.datetime.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,7 +9,7 @@ import org.junit.Test
 
 class FoodQualityEngineTest {
 
-    private val zoneId = ZoneId.of("UTC")
+    private val zoneId = TimeZone.UTC
     private val now = System.currentTimeMillis()
     private val oneDayMs = 24 * 3600 * 1000L
 
