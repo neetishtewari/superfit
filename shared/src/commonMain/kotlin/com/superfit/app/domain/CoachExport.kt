@@ -1,13 +1,14 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
-import kotlinx.datetime.toJavaLocalDate
-import kotlinx.datetime.toKotlinLocalDate
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 /** Who the report is about, shown at the top of page 1. */
 data class CoachExportHeader(
@@ -70,30 +71,29 @@ data class CoachExport(
  * Builds the "Share my report" summary from the same day totals Insights uses. Averages
  * count only logged days, so a forgotten day never reads as under-eating. No AI.
  */
+@OptIn(ExperimentalTime::class)
 object CoachExportBuilder {
-
-    private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
     fun build(
         header: CoachExportHeader,
         weeks: Int,
         today: LocalDate,
-        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
+        days: Map<LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity>,
         weighIns: List<Pair<LocalDate, Double>>,
         proteinTargetG: Double,
         dietScores: List<Int?>,
-        zone: ZoneId = ZoneId.systemDefault(),
+        zone: TimeZone = TimeZone.currentSystemDefault(),
         body: BodySummary? = null
     ): CoachExport {
         // Ends yesterday, like Insights: today isn't over yet.
-        val to = today.minusDays(1)
-        val from = to.minusDays(weeks * 7L - 1)
-        val mealsByDate = meals.groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
+        val to = today.minus(1, DateTimeUnit.DAY)
+        val from = to.minus(weeks * 7 - 1, DateTimeUnit.DAY)
+        val mealsByDate = meals.groupBy { Instant.fromEpochMilliseconds(it.timestamp).toLocalDateTime(zone).date }
         val weightByDate = weighIns.toMap()
 
-        val reportDays = InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()).map { d ->
-            val date = d.date.toJavaLocalDate()
+        val reportDays = InsightsEngine.range(days, from, to).map { d ->
+            val date = d.date
             val dayMeals = mealsByDate[date].orEmpty().sortedBy { it.timestamp }
             CoachExportDay(
                 date = date,
@@ -108,7 +108,7 @@ object CoachExportBuilder {
                 weightKg = weightByDate[date],
                 meals = dayMeals.map {
                     CoachExportMeal(
-                        time = Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalTime().format(timeFormat),
+                        time = Instant.fromEpochMilliseconds(it.timestamp).toLocalDateTime(zone).time.let { t -> "${two(t.hour)}:${two(t.minute)}" },
                         name = it.foodText,
                         kcal = it.calories.roundToInt(),
                         proteinG = it.proteinG.roundToInt()
@@ -119,12 +119,12 @@ object CoachExportBuilder {
 
         val logged = reportDays.filter { it.logged }
         fun avg(f: (CoachExportDay) -> Int): Int? = if (logged.isEmpty()) null else logged.map(f).average().roundToInt()
-        val stats = InsightsEngine.stats(InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()))
+        val stats = InsightsEngine.stats(InsightsEngine.range(days, from, to))
         val withSteps = reportDays.filter { it.steps > 0 }
         // Short walks are counted apart so a coach doesn't read 70 walks as 70 training sessions.
-        val facts = InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()).flatMap { it.workouts }
+        val facts = InsightsEngine.range(days, from, to).flatMap { it.workouts }
         val walks = facts.count { isWalk(it) }
-        val inPeriod = weighIns.filter { !it.first.isBefore(from) && !it.first.isAfter(to) }.sortedBy { it.first }
+        val inPeriod = weighIns.filter { it.first >= from && it.first <= to }.sortedBy { it.first }
 
         return CoachExport(
             header = header,
@@ -150,6 +150,8 @@ object CoachExportBuilder {
         )
     }
 
+    private fun two(n: Int) = n.toString().padStart(2, '0')
+
     private fun isWalk(w: ActivityFact) = !w.isRun && w.title.contains("walk", ignoreCase = true)
 
     /** One line per kind of workout in a day: "4× Walk · 70 min · 3.6 km" instead of four lines. */
@@ -162,7 +164,7 @@ object CoachExportBuilder {
             buildList {
                 add("${list.size}× $title")
                 if (minutes > 0) add("$minutes min")
-                if (km > 0) add(String.format(java.util.Locale.US, "%.1f km", km))
+                if (km > 0) add("${Decimals.one(km)} km")
             }.joinToString(" · ")
         }
     }
@@ -171,7 +173,7 @@ object CoachExportBuilder {
     fun describe(w: ActivityFact): String = buildList {
         add(w.title)
         if (w.minutes > 0) add("${w.minutes} min")
-        w.distanceKm?.takeIf { it > 0 }?.let { add(String.format(java.util.Locale.US, "%.1f km", it)) }
+        w.distanceKm?.takeIf { it > 0 }?.let { add("${Decimals.one(it)} km") }
     }.joinToString(" · ")
 
     fun goalLabel(goal: String): String = FitnessGoals.title(goal)

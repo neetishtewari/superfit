@@ -64,7 +64,9 @@ tested on the dev app first.
    - 3m: the monthly recap (which cards appear, their numbers, and the words for the AI) moves to
      `shared`, using kotlinx-datetime's YearMonth. The saved AI words keep the same key, so
      nobody's finished recap is rewritten.
-   - 3n onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3n: the "Share my report" numbers (averages, weigh-ins, day-by-day meals and workouts) move
+     to `shared`. The PDF drawing itself stays Android-only for now; the iPhone draws its own.
+   - 3o onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -94,6 +96,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3n (reviewed 6 Nov): code moved without behaviour changes. No new libraries, permissions,
+network calls or secrets. The report is still built on the phone and only leaves it when the user
+shares it themselves.
 
 Step 3m (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets. The recap still makes one AI call a month through Firebase AI Logic,
