@@ -29,7 +29,11 @@ tested on the dev app first.
      `org.json` the app uses, with the same forgiving rules, so the AI's answers and saved data read
      exactly as before. The app's logic files switch to it; the files themselves move in 3c. It needs
      no new library.
-   - 3c: files that need `java.time` swapped for kotlinx-datetime, and the database entities they read.
+   - 3c: the database entities (meals, workouts, weights, profile...) move to `shared`, since most
+     logic reads them. Only Room's annotations come along; the DAOs and database stay in `app`
+     until step 4. Same tables, so no database change.
+   - 3d onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+     shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
    iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
@@ -58,6 +62,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3c (reviewed 5 Nov): entities move unchanged apart from the profile's start-date default,
+which now reads the clock through Kotlin instead of Java. Adds Room's annotation library (Google's,
+already in the app). No new permissions, network calls or secrets.
 
 Step 3b (reviewed 4 Nov): the JSON reader only parses text the app already parsed (AI answers,
 its own saved data); no network, files or permissions. It has no recursion limit, like org.json, so

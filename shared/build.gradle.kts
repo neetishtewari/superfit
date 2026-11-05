@@ -19,6 +19,10 @@ kotlin {
   jvm()
 
   sourceSets {
+    commonMain.dependencies {
+      // Room's annotations only (no database code), so the entities can live here.
+      api(libs.androidx.room.common)
+    }
     commonTest.dependencies {
       implementation(kotlin("test"))
     }
