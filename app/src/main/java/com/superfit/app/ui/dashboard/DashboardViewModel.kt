@@ -808,8 +808,8 @@ class DashboardViewModel(
         } else {
             emptyList()
         }
-        val steps = activity.mapNotNull { row -> runCatching { DaySteps(LocalDate.parse(row.date), row.steps) }.getOrNull() }
-        val bests = PersonalBests.compute(views, steps, LocalDate.now())
+        val steps = activity.mapNotNull { row -> runCatching { DaySteps(kotlinx.datetime.LocalDate.parse(row.date), row.steps) }.getOrNull() }
+        val bests = PersonalBests.compute(views, steps, LocalDate.now().toKotlinLocalDate())
         val baseline = prefs.bestBaseline
         val seen = prefs.bestPodiumSeen
         val check = PersonalBests.check(bests, baseline, seen, System.currentTimeMillis())

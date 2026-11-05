@@ -19,6 +19,7 @@ class MonthlyRecapTest {
 
     private val utc = ZoneOffset.UTC
     private val october = YearMonth.of(2026, 10)
+    private fun oct(day: Int) = kotlinx.datetime.LocalDate(2026, 10, day)
     private val allSet = RecapSetup(healthConnect = true, mic = true, widget = true)
 
     private fun day(
@@ -150,10 +151,10 @@ class MonthlyRecapTest {
     fun strengthCardSaysHowOftenHowLongAndWhatWasTrained() {
         val days = month { d -> day(d) }
         val sessions = listOf(
-            StrengthSession(october.atDay(2), 40, setOf(BodyArea.UPPER)),
-            StrengthSession(october.atDay(9), 40, setOf(BodyArea.UPPER)),
-            StrengthSession(october.atDay(16), 40, setOf(BodyArea.UPPER)),
-            StrengthSession(october.atDay(23), 40, setOf(BodyArea.UPPER))
+            StrengthSession(oct(2), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(oct(9), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(oct(16), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(oct(23), 40, setOf(BodyArea.UPPER))
         )
         val d = recap(days, strength = sessions)!!.cards.filterIsInstance<RecapCard.Strength>().single().detail!!
         assertEquals(160, d.minutes)
@@ -166,9 +167,9 @@ class MonthlyRecapTest {
     fun bothHalvesTrainedIsNotFlagged() {
         val d = StrengthSessions.detail(
             listOf(
-                StrengthSession(october.atDay(1), null, setOf(BodyArea.UPPER)),
-                StrengthSession(october.atDay(4), null, setOf(BodyArea.LOWER)),
-                StrengthSession(october.atDay(8), null, emptySet())
+                StrengthSession(oct(1), null, setOf(BodyArea.UPPER)),
+                StrengthSession(oct(4), null, setOf(BodyArea.LOWER)),
+                StrengthSession(oct(8), null, emptySet())
             ),
             31
         )!!

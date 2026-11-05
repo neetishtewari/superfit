@@ -9,6 +9,7 @@ import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.datetime.toJavaLocalDate
 
 /** One fact on the "What moved the needle" card, e.g. "Protein on target" / "19 of 24 logged days". */
 data class RecapFact(val title: String, val detail: String)
@@ -131,9 +132,9 @@ object MonthlyRecap {
         val monthMeals = meals.filter { dateOf(it.timestamp, zone).let { d -> !d.isBefore(first) && !d.isAfter(last) } }
         val loggedDates = logged.map { it.date }.toSet()
         val lose = journey?.let { it.targetKg < it.startKg } ?: true
-        val strengthMonth = strength.filter { !it.date.isBefore(first) && !it.date.isAfter(last) }
+        val strengthMonth = strength.filter { it.date.toJavaLocalDate().let { d -> !d.isBefore(first) && !d.isAfter(last) } }
         val strengthNow = strengthMonth.size
-        val strengthPrev = strength.count { !it.date.isBefore(first.minusMonths(1)) && it.date.isBefore(first) }
+        val strengthPrev = strength.count { it.date.toJavaLocalDate().let { d -> !d.isBefore(first.minusMonths(1)) && d.isBefore(first) } }
 
         val cards = buildList {
             if (goalSet && journey != null) add(goal(journey, weighIns, first, last))

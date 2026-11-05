@@ -153,7 +153,7 @@ class ShareCardsTest {
 
     @Test
     fun weekStepsCardNamesTheWeek() {
-        val best = PersonalBest(BestKind.MOST_STEPS_WEEK, 84200.0, null, previousValue = 80000.0, previousTime = null, periodStart = LocalDate.of(2026, 10, 13))
+        val best = PersonalBest(BestKind.MOST_STEPS_WEEK, 84200.0, null, previousValue = 80000.0, previousTime = null, periodStart = kotlinx.datetime.LocalDate(2026, 10, 13))
         val card = ShareCards.best(best, isNew = true, today = today, zone = utc)
         assertEquals("Week of 13 Oct", card.dateLine)
         assertEquals("84,200", card.bigValue)

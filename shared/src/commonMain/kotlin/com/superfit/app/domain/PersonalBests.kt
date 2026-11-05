@@ -1,11 +1,16 @@
 package com.superfit.app.domain
 
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
-import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 
 /** How a best is measured: one workout, or the total over a finished day, week or month. */
 enum class BestPeriod { WORKOUT, DAY, WEEK, MONTH }
@@ -85,6 +90,7 @@ data class BestCheck(
  * never floods Home with old "new bests". Day, week and month totals only count once that day,
  * week or month is over, so a best is offered once and not again every hour as it grows.
  */
+@OptIn(ExperimentalTime::class)
 object PersonalBests {
 
     // A run this much short of the distance still counts, so a 9.96 km run is a 10K.
@@ -109,7 +115,7 @@ object PersonalBests {
         workouts: List<WorkoutView>,
         steps: List<DaySteps>,
         today: LocalDate,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): List<PersonalBest> = BestKind.entries.mapNotNull { kind ->
         val entries = when (kind.period) {
             BestPeriod.WORKOUT -> workouts.mapNotNull { w -> valueOf(kind, w)?.let { Entry(it, w.startTime, w) } }
@@ -155,23 +161,23 @@ object PersonalBests {
         workouts: List<WorkoutView>,
         steps: List<DaySteps>,
         today: LocalDate,
-        zone: ZoneId
+        zone: TimeZone
     ): List<Entry> {
         val perDay: Map<LocalDate, Double> = if (kind.isSteps) {
             steps.filter { it.steps > 0 }.associate { it.date to it.steps.toDouble() }
         } else {
             workouts.filter { (it.title == "Run" || it.title == "Walk") && (it.distanceKm ?: 0.0) > 0 }
-                .groupBy { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
+                .groupBy { Instant.fromEpochMilliseconds(it.startTime).toLocalDateTime(zone).date }
                 .mapValues { (_, ws) -> ws.sumOf { it.distanceKm ?: 0.0 } }
         }
         return perDay.entries
             .groupBy { periodStart(kind.period, it.key) }
             .mapNotNull { (start, days) ->
                 val end = periodEnd(kind.period, start)
-                if (!end.isBefore(today)) return@mapNotNull null
+                if (end >= today) return@mapNotNull null
                 // Steps are counted every day, so a week or month with gaps in the data would undercount.
                 if (kind.isSteps && days.size < minStepDays(kind.period, start)) return@mapNotNull null
-                val endMillis = end.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+                val endMillis = end.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone).toEpochMilliseconds() - 1
                 Entry(days.sumOf { it.value }, endMillis, periodStart = start)
             }
     }
@@ -179,19 +185,20 @@ object PersonalBests {
     /** Days of step data a week or month needs to count: all but one of a week, all but three of a month. */
     private fun minStepDays(period: BestPeriod, start: LocalDate): Int = when (period) {
         BestPeriod.WEEK -> 6
-        BestPeriod.MONTH -> start.lengthOfMonth() - 3
+        BestPeriod.MONTH -> start.daysUntil(start.plus(1, DateTimeUnit.MONTH)) - 3
         else -> 1
     }
 
     fun periodStart(period: BestPeriod, date: LocalDate): LocalDate = when (period) {
-        BestPeriod.WEEK -> date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        BestPeriod.MONTH -> date.withDayOfMonth(1)
+        // Weeks start on Monday (kotlinx's DayOfWeek runs MONDAY..SUNDAY).
+        BestPeriod.WEEK -> date.minus(date.dayOfWeek.ordinal, DateTimeUnit.DAY)
+        BestPeriod.MONTH -> LocalDate(date.year, date.month, 1)
         else -> date
     }
 
     private fun periodEnd(period: BestPeriod, start: LocalDate): LocalDate = when (period) {
-        BestPeriod.WEEK -> start.plusDays(6)
-        BestPeriod.MONTH -> start.plusMonths(1).minusDays(1)
+        BestPeriod.WEEK -> start.plus(6, DateTimeUnit.DAY)
+        BestPeriod.MONTH -> start.plus(1, DateTimeUnit.MONTH).minus(1, DateTimeUnit.DAY)
         else -> start
     }
 
@@ -253,5 +260,5 @@ object PersonalBests {
     fun acknowledgePodium(best: PersonalBest, seen: Set<String>): Set<String> = best.podiumKey?.let { seen + it } ?: seen
 
     /** Steps rounded for display, e.g. "23,410". */
-    fun stepsText(value: Double): String = "%,d".format(value.roundToInt())
+    fun stepsText(value: Double): String = Decimals.grouped(value.roundToLong())
 }

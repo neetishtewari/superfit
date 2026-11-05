@@ -23,6 +23,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
 import org.json.JSONObject
 
@@ -116,9 +117,9 @@ object MonthlyRecapData {
         val tags = strengthTags(context, strengthLogs.filter { YearMonth.from(Instant.ofEpochMilli(it.timestamp).atZone(zone)) == month })
         val strength = strengthLogs.map { w ->
             val t = tags[tagKey(w)]
-            StrengthSession(Instant.ofEpochMilli(w.timestamp).atZone(zone).toLocalDate(), t?.second, t?.first.orEmpty())
+            StrengthSession(Instant.ofEpochMilli(w.timestamp).atZone(zone).toLocalDate().toKotlinLocalDate(), t?.second, t?.first.orEmpty())
         } + views.filter { it.title == "Strength workout" }.map { v ->
-            StrengthSession(Instant.ofEpochMilli(v.startTime).atZone(zone).toLocalDate(), v.minutes.toInt().takeIf { it > 0 })
+            StrengthSession(Instant.ofEpochMilli(v.startTime).atZone(zone).toLocalDate().toKotlinLocalDate(), v.minutes.toInt().takeIf { it > 0 })
         }
         val hc = repository.healthConnectManager
         val setup = RecapSetup(

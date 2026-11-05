@@ -45,7 +45,10 @@ tested on the dev app first.
      exercise calories) move to `shared`. Health Connect's exercise type numbers are copied into
      `ExerciseTypes`, with an app test that checks every one against the Health Connect library;
      on iPhone, HealthKit types will map onto the same numbers.
-   - 3h onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3h: personal bests and strength sessions move to `shared`. Insights, Journey, the monthly
+     recap, the coach report and the Diet Quality score all share the same day-by-day data and the
+     coach's pattern engine, so they follow bottom-up in the next pieces.
+   - 3i onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -75,6 +78,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3h (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
+network calls or secrets.
 
 Step 3g (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets.
