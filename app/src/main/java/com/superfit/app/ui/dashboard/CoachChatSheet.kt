@@ -79,6 +79,7 @@ import com.superfit.app.ui.components.SuperfitField
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.datetime.toKotlinLocalDate
 
 /** One row of the chat list: a line between days, or a message. */
 private sealed interface ChatRow {
@@ -99,7 +100,7 @@ private fun chatRows(entries: List<ChatEntry>, today: LocalDate, zone: ZoneId): 
     entries.forEachIndexed { index, entry ->
         val day = Instant.ofEpochMilli(entry.time).atZone(zone).toLocalDate()
         if (day != lastDay) {
-            rows += ChatRow.Day(CoachChat.dayLabel(day, today))
+            rows += ChatRow.Day(CoachChat.dayLabel(day.toKotlinLocalDate(), today.toKotlinLocalDate()))
             lastDay = day
         }
         rows += ChatRow.Message(
@@ -247,7 +248,7 @@ internal fun CoachChatSheet(
                         style = MaterialTheme.typography.titleLarge,
                         color = ThemeTextPrimary
                     )
-                    val activeNotes = notes.count { it.isActive(LocalDate.now()) }
+                    val activeNotes = notes.count { it.isActive(LocalDate.now().toKotlinLocalDate()) }
                     Text(
                         text = if (activeNotes > 0) {
                             "Knows your meals, workouts and goal, plus $activeNotes ${if (activeNotes == 1) "note" else "notes"} you've shared"

@@ -320,7 +320,7 @@ class DashboardViewModel(
         if (question.length < 12 || question == com.superfit.app.domain.CoachChat.TELL_ME_MORE) return
         viewModelScope.launch {
             try {
-                val today = LocalDate.now()
+                val today = LocalDate.now().toKotlinLocalDate()
                 val notes = _coachNotes.value
                 val response = GeminiClient.generateContent(
                     prompt = com.superfit.app.domain.CoachNotes.extractPrompt(notes, today, question, reply.text),
@@ -382,7 +382,7 @@ class DashboardViewModel(
 
     /** Adds what the user typed or pasted in Settings; each line becomes its own note. */
     fun addCoachNote(text: String) {
-        val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now(), System.currentTimeMillis())
+        val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now().toKotlinLocalDate(), System.currentTimeMillis())
         if (notes.isEmpty()) return
         saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(notes, emptyList())))
         notes.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = true) }

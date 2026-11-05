@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /**
  * What the coach chat knows about the user when it answers: their own meals, days, workouts,
@@ -74,7 +75,7 @@ object CoachChatContext {
         appendLine("Foods they often eat: ${commonFoods.ifBlank { "not enough logs yet" }}")
         appendLine()
         appendLine("What you know about them (from earlier chats and their own notes; respect these):")
-        appendLine(CoachNotes.promptLines(notes, today).ifBlank { "- nothing yet" })
+        appendLine(CoachNotes.promptLines(notes, today.toKotlinLocalDate()).ifBlank { "- nothing yet" })
         if (todayTip != null) {
             appendLine()
             appendLine("Today's tip on their home screen, from you: ${todayTip.headline} ${todayTip.action}".trim())

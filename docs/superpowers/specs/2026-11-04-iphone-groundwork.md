@@ -71,7 +71,11 @@ tested on the dev app first.
      `Ai` interface; Android plugs in its Firebase AI Logic client (GeminiClient) at start-up, the
      iPhone app will plug in Firebase's iPhone SDK. Photo reading, coach chat and the model
      failover stay in the app for now.
-   - 3p onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3p: coach chat history (earlier topics, day labels) and the coach's notes (what it remembers,
+     when short notes and plans fade, plan follow-ups) move to `shared`, with a small shared
+     `EnglishDates` for "Sat 10 Oct" style wording. Saved notes keep the same format, so nothing
+     anyone saved changes.
+   - 3q onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -101,6 +105,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3p (reviewed 6 Nov): code moved without behaviour changes. Notes are stored, backed up and
+cleared exactly as before (same prefs key and Firestore documents); the note text sent to the AI is
+unchanged. No new libraries, permissions, network calls or secrets.
 
 Step 3o (reviewed 6 Nov): prompts and answer reading moved without changes. The AI is still
 reached only through Firebase AI Logic with App Check, the same models and the same retries; the

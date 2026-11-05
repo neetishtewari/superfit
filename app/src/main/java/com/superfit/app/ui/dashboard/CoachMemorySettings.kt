@@ -34,6 +34,8 @@ import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /**
  * "What my AI coach knows": every note the AI coach keeps about the user, from chats or typed here.
@@ -43,7 +45,7 @@ import java.util.Locale
 fun CoachMemorySettings(viewModel: DashboardViewModel) {
     val notes by viewModel.coachNotes.collectAsState()
     val today = LocalDate.now()
-    val active = notes.filter { it.isActive(today) }
+    val active = notes.filter { it.isActive(today.toKotlinLocalDate()) }
     var newNote by remember { mutableStateOf("") }
     var confirmClear by remember { mutableStateOf(false) }
 
@@ -154,13 +156,14 @@ fun CoachMemorySettings(viewModel: DashboardViewModel) {
 @Composable
 private fun NoteRow(note: CoachNote, today: LocalDate, onRemove: () -> Unit) {
     val dayFormat = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+    val added = note.added.toJavaLocalDate()
     val source = when {
-        note.byUser -> "Added by you, ${note.added.format(dayFormat)}"
-        note.added == today -> "From chat, today"
-        note.added == today.minusDays(1) -> "From chat, yesterday"
-        else -> "From chat, ${note.added.format(dayFormat)}"
+        note.byUser -> "Added by you, ${added.format(dayFormat)}"
+        added == today -> "From chat, today"
+        added == today.minusDays(1) -> "From chat, yesterday"
+        else -> "From chat, ${added.format(dayFormat)}"
     }
-    val fades = note.expires?.let { " · fades ${it.format(dayFormat)}" }.orEmpty()
+    val fades = note.expires?.let { " · fades ${it.toJavaLocalDate().format(dayFormat)}" }.orEmpty()
     val kind = if (note.kind == NoteKind.PLAN) "Plan: " else ""
     Row(
         modifier = Modifier.fillMaxWidth(),

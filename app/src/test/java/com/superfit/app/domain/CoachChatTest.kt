@@ -3,6 +3,7 @@ package com.superfit.app.domain
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -24,7 +25,7 @@ class CoachChatTest {
 
     @Test
     fun savedChatComesBackTheSame() {
-        val note = CoachNote("n1", "Knee hurts after running", NoteKind.LASTING, LocalDate.of(2026, 10, 25))
+        val note = CoachNote("n1", "Knee hurts after running", NoteKind.LASTING, LocalDate.of(2026, 10, 25).toKotlinLocalDate())
         val entries = listOf(
             msg(1, true, "My knee hurts", 5).copy(spoken = true),
             msg(2, false, "Skip the run", 5).copy(rememberedIds = listOf("n1"), forgotten = listOf(note), mealToLog = "2 eggs", mealLogged = true)
@@ -79,7 +80,7 @@ class CoachChatTest {
             msg(4, true, "My knee hurts", 100),
             msg(5, true, "Recent question", 2)
         )
-        val topics = CoachChat.earlierTopics(entries, now, ZoneOffset.UTC)
+        val topics = CoachChat.earlierTopics(entries, now, kotlinx.datetime.TimeZone.UTC)
         assertEquals(2, topics.size)
         assertTrue(topics[0].endsWith("My knee hurts"))
         assertTrue(topics[1].endsWith("Is oats ok for breakfast?"))
@@ -115,9 +116,9 @@ class CoachChatTest {
     @Test
     fun dayLabels() {
         val today = LocalDate.of(2026, 10, 26)
-        assertEquals("Today", CoachChat.dayLabel(today, today))
-        assertEquals("Yesterday", CoachChat.dayLabel(today.minusDays(1), today))
-        assertEquals("Fri 23 Oct", CoachChat.dayLabel(today.minusDays(3), today))
+        assertEquals("Today", CoachChat.dayLabel(today.toKotlinLocalDate(), today.toKotlinLocalDate()))
+        assertEquals("Yesterday", CoachChat.dayLabel(today.minusDays(1).toKotlinLocalDate(), today.toKotlinLocalDate()))
+        assertEquals("Fri 23 Oct", CoachChat.dayLabel(today.minusDays(3).toKotlinLocalDate(), today.toKotlinLocalDate()))
     }
 
     @Test
