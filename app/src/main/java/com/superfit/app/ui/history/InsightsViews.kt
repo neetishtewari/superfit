@@ -83,6 +83,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.datetime.toJavaLocalDate
 
 private val shortDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 private val Orange = SolarAmber
@@ -586,7 +587,7 @@ private fun BodyCard(b: BodySummary, canAskBodyAccess: Boolean, onAllowBody: () 
         b.bmi?.let { BodyRow("BMI", BodyReadings.fmt(it), null) }
         when {
             b.hasScaleData -> {
-                val from = listOfNotNull(b.source?.let { "From $it" }, b.measuredOn?.let { "measured ${it.format(shortDate)}" }).joinToString(", ")
+                val from = listOfNotNull(b.source?.let { "From $it" }, b.measuredOn?.let { "measured ${it.toJavaLocalDate().format(shortDate)}" }).joinToString(", ")
                 val usesIt = MeasuredBody.currentBodyFat() != null
                 Text(
                     listOf(from, if (usesIt) "Your calorie target uses this body fat." else "").filter { it.isNotEmpty() }.joinToString(". "),

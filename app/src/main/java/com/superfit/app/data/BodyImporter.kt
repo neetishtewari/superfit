@@ -13,6 +13,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.toKotlinLocalDate
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -46,7 +47,7 @@ object BodyImporter {
     fun load(context: Context) {
         val prefs = getUserSharedPrefs(context)
         MeasuredBody.bodyFatPct = if (prefs.contains(KEY_FAT)) prefs.getFloat(KEY_FAT, 0f).toDouble() else null
-        MeasuredBody.measuredOn = prefs.getString(KEY_FAT_DATE, null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        MeasuredBody.measuredOn = prefs.getString(KEY_FAT_DATE, null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }?.toKotlinLocalDate()
     }
 
     suspend fun importNew(context: Context, repository: DataRepository) = lock.withLock {
@@ -92,11 +93,11 @@ object BodyImporter {
             }
         }
         save(prefs, mine.values, notMe.values, pending.values)
-        prefs.edit().putLong(KEY_LAST, weights.maxOf { it.time }.toEpochMilli()).apply()
+        prefs.edit().putLong(KEY_LAST, weights.maxOf { it.timeMs }).apply()
     }
 
     /** The oldest reading still waiting for "Is this you?", or null. */
-    fun nextPending(context: Context): ScaleReading? = load(getUserSharedPrefs(context), KEY_PENDING).minByOrNull { it.time }
+    fun nextPending(context: Context): ScaleReading? = load(getUserSharedPrefs(context), KEY_PENDING).minByOrNull { it.timeMs }
 
     /**
      * The user's answer to "Is this you?". Other waiting readings are then looked at again, so one
@@ -114,7 +115,7 @@ object BodyImporter {
         } else {
             notMe[id] = r
         }
-        for (other in pending.values.sortedBy { it.time }.toList()) {
+        for (other in pending.values.sortedBy { it.timeMs }.toList()) {
             when (BodyReadings.decide(other, baseline(repository, mine.values), notMe.values.toList())) {
                 ReadingMatch.MINE -> {
                     pending.remove(other.id)
@@ -132,7 +133,7 @@ object BodyImporter {
     }
 
     /** The user's own scale readings, oldest first, for the Body card and the coach. */
-    fun mine(context: Context): List<ScaleReading> = load(getUserSharedPrefs(context), KEY_MINE).sortedBy { it.time }
+    fun mine(context: Context): List<ScaleReading> = load(getUserSharedPrefs(context), KEY_MINE).sortedBy { it.timeMs }
 
     /** Whether the Body card has offered the body measurements permission; it offers it once, quietly. */
     fun bodyPermissionOffered(context: Context): Boolean = getUserSharedPrefs(context).getBoolean(KEY_BODY_ASKED, false)
@@ -149,19 +150,19 @@ object BodyImporter {
     }
 
     private suspend fun baseline(repository: DataRepository, mine: Collection<ScaleReading>): Baseline {
-        val lastMine = mine.maxByOrNull { it.time }
+        val lastMine = mine.maxByOrNull { it.timeMs }
         val logged = repository.getAllWeightEntries().maxByOrNull { it.timestamp }
         val weight = when {
-            lastMine != null && (logged == null || lastMine.time.toEpochMilli() >= logged.timestamp) -> lastMine.weightKg
+            lastMine != null && (logged == null || lastMine.timeMs >= logged.timestamp) -> lastMine.weightKg
             logged != null -> logged.weightKg
             else -> repository.getProfile()?.weightKg
         }
-        val fat = mine.filter { it.bodyFatPct != null }.maxByOrNull { it.time }?.bodyFatPct
+        val fat = mine.filter { it.bodyFatPct != null }.maxByOrNull { it.timeMs }?.bodyFatPct
         return Baseline(weight, fat)
     }
 
     private suspend fun addToLog(context: Context, repository: DataRepository, r: ScaleReading) {
-        repository.addImportedWeight(r.weightKg, r.time.toEpochMilli(), NOTE_PREFIX + r.source)
+        repository.addImportedWeight(r.weightKg, r.timeMs, NOTE_PREFIX + r.source)
         rememberBodyFat(context, r)
     }
 
@@ -169,18 +170,18 @@ object BodyImporter {
     private fun rememberBodyFat(context: Context, r: ScaleReading) {
         val fat = r.bodyFatPct ?: return
         val prefs = getUserSharedPrefs(context)
-        val day = r.time.atZone(ZoneId.systemDefault()).toLocalDate()
+        val day = Instant.ofEpochMilli(r.timeMs).atZone(ZoneId.systemDefault()).toLocalDate()
         val savedDay = prefs.getString(KEY_FAT_DATE, null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         if (savedDay == null || !day.isBefore(savedDay)) {
             prefs.edit().putFloat(KEY_FAT, fat.toFloat()).putString(KEY_FAT_DATE, day.toString()).apply()
             MeasuredBody.bodyFatPct = fat
-            MeasuredBody.measuredOn = day
+            MeasuredBody.measuredOn = day.toKotlinLocalDate()
         }
     }
 
     private fun save(prefs: SharedPreferences, mine: Collection<ScaleReading>, notMe: Collection<ScaleReading>, pending: Collection<ScaleReading>) {
         fun json(list: Collection<ScaleReading>) = JSONArray().apply {
-            list.sortedByDescending { it.time }.take(KEEP).forEach { put(toJson(it)) }
+            list.sortedByDescending { it.timeMs }.take(KEEP).forEach { put(toJson(it)) }
         }.toString()
         prefs.edit()
             .putString(KEY_MINE, json(mine))
@@ -201,7 +202,7 @@ object BodyImporter {
 
     private fun toJson(r: ScaleReading) = JSONObject().apply {
         put("id", r.id)
-        put("t", r.time.toEpochMilli())
+        put("t", r.timeMs)
         put("w", r.weightKg)
         put("s", r.source)
         r.bodyFatPct?.let { put("f", it) }
@@ -212,7 +213,7 @@ object BodyImporter {
 
     private fun fromJson(o: JSONObject) = ScaleReading(
         id = o.getString("id"),
-        time = Instant.ofEpochMilli(o.getLong("t")),
+        timeMs = o.getLong("t"),
         weightKg = o.getDouble("w"),
         source = o.optString("s"),
         bodyFatPct = o.optDouble("f").takeIf { o.has("f") },

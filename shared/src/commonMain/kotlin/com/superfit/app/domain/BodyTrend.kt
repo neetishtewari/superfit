@@ -1,9 +1,15 @@
 package com.superfit.app.domain
 
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.ZoneId
 import kotlin.math.abs
+import kotlin.math.roundToLong
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * How body fat, muscle (lean mass) and resting burn moved over a stretch of time, from the user's
@@ -36,6 +42,7 @@ data class BodyChange(
     private fun diff(a: Double?, b: Double?) = if (a != null && b != null) b - a else null
 }
 
+@OptIn(ExperimentalTime::class)
 object BodyTrend {
     /** Smaller moves than these are within what a home scale wobbles day to day. */
     const val FAT_POINTS = 0.5
@@ -49,9 +56,9 @@ object BodyTrend {
         fromEnd: LocalDate,
         toStart: LocalDate,
         toEnd: LocalDate,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): BodyChange? {
-        fun inRange(a: LocalDate, b: LocalDate) = mine.filter { it.time.atZone(zone).toLocalDate().let { d -> !d.isBefore(a) && !d.isAfter(b) } }
+        fun inRange(a: LocalDate, b: LocalDate) = mine.filter { Instant.fromEpochMilliseconds(it.timeMs).toLocalDateTime(zone).date in a..b }
         val before = inRange(fromStart, fromEnd)
         val after = inRange(toStart, toEnd)
         if (before.isEmpty() || after.isEmpty()) return null
@@ -71,14 +78,17 @@ object BodyTrend {
     }
 
     /** The last 4 weeks: readings from the last 10 days against those 3 to 5 weeks ago. */
-    fun fourWeeks(mine: List<ScaleReading>, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): BodyChange? =
-        between(mine, today.minusDays(38), today.minusDays(21), today.minusDays(9), today, zone)
+    fun fourWeeks(mine: List<ScaleReading>, today: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): BodyChange? =
+        between(mine, today.daysAgo(38), today.daysAgo(21), today.daysAgo(9), today, zone)
 
-    /** A month: readings around its start (from a week before) against its last 10 days. */
-    fun month(mine: List<ScaleReading>, month: YearMonth, zone: ZoneId = ZoneId.systemDefault()): BodyChange? {
-        val end = month.atEndOfMonth()
-        return between(mine, month.atDay(1).minusDays(7), month.atDay(10), end.minusDays(9), end, zone)
+    /** A month ([month] 1-12): readings around its start (from a week before) against its last 10 days. */
+    fun month(mine: List<ScaleReading>, year: Int, month: Int, zone: TimeZone = TimeZone.currentSystemDefault()): BodyChange? {
+        val first = LocalDate(year, month, 1)
+        val end = first.plus(1, DateTimeUnit.MONTH).daysAgo(1)
+        return between(mine, first.daysAgo(7), LocalDate(year, month, 10), end.daysAgo(9), end, zone)
     }
+
+    private fun LocalDate.daysAgo(n: Int) = minus(n, DateTimeUnit.DAY)
 
     /**
      * The Insights line, goal-aware: losing fat or keeping muscle is good news; muscle going with
@@ -131,5 +141,5 @@ object BodyTrend {
     /** True when [finding] is a heads-up rather than good news. */
     fun isWatch(i: Insight): Boolean = i.id in setOf("body_muscle_loss", "body_fat_up")
 
-    private fun kcal(v: Double) = Math.round(v).toString()
+    private fun kcal(v: Double) = v.roundToLong().toString()
 }

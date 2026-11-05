@@ -1,28 +1,28 @@
 package com.superfit.app.domain
 
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 
 class BodyReadingsTest {
 
-    private val t0 = Instant.parse("2026-10-23T07:00:00Z")
+    // 2026-10-23T07:00:00Z
+    private val t0 = 1792738800000L
     private fun reading(id: String, kg: Double, fat: Double? = null, daysAgo: Long = 0, lean: Double? = null) =
-        ScaleReading(id, t0.minusSeconds(daysAgo * 86400), kg, "FitDays", bodyFatPct = fat, leanKg = lean)
+        ScaleReading(id, t0 - daysAgo * 86_400_000L, kg, "FitDays", bodyFatPct = fat, leanKg = lean)
 
     @Test
     fun bodyValuesFromTheSameAppJoinTheirWeighIn() {
         val w = reading("w1", 80.0)
         val grouped = BodyReadings.group(
             weights = listOf(w),
-            bodyFat = listOf(BodyValue(t0.plusSeconds(30), "FitDays", 22.5), BodyValue(t0, "Other app", 40.0)),
+            bodyFat = listOf(BodyValue(t0 + 30_000, "FitDays", 22.5), BodyValue(t0, "Other app", 40.0)),
             lean = emptyList(),
-            bone = listOf(BodyValue(t0.plusSeconds(3600), "FitDays", 3.1)), // an hour later: a different weigh-in
+            bone = listOf(BodyValue(t0 + 3_600_000, "FitDays", 3.1)), // an hour later: a different weigh-in
             bmr = listOf(BodyValue(t0, "FitDays", 1700.0))
         )
         assertEquals(22.5, grouped.single().bodyFatPct!!, 0.01)
@@ -70,8 +70,8 @@ class BodyReadingsTest {
 
     @Test
     fun summaryShowsOnlyWhatTheScaleSends() {
-        val today = LocalDate.of(2026, 10, 23)
-        val weightOnly = BodyReadings.summary(listOf(reading("a", 80.0)), 80.0, 180.0, today, ZoneOffset.UTC)
+        val today = LocalDate(2026, 10, 23)
+        val weightOnly = BodyReadings.summary(listOf(reading("a", 80.0)), 80.0, 180.0, today, TimeZone.UTC)
         assertFalse(weightOnly.hasScaleData)
         assertEquals(24.7, weightOnly.bmi!!, 0.05)
         assertNull(weightOnly.bodyFatPct)
@@ -81,7 +81,7 @@ class BodyReadingsTest {
             80.0,
             180.0,
             today,
-            ZoneOffset.UTC
+            TimeZone.UTC
         )
         assertTrue(withFat.hasScaleData)
         assertEquals(22.6, withFat.bodyFatPct!!, 0.01)
@@ -99,10 +99,10 @@ class BodyReadingsTest {
     @Test
     fun oldBodyFatNoLongerSetsTheTarget() {
         MeasuredBody.bodyFatPct = 20.0
-        MeasuredBody.measuredOn = LocalDate.of(2026, 8, 1)
-        assertNull(MeasuredBody.currentBodyFat(LocalDate.of(2026, 10, 23)))
-        MeasuredBody.measuredOn = LocalDate.of(2026, 10, 20)
-        assertEquals(20.0, MeasuredBody.currentBodyFat(LocalDate.of(2026, 10, 23))!!, 0.01)
+        MeasuredBody.measuredOn = LocalDate(2026, 8, 1)
+        assertNull(MeasuredBody.currentBodyFat(LocalDate(2026, 10, 23)))
+        MeasuredBody.measuredOn = LocalDate(2026, 10, 20)
+        assertEquals(20.0, MeasuredBody.currentBodyFat(LocalDate(2026, 10, 23))!!, 0.01)
         MeasuredBody.bodyFatPct = null
         MeasuredBody.measuredOn = null
     }
