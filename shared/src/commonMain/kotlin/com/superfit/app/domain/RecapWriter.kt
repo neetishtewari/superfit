@@ -1,11 +1,8 @@
 package com.superfit.app.domain
 
 import com.superfit.app.json.JSONObject
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.datetime.isoDayNumber
 
 /** The words on one recap card: a short title above the big number and a line under it. */
 data class RecapWords(val title: String, val line: String)
@@ -15,8 +12,6 @@ data class RecapWords(val title: String, val line: String)
  * worked out every number; the AI only phrases them. Without the AI, plain wording is used.
  */
 object RecapWriter {
-
-    private val etaFormat = DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())
 
     val SYSTEM_INSTRUCTION = """
         You write the words on the monthly recap cards inside Superfit, a fitness and nutrition app. It is like Spotify Wrapped for the user's month: each card is one highlight they may share as an Instagram story.
@@ -34,7 +29,7 @@ object RecapWriter {
     """.trimIndent()
 
     fun prompt(recap: MonthRecap): String = buildString {
-        append("Month: ${recap.month.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.US)} ${recap.month.year}. ")
+        append("Month: ${englishName(recap.month.month.name)} ${recap.month.year}. ")
         append("Fully logged days: ${recap.loggedDays}.\n\nCards:\n")
         recap.cards.filter { it !is RecapCard.Setup }.forEach { append("- ${it.id}: ${facts(it)}\n") }
     }
@@ -44,7 +39,7 @@ object RecapWriter {
         is RecapCard.Goal -> listOfNotNull(
             if (card.reached) "Goal reached." else "${fmt(card.kgDone)} of ${fmt(card.kgTotal)} kg ${if (card.lose) "lost" else "gained"} towards the goal so far.",
             card.monthKg?.let { if (it >= 0) "${fmt(it)} kg of that this month." else "Moved ${fmt(-it)} kg the wrong way this month." },
-            card.eta?.let { "At this pace the goal is reached around ${it.format(etaFormat)}." }
+            card.eta?.let { "At this pace the goal is reached around ${dayMonth(it)}." }
         ).joinToString(" ")
         is RecapCard.Needle -> listOfNotNull(
             card.helped.takeIf { it.isNotEmpty() }?.joinToString("; ", "Helped: ") { "${it.title} (${it.detail})" },
@@ -65,7 +60,7 @@ object RecapWriter {
         is RecapCard.Moving -> listOfNotNull(
             "Active on ${card.activeDays.size} of ${card.daysInMonth} days" + (card.prevActiveDays?.let { " (last month $it)" } ?: "") + ".",
             if (card.km >= 1) "${fmt(card.km)} km of workouts." else null,
-            if (card.avgSteps > 0) "${String.format(Locale.US, "%,d", card.avgSteps)} steps a day on average." else null
+            if (card.avgSteps > 0) "${Decimals.grouped(card.avgSteps.toLong())} steps a day on average." else null
         ).joinToString(" ")
         is RecapCard.Strength -> if (card.sessions == 0) {
             "No strength sessions logged this month" + (if (card.km >= 1) ", while doing ${fmt(card.km)} km of cardio" else "") +
@@ -150,9 +145,15 @@ object RecapWriter {
         d.missing?.let { " No ${it.label} sessions were logged: suggest adding one a week for balance, or logging it if they already train it." }
     ).joinToString("")
 
-    private fun num(v: Int) = String.format(Locale.US, "%,d", v)
+    private fun num(v: Int) = Decimals.grouped(v.toLong())
 
-    private fun dayName(d: kotlinx.datetime.DayOfWeek) = java.time.DayOfWeek.of(d.isoDayNumber).getDisplayName(java.time.format.TextStyle.FULL, Locale.US) + "s"
+    private fun dayName(d: kotlinx.datetime.DayOfWeek) = englishName(d.name) + "s"
+
+    /** "OCTOBER" -> "October": the English name, for the AI prompt and English card text. */
+    private fun englishName(name: String) = name.lowercase().replaceFirstChar { it.uppercase() }
+
+    /** "14 December", month in the phone's language. */
+    private fun dayMonth(date: kotlinx.datetime.LocalDate) = "${date.day} ${localMonthName(date.month)}"
 
     /** Reads the AI's words; any card it skipped or got wrong keeps the plain wording. */
     fun parse(json: String, recap: MonthRecap): Map<String, RecapWords> {
@@ -171,8 +172,8 @@ object RecapWriter {
     fun plain(card: RecapCard): RecapWords = when (card) {
         is RecapCard.Goal -> when {
             card.reached -> RecapWords("Goal reached", "You got there. Time to set the next one.")
-            (card.monthKg ?: 0.0) > 0 -> RecapWords("This month you ${if (card.lose) "lost" else "gained"}", "${fmt(card.kgDone)} of ${fmt(card.kgTotal)} kg done." + (card.eta?.let { " At this pace you get there around ${it.format(etaFormat)}." } ?: ""))
-            else -> RecapWords("Your goal", "${fmt(card.kgDone)} of ${fmt(card.kgTotal)} kg done so far." + (card.eta?.let { " At this pace you get there around ${it.format(etaFormat)}." } ?: ""))
+            (card.monthKg ?: 0.0) > 0 -> RecapWords("This month you ${if (card.lose) "lost" else "gained"}", "${fmt(card.kgDone)} of ${fmt(card.kgTotal)} kg done." + (card.eta?.let { " At this pace you get there around ${dayMonth(it)}." } ?: ""))
+            else -> RecapWords("Your goal", "${fmt(card.kgDone)} of ${fmt(card.kgTotal)} kg done so far." + (card.eta?.let { " At this pace you get there around ${dayMonth(it)}." } ?: ""))
         }
         is RecapCard.Needle -> RecapWords("What moved the needle", (card.helped.map { it.title } + card.held.map { it.title }).joinToString(". ") + ".")
         is RecapCard.Calories -> card.sources.let { c ->
@@ -180,8 +181,8 @@ object RecapWriter {
             RecapWords(
                 "Where your calories came from",
                 when {
-                    b != null && c.treatRank != null -> "${b.name} made your top 5, at number ${c.treatRank}. " + (c.swap?.let { "Try ${it.alternative.lowercase(Locale.getDefault())} next month." } ?: "An easy win for next month.")
-                    b != null -> "Your biggest treat, ${b.name.lowercase(Locale.getDefault())}, stayed out of your top 5. Everyday food did the heavy lifting."
+                    b != null && c.treatRank != null -> "${b.name} made your top 5, at number ${c.treatRank}. " + (c.swap?.let { "Try ${it.alternative.lowercase()} next month." } ?: "An easy win for next month.")
+                    b != null -> "Your biggest treat, ${b.name.lowercase()}, stayed out of your top 5. Everyday food did the heavy lifting."
                     c.surelyNoTreats -> "No treat foods this month. Everyday food did all the work."
                     else -> "Your five biggest calorie foods this month."
                 }
@@ -214,5 +215,5 @@ object RecapWriter {
         is RecapCard.Setup -> RecapWords("Make next month's recap smarter", "Only what's missing is listed.")
     }
 
-    fun fmt(v: Double): String = if (abs(v - v.roundToInt()) < 0.05) "${v.roundToInt()}" else String.format(Locale.US, "%.1f", v)
+    fun fmt(v: Double): String = if (abs(v - v.roundToInt()) < 0.05) "${v.roundToInt()}" else Decimals.one(v)
 }

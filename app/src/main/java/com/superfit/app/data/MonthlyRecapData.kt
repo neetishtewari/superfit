@@ -23,8 +23,10 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlinx.datetime.toJavaYearMonth
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
+import kotlinx.datetime.toKotlinYearMonth
 import org.json.JSONObject
 
 /**
@@ -129,7 +131,7 @@ object MonthlyRecapData {
             widget = !WidgetPin.canPin(context) || WidgetPin.isPlaced(context)
         )
         val body = BodyTrend.month(BodyImporter.mine(context), month.year, month.monthValue, zone.toKotlinTimeZone())
-        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, body)
+        return MonthlyRecap.build(month.toKotlinYearMonth(), days, nutrition, strength, kWeighIns, journey, goalSet, setup, zone.toKotlinTimeZone(), body)
     }
 
     fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"
@@ -165,8 +167,9 @@ object MonthlyRecapData {
      */
     suspend fun words(context: Context, recap: MonthRecap, today: LocalDate = LocalDate.now()): Map<String, RecapWords> {
         val prefs = getUserSharedPrefs(context)
-        val key = KEY_WORDS + recap.month + "_" + CoachStyle.current.name
-        val finished = recap.month.isBefore(YearMonth.from(today))
+        val month = recap.month.toJavaYearMonth()
+        val key = KEY_WORDS + month + "_" + CoachStyle.current.name
+        val finished = month.isBefore(YearMonth.from(today))
         if (finished) prefs.getString(key, null)?.let { return RecapWriter.parse(it, recap) }
         val json = runCatching {
             GeminiClient.generateContent(

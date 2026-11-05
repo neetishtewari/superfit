@@ -53,6 +53,7 @@ import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.datetime.toJavaLocalDate
 
 /**
  * How far the card's numbers and bars have grown, 0-1. The playing recap counts them up as each card
@@ -200,7 +201,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Small("${RecapWriter.fmt(card.kgDone)} of ${RecapWriter.fmt(card.kgTotal)} kg ${if (card.lose) "down" else "up"}", p, bold = true)
-                card.eta?.let { Small("Goal around ${it.dayOfMonth} ${it.month.getDisplayName(DateTextStyle.SHORT, Locale.getDefault())}", p, bold = true) }
+                card.eta?.toJavaLocalDate()?.let { Small("Goal around ${it.dayOfMonth} ${it.month.getDisplayName(DateTextStyle.SHORT, Locale.getDefault())}", p, bold = true) }
             }
         }
         is RecapCard.Needle -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
