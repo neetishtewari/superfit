@@ -112,9 +112,9 @@ class InsightsEngineTest {
 
     @Test
     fun activeWeekAndFasterRunsAreWorking() {
-        val days = mutableMapOf<LocalDate, DayTotals>()
-        for (i in 1..28) days[today.minusDays(i.toLong())] = day(today.minusDays(i.toLong()), steps = 9000, workouts = listOf(run(5.0, 320)))
-        for (i in 29..56) days[today.minusDays(i.toLong())] = day(today.minusDays(i.toLong()), workouts = listOf(run(5.0, 350)))
+        val days = mutableMapOf<kotlinx.datetime.LocalDate, DayTotals>()
+        for (i in 1..28) days[today.minusDays(i.toLong()).toKotlinLocalDate()] = day(today.minusDays(i.toLong()), steps = 9000, workouts = listOf(run(5.0, 320)))
+        for (i in 29..56) days[today.minusDays(i.toLong()).toKotlinLocalDate()] = day(today.minusDays(i.toLong()), workouts = listOf(run(5.0, 350)))
         val r = InsightsEngine.weekReport(days, kToday)
         assertEquals("active", r.working[0].id)
         assertTrue(r.working.any { it.id == "pace" })
@@ -124,9 +124,9 @@ class InsightsEngineTest {
 
     @Test
     fun fewerWorkoutsThanUsualIsWatched() {
-        val days = mutableMapOf<LocalDate, DayTotals>()
-        for (i in 8..28) days[today.minusDays(i.toLong())] = day(today.minusDays(i.toLong()), workouts = listOf(run(3.0, 360)))
-        days[today.minusDays(2)] = day(today.minusDays(2), workouts = listOf(run(3.0, 360)))
+        val days = mutableMapOf<kotlinx.datetime.LocalDate, DayTotals>()
+        for (i in 8..28) days[today.minusDays(i.toLong()).toKotlinLocalDate()] = day(today.minusDays(i.toLong()), workouts = listOf(run(3.0, 360)))
+        days[today.minusDays(2).toKotlinLocalDate()] = day(today.minusDays(2), workouts = listOf(run(3.0, 360)))
         val r = InsightsEngine.weekReport(days, kToday)
         assertTrue(r.watch.any { it.id == "fewer" })
     }
