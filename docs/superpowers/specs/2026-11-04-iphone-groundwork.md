@@ -35,7 +35,9 @@ tested on the dev app first.
    - 3d: meal items, meal tags, personal nutrition, packaged food, repeat-meal cache and the
      weight trend move to `shared` (they need no dates). `String.format("%.1f")` becomes
      `Decimals.one`, which rounds the same way.
-   - 3e onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3e: adds kotlinx-datetime to `shared`; the meal streak moves first, as the smallest file that
+     needs dates. Same day boundaries (the phone's time zone), so streaks don't change.
+   - 3f onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -65,6 +67,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3e (reviewed 5 Nov): adds kotlinx-datetime 0.7.1 (JetBrains' official date library, from
+Maven Central; on Android it uses the phone's own java.time underneath). The streak moves without
+behaviour changes. No new permissions, network calls or secrets.
 
 Step 3d (reviewed 5 Nov): code moved without behaviour changes; no new libraries, permissions,
 network calls or secrets.

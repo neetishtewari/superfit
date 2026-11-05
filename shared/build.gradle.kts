@@ -22,6 +22,8 @@ kotlin {
     commonMain.dependencies {
       // Room's annotations only (no database code), so the entities can live here.
       api(libs.androidx.room.common)
+      // Dates and time zones that work on Android and iPhone alike (replaces java.time).
+      api(libs.kotlinx.datetime)
     }
     commonTest.dependencies {
       implementation(kotlin("test"))
