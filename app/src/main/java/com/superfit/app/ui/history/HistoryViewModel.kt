@@ -451,13 +451,13 @@ class HistoryViewModel(
                     targetKg = profile.targetWeightKg
                 ),
                 weeks = weeks,
-                today = today,
+                today = today.toKotlinLocalDate(),
                 days = dayTotals,
                 meals = allMeals,
-                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()),
+                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()).map { it.first.toKotlinLocalDate() to it.second },
                 proteinTargetG = proteinTarget,
                 dietScores = dietScores,
-                zone = zone,
+                zone = zone.toKotlinTimeZone(),
                 body = body
             )
             com.superfit.app.ui.share.CoachExportPdf.share(context, report)

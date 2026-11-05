@@ -22,6 +22,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.toJavaLocalDate
 
 /**
  * Draws a [CoachExport] as a branded A4 PDF: a summary page with headline numbers, a day-by-day table,
@@ -554,3 +555,6 @@ object CoachExportPdf {
         }
     }
 }
+
+/** The report's dates are shared-code dates; the PDF still formats them the Android way. */
+private fun kotlinx.datetime.LocalDate.format(formatter: DateTimeFormatter): String = toJavaLocalDate().format(formatter)
