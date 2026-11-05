@@ -4,6 +4,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -29,7 +30,7 @@ class MonthlyRecapTest {
         protein: Double = 100.0,
         steps: Int = 8000,
         workouts: List<ActivityFact> = emptyList()
-    ) = DayTotals(date, kcal, 1900.0, meals, protein, 110.0, steps, workouts)
+    ) = DayTotals(date.toKotlinLocalDate(), kcal, 1900.0, meals, protein, 110.0, steps, workouts)
 
     private fun run(km: Double, pace: Long) = ActivityFact("Run", (km * pace / 60).toLong(), km, 400.0, pace, isRun = true)
 
@@ -43,11 +44,11 @@ class MonthlyRecapTest {
         qualityTags = MealTags(processing = 1, fried = false, addedSugar = false, vegFruitServings = 1.0, fiberG = 8.0, treat = false, foodType = food, rating = rating).encode()
     )
 
-    private fun month(build: (LocalDate) -> DayTotals?): Map<LocalDate, DayTotals> =
+    private fun month(build: (LocalDate) -> DayTotals?): Map<kotlinx.datetime.LocalDate, DayTotals> =
         (1..31).mapNotNull { build(october.atDay(it)) }.associateBy { it.date }
 
     private fun recap(
-        days: Map<LocalDate, DayTotals>,
+        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity> = emptyList(),
         strength: List<StrengthSession> = emptyList(),
         setup: RecapSetup = allSet
@@ -86,7 +87,7 @@ class MonthlyRecapTest {
         fun walk(bpm: Long) = ActivityFact("Walk", 60, 5.0, 250.0, 720, isRun = false, avgHeartRate = bpm)
         val days = (1..30).associate { i ->
             val sep = october.atDay(1).minusDays(i.toLong())
-            sep to day(sep, workouts = if (i % 5 == 0) listOf(walk(120)) else emptyList())
+            sep.toKotlinLocalDate() to day(sep, workouts = if (i % 5 == 0) listOf(walk(120)) else emptyList())
         } + month { d -> day(d, workouts = if (d.dayOfMonth % 5 == 0) listOf(walk(112)) else emptyList()) }
         val card = recap(days)!!.cards.filterIsInstance<RecapCard.Heart>().single()
         assertEquals(8, card.change.bpmDrop)

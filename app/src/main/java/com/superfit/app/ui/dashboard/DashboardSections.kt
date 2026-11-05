@@ -78,6 +78,7 @@ import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 @Composable
 internal fun DashboardHeader(
@@ -775,7 +776,7 @@ internal fun ActivityPerformanceCard(
             color = ThemeTextPrimary
         )
 
-        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(LocalDate.now(), state.activity.steps, emptyList(), null)
+        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(LocalDate.now().toKotlinLocalDate(), state.activity.steps, emptyList(), null)
         val usual = today.usual
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

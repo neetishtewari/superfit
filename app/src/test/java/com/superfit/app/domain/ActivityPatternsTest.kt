@@ -2,6 +2,7 @@ package com.superfit.app.domain
 
 import java.time.DayOfWeek
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -11,7 +12,7 @@ class ActivityPatternsTest {
     private fun walk(bpm: Long?, pace: Long = 720, hour: Int? = null) = ActivityFact("Walk", 60, 5.0, 250.0, pace, isRun = false, avgHeartRate = bpm, startHour = hour)
     private fun voice(text: String, reps: Int) = ActivityFact(text, 0, null, 100.0, null, isRun = false, reps = reps)
     private fun day(date: LocalDate, steps: Int = 0, workouts: List<ActivityFact> = emptyList(), rating: Double? = null, meals: Int = 3) =
-        DayTotals(date, 1800.0, 1900.0, meals, 100.0, 110.0, steps, workouts, rating)
+        DayTotals(date.toKotlinLocalDate(), 1800.0, 1900.0, meals, 100.0, 110.0, steps, workouts, rating)
 
     @Test
     fun lowerHeartRateAtTheSamePaceIsAFitterHeart() {
@@ -73,7 +74,7 @@ class ActivityPatternsTest {
         }
         val r = ActivityPatterns.rhythm(days)!!
         assertEquals(7, r.hour)
-        assertEquals(DayOfWeek.SUNDAY, r.bestDay)
+        assertEquals(kotlinx.datetime.DayOfWeek.SUNDAY, r.bestDay)
         assertEquals("7 am", ActivityPatterns.hourLabel(7))
     }
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
 
@@ -139,7 +140,7 @@ class HistoryViewModel(
     private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
     private var importedByDate: Map<LocalDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
     private var profile: UserProfileEntity? = null
-    private var dayTotals: Map<LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
+    private var dayTotals: Map<kotlinx.datetime.LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
     private var allMeals: List<NutritionEntryEntity> = emptyList()
 
     /** The day's calorie target, including that day's workouts for people who connected them. */
@@ -366,7 +367,7 @@ class HistoryViewModel(
             val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
             this@HistoryViewModel.dayTotals = dayTotals
             recapMonths = (1..12).map { YearMonth.from(today).minusMonths(it.toLong()) }.filter { m ->
-                val inMonth = dayTotals.values.filter { YearMonth.from(it.date) == m }
+                val inMonth = dayTotals.values.filter { YearMonth.from(it.date.toJavaLocalDate()) == m }
                 inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
             }
             allMeals = allNutrition
@@ -374,7 +375,7 @@ class HistoryViewModel(
             val scaleReadings = com.superfit.app.data.BodyImporter.mine(appContext)
             weekReport = com.superfit.app.domain.InsightsEngine.weekReport(
                 dayTotals,
-                today,
+                today.toKotlinLocalDate(),
                 loseGoal,
                 allNutrition,
                 body = com.superfit.app.domain.BodyTrend.fourWeeks(scaleReadings, today.toKotlinLocalDate())

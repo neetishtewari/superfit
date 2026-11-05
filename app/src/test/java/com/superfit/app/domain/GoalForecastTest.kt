@@ -1,6 +1,7 @@
 package com.superfit.app.domain
 
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -13,7 +14,7 @@ class GoalForecastTest {
     private val start = today.minusDays(57)
 
     private fun day(date: LocalDate, eaten: Double, target: Double = 2000.0, workouts: Int = 0) =
-        DayTotals(date, eaten, target, 3, 110.0, 110.0, 6000, List(workouts) { ActivityFact("Run", 40, 6.0, 450.0, 330, true) })
+        DayTotals(date.toKotlinLocalDate(), eaten, target, 3, 110.0, 110.0, 6000, List(workouts) { ActivityFact("Run", 40, 6.0, 450.0, 330, true) })
 
     /** Weigh-ins every 7 days losing [early] kg/week for the first 4 weeks, then [late]. */
     private fun weighIns(from: Double, early: Double, late: Double): List<Pair<LocalDate, Double>> {
@@ -28,7 +29,7 @@ class GoalForecastTest {
 
     private fun forecast(
         weighIns: List<Pair<LocalDate, Double>>,
-        days: Map<LocalDate, DayTotals> = emptyMap(),
+        days: Map<kotlinx.datetime.LocalDate, DayTotals> = emptyMap(),
         targetDate: LocalDate? = null,
         startKg: Double = 82.0,
         targetKg: Double = 75.0
@@ -73,7 +74,7 @@ class GoalForecastTest {
     @Test
     fun withoutWeighInsLoggedEatingDrivesThePace() {
         // Eating 200 under a target that is already 500 under maintenance: 700 a day, about 0.64 kg a week.
-        val days = (1..28).associate { today.minusDays(it.toLong()) to day(today.minusDays(it.toLong()), 1800.0) }
+        val days = (1..28).associate { today.minusDays(it.toLong()).toKotlinLocalDate() to day(today.minusDays(it.toLong()), 1800.0) }
         val f = forecast(emptyList(), days)
         assertTrue(!f.rateFromWeighIns)
         assertEquals(0.64, f.recentRate!!, 0.02)
@@ -91,7 +92,7 @@ class GoalForecastTest {
     fun weekendFixShowsWeeksSooner() {
         val days = (1..28).associate { i ->
             val d = today.minusDays(i.toLong())
-            d to day(d, if (d.dayOfWeek.value >= 6) 2900.0 else 1500.0)
+            d.toKotlinLocalDate() to day(d, if (d.dayOfWeek.value >= 6) 2900.0 else 1500.0)
         }
         val f = forecast(weighIns(82.0, 0.3, 0.2), days)
         assertTrue(f.slowing.any { it.id == "weekend" })

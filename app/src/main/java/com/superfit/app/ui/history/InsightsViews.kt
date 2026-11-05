@@ -136,7 +136,7 @@ fun InsightsTab(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard {
-            SectionLabel("Your week · ${report.from.format(shortDate)} to ${report.to.format(shortDate)}", NeonMint)
+            SectionLabel("Your week · ${report.from.toJavaLocalDate().format(shortDate)} to ${report.to.toJavaLocalDate().format(shortDate)}", NeonMint)
             Text(report.verdict, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 24.sp)
             val s = report.thisWeek
             val l = report.lastWeek
@@ -372,7 +372,7 @@ private fun LegendDot(color: Color, label: String) {
 }
 
 @Composable
-private fun NetBars(days: List<Pair<LocalDate, Double?>>) {
+private fun NetBars(days: List<Pair<kotlinx.datetime.LocalDate, Double?>>) {
     val maxAbs = max(300.0, days.mapNotNull { it.second?.let(::abs) }.maxOrNull() ?: 0.0)
     val missing = ThemeGlassBorder
     val axis = ThemeTextSecondary.copy(alpha = 0.4f)
