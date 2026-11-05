@@ -52,7 +52,12 @@ tested on the dev app first.
      engine move to `shared` together (they call each other). Dates use kotlinx-datetime; the
      coach's day names ("Sun 11 Oct") are written by hand in English, as before, with a test.
      Food names are capitalised without the phone's language rules (only Turkish "i" differs).
-   - 3j onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3j: the Insights week report, "vs your usual" and activity patterns move to `shared`, with the
+     day-by-day totals they read. Weekday names in the phone's language come from a small
+     platform hook (`localWeekdayName`, `localMonthName`): Java's names on Android, Apple's on
+     iPhone. Journey, the recap and the coach report still live in the app and convert dates at
+     the edge until they move.
+   - 3k onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -82,6 +87,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3j (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
+network calls or secrets.
 
 Step 3i (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets. What the coach sends the AI is built from the same numbers as before.

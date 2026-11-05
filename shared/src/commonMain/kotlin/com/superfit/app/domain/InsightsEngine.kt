@@ -1,17 +1,21 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.TextStyle
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 
 /** One workout as Insights needs it, from a Health Connect import or a voice log. */
+@OptIn(ExperimentalTime::class)
 data class ActivityFact(
     val title: String,
     val minutes: Long,
@@ -29,7 +33,7 @@ data class ActivityFact(
     val isWalk: Boolean get() = title == "Walk"
 
     companion object {
-        fun of(view: WorkoutView, zone: ZoneId = ZoneId.systemDefault()): ActivityFact = ActivityFact(
+        fun of(view: WorkoutView, zone: TimeZone = TimeZone.currentSystemDefault()): ActivityFact = ActivityFact(
             title = view.title,
             minutes = view.minutes,
             distanceKm = view.distanceKm,
@@ -37,7 +41,7 @@ data class ActivityFact(
             paceSecondsPerKm = view.paceSecondsPerKm,
             isRun = view.title == "Run",
             avgHeartRate = view.avgHeartRate?.takeIf { it in 40..220 },
-            startHour = runCatching { Instant.ofEpochMilli(view.startTime).atZone(zone).hour }.getOrNull()
+            startHour = runCatching { Instant.fromEpochMilliseconds(view.startTime).toLocalDateTime(zone).hour }.getOrNull()
         )
     }
 }
@@ -104,6 +108,7 @@ data class WeekReport(
  * The Insights screen's numbers and findings, worked out on the phone from the last 7 full days
  * (today is left out because it isn't over). No AI.
  */
+@OptIn(ExperimentalTime::class)
 object InsightsEngine {
 
     fun weekReport(
@@ -111,17 +116,17 @@ object InsightsEngine {
         today: LocalDate,
         loseGoal: Boolean = true,
         meals: List<NutritionEntryEntity> = emptyList(),
-        zone: ZoneId = ZoneId.systemDefault(),
+        zone: TimeZone = TimeZone.currentSystemDefault(),
         body: BodyChange? = null
     ): WeekReport {
-        val to = today.minusDays(1)
-        val from = to.minusDays(6)
+        val to = today.minus(1, DateTimeUnit.DAY)
+        val from = to.minus(6, DateTimeUnit.DAY)
         val week = range(days, from, to)
-        val prev = range(days, from.minusDays(7), from.minusDays(1))
+        val prev = range(days, from.minus(7, DateTimeUnit.DAY), from.minus(1, DateTimeUnit.DAY))
         val thisWeek = stats(week)
         val lastWeek = stats(prev)
 
-        val weekMeals = meals.filter { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate().let { d -> !d.isBefore(from) && !d.isAfter(to) } }
+        val weekMeals = meals.filter { Instant.fromEpochMilliseconds(it.timestamp).toLocalDateTime(zone).date.let { d -> d >= from && d <= to } }
         val calories = if (thisWeek.loggedDays >= 3) CalorieSourcesEngine.build(weekMeals) else null
         val treat = calories?.let { treatFinding(it) }
         // Smart scale: only when it measures body fat, muscle or resting burn and one of them moved.
@@ -160,26 +165,26 @@ object InsightsEngine {
             ?: return Insight(
                 "treat_small",
                 "Treats stayed small",
-                "Your biggest treat, ${name.lowercase(Locale.getDefault())} (${kcal(b.treatKcal.toDouble())} kcal), wasn't in your top 5 calorie foods.",
+                "Your biggest treat, ${name.lowercase()} (${kcal(b.treatKcal.toDouble())} kcal), wasn't in your top 5 calorie foods.",
                 "treats stayed small"
             )
         val detail = buildString {
             append("${kcal(b.treatKcal.toDouble())} kcal in ${b.times} ${if (b.times == 1) "sitting" else "sittings"}")
-            c.outweighs?.let { append(", more than all your ${it.name.lowercase(Locale.getDefault())}") }
+            c.outweighs?.let { append(", more than all your ${it.name.lowercase()}") }
             append(".")
             c.swap?.let { sw ->
-                append(" Swap idea: ${sw.alternative.lowercase(Locale.getDefault())}")
+                append(" Swap idea: ${sw.alternative.lowercase()}")
                 if (sw.kcalSaved >= 30) append(", about ${sw.kcalSaved} kcal less each time")
                 append(".")
             }
         }
-        return Insight("treat_top", "$name is your #$rank calorie food", detail, "${name.lowercase(Locale.getDefault())} made your top 5 calorie foods")
+        return Insight("treat_top", "$name is your #$rank calorie food", detail, "${name.lowercase()} made your top 5 calorie foods")
     }
 
     /** Fitter heart, rep totals and better meals on move days, when the data clearly shows them. */
     private fun activityFindings(days: Map<LocalDate, DayTotals>, week: List<DayTotals>, prev: List<DayTotals>, today: LocalDate): List<Insight> = buildList {
         val first = week.first().date
-        val before = range(days, first.minusDays(28), first.minusDays(1))
+        val before = range(days, first.minus(28, DateTimeUnit.DAY), first.minus(1, DateTimeUnit.DAY))
         ActivityPatterns.heart(week.flatMap { it.workouts }, before.flatMap { it.workouts })?.let { h ->
             add(
                 Insight(
@@ -192,16 +197,16 @@ object InsightsEngine {
         }
         ActivityPatterns.reps(week.flatMap { it.workouts }, prev.flatMap { it.workouts })?.let { r ->
             if (r.prev == 0 || r.total > r.prev) {
-                val title = r.top?.let { "${String.format(Locale.US, "%,d", it.second)} ${it.first}" } ?: "${String.format(Locale.US, "%,d", r.total)} reps"
+                val title = r.top?.let { "${Decimals.grouped(it.second.toLong())} ${it.first}" } ?: "${Decimals.grouped(r.total.toLong())} reps"
                 val detail = when {
-                    r.prev > 0 && r.top != null -> "${String.format(Locale.US, "%,d", r.total)} reps in all, up from ${String.format(Locale.US, "%,d", r.prev)} last week."
-                    r.prev > 0 -> "Up from ${String.format(Locale.US, "%,d", r.prev)} last week."
+                    r.prev > 0 && r.top != null -> "${Decimals.grouped(r.total.toLong())} reps in all, up from ${Decimals.grouped(r.prev.toLong())} last week."
+                    r.prev > 0 -> "Up from ${Decimals.grouped(r.prev.toLong())} last week."
                     else -> "Logged by voice this week."
                 }
-                add(Insight("reps", title, detail, "you put in ${String.format(Locale.US, "%,d", r.total)} reps"))
+                add(Insight("reps", title, detail, "you put in ${Decimals.grouped(r.total.toLong())} reps"))
             }
         }
-        ActivityPatterns.moveDayPlates(range(days, today.minusDays(28), today.minusDays(1)))?.let { m ->
+        ActivityPatterns.moveDayPlates(range(days, today.minus(28, DateTimeUnit.DAY), today.minus(1, DateTimeUnit.DAY)))?.let { m ->
             val protein = if (m.activeProteinPct != null && m.restProteinPct != null && m.activeProteinPct - m.restProteinPct >= 10) {
                 " Protein ${m.activeProteinPct}% of goal vs ${m.restProteinPct}%."
             } else {
@@ -226,9 +231,9 @@ object InsightsEngine {
     fun range(days: Map<LocalDate, DayTotals>, from: LocalDate, to: LocalDate): List<DayTotals> {
         val out = mutableListOf<DayTotals>()
         var d = from
-        while (!d.isAfter(to)) {
+        while (d <= to) {
             out += days[d] ?: DayTotals(d, 0.0, 0.0, 0, 0.0, 0.0, 0, emptyList())
-            d = d.plusDays(1)
+            d = d.plus(1, DateTimeUnit.DAY)
         }
         return out
     }
@@ -242,7 +247,7 @@ object InsightsEngine {
         loseGoal: Boolean
     ): List<Insight> = buildList {
         if (s.activeDays >= 5) {
-            val month = range(days, today.minusDays(28), today.minusDays(1)).count { it.active }
+            val month = range(days, today.minus(28, DateTimeUnit.DAY), today.minus(1, DateTimeUnit.DAY)).count { it.active }
             add(Insight("active", "Active ${s.activeDays} of 7 days", "$month of the last 28 days.", "you were active ${s.activeDays} of 7 days"))
         }
         paceChange(days, today)?.let { (now, faster) ->
@@ -292,7 +297,7 @@ object InsightsEngine {
             }
         }
         underFuelled(week)?.let { add(it) }
-        val earlier = (1..3).map { w -> stats(range(days, today.minusDays(7L * w + 7), today.minusDays(7L * w + 1))).workouts }
+        val earlier = (1..3).map { w -> stats(range(days, today.minus(7 * w + 7, DateTimeUnit.DAY), today.minus(7 * w + 1, DateTimeUnit.DAY))).workouts }
         val usual = earlier.average()
         if (usual >= 2 && s.workouts <= usual * 0.6) {
             add(Insight("fewer", "Fewer workouts", "${s.workouts} this week, down from about ${usual.roundToInt()} a week.", "you did fewer workouts"))
@@ -324,9 +329,9 @@ object InsightsEngine {
                 d.workouts.any { (it.isRun && (it.distanceKm ?: 0.0) >= 5.0) || it.kcal >= 400 }
         }.maxByOrNull { d -> d.workoutKcal } ?: return null
         val w = day.workouts.maxByOrNull { it.kcal }!!
-        val what = w.distanceKm?.let { String.format(Locale.US, "%s %.1f km", w.title.lowercase(Locale.getDefault()), it) }
-            ?: w.title.lowercase(Locale.getDefault())
-        val dayName = day.date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        val what = w.distanceKm?.let { "${w.title.lowercase()} ${Decimals.one(it)} km" }
+            ?: w.title.lowercase()
+        val dayName = localWeekdayName(day.date.dayOfWeek)
         return Insight(
             "fuel_low",
             "Under-fuelled after a big workout",
@@ -344,8 +349,8 @@ object InsightsEngine {
             val km = runs.sumOf { it.distanceKm!! }
             return (runs.sumOf { it.paceSecondsPerKm!! * it.distanceKm!! } / km).roundToLong()
         }
-        val now = avgPace(today.minusDays(28), today.minusDays(1)) ?: return null
-        val before = avgPace(today.minusDays(56), today.minusDays(29)) ?: return null
+        val now = avgPace(today.minus(28, DateTimeUnit.DAY), today.minus(1, DateTimeUnit.DAY)) ?: return null
+        val before = avgPace(today.minus(56, DateTimeUnit.DAY), today.minus(29, DateTimeUnit.DAY)) ?: return null
         return now to (before - now)
     }
 
@@ -356,13 +361,13 @@ object InsightsEngine {
         else -> "A steady week. Keep logging to see more here."
     }
 
-    private fun cap(s: String) = s.replaceFirstChar { it.titlecase(Locale.getDefault()) }
+    private fun cap(s: String) = s.replaceFirstChar { it.titlecase() }
 
-    fun pace(seconds: Long) = "%d:%02d".format(Locale.US, seconds / 60, seconds % 60)
+    fun pace(seconds: Long) = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
 
-    fun kcal(v: Double) = String.format(Locale.US, "%,d", abs(v).roundToInt())
+    fun kcal(v: Double) = Decimals.grouped(abs(v).roundToInt().toLong())
 
-    fun minutes(m: Long) = if (m >= 60) "${m / 60} h ${"%02d".format(m % 60)} min" else "$m min"
+    fun minutes(m: Long) = if (m >= 60) "${m / 60} h ${(m % 60).toString().padStart(2, '0')} min" else "$m min"
 }
 
 /** "Your usual" for today: the same weekday's average over the last 4 weeks. */
@@ -370,7 +375,7 @@ data class UsualDay(val steps: Int, val distanceKm: Double, val moveMinutes: Lon
     companion object {
         /** Null until there are at least 2 earlier same-weekday days with steps. */
         fun forDay(days: Map<LocalDate, DayTotals>, today: LocalDate): UsualDay? {
-            val same = (1..4).mapNotNull { days[today.minusWeeks(it.toLong())] }.filter { it.steps > 0 || it.workouts.isNotEmpty() }
+            val same = (1..4).mapNotNull { days[today.minus(it, DateTimeUnit.WEEK)] }.filter { it.steps > 0 || it.workouts.isNotEmpty() }
             if (same.size < 2) return null
             return UsualDay(
                 steps = same.map { it.steps }.average().roundToInt(),
@@ -407,7 +412,7 @@ data class TodayVsUsual(
             ahead.size == 1 -> "Already past your usual $weekday on ${ahead[0]}."
             // Late in the day only, so a quiet morning never reads as falling behind.
             hour >= 18 && u.steps > 0 && steps < u.steps * 0.7 ->
-                "About ${String.format(Locale.US, "%,d", u.steps - steps)} steps short of a usual $weekday. A short walk would close most of it."
+                "About ${Decimals.grouped((u.steps - steps).toLong())} steps short of a usual $weekday. A short walk would close most of it."
             else -> null
         }
     }
@@ -427,7 +432,7 @@ data class TodayVsUsual(
             moveMinutes = workouts.sumOf { it.minutes },
             workoutKcal = workouts.sumOf { it.kcal },
             usual = usual,
-            weekday = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            weekday = localWeekdayName(today.dayOfWeek)
         )
     }
 }

@@ -3,6 +3,7 @@ package com.superfit.app.domain
 import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -26,9 +27,9 @@ class CoachExportTest {
 
     private fun build(meals: List<NutritionEntryEntity>, weeks: Int = 2, weighIns: List<Pair<LocalDate, Double>> = emptyList(), workouts: Map<LocalDate, List<ActivityFact>> = emptyMap()): CoachExport {
         val days = meals.groupBy { java.time.Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
-            .mapValues { (date, list) -> DayTotals(date, list.sumOf { it.calories }, 2000.0, list.size, list.sumOf { it.proteinG }, 120.0, 0, workouts[date].orEmpty()) }
-            .toMutableMap()
-        workouts.forEach { (date, w) -> if (date !in days) days[date] = DayTotals(date, 0.0, 2000.0, 0, 0.0, 120.0, 0, w) }
+            .map { (date, list) -> date.toKotlinLocalDate() to DayTotals(date.toKotlinLocalDate(), list.sumOf { it.calories }, 2000.0, list.size, list.sumOf { it.proteinG }, 120.0, 0, workouts[date].orEmpty()) }
+            .toMap().toMutableMap()
+        workouts.forEach { (date, w) -> if (date.toKotlinLocalDate() !in days) days[date.toKotlinLocalDate()] = DayTotals(date.toKotlinLocalDate(), 0.0, 2000.0, 0, 0.0, 120.0, 0, w) }
         return CoachExportBuilder.build(header, weeks, today, days, meals, weighIns, 120.0, listOf(null, 70), zone)
     }
 

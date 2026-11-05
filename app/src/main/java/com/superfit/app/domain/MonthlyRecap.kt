@@ -10,6 +10,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /** One fact on the "What moved the needle" card, e.g. "Protein on target" / "19 of 24 logged days". */
 data class RecapFact(val title: String, val detail: String)
@@ -111,7 +112,7 @@ object MonthlyRecap {
 
     fun build(
         month: YearMonth,
-        days: Map<LocalDate, DayTotals>,
+        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity>,
         strength: List<StrengthSession>,
         weighIns: List<Pair<LocalDate, Double>>,
@@ -123,14 +124,14 @@ object MonthlyRecap {
     ): MonthRecap? {
         val first = month.atDay(1)
         val last = month.atEndOfMonth()
-        val monthDays = InsightsEngine.range(days, first, last)
-        val prev = InsightsEngine.range(days, first.minusMonths(1), first.minusDays(1))
+        val monthDays = InsightsEngine.range(days, first.toKotlinLocalDate(), last.toKotlinLocalDate())
+        val prev = InsightsEngine.range(days, first.minusMonths(1).toKotlinLocalDate(), first.minusDays(1).toKotlinLocalDate())
         val logged = monthDays.filter { it.logged }
         val active = monthDays.filter { it.active }
         if (logged.size < MIN_DAYS && active.size < MIN_DAYS) return null
 
         val monthMeals = meals.filter { dateOf(it.timestamp, zone).let { d -> !d.isBefore(first) && !d.isAfter(last) } }
-        val loggedDates = logged.map { it.date }.toSet()
+        val loggedDates = logged.map { it.date.toJavaLocalDate() }.toSet()
         val lose = journey?.let { it.targetKg < it.startKg } ?: true
         val strengthMonth = strength.filter { it.date.toJavaLocalDate().let { d -> !d.isBefore(first) && !d.isAfter(last) } }
         val strengthNow = strengthMonth.size
@@ -254,7 +255,7 @@ object MonthlyRecap {
     }
 
     fun moving(month: List<DayTotals>, prev: List<DayTotals>, ym: YearMonth): RecapCard.Moving? {
-        val active = month.filter { it.active }.map { it.date.dayOfMonth }.toSet()
+        val active = month.filter { it.active }.map { it.date.day }.toSet()
         val km = month.sumOf { it.workoutKm }
         val stepDays = month.filter { it.steps > 0 }
         if (active.isEmpty() && km < 1) return null

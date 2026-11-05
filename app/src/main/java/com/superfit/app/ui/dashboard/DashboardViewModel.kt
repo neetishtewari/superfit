@@ -495,7 +495,7 @@ class DashboardViewModel(
     /** Today's steps and workouts next to the usual for this weekday. */
     fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?) =
         com.superfit.app.domain.TodayVsUsual.of(
-            today = LocalDate.now(),
+            today = LocalDate.now().toKotlinLocalDate(),
             steps = state.activity.steps,
             workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
                 com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
@@ -784,7 +784,7 @@ class DashboardViewModel(
             kcalTarget = { 0.0 },
             proteinTargetG = 0.0
         )
-        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now())
+        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now().toKotlinLocalDate())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

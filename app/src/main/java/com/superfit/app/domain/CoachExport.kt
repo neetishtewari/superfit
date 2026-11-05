@@ -6,6 +6,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /** Who the report is about, shown at the top of page 1. */
 data class CoachExportHeader(
@@ -76,7 +78,7 @@ object CoachExportBuilder {
         header: CoachExportHeader,
         weeks: Int,
         today: LocalDate,
-        days: Map<LocalDate, DayTotals>,
+        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity>,
         weighIns: List<Pair<LocalDate, Double>>,
         proteinTargetG: Double,
@@ -90,10 +92,11 @@ object CoachExportBuilder {
         val mealsByDate = meals.groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
         val weightByDate = weighIns.toMap()
 
-        val reportDays = InsightsEngine.range(days, from, to).map { d ->
-            val dayMeals = mealsByDate[d.date].orEmpty().sortedBy { it.timestamp }
+        val reportDays = InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()).map { d ->
+            val date = d.date.toJavaLocalDate()
+            val dayMeals = mealsByDate[date].orEmpty().sortedBy { it.timestamp }
             CoachExportDay(
-                date = d.date,
+                date = date,
                 logged = d.logged,
                 kcal = d.kcalEaten.roundToInt(),
                 kcalTarget = d.kcalTarget.roundToInt(),
@@ -102,7 +105,7 @@ object CoachExportBuilder {
                 fatG = dayMeals.sumOf { it.fatG }.roundToInt(),
                 steps = d.steps,
                 workouts = group(d.workouts),
-                weightKg = weightByDate[d.date],
+                weightKg = weightByDate[date],
                 meals = dayMeals.map {
                     CoachExportMeal(
                         time = Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalTime().format(timeFormat),
@@ -116,10 +119,10 @@ object CoachExportBuilder {
 
         val logged = reportDays.filter { it.logged }
         fun avg(f: (CoachExportDay) -> Int): Int? = if (logged.isEmpty()) null else logged.map(f).average().roundToInt()
-        val stats = InsightsEngine.stats(InsightsEngine.range(days, from, to))
+        val stats = InsightsEngine.stats(InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()))
         val withSteps = reportDays.filter { it.steps > 0 }
         // Short walks are counted apart so a coach doesn't read 70 walks as 70 training sessions.
-        val facts = InsightsEngine.range(days, from, to).flatMap { it.workouts }
+        val facts = InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()).flatMap { it.workouts }
         val walks = facts.count { isWalk(it) }
         val inPeriod = weighIns.filter { !it.first.isBefore(from) && !it.first.isAfter(to) }.sortedBy { it.first }
 

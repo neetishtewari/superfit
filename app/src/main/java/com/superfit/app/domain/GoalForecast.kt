@@ -8,6 +8,7 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.datetime.toKotlinLocalDate
 
 enum class ForecastStatus { ON_TRACK, AT_RISK, OFF_TRACK, REACHED, NOT_ENOUGH_DATA }
 
@@ -68,7 +69,7 @@ object GoalForecast {
         targetKg: Double,
         startDate: LocalDate,
         weighIns: List<Pair<LocalDate, Double>>,
-        days: Map<LocalDate, DayTotals>,
+        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
         calorieOffset: Int,
         targetDate: LocalDate?,
         today: LocalDate,
@@ -91,8 +92,8 @@ object GoalForecast {
         val recent = (recentWeigh ?: recentEnergy)?.times(dir)
         val earlier = (if (fromWeighIns) earlierWeigh else earlierEnergy)?.times(dir)
 
-        val month = InsightsEngine.range(days, today.minusDays(28), today.minusDays(1))
-        val prevMonth = InsightsEngine.range(days, today.minusDays(56), today.minusDays(29))
+        val month = InsightsEngine.range(days, today.minusDays(28).toKotlinLocalDate(), today.minusDays(1).toKotlinLocalDate())
+        val prevMonth = InsightsEngine.range(days, today.minusDays(56).toKotlinLocalDate(), today.minusDays(29).toKotlinLocalDate())
         val slowing = slowingReasons(month, prevMonth, dir < 0)
         val lastWeighIn = sorted.lastOrNull()?.first
         val milestones = milestones(startKg, targetKg, currentKg, sorted, dir)
@@ -198,8 +199,8 @@ object GoalForecast {
      * Weight change a week implied by logged eating: (eaten - maintenance) / 7700. The day's target
      * already includes the goal's offset, so maintenance = target - offset. Needs 7+ logged days.
      */
-    fun energyRate(days: Map<LocalDate, DayTotals>, from: LocalDate, to: LocalDate, calorieOffset: Int): Double? {
-        val logged = InsightsEngine.range(days, from, to).filter { it.logged && it.kcalTarget > 0 }
+    fun energyRate(days: Map<kotlinx.datetime.LocalDate, DayTotals>, from: LocalDate, to: LocalDate, calorieOffset: Int): Double? {
+        val logged = InsightsEngine.range(days, from.toKotlinLocalDate(), to.toKotlinLocalDate()).filter { it.logged && it.kcalTarget > 0 }
         if (logged.size < 7) return null
         val balance = logged.map { it.net + calorieOffset }.average()
         return balance * 7 / KCAL_PER_KG

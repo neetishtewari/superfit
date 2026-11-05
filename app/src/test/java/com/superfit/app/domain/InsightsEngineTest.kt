@@ -1,6 +1,7 @@
 package com.superfit.app.domain
 
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -12,6 +13,7 @@ class InsightsEngineTest {
 
     // A Monday, so the 7 full days before it run Mon 12 Oct to Sun 18 Oct.
     private val today = LocalDate.of(2026, 10, 19)
+    private val kToday = today.toKotlinLocalDate()
 
     private fun run(km: Double, paceSec: Long, kcal: Double = 500.0) =
         ActivityFact("Run", minutes = km.times(paceSec).div(60).toLong(), distanceKm = km, kcal = kcal, paceSecondsPerKm = paceSec, isRun = true)
@@ -24,7 +26,7 @@ class InsightsEngineTest {
         protein: Double = 110.0,
         steps: Int = 6000,
         workouts: List<ActivityFact> = emptyList()
-    ) = DayTotals(date, eaten, target, meals, protein, 110.0, steps, workouts)
+    ) = DayTotals(date.toKotlinLocalDate(), eaten, target, meals, protein, 110.0, steps, workouts)
 
     private fun map(vararg d: DayTotals) = d.associateBy { it.date }
 
@@ -35,9 +37,9 @@ class InsightsEngineTest {
             day(today.minusDays(1), workouts = listOf(run(5.0, 330))),
             day(today.minusDays(8), workouts = listOf(run(3.0, 330)))
         )
-        val r = InsightsEngine.weekReport(days, today)
-        assertEquals(LocalDate.of(2026, 10, 12), r.from)
-        assertEquals(LocalDate.of(2026, 10, 18), r.to)
+        val r = InsightsEngine.weekReport(days, kToday)
+        assertEquals(LocalDate.of(2026, 10, 12).toKotlinLocalDate(), r.from)
+        assertEquals(LocalDate.of(2026, 10, 18).toKotlinLocalDate(), r.to)
         assertEquals(5.0, r.thisWeek.distanceKm, 0.01)
         assertEquals(3.0, r.lastWeek.distanceKm, 0.01)
         assertEquals(7, r.dailyNet.size)
@@ -51,7 +53,7 @@ class InsightsEngineTest {
             day(today.minusDays(3), protein = 66.0), // 60%
             day(today.minusDays(4), protein = 0.0, meals = 0) // not logged: left out
         )
-        val s = InsightsEngine.weekReport(days, today).thisWeek
+        val s = InsightsEngine.weekReport(days, kToday).thisWeek
         assertEquals(80, s.proteinPct)
         assertEquals(1, s.proteinDaysHit)
         assertEquals(3, s.loggedDays)
@@ -60,7 +62,7 @@ class InsightsEngineTest {
     @Test
     fun closeToProteinGoalEveryDayIsNotFlaggedAsShort() {
         val days = map(*(1L..5L).map { day(today.minusDays(it), protein = 97.0) }.toTypedArray()) // 88% each
-        val r = InsightsEngine.weekReport(days, today)
+        val r = InsightsEngine.weekReport(days, kToday)
         assertEquals(88, r.thisWeek.proteinPct)
         assertTrue(r.watch.none { it.id == "protein_low" })
     }
@@ -68,19 +70,19 @@ class InsightsEngineTest {
     @Test
     fun proteinWellUnderGoalIsWatched() {
         val days = map(*(1L..4L).map { day(today.minusDays(it), protein = 55.0) }.toTypedArray()) // 50%
-        val r = InsightsEngine.weekReport(days, today)
+        val r = InsightsEngine.weekReport(days, kToday)
         assertTrue(r.watch.any { it.id == "protein_low" && it.detail.contains("50%") })
     }
 
     @Test
     fun noLoggedDaysHasNoProteinPercent() {
-        assertNull(InsightsEngine.weekReport(emptyMap(), today).thisWeek.proteinPct)
+        assertNull(InsightsEngine.weekReport(emptyMap(), kToday).thisWeek.proteinPct)
     }
 
     @Test
     fun blankDaysAreUnknownNotUnderEating() {
         val days = map(day(today.minusDays(1), eaten = 300.0, meals = 1))
-        val r = InsightsEngine.weekReport(days, today)
+        val r = InsightsEngine.weekReport(days, kToday)
         assertEquals(0, r.thisWeek.loggedDays)
         assertNull(r.dailyNet.last().second)
         assertEquals(0.0, r.thisWeek.netKcal, 0.0)
@@ -92,7 +94,7 @@ class InsightsEngineTest {
         val week = (1..7).map { today.minusDays(it.toLong()) }.map { d ->
             if (d.dayOfWeek.value >= 6) day(d, eaten = 2800.0) else day(d, eaten = 1600.0)
         }
-        val r = InsightsEngine.weekReport(map(*week.toTypedArray()), today)
+        val r = InsightsEngine.weekReport(map(*week.toTypedArray()), kToday)
         val weekend = r.watch.firstOrNull { it.id == "weekend" }
         assertNotNull(weekend)
         assertTrue(weekend!!.title.contains("800"))
@@ -102,7 +104,7 @@ class InsightsEngineTest {
     @Test
     fun underFuelledBigRunNamesTheDay() {
         val sat = LocalDate.of(2026, 10, 17)
-        val r = InsightsEngine.weekReport(map(day(sat, protein = 50.0, workouts = listOf(run(8.7, 334, kcal = 610.0)))), today)
+        val r = InsightsEngine.weekReport(map(day(sat, protein = 50.0, workouts = listOf(run(8.7, 334, kcal = 610.0)))), kToday)
         val f = r.watch.firstOrNull { it.id == "fuel_low" }
         assertNotNull(f)
         assertTrue(f!!.detail.startsWith("Saturday's run 8.7 km"))
@@ -113,7 +115,7 @@ class InsightsEngineTest {
         val days = mutableMapOf<LocalDate, DayTotals>()
         for (i in 1..28) days[today.minusDays(i.toLong())] = day(today.minusDays(i.toLong()), steps = 9000, workouts = listOf(run(5.0, 320)))
         for (i in 29..56) days[today.minusDays(i.toLong())] = day(today.minusDays(i.toLong()), workouts = listOf(run(5.0, 350)))
-        val r = InsightsEngine.weekReport(days, today)
+        val r = InsightsEngine.weekReport(days, kToday)
         assertEquals("active", r.working[0].id)
         assertTrue(r.working.any { it.id == "pace" })
         assertTrue(r.working.first { it.id == "pace" }.detail.contains("30 s faster"))
@@ -125,14 +127,14 @@ class InsightsEngineTest {
         val days = mutableMapOf<LocalDate, DayTotals>()
         for (i in 8..28) days[today.minusDays(i.toLong())] = day(today.minusDays(i.toLong()), workouts = listOf(run(3.0, 360)))
         days[today.minusDays(2)] = day(today.minusDays(2), workouts = listOf(run(3.0, 360)))
-        val r = InsightsEngine.weekReport(days, today)
+        val r = InsightsEngine.weekReport(days, kToday)
         assertTrue(r.watch.any { it.id == "fewer" })
     }
 
     @Test
     fun usualNeedsTwoEarlierSameWeekdays() {
-        assertNull(UsualDay.forDay(map(day(today.minusWeeks(1), steps = 8000)), today))
-        val u = UsualDay.forDay(map(day(today.minusWeeks(1), steps = 8000), day(today.minusWeeks(2), steps = 6000), day(today.minusDays(1), steps = 20000)), today)
+        assertNull(UsualDay.forDay(map(day(today.minusWeeks(1), steps = 8000)), kToday))
+        val u = UsualDay.forDay(map(day(today.minusWeeks(1), steps = 8000), day(today.minusWeeks(2), steps = 6000), day(today.minusDays(1), steps = 20000)), kToday)
         assertEquals(7000, u!!.steps)
         assertEquals(2, u.samples)
     }
@@ -140,20 +142,20 @@ class InsightsEngineTest {
     @Test
     fun gainGoalDoesNotCallASurplusAProblem() {
         val week = (1..7).map { day(today.minusDays(it.toLong()), eaten = 2400.0) }
-        val r = InsightsEngine.weekReport(map(*week.toTypedArray()), today, loseGoal = false)
+        val r = InsightsEngine.weekReport(map(*week.toTypedArray()), kToday, loseGoal = false)
         assertFalse(r.watch.any { it.id == "over" || it.id == "weekend" })
     }
 
     @Test
     fun todayVsUsualOnlyNudgesLateInTheDay() {
         val usual = UsualDay(steps = 8000, distanceKm = 6.0, moveMinutes = 40, workoutKcal = 300.0, samples = 3)
-        val quiet = TodayVsUsual.of(today, 2000, emptyList(), usual)
+        val quiet = TodayVsUsual.of(kToday, 2000, emptyList(), usual)
         assertNull(quiet.coachLine(hour = 11))
         assertTrue(quiet.coachLine(hour = 19)!!.contains("6,000 steps short"))
-        val busy = TodayVsUsual.of(today, 9000, listOf(run(8.0, 330)), usual)
+        val busy = TodayVsUsual.of(kToday, 9000, listOf(run(8.0, 330)), usual)
         assertTrue(busy.coachLine(hour = 9)!!.contains("steps and move time"))
         assertEquals(44, busy.moveMinutes)
         assertTrue(busy.chatLine().contains("steps 9000 vs 8000"))
-        assertNull(TodayVsUsual.of(today, 9000, emptyList(), null).coachLine(20))
+        assertNull(TodayVsUsual.of(kToday, 9000, emptyList(), null).coachLine(20))
     }
 }

@@ -1,9 +1,9 @@
 package com.superfit.app.domain
 
-import java.time.DayOfWeek
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlinx.datetime.DayOfWeek
 
 /** Same kind of walk or run as before, with the heart working less: a sign of getting fitter. */
 data class HeartChange(val activity: String, val paceNow: Long, val pacePrev: Long, val bpmNow: Int, val bpmPrev: Int) {
