@@ -384,21 +384,22 @@ class HistoryViewModel(
             val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
             goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
             val journeyWeighIns = InsightsData.weighIns(repository.getAllWeightEntries())
+            val kJourneyWeighIns = journeyWeighIns.map { it.first.toKotlinLocalDate() to it.second }
             val journeyStart = com.superfit.app.domain.GoalForecast.startDate(
-                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() },
-                weighIns = journeyWeighIns,
-                firstLogged = allNutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() },
-                today = today
+                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() },
+                weighIns = kJourneyWeighIns,
+                firstLogged = allNutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() },
+                today = today.toKotlinLocalDate()
             )
             journey = com.superfit.app.domain.GoalForecast.compute(
                 startKg = profile.startingWeightKg,
                 targetKg = profile.targetWeightKg,
                 startDate = journeyStart,
-                weighIns = journeyWeighIns,
+                weighIns = kJourneyWeighIns,
                 days = dayTotals,
                 calorieOffset = profile.calorieOffset,
-                targetDate = goalTargetDate,
-                today = today,
+                targetDate = goalTargetDate?.toKotlinLocalDate(),
+                today = today.toKotlinLocalDate(),
                 fallbackCurrentKg = profile.weightKg
             )
 

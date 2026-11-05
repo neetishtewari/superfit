@@ -92,6 +92,7 @@ object MonthlyRecapData {
             }
         val days = InsightsData.days(nutrition, workouts, repository.getAllActivityTelemetry(), importedByDate, ::target, PhysiologyEngine.proteinTargetG(profile))
         val weighIns = InsightsData.weighIns(repository.getAllWeightEntries())
+        val kWeighIns = weighIns.map { it.first.toKotlinLocalDate() to it.second }
 
         // The goal as it stood at the end of the month (or today, for a month still going).
         val asOf = minOf(month.atEndOfMonth().plusDays(1), today)
@@ -101,16 +102,16 @@ object MonthlyRecapData {
             startKg = profile.startingWeightKg,
             targetKg = profile.targetWeightKg,
             startDate = GoalForecast.startDate(
-                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
-                weighIns = weighIns,
-                firstLogged = nutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
-                today = asOf
+                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toKotlinLocalDate() },
+                weighIns = kWeighIns,
+                firstLogged = nutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toKotlinLocalDate() },
+                today = asOf.toKotlinLocalDate()
             ),
-            weighIns = weighIns.filter { !it.first.isAfter(asOf) },
+            weighIns = kWeighIns.filter { it.first <= asOf.toKotlinLocalDate() },
             days = days,
             calorieOffset = profile.calorieOffset,
-            targetDate = GoalDatePref.get(prefs),
-            today = asOf,
+            targetDate = GoalDatePref.get(prefs)?.toKotlinLocalDate(),
+            today = asOf.toKotlinLocalDate(),
             fallbackCurrentKg = profile.weightKg
         )
         val strengthLogs = workouts.filter { it.workoutType == "Strength" }
