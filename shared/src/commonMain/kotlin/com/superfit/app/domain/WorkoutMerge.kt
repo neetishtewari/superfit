@@ -1,6 +1,5 @@
 package com.superfit.app.domain
 
-import androidx.health.connect.client.records.ExerciseSessionRecord
 import com.superfit.app.data.ImportedWorkoutEntity
 
 /** One workout as the user sees it: the best copy of a session that one or more apps recorded. */
@@ -86,9 +85,9 @@ object WorkoutMerge {
     // Health Connect has separate types for, say, a treadmill run and an outdoor run; apps don't
     // always agree on which one to use, so they count as the same kind here.
     private fun family(type: Int): Int = when (type) {
-        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> ExerciseSessionRecord.EXERCISE_TYPE_RUNNING
-        ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY -> ExerciseSessionRecord.EXERCISE_TYPE_BIKING
-        ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL
+        ExerciseTypes.RUNNING_TREADMILL -> ExerciseTypes.RUNNING
+        ExerciseTypes.BIKING_STATIONARY -> ExerciseTypes.BIKING
+        ExerciseTypes.SWIMMING_OPEN_WATER -> ExerciseTypes.SWIMMING_POOL
         else -> type
     }
 
