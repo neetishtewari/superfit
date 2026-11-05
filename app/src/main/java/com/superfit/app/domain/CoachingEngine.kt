@@ -12,6 +12,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinLocalTime
 
 /** What the coach card shows: one headline, one thing to do, and the numbers behind it. */
 data class CoachInsight(
@@ -75,8 +77,8 @@ class CoachingEngine {
         now: LocalTime = LocalTime.now()
     ): CoachInsight {
         val report = CoachPatternEngine.analyze(
-            today = today,
-            now = now,
+            today = today.toKotlinLocalDate(),
+            now = now.toKotlinLocalTime(),
             weightKg = profile.weightKg,
             goal = profile.goal,
             targets = macroTargets,

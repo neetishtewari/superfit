@@ -155,10 +155,3 @@ enum class WorkoutAddBack(val fraction: Double) { OFF(0.0), HALF(0.5), ALL(1.0) 
 data class DailyTarget(val targets: MacroTargets, val tdee: Double, val workoutKcal: Double, val maintenance: Double) {
     val baseCalories: Double get() = targets.calories - workoutKcal
 }
-
-data class MacroTargets(
-    val calories: Double,
-    val proteinG: Double,
-    val carbsG: Double,
-    val fatG: Double
-)

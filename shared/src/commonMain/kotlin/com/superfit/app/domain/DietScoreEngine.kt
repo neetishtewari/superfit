@@ -1,10 +1,14 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.math.roundToInt
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 /** One part of the Diet Quality score, e.g. "Vegetables & fruit: 18 / 25". */
 data class DietScorePart(
@@ -46,6 +50,7 @@ data class DietScoreWeights(val food: Int, val balance: Int, val protein: Int, v
  * everything at once in the evening. A forgotten meal doesn't cost points: balance, vegetables and
  * fibre use the mix of what was logged, and protein totals use only days that look fully logged.
  */
+@OptIn(ExperimentalTime::class)
 object DietScoreEngine {
 
     const val MIN_DAYS = 3
@@ -65,11 +70,11 @@ object DietScoreEngine {
         today: LocalDate,
         proteinTargetG: Double,
         calorieTarget: Double,
-        zone: ZoneId,
+        zone: TimeZone,
         weeksAgo: Int = 0,
         goal: String = PersonalNutrition.goal
     ): DietScore? {
-        val dates = (0..6).map { today.minusDays((weeksAgo * 7 + it).toLong()) }.toSet()
+        val dates = (0..6).map { today.minus(weeksAgo * 7 + it, DateTimeUnit.DAY) }.toSet()
         val byDate = entries.groupBy { dateOf(it.timestamp, zone) }
         val inWindow = entries.filter { dateOf(it.timestamp, zone) in dates }
         val daysLogged = inWindow.map { dateOf(it.timestamp, zone) }.distinct().size
@@ -188,11 +193,11 @@ object DietScoreEngine {
         target: Double,
         calorieTarget: Double,
         today: LocalDate,
-        zone: ZoneId,
+        zone: TimeZone,
         max: Int
     ): DietScorePart {
         val tip = "Have a protein with most meals: eggs, paneer, chicken, fish, tofu, curd, dal or a whey shake."
-        val history = (1..CoachPatternEngine.LOOKBACK_DAYS).map { byDate[today.minusDays(it.toLong())].orEmpty() }
+        val history = (1..CoachPatternEngine.LOOKBACK_DAYS).map { byDate[today.minus(it, DateTimeUnit.DAY)].orEmpty() }
         val typical = CoachPatternEngine.typicalDayCalories(history, calorieTarget)
         val complete = days.mapNotNull { d ->
             byDate[d]?.let { CoachPatternEngine.buildDayLog(d, it, typical, calorieTarget, zone) }
@@ -248,7 +253,7 @@ object DietScoreEngine {
      * Real treats, where foods eaten within an hour of each other are one sitting, and a sitting
      * needs a treat's worth of treat food to count (see [Treats]).
      */
-    private fun treatOccasions(tagged: List<Pair<NutritionEntryEntity, MealTags>>, zone: ZoneId): Int =
+    private fun treatOccasions(tagged: List<Pair<NutritionEntryEntity, MealTags>>, zone: TimeZone): Int =
         tagged.filter { (e, t) -> Treats.kcalOf(e, t) > 0.0 }.map { it.first }
             .groupBy { dateOf(it.timestamp, zone) }.values
             .sumOf { day ->
@@ -260,7 +265,7 @@ object DietScoreEngine {
                 Treats.occasions(sittings).size
             }
 
-    private fun treatPart(tagged: List<Pair<NutritionEntryEntity, MealTags>>, max: Int, zone: ZoneId): DietScorePart {
+    private fun treatPart(tagged: List<Pair<NutritionEntryEntity, MealTags>>, max: Int, zone: TimeZone): DietScorePart {
         val treats = treatOccasions(tagged, zone)
         val allowance = CoachPatternEngine.WEEKLY_TREAT_ALLOWANCE
         val extra = (treats - allowance).coerceAtLeast(0)
@@ -314,5 +319,5 @@ object DietScoreEngine {
     private fun scaled(ratio: Double, fullAt: Double, max: Int): Int =
         (max * (ratio / fullAt).coerceIn(0.0, 1.0)).roundToInt()
 
-    private fun dateOf(timestamp: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
+    private fun dateOf(timestamp: Long, zone: TimeZone): LocalDate = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(zone).date
 }

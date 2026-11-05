@@ -1,7 +1,6 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /** One food's share of the calories over a week or month. */
@@ -145,17 +144,17 @@ object CalorieSourcesEngine {
         val single = items.map { key(it.name) }.distinct().size == 1
         return items.mapIndexed { i, item ->
             val share = if (sum > 0) weights[i] / sum else 1.0 / items.size
-            val name = item.name.trim().replaceFirstChar { it.titlecase(Locale.getDefault()) }
+            val name = item.name.trim().replaceFirstChar { it.titlecase() }
             val kcal = meal.calories * share
             val treatFood = isTreat(item.name, single)
             MealPart(key(item.name), name, kcal, kcal >= SMALL_TASTE_KCAL && treatFood, treatFood)
         }
     }
 
-    fun key(name: String): String = name.trim().lowercase(Locale.getDefault()).replace(Regex("\\s+"), " ")
+    fun key(name: String): String = name.trim().lowercase().replace(Regex("\\s+"), " ")
 
     private fun shortName(text: String): String {
-        val name = text.trim().replaceFirstChar { it.titlecase(Locale.getDefault()) }
+        val name = text.trim().replaceFirstChar { it.titlecase() }
         return if (name.length <= 32) name else name.take(31).substringBeforeLast(' ').trimEnd(',', ' ') + "…"
     }
 
