@@ -4,6 +4,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import com.superfit.app.data.ImportedWorkoutEntity
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -43,48 +44,48 @@ class WorkoutMomentsTest {
     fun hardestSinceTheLastHarderOne() {
         val history = listOf(workout(60, hiit, hr = 160), workout(20, hiit, hr = 140), workout(15, hiit, hr = 145), workout(10, hiit, hr = 142), workout(5, hiit, hr = 150))
         val now = workout(0, hiit, hr = 158)
-        assertEquals("Hardest HIIT since September", WorkoutMoments.hardest(now, history, utc))
+        assertEquals("Hardest HIIT since September", WorkoutMoments.hardest(now, history, TimeZone.UTC))
     }
 
     @Test
     fun hardestNeedsEnoughHistoryAndAMonth() {
         val few = listOf(workout(40, hr = 120), workout(20, hr = 120), workout(10, hr = 120))
-        assertNull(WorkoutMoments.hardest(workout(0, hr = 150), few, utc))
+        assertNull(WorkoutMoments.hardest(workout(0, hr = 150), few, TimeZone.UTC))
         val recentHarder = listOf(workout(40, hr = 120), workout(30, hr = 120), workout(20, hr = 120), workout(10, hr = 155))
-        assertNull(WorkoutMoments.hardest(workout(0, hr = 150), recentHarder, utc))
+        assertNull(WorkoutMoments.hardest(workout(0, hr = 150), recentHarder, TimeZone.UTC))
     }
 
     @Test
     fun hardestEverInImportedHistorySaysDays() {
         val history = listOf(workout(45, hr = 120), workout(30, hr = 125), workout(20, hr = 122), workout(10, hr = 128))
-        assertEquals("Hardest strength workout in 45 days", WorkoutMoments.hardest(workout(0, hr = 150), history, utc))
+        assertEquals("Hardest strength workout in 45 days", WorkoutMoments.hardest(workout(0, hr = 150), history, TimeZone.UTC))
     }
 
     @Test
     fun longestRunGoesByDistance() {
         val history = listOf(workout(70, run, km = 12.0), workout(30, run, km = 5.0), workout(20, run, km = 6.0), workout(10, run, km = 5.5))
-        assertEquals("Longest run since August", WorkoutMoments.longest(workout(0, run, minutes = 60, km = 10.0), history, utc))
+        assertEquals("Longest run since August", WorkoutMoments.longest(workout(0, run, minutes = 60, km = 10.0), history, TimeZone.UTC))
     }
 
     @Test
     fun genericWorkoutsAndShortOnesSayNothing() {
         val other = ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT
         val history = List(6) { workout(10L + it * 10, other, minutes = 20, hr = 110) }
-        assertNull(WorkoutMoments.line(workout(0, other, minutes = 90, hr = 170), history, utc))
+        assertNull(WorkoutMoments.line(workout(0, other, minutes = 90, hr = 170), history, TimeZone.UTC))
     }
 
     @Test
     fun busiestWeekInEightOrMore() {
         // Monday and Tuesday this week, and one a week for the ten weeks before.
         val history = List(10) { workout(9L + it * 7, minutes = 30, hr = 130) } + workout(2) + workout(1)
-        assertEquals("Most workouts in a week in 10 weeks", WorkoutMoments.busiestWeek(workout(0), history, utc))
+        assertEquals("Most workouts in a week in 10 weeks", WorkoutMoments.busiestWeek(workout(0), history, TimeZone.UTC))
     }
 
     @Test
     fun busiestWeekNotWhenARecentWeekWasAsBusy() {
         val busy = listOf(workout(16), workout(15), workout(14))
         val history = List(10) { workout(30L + it * 7) } + busy + workout(2) + workout(1)
-        assertNull(WorkoutMoments.busiestWeek(workout(0), history, utc))
+        assertNull(WorkoutMoments.busiestWeek(workout(0), history, TimeZone.UTC))
     }
 
     @Test
@@ -100,6 +101,6 @@ class WorkoutMomentsTest {
         val history = listOf(workout(45, hr = 120), workout(30, hr = 125), workout(20, hr = 122), workout(10, hr = 128))
         val now = workout(5, hr = 150)
         val later = workout(1, hr = 170)
-        assertEquals("Hardest strength workout in 40 days", WorkoutMoments.line(now, history + later + now, utc))
+        assertEquals("Hardest strength workout in 40 days", WorkoutMoments.line(now, history + later + now, TimeZone.UTC))
     }
 }

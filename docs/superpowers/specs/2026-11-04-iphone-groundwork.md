@@ -57,7 +57,9 @@ tested on the dev app first.
      platform hook (`localWeekdayName`, `localMonthName`): Java's names on Android, Apple's on
      iPhone. Journey, the recap and the coach report still live in the app and convert dates at
      the edge until they move.
-   - 3k onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3k: the workout card's "stands out" line and its sleep line move to `shared` (month names
+     through `localMonthName`).
+   - 3l onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -87,6 +89,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3k (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
+network calls or secrets. Sleep data still stays on the phone.
 
 Step 3j (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets.

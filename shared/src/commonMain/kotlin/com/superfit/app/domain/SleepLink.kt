@@ -1,15 +1,18 @@
 package com.superfit.app.domain
 
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.math.roundToInt
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * A sleep line for a workout card, only when the user's own workouts prove the link: at least 10
  * earlier ones of the same kind with sleep data, and the ones after 7+ hour nights clearly better.
  * Shown only after a good night, so it's never a telling-off after a short one.
  */
+@OptIn(ExperimentalTime::class)
 object SleepLink {
 
     const val GOOD_NIGHT_HOURS = 7.0
@@ -17,8 +20,8 @@ object SleepLink {
     private const val MIN_PER_GROUP = 3
 
     /** [sleepHours] is the night that ended on each date (the morning of the workout). */
-    fun line(workout: WorkoutView, earlier: List<WorkoutView>, sleepHours: Map<LocalDate, Double>, zone: ZoneId = ZoneId.systemDefault()): String? {
-        fun day(w: WorkoutView) = Instant.ofEpochMilli(w.startTime).atZone(zone).toLocalDate()
+    fun line(workout: WorkoutView, earlier: List<WorkoutView>, sleepHours: Map<LocalDate, Double>, zone: TimeZone = TimeZone.currentSystemDefault()): String? {
+        fun day(w: WorkoutView) = Instant.fromEpochMilliseconds(w.startTime).toLocalDateTime(zone).date
         val lastNight = sleepHours[day(workout)]?.takeIf { it >= GOOD_NIGHT_HOURS } ?: return null
         if (workout.title == "Workout") return null
         val withSleep = earlier.filter { it.title == workout.title && sleepHours[day(it)] != null && it.startTime < workout.startTime }
@@ -62,7 +65,7 @@ object SleepLink {
     /** "7h 40m". */
     fun hours(h: Double): String {
         val total = (h * 60).roundToInt()
-        return "${total / 60}h ${"%02d".format(total % 60)}m"
+        return "${total / 60}h ${(total % 60).toString().padStart(2, '0')}m"
     }
 
     private fun plural(name: String): String = when {
