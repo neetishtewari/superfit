@@ -1,58 +1,65 @@
 package com.superfit.app.domain
 
-import java.time.LocalDate
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 
 class StreakEngineTest {
 
-    private val today = LocalDate.of(2026, 10, 5)
-    private fun daysAgo(vararg n: Long) = n.map { today.minusDays(it) }
+    private val today = LocalDate(2026, 10, 5)
+    private fun daysAgo(vararg n: Int) = n.map { today.minus(it, DateTimeUnit.DAY) }
 
     @Test
-    fun `no meals means no streak`() {
+    fun noMealsMeansNoStreak() {
         val s = StreakEngine.fromLoggedDates(emptyList(), today)
         assertEquals(0, s.currentStreak)
         assertEquals(0, s.longestStreak)
     }
 
     @Test
-    fun `logging every day counts every day`() {
+    fun loggingEveryDayCountsEveryDay() {
         val s = StreakEngine.fromLoggedDates(daysAgo(0, 1, 2, 3, 4), today)
         assertEquals(5, s.currentStreak)
         assertEquals(5, s.longestStreak)
+        assertEquals("2026-10-05", s.lastLoggedDate)
     }
 
     @Test
-    fun `streak survives before today is logged`() {
+    fun streakSurvivesBeforeTodayIsLogged() {
         val s = StreakEngine.fromLoggedDates(daysAgo(1, 2, 3), today)
         assertEquals(3, s.currentStreak)
         assertEquals(1, s.graceDaysRemaining)
     }
 
     @Test
-    fun `one missed day is forgiven`() {
+    fun oneMissedDayIsForgiven() {
         // Logged 4 days ago, 3 days ago, missed 2 days ago, logged yesterday and today.
         val s = StreakEngine.fromLoggedDates(daysAgo(0, 1, 3, 4), today)
         assertEquals(4, s.currentStreak)
     }
 
     @Test
-    fun `missed yesterday keeps streak but flags grace in use`() {
+    fun missedYesterdayKeepsStreakButFlagsGraceInUse() {
         val s = StreakEngine.fromLoggedDates(daysAgo(2, 3, 4), today)
         assertEquals(3, s.currentStreak)
         assertEquals(0, s.graceDaysRemaining)
+        assertEquals("2026-10-04", s.lastGraceUsedDate)
     }
 
     @Test
-    fun `two missed days end the streak but keep the longest`() {
+    fun twoMissedDaysEndTheStreakButKeepTheLongest() {
         val s = StreakEngine.fromLoggedDates(daysAgo(3, 4, 5, 6), today)
         assertEquals(0, s.currentStreak)
         assertEquals(4, s.longestStreak)
     }
 
     @Test
-    fun `two missed days in the middle start a new streak`() {
+    fun twoMissedDaysInTheMiddleStartANewStreak() {
         // Run of 3 (days 10-8), gap of two missed days (7, 6), new run of 2 (days 5, 4)... then today.
         val s = StreakEngine.fromLoggedDates(daysAgo(10, 9, 8, 5, 4, 3, 2, 1, 0), today)
         assertEquals(6, s.currentStreak)
@@ -64,8 +71,22 @@ class StreakEngineTest {
     }
 
     @Test
-    fun `several meals on one day count once`() {
+    fun severalMealsOnOneDayCountOnce() {
         val s = StreakEngine.fromLoggedDates(daysAgo(0, 0, 0, 1, 1), today)
         assertEquals(2, s.currentStreak)
+    }
+
+    @OptIn(ExperimentalTime::class)
+    @Test
+    fun mealTimesUseTheirLocalDayAndIgnoreTheFuture() {
+        // 2026-10-04 20:00 UTC is already 2026-10-05 in India.
+        val lateEvening = Instant.parse("2026-10-04T20:00:00Z").toEpochMilliseconds()
+        val tomorrow = Instant.parse("2026-10-06T06:00:00Z").toEpochMilliseconds()
+        val india = TimeZone.of("Asia/Kolkata")
+        val s = StreakEngine.fromMealTimestamps(listOf(lateEvening, tomorrow), india, today)
+        assertEquals(1, s.currentStreak)
+        assertEquals("2026-10-05", s.lastLoggedDate)
+        val utc = StreakEngine.fromMealTimestamps(listOf(lateEvening), TimeZone.UTC, today)
+        assertEquals("2026-10-04", utc.lastLoggedDate)
     }
 }
