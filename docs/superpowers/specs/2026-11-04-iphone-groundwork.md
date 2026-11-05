@@ -97,7 +97,7 @@ Each step gets a security review before merge, on top of the release checklist's
 
 Step 3m (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets. The recap still makes one AI call a month through Firebase AI Logic,
-sending the same app-computed numbers as before (no meal photos, names or account details).
+sending the same facts as before (numbers and logged food names; no photos or account details).
 
 Step 3l (reviewed 5 Nov): code moved without behaviour changes. No new libraries, permissions,
 network calls or secrets. Weight data still stays on the phone and in the user's own cloud backup.
