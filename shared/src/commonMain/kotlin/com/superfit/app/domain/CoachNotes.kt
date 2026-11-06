@@ -4,12 +4,14 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.json.JSONArray
 import com.superfit.app.json.JSONObject
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.util.Locale
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * How long a note matters. LASTING stays until the user removes it (vegetarian on Tuesdays, a
@@ -34,8 +36,8 @@ data class CoachNote(
     val expires: LocalDate?
         get() = when (kind) {
             NoteKind.LASTING -> null
-            NoteKind.SHORT -> added.plusDays(CoachNotes.SHORT_DAYS)
-            NoteKind.PLAN -> added.plusDays(CoachNotes.PLAN_DAYS)
+            NoteKind.SHORT -> added.plus(CoachNotes.SHORT_DAYS.toInt(), DateTimeUnit.DAY)
+            NoteKind.PLAN -> added.plus(CoachNotes.PLAN_DAYS.toInt(), DateTimeUnit.DAY)
         }
 
     fun isActive(today: LocalDate): Boolean = expires?.let { today < it } ?: true
@@ -91,7 +93,7 @@ object CoachNotes {
             val added = runCatching { LocalDate.parse(o.optString("added")) }.getOrNull()
             if (text.isEmpty() || added == null) return@mapNotNull null
             CoachNote(
-                id = o.optString("id", "").ifBlank { "n${added.toEpochDay()}_$i" },
+                id = o.optString("id", "").ifBlank { "n${added.toEpochDays()}_$i" },
                 text = text,
                 kind = runCatching { NoteKind.valueOf(o.optString("kind")) }.getOrDefault(NoteKind.LASTING),
                 added = added,
@@ -134,14 +136,13 @@ object CoachNotes {
 
     /** One line per note for the AI, with its id so it can say which ones are out of date. */
     fun promptLines(notes: List<CoachNote>, today: LocalDate): String {
-        val dayFormat = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
         return active(notes, today).joinToString("\n") { n ->
             val kind = when (n.kind) {
                 NoteKind.LASTING -> ""
                 NoteKind.SHORT -> " (for now)"
                 NoteKind.PLAN -> " (their plan)"
             }
-            "- [${n.id}] ${n.text}$kind, noted ${n.added.format(dayFormat)}"
+            "- [${n.id}] ${n.text}$kind, noted ${EnglishDates.dayMonth(n.added)}"
         }
     }
 
@@ -224,11 +225,12 @@ object CoachNotes {
         nutrition: List<NutritionEntryEntity>,
         workouts: List<WorkoutEntryEntity>,
         today: LocalDate,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): PlanCheck? {
         val planLog = note.planLog ?: return null
         if (note.kind != NoteKind.PLAN || note.lookFor.isEmpty()) return null
-        fun dateOf(ms: Long) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+        @OptIn(ExperimentalTime::class)
+        fun dateOf(ms: Long) = Instant.fromEpochMilliseconds(ms).toLocalDateTime(zone).date
         val logs: List<Pair<LocalDate, String>> = when (planLog) {
             PlanLog.MEAL -> nutrition.map { e ->
                 val names = MealItems.decode(e.items)?.items?.joinToString(" ") { it.name }.orEmpty()
@@ -250,13 +252,12 @@ object CoachNotes {
         nutrition: List<NutritionEntryEntity>,
         workouts: List<WorkoutEntryEntity>,
         today: LocalDate,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): List<CoachFinding> {
-        val dayFormat = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH)
         return active(notes, today).mapNotNull { note ->
             val check = checkPlan(note, nutrition, workouts, today, zone) ?: return@mapNotNull null
-            val days = ChronoUnit.DAYS.between(note.added, today)
-            val whenSaid = if (days <= 1) "Yesterday" else "On ${note.added.format(dayFormat)}"
+            val days = note.added.daysUntil(today)
+            val whenSaid = if (days <= 1) "Yesterday" else "On ${EnglishDates.weekday(note.added)}"
             val plan = note.text.replaceFirstChar { it.lowercase() }
             when {
                 check.daysDone > 0 -> CoachFinding(

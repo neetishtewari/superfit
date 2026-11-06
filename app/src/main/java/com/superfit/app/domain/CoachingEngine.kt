@@ -90,7 +90,7 @@ class CoachingEngine {
             weights = historyWeights,
             targetWeightKg = profile.targetWeightKg
         )
-        val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today)
+        val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today.toKotlinLocalDate())
         val focus = chooseFocus(report, memory, today, plans, lastTreatDay(historyNutrition))
         val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
         val why = whyLines(focus, report)
@@ -396,7 +396,7 @@ class CoachingEngine {
                 appendLine("Foods they often eat: ${commonFoods(nutrition, today).ifBlank { "not enough logs yet" }}")
                 appendLine()
                 appendLine("What you know about them from your chats (respect these):")
-                appendLine(CoachNotes.promptLines(notes, today).ifBlank { "- nothing yet" })
+                appendLine(CoachNotes.promptLines(notes, today.toKotlinLocalDate()).ifBlank { "- nothing yet" })
                 appendLine()
                 appendLine("Your recent messages (newest first):")
                 appendLine(recentMessages)

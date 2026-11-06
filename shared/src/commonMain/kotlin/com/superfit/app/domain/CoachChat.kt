@@ -2,11 +2,13 @@ package com.superfit.app.domain
 
 import com.superfit.app.json.JSONArray
 import com.superfit.app.json.JSONObject
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * One message in the coach chat. Saved on the phone and backed up with the user's account, so
@@ -116,15 +118,15 @@ object CoachChat {
      * What the user asked about before the word-for-word history, so the coach can refer back
      * ("last week you asked about knee pain"). Newest first.
      */
-    fun earlierTopics(entries: List<ChatEntry>, now: Long, zone: ZoneId = ZoneId.systemDefault(), limit: Int = 8): List<String> {
+    @OptIn(ExperimentalTime::class)
+    fun earlierTopics(entries: List<ChatEntry>, now: Long, zone: TimeZone = TimeZone.currentSystemDefault(), limit: Int = 8): List<String> {
         val since = now - HISTORY_DAYS * 24 * 3600 * 1000
-        val dayFormat = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
         return entries
             .filter { it.fromUser && it.time < since && it.text != TELL_ME_MORE }
             .takeLast(limit)
             .reversed()
             .map { e ->
-                val day = Instant.ofEpochMilli(e.time).atZone(zone).toLocalDate().format(dayFormat)
+                val day = EnglishDates.short(Instant.fromEpochMilliseconds(e.time).toLocalDateTime(zone).date)
                 "$day: ${e.text.replace('\n', ' ').take(120)}"
             }
     }
@@ -164,14 +166,14 @@ object CoachChat {
      */
     fun isRoastRequest(question: String?): Boolean {
         if (question == null) return false
-        val words = question.lowercase(Locale.ENGLISH).replace(Regex("[^a-z ]"), " ").split(' ').filter { it.isNotBlank() }
+        val words = question.lowercase().replace(Regex("[^a-z ]"), " ").split(' ').filter { it.isNotBlank() }
         if (words == listOf("roast")) return true
         return words.windowed(2).any { it == listOf("roast", "me") } || words.windowed(3).any { it == listOf("roast", "my", "day") }
     }
 
     fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
         today -> "Today"
-        today.minusDays(1) -> "Yesterday"
-        else -> date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH))
+        today.minus(1, DateTimeUnit.DAY) -> "Yesterday"
+        else -> EnglishDates.short(date)
     }
 }
