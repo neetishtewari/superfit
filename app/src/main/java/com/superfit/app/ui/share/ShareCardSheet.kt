@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -133,7 +134,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     // Light background by default (Neetish, 2026-11-03).
     var light by remember { mutableStateOf(true) }
     // The card's look, remembered from the last share; Poster for someone who hasn't picked one.
-    var style by remember { mutableStateOf(CardStyle.of(cardPrefs.style)) }
+    var cardStyle by remember { mutableStateOf(CardStyle.of(cardPrefs.style)) }
     // The user's photo lives only in memory while the sheet is open; it is never saved or uploaded.
     var photo by remember(card) { mutableStateOf<ImageBitmap?>(null) }
     var frame by remember(card) { mutableStateOf(PhotoFrame()) }
@@ -268,7 +269,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 val current = photo
                 val preview: @Composable (Modifier) -> Unit = { m ->
                     if (current == null) {
-                        CapturableCard(shown, accent, null, light, style, frame, layer, m)
+                        CapturableCard(shown, accent, null, light, cardStyle, frame, layer, m)
                     } else {
                         // Pinch to zoom, drag to move, double-tap to reset. Grid lines show while a finger
                         // is down; they sit on top of the preview, outside the picture that gets shared.
@@ -298,7 +299,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                     }
                                 }
                         ) {
-                            CapturableCard(shown, accent, current, light, style, frame, layer, Modifier.fillMaxWidth())
+                            CapturableCard(shown, accent, current, light, cardStyle, frame, layer, Modifier.fillMaxWidth())
                             if (touching) {
                                 Canvas(Modifier.matchParentSize()) {
                                     val line = Color.White.copy(alpha = 0.45f)
@@ -332,7 +333,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                             )
                         }
                         Spacer(Modifier.height(6.dp))
-                        if (current == null && style == CardStyle.CLASSIC) {
+                        if (current == null && cardStyle == CardStyle.CLASSIC) {
                             // Classic keeps its dark or light background; a photo card always keeps its dark fade.
                             MiniChoice("Dark", !light, accent) { light = false }
                             MiniChoice("Light", light, accent) { light = true }
@@ -350,8 +351,8 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                     // The look of the card: every style shows the same numbers and add-ons.
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CardStyle.entries.forEach { s ->
-                            StyleThumb(s, picked = s == style, accent = accent, modifier = Modifier.weight(1f)) {
-                                style = s
+                            StyleThumb(s, picked = s == cardStyle, accent = accent, modifier = Modifier.weight(1f)) {
+                                cardStyle = s
                                 cardPrefs.style = s.key
                             }
                         }
@@ -497,7 +498,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                     ?: roastCard?.let { dayChips.joinToString(",") { it.key } },
                                 statsPlace = if (frame.statsTop) "top" else "bottom",
                                 heartLine = activity?.shownHeart != null,
-                                style = if (photo != null) "photo" else style.key
+                                style = if (photo != null) "photo" else cardStyle.key
                             )
                             onShared()
                         } catch (e: Exception) {
