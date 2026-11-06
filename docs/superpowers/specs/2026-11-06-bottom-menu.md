@@ -52,6 +52,20 @@ coach) one tap away from anywhere, without moving the big log button off the top
 - The text box sits just above the menu. While typing, the keyboard covers the menu.
 - Opens scrolled to the latest message.
 
+## Clearer switches (Neetish 2026-11-06: people miss Activity, Journey, Log)
+
+Why they are missed: `SegmentedPills` looks like a quiet grey filter; on Home the Food / Activity
+switch sits under the big green log buttons, which take the eye first; "Log" reads as an action.
+
+- New switch style for Food / Activity and Insights / Journey / Past days: taller, each option
+  has a Material icon, a label and a short live hint (Food "1,260 kcal", Activity "6,420 steps",
+  Insights "This week", Journey "To your goal", Past days "Every meal").
+- Food / Activity moves to the top of Today, above the log buttons.
+- "Log" is renamed **"Past days"** (analytics key stays `log`).
+- A small amber dot on a switch option never opened, cleared on first open (one pref per option).
+- Swipe sideways between options (HorizontalPager), as well as tapping.
+- "Next: your Journey" / "Next: past days" link at the bottom of Insights and Journey.
+
 ## Back button and full-screen pages
 
 - From Progress or Coach, the phone's back goes to Today. From Today it leaves the app (as now).
