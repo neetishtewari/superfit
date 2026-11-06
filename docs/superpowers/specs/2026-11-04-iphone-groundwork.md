@@ -98,8 +98,14 @@ tested on the dev app first.
      platform, schemas now in `shared/schemas`). Android keeps its existing database file,
      per-user file name and migrations in `SuperfitDatabaseBuilder.kt`. Room's bundled SQLite
      driver is added with the iPhone target in step 5; the iPhone starts with a fresh database.
-5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
-   iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
+5. **Then the iPhone work.**
+   - 5a (no Apple account needed): `shared` also builds for iPhone (`iosArm64`,
+     `iosSimulatorArm64`) as a static `Shared` framework, with iPhone versions of `AppLog`,
+     `AiPhoto` (JPEG bytes), `LocalFormat` and `localWeekdayName`/`localMonthName` (Foundation's
+     formatters in the phone's language), and Room's bundled SQLite. CI's `ios-shared` job runs
+     the shared tests on the iPhone simulator and builds the framework on GitHub's Mac.
+   - 5b (needs Neetish's Mac with Xcode, an Apple Developer account and an iPhone): an `iosApp`
+     folder, shared screens, then the iPhone-only parts.
 
 ## Launch goal
 
@@ -125,6 +131,12 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 5a (reviewed 6 Nov): no iPhone app yet, so nothing ships to anyone. The iPhone log only
+writes debug text (no meals, weights or personal data), the same rule as Android. SQLite is built
+into the app from Google's Maven (androidx.sqlite 2.5.0); the database file will live in the
+app's own private folder, as on Android. No secrets, keys or network calls added; the CI job uses
+no secrets.
 
 Step 4b (reviewed 6 Nov): same tables, queries and schema (version 9), same file per signed-in
 user, so one person's data is never opened for another. All queries stay Room's bound

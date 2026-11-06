@@ -21,7 +21,7 @@ class NumberInputTest {
     }
 
     @Test
-    fun `whole-number boxes take digits only, and empty is allowed`() {
+    fun `whole-number boxes take digits only and empty is allowed`() {
         assertEquals("28", NumberInput.clean("28", allowDecimals = false))
         assertNull(NumberInput.clean("28.5", allowDecimals = false))
         assertEquals("", NumberInput.clean("", allowDecimals = false))
