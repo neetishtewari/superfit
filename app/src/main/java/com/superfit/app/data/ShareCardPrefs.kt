@@ -30,6 +30,24 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_SHOW_WEIGHT, false)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_WEIGHT, value).apply()
 
+    /** The "ready to share" card on Today: offer every run (on unless turned off). */
+    var offerRuns: Boolean
+        get() = prefs.getBoolean(KEY_OFFER_RUNS, true)
+        set(value) = prefs.edit().putBoolean(KEY_OFFER_RUNS, value).apply()
+
+    /** Offer walks at least this long; null means walks are off. */
+    var offerWalkMinutes: Int?
+        get() = prefs.getInt(KEY_OFFER_WALK_MIN, com.superfit.app.domain.ShareOffer.DEFAULT_WALK_MINUTES).takeIf { it > 0 }
+        set(value) = prefs.edit().putInt(KEY_OFFER_WALK_MIN, value ?: 0).apply()
+
+    /** Workouts whose card was shared or dismissed, so it isn't offered again. Keeps the newest few. */
+    val handledOffers: Set<String> get() = prefs.getString(KEY_OFFER_HANDLED, null)?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+    fun markOfferHandled(id: String) {
+        val list = (prefs.getString(KEY_OFFER_HANDLED, null)?.split(',')?.filter { it.isNotBlank() } ?: emptyList()) - id + id
+        prefs.edit().putString(KEY_OFFER_HANDLED, list.takeLast(MAX_HANDLED).joinToString(",")).apply()
+    }
+
     /** Fresh roasts from "Try another" used on [day] ("2026-11-04"). */
     fun roastsAgain(day: String): Int = if (prefs.getString(KEY_AGAIN_DAY, null) == day) prefs.getInt(KEY_AGAIN_COUNT, 0) else 0
 
@@ -63,6 +81,10 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         private const val OLD_LINE_PHOTO = "line_on_photo"
         private const val OLD_LINE_PLAIN = "line_on_plain"
         private const val MAX_LINES = 40
+        private const val KEY_OFFER_RUNS = "offer_runs"
+        private const val KEY_OFFER_WALK_MIN = "offer_walk_minutes"
+        private const val KEY_OFFER_HANDLED = "offer_handled_ids"
+        private const val MAX_HANDLED = 30
 
         fun of(context: Context) = ShareCardPrefs(context.getSharedPreferences(FILE, Context.MODE_PRIVATE))
     }

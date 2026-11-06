@@ -13,10 +13,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +56,7 @@ import com.superfit.app.ui.dashboard.WeighInDialog
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.launch
 import kotlinx.datetime.toKotlinLocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,15 +66,36 @@ fun HistoryScreen(
     dashboardViewModel: DashboardViewModel? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    onOpenRecap: (java.time.YearMonth) -> Unit = {}
+    onOpenRecap: (java.time.YearMonth) -> Unit = {},
+    /** Shown as a tab of the bottom menu: no back arrow, and the menu handles the bottom edge. */
+    asTab: Boolean = false,
+    /** Goes up by one each time the Progress tab is tapped while already on it: scroll back to the top. */
+    reselectCount: Int = 0
 ) {
-    val scrollState = rememberScrollState()
+    // One scroll position per page, so swiping between them keeps each one's place.
+    val scrollStates = listOf(rememberScrollState(), rememberScrollState(), rememberScrollState())
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { 3 })
+    val pagerScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     val bodyPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
     ) { viewModel.onBodyAccessResult() }
-    var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 = Insights, 1 = Journey, 2 = Log
-    LaunchedEffect(selectedTab) { com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab]) }
+    // 0 = Insights, 1 = Journey, 2 = History (was "Log"; the analytics name stays "log")
+    val selectedTab = pagerState.currentPage
+    fun openTab(page: Int) {
+        pagerScope.launch { pagerState.animateScrollToPage(page) }
+    }
+    var unseen by remember { mutableStateOf(com.superfit.app.data.SeenTabs.unseen(context, listOf("progress_1", "progress_2"))) }
+    LaunchedEffect(selectedTab) {
+        com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab])
+        if ("progress_$selectedTab" in unseen) {
+            com.superfit.app.data.SeenTabs.markSeen(context, "progress_$selectedTab")
+            unseen = unseen - "progress_$selectedTab"
+        }
+    }
+    LaunchedEffect(reselectCount) {
+        if (reselectCount > 0) scrollStates[pagerState.currentPage].animateScrollTo(0)
+    }
     val dashboardState = dashboardViewModel?.dashboardState?.collectAsState()?.value
     val bests = dashboardViewModel?.personalBests?.collectAsState()?.value
     val dietNote = dashboardViewModel?.dietNote?.collectAsState()?.value
@@ -97,14 +126,16 @@ fun HistoryScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(
-                            onClick = onBack,
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = ThemeCardBg,
-                                contentColor = ThemeTextPrimary
-                            )
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        if (!asTab) {
+                            IconButton(
+                                onClick = onBack,
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = ThemeCardBg,
+                                    contentColor = ThemeTextPrimary
+                                )
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -112,146 +143,187 @@ fun HistoryScreen(
                     )
                 )
             },
-            containerColor = Color.Transparent
+            containerColor = Color.Transparent,
+            // As a tab, the bottom menu below already keeps clear of the phone's navigation bar.
+            contentWindowInsets = if (asTab) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets
         ) { paddingValues ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .verticalScroll(scrollState)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Insights | Journey | Log
-                val tabs = listOf("0" to "Insights", "1" to "Journey", "2" to "Log")
+                // Insights | Journey | History
                 com.superfit.app.ui.dashboard.SegmentedPills(
-                    options = tabs,
+                    options = listOf("0" to "Insights", "1" to "Journey", "2" to "History"),
                     selected = selectedTab.toString(),
-                    onSelect = { selectedTab = it.toInt() },
-                    modifier = Modifier.fillMaxWidth()
+                    onSelect = { openTab(it.toInt()) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    icons = mapOf(
+                        "0" to (Icons.Rounded.Lightbulb to Icons.Outlined.Lightbulb),
+                        "1" to (Icons.Rounded.Flag to Icons.Outlined.Flag),
+                        "2" to (Icons.Rounded.History to Icons.Outlined.History)
+                    ),
+                    unseen = unseen.map { it.removePrefix("progress_") }.toSet()
                 )
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top
+                ) { page ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollStates[page])
+                            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // The new monthly recap sits at the top of Progress for the first week of the month.
+                        val newRecap = com.superfit.app.data.MonthlyRecapData.offeredMonth(LocalDate.now()).takeIf {
+                            com.superfit.app.data.MonthlyRecapData.showAtTopOfProgress(LocalDate.now()) && it in viewModel.recapMonths
+                        }
+                        if (page == 0 && newRecap != null) {
+                            com.superfit.app.ui.recap.RecapReadyCard(newRecap, onOpen = { onOpenRecap(newRecap) })
+                        }
 
-                // The new monthly recap sits at the top of Progress for the first week of the month.
-                val newRecap = com.superfit.app.data.MonthlyRecapData.offeredMonth(LocalDate.now()).takeIf {
-                    com.superfit.app.data.MonthlyRecapData.showAtTopOfProgress(LocalDate.now()) && it in viewModel.recapMonths
-                }
-                if (selectedTab == 0 && newRecap != null) {
-                    com.superfit.app.ui.recap.RecapReadyCard(newRecap, onOpen = { onOpenRecap(newRecap) })
-                }
-
-                when (selectedTab) {
-                    0 -> viewModel.weekReport?.let { report ->
-                        InsightsTab(
-                            report = report,
-                            onOpenJourney = { selectedTab = 1 },
-                            onShareWithCoach = { weeks -> viewModel.shareWithCoach(context, weeks) },
-                            foodQuality = {
-                                if (dashboardState is DashboardUiState.Success) {
-                                    FoodQualityCard(
-                                        metrics = dashboardState.dietQualityMetrics,
-                                        note = dietNote,
-                                        onFineForMe = { item, fine -> dashboardViewModel?.setFineForMe(item.approvalKey, fine) }
-                                    )
-                                    dashboardState.dietQualityMetrics.swapSuggestions.forEach { swap ->
-                                        FoodSwapCard(swap = swap)
-                                    }
-                                }
-                            },
-                            bests = {
-                                PersonalBestsList(bests = bests?.all.orEmpty(), onShare = { best ->
-                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = false, today = LocalDate.now().toKotlinLocalDate())
-                                })
-                            },
-                            trends = {
-                                if (dashboardState is DashboardUiState.Success) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        TrendItem(
-                                            label = "Current streak",
-                                            value = "${dashboardState.streakState.currentStreak} ${if (dashboardState.streakState.currentStreak == 1) "day" else "days"}",
-                                            valueColor = SolarAmber,
-                                            modifier = Modifier.weight(1f)
+                        when (page) {
+                            0 -> viewModel.weekReport?.let { report ->
+                                InsightsTab(
+                                    report = report,
+                                    onOpenJourney = { openTab(1) },
+                                    bodyNow = {
+                                        BodyNowCard(
+                                            body = viewModel.body,
+                                            weightKg = viewModel.latestWeightKg,
+                                            weightChange4w = viewModel.weightChange4w,
+                                            goalKgChange = viewModel.goalKgChange
                                         )
-                                        TrendItem(
-                                            label = "Longest streak",
-                                            value = "${dashboardState.streakState.longestStreak} ${if (dashboardState.streakState.longestStreak == 1) "day" else "days"}",
-                                            valueColor = ElectricCyan,
-                                            modifier = Modifier.weight(1f)
+                                    },
+                                    onShareWithCoach = { weeks -> viewModel.shareWithCoach(context, weeks) },
+                                    foodQuality = {
+                                        if (dashboardState is DashboardUiState.Success) {
+                                            FoodQualityCard(
+                                                metrics = dashboardState.dietQualityMetrics,
+                                                note = dietNote,
+                                                onFineForMe = { item, fine -> dashboardViewModel?.setFineForMe(item.approvalKey, fine) }
+                                            )
+                                            dashboardState.dietQualityMetrics.swapSuggestions.forEach { swap ->
+                                                FoodSwapCard(swap = swap)
+                                            }
+                                        }
+                                    },
+                                    bests = {
+                                        PersonalBestsList(bests = bests?.all.orEmpty(), onShare = { best ->
+                                            shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = false, today = LocalDate.now().toKotlinLocalDate())
+                                        })
+                                    },
+                                    trends = {
+                                        if (dashboardState is DashboardUiState.Success) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                TrendItem(
+                                                    label = "Current streak",
+                                                    value = "${dashboardState.streakState.currentStreak} ${if (dashboardState.streakState.currentStreak == 1) "day" else "days"}",
+                                                    valueColor = SolarAmber,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                TrendItem(
+                                                    label = "Longest streak",
+                                                    value = "${dashboardState.streakState.longestStreak} ${if (dashboardState.streakState.longestStreak == 1) "day" else "days"}",
+                                                    valueColor = ElectricCyan,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                        ConsistencyScoreGauge(
+                                            deficitScore = viewModel.consistencyScore,
+                                            deficitDays = viewModel.deficitDaysCount,
+                                            loggedDays = viewModel.loggedDaysCount,
+                                            trainingScore = viewModel.workoutConsistencyScore
                                         )
+                                        viewModel.weeklyTrends?.let { trends -> WeeklyTrendsCard(trends = trends) }
                                     }
-                                }
-                                ConsistencyScoreGauge(
-                                    deficitScore = viewModel.consistencyScore,
-                                    deficitDays = viewModel.deficitDaysCount,
-                                    loggedDays = viewModel.loggedDaysCount,
-                                    trainingScore = viewModel.workoutConsistencyScore
                                 )
-                                viewModel.weeklyTrends?.let { trends -> WeeklyTrendsCard(trends = trends) }
-                            }
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        com.superfit.app.ui.recap.PastMonthsList(viewModel.recapMonths - setOfNotNull(newRecap), onOpenRecap)
-                        if (context.packageName.endsWith(".debug")) {
-                            // Dev app only: see this month's recap so far, to check the cards before the 1st.
-                            androidx.compose.material3.TextButton(onClick = { onOpenRecap(java.time.YearMonth.now()) }) {
-                                Text("Preview this month's recap (dev app)")
-                            }
-                        }
-                    }
-                    1 -> viewModel.journey?.let { journey ->
-                        JourneyTab(
-                            j = journey,
-                            goalSet = viewModel.goalSet,
-                            onWeighIn = { showWeighIn = true },
-                            onEditGoal = { showGoalEdit = true },
-                            body = viewModel.body,
-                            canAskBodyAccess = viewModel.canAskBodyAccess,
-                            onAllowBody = {
-                                com.superfit.app.ui.launchHealthConnectPermissions(context, bodyPermissionLauncher, viewModel.bodyPermissions)
-                            }
-                        )
-                    }
-                    else -> {
-                        // Calorie Trend Chart for the week up to the chosen day
-                        val daysInMonth = viewModel.daysInMonth
-                        if (daysInMonth.isNotEmpty()) {
-                            val selectedDate = viewModel.selectedDate
-                            val chartDays = remember(daysInMonth, selectedDate) {
-                                val selectedIndex = daysInMonth.indexOfFirst { it.date == selectedDate }
-                                if (selectedIndex != -1) {
-                                    val start = (selectedIndex - 6).coerceAtLeast(0)
-                                    daysInMonth.subList(start, selectedIndex + 1)
-                                } else {
-                                    daysInMonth.takeLast(7)
+                                Spacer(Modifier.height(8.dp))
+                                com.superfit.app.ui.recap.PastMonthsList(viewModel.recapMonths - setOfNotNull(newRecap), onOpenRecap)
+                                if (context.packageName.endsWith(".debug")) {
+                                    // Dev app only: see this month's recap so far, to check the cards before the 1st.
+                                    androidx.compose.material3.TextButton(onClick = { onOpenRecap(java.time.YearMonth.now()) }) {
+                                        Text("Preview this month's recap (dev app)")
+                                    }
                                 }
                             }
-                            CalorieTrendChart(days = chartDays)
+                            1 -> viewModel.journey?.let { journey ->
+                                JourneyTab(
+                                    j = journey,
+                                    goalSet = viewModel.goalSet,
+                                    onWeighIn = { showWeighIn = true },
+                                    onEditGoal = { showGoalEdit = true },
+                                    bodyTrends = {
+                                        BodyTrendsCard(
+                                            series = viewModel.bodySeries,
+                                            period = viewModel.bodyPeriod,
+                                            onPeriod = { viewModel.chooseBodyPeriod(it) },
+                                            insight = viewModel.body?.insight,
+                                            canAskBodyAccess = viewModel.canAskBodyAccess,
+                                            onAllowBody = {
+                                                com.superfit.app.ui.launchHealthConnectPermissions(context, bodyPermissionLauncher, viewModel.bodyPermissions)
+                                            },
+                                            hasHistory = viewModel.bodyHasHistory
+                                        )
+                                    }
+                                )
+                            }
+                            else -> {
+                                // Calorie Trend Chart for the week up to the chosen day
+                                val daysInMonth = viewModel.daysInMonth
+                                if (daysInMonth.isNotEmpty()) {
+                                    val selectedDate = viewModel.selectedDate
+                                    val chartDays = remember(daysInMonth, selectedDate) {
+                                        val selectedIndex = daysInMonth.indexOfFirst { it.date == selectedDate }
+                                        if (selectedIndex != -1) {
+                                            val start = (selectedIndex - 6).coerceAtLeast(0)
+                                            daysInMonth.subList(start, selectedIndex + 1)
+                                        } else {
+                                            daysInMonth.takeLast(7)
+                                        }
+                                    }
+                                    CalorieTrendChart(days = chartDays)
+                                }
+
+                                CalendarCard(
+                                    currentMonthName = viewModel.currentMonth.month.getDisplayName(TextStyle.FULL, Locale.US) + " " + viewModel.currentMonth.year,
+                                    daysInMonth = viewModel.daysInMonth,
+                                    selectedDate = viewModel.selectedDate,
+                                    onDateSelected = { viewModel.selectDate(it) },
+                                    onPrevMonth = { viewModel.prevMonth() },
+                                    onNextMonth = { viewModel.nextMonth() },
+                                    canGoNext = viewModel.canGoToNextMonth
+                                )
+
+                                viewModel.selectedSummary?.let { summary ->
+                                    DayBalanceCard(
+                                        summary = summary,
+                                        selectedDate = viewModel.selectedDate,
+                                        viewModel = viewModel
+                                    )
+                                }
+                            }
                         }
 
-                        CalendarCard(
-                            currentMonthName = viewModel.currentMonth.month.getDisplayName(TextStyle.FULL, Locale.US) + " " + viewModel.currentMonth.year,
-                            daysInMonth = viewModel.daysInMonth,
-                            selectedDate = viewModel.selectedDate,
-                            onDateSelected = { viewModel.selectDate(it) },
-                            onPrevMonth = { viewModel.prevMonth() },
-                            onNextMonth = { viewModel.nextMonth() },
-                            canGoNext = viewModel.canGoToNextMonth
-                        )
-
-                        viewModel.selectedSummary?.let { summary ->
-                            DayBalanceCard(
-                                summary = summary,
-                                selectedDate = viewModel.selectedDate,
-                                viewModel = viewModel
+                        if (page < 2) {
+                            NextTabLink(
+                                text = if (page == 0) "Next: your Journey" else "Next: History",
+                                onClick = { openTab(page + 1) }
                             )
                         }
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
         if (showWeighIn) {
@@ -281,5 +353,24 @@ fun HistoryScreen(
         shareCard?.let { card ->
             com.superfit.app.ui.share.ShareCardSheet(card = card, onDismiss = { shareCard = null })
         }
+    }
+}
+
+/** At the bottom of Insights and Journey, so scrolling down also finds the next switch option. */
+@Composable
+private fun NextTabLink(text: String, onClick: () -> Unit) {
+    val colors = com.superfit.app.theme.SuperfitTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.5.dp, colors.selectedLine, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text, color = colors.primaryAccent, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = colors.primaryAccent)
     }
 }

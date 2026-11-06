@@ -853,7 +853,7 @@ fun SettingsScreen(
             }
 
             SettingsGroupLabel("Sharing")
-            com.superfit.app.ui.share.SharingSettingsCard()
+            com.superfit.app.ui.share.SharingSettingsCard(onOffersChanged = { viewModel.refreshShareOffer() })
 
             SettingsGroupLabel("Privacy")
             // Anonymous usage and crash reports (see AppAnalytics)

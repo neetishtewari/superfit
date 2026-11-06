@@ -91,7 +91,10 @@ object AppAnalytics {
 
     /** The monthly recap played through to its last story card. */
     fun recapWatched(cards: Int) = log("recap_watched", "cards" to "$cards")
-    fun screenOpened(screen: String) = log("screen_opened", "screen" to screen)
+
+    /** [how] for the bottom menu tabs: menu, card (the coach card on Today), back or start. */
+    fun screenOpened(screen: String, how: String? = null) =
+        log("screen_opened", *listOfNotNull("screen" to screen, how?.let { "how" to it }).toTypedArray())
     fun goalSet(withDate: Boolean) = log("goal_set", "target_date" to if (withDate) "yes" else "no")
     fun weighIn() = log("weigh_in")
     fun widgetAdded() = log("widget_added")
@@ -101,6 +104,9 @@ object AppAnalytics {
     fun coachMealLogged() = log("coach_meal_logged")
     fun coachStyleChanged(style: String) = log("coach_style_changed", "style" to style)
     fun stepGoalChanged(direction: String, mode: String) = log("step_goal_changed", "direction" to direction, "mode" to mode)
+
+    /** The "ready to share" card on Today: [action] shown, shared or dismissed; [type] run or walk. */
+    fun shareOffer(action: String, type: String) = log("share_offer", "action" to action, "type" to type)
     fun reportShared(weeks: Int) = log("coach_report_shared", "weeks" to "$weeks")
 
     /** Which speech service voice logging used, attached to any later crash report. */
