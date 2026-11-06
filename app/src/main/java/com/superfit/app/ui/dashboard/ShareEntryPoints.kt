@@ -124,20 +124,12 @@ fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> U
             .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color.White),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                if (run) Icons.AutoMirrored.Rounded.DirectionsRun else Icons.AutoMirrored.Rounded.DirectionsWalk,
-                contentDescription = null,
-                tint = ShareTeal,
-                modifier = Modifier.size(26.dp)
-            )
-        }
+        Icon(
+            if (run) Icons.AutoMirrored.Rounded.DirectionsRun else Icons.AutoMirrored.Rounded.DirectionsWalk,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(30.dp)
+        )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -148,18 +140,24 @@ fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> U
             )
             Text(
                 listOfNotNull(workout.detailLine.takeIf { it.isNotBlank() }, "yesterday".takeIf { yesterday }).joinToString(" · "),
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                maxLines = 2
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }
-        Button(
-            onClick = onShare,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = ShareTeal),
-            shape = RoundedCornerShape(50)
+        // A round Share button leaves the run line room for distance, time and pace.
+        Box(
+            Modifier
+                .padding(start = 8.dp)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+                .clickable(onClickLabel = "Share", onClick = onShare),
+            contentAlignment = Alignment.Center
         ) {
-            Text("Share", fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.Share, contentDescription = "Share", tint = ShareTeal, modifier = Modifier.size(22.dp))
         }
         IconButton(onClick = onDismiss) {
             Icon(Icons.Default.Close, contentDescription = "Don't suggest this one", tint = Color.White.copy(alpha = 0.85f))
