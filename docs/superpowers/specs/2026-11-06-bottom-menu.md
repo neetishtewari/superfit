@@ -66,6 +66,15 @@ switch sits under the big green log buttons, which take the eye first; "Log" rea
 - Swipe sideways between options (HorizontalPager), as well as tapping.
 - "Next: your Journey" / "Next: past days" link at the bottom of Insights and Journey.
 
+## Calmer green (Neetish 2026-11-06 18:50Z: yes)
+
+- Solid brand green only on the two log buttons on Today.
+- Selected switch option (Food/Activity, Insights/Journey/Past days) and selected menu tab:
+  light mode pale green (BrandGreenSoft) with dark green text (BrandGreenDeep) and a thin green
+  outline; dark mode deeper green fill with white text (keeps the earlier dark-mode visibility fix).
+- Macro bars: protein green, carbs slate blue, fat sand, fibre sage (quiet, not semantic colours).
+- Steps teal, coach purple, amber warnings, red delete only: unchanged.
+
 ## Back button and full-screen pages
 
 - From Progress or Coach, the phone's back goes to Today. From Today it leaves the app (as now).
