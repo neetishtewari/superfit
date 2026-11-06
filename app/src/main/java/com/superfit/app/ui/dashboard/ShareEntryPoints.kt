@@ -139,7 +139,8 @@ fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> U
                 fontWeight = FontWeight.Bold
             )
             Text(
-                listOfNotNull(workout.detailLine.takeIf { it.isNotBlank() }, "yesterday".takeIf { yesterday }).joinToString(" · "),
+                // Distance, time and pace are enough here; heart rate and the rest are on the card itself.
+                (workout.detailLine.split(" · ").filter { it.isNotBlank() }.take(3) + listOfNotNull("yesterday".takeIf { yesterday })).joinToString(" · "),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
