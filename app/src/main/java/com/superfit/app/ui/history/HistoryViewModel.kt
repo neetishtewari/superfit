@@ -148,7 +148,7 @@ class HistoryViewModel(
         private set
     private var bodyInputs: (() -> List<com.superfit.app.domain.BodySeries>)? = null
 
-    fun setBodyPeriod(period: com.superfit.app.domain.BodyPeriod) {
+    fun chooseBodyPeriod(period: com.superfit.app.domain.BodyPeriod) {
         bodyPeriod = period
         sharedPrefs.edit().putString(KEY_BODY_PERIOD, period.label).apply()
         bodyInputs?.let { bodySeries = it() }

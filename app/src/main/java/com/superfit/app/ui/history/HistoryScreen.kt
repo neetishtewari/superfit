@@ -267,7 +267,7 @@ fun HistoryScreen(
                                         BodyTrendsCard(
                                             series = viewModel.bodySeries,
                                             period = viewModel.bodyPeriod,
-                                            onPeriod = { viewModel.setBodyPeriod(it) },
+                                            onPeriod = { viewModel.chooseBodyPeriod(it) },
                                             insight = viewModel.body?.insight,
                                             canAskBodyAccess = viewModel.canAskBodyAccess,
                                             onAllowBody = {
