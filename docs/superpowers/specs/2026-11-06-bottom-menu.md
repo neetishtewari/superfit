@@ -57,14 +57,13 @@ coach) one tap away from anywhere, without moving the big log button off the top
 Why they are missed: `SegmentedPills` looks like a quiet grey filter; on Home the Food / Activity
 switch sits under the big green log buttons, which take the eye first; "Log" reads as an action.
 
-- New switch style for Food / Activity and Insights / Journey / Past days: taller, each option
-  has a Material icon, a label and a short live hint (Food "1,260 kcal", Activity "6,420 steps",
-  Insights "This week", Journey "To your goal", Past days "Every meal").
+- New switch style for Food / Activity and Insights / Journey / History: taller, each option
+  has a Material icon and its short name (no description lines; Neetish 19:05Z).
 - Food / Activity moves to the top of Today, above the log buttons.
-- "Log" is renamed **"Past days"** (analytics key stays `log`).
+- "Log" is renamed **"History"** (analytics key stays `log`).
 - A small amber dot on a switch option never opened, cleared on first open (one pref per option).
 - Swipe sideways between options (HorizontalPager), as well as tapping.
-- "Next: your Journey" / "Next: past days" link at the bottom of Insights and Journey.
+- "Next: your Journey" / "Next: History" link at the bottom of Insights and Journey.
 
 ## Calmer green (Neetish 2026-11-06 18:50Z: yes)
 
@@ -74,6 +73,23 @@ switch sits under the big green log buttons, which take the eye first; "Log" rea
   outline; dark mode deeper green fill with white text (keeps the earlier dark-mode visibility fix).
 - Macro bars: protein green, carbs slate blue, fat sand, fibre sage (quiet, not semantic colours).
 - Steps teal, coach purple, amber warnings, red delete only: unchanged.
+
+## Body: latest on Insights, change over time on Journey (Neetish 2026-11-06 19:05Z)
+
+The BodyCard sits at the bottom of Journey today, so the latest readings are missed.
+
+- **Insights (default tab): "Your body now"** card near the top. With scale data: weight, body
+  fat, muscle (each with small latest change), and one line for BMI, bone mass, resting burn,
+  plus source and date. Without scale data: weight and BMI only. No empty rows, no prompt here.
+- **Journey: "How your body has changed"** below goal/milestones/weigh-in: one small trend line
+  per measure (weight, body fat, muscle, bone mass, BMI) with change over the period.
+  Period pills 1M / 3M / 6M / 1Y, **default 3M**, remembered.
+- A measure appears only with 2+ readings in the period. BMI computed from weight log + height,
+  so everyone gets weight + BMI.
+- Change colour: green if it moved the right way for the goal, amber if not. No red.
+- Data: BodyImporter already keeps up to 400 scale readings (`scale_mine`); weight from the
+  weight log. No new permissions. The "Allow body measurements" line moves to the bottom of the
+  Journey body section, shown only when access can be asked.
 
 ## "Ready to share" card for walks and runs (Neetish 2026-11-06 18:53Z)
 
