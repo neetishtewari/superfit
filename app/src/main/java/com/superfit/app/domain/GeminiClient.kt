@@ -57,9 +57,6 @@ object GeminiClient {
     // Cache GenerativeModel instances to maintain warm HTTP/2 & TLS connection pools.
     private val firebaseModelCache = ConcurrentHashMap<String, GenerativeModel>()
 
-    /** One message in a coach conversation, for [chat]. */
-    data class ChatTurn(val fromUser: Boolean, val text: String)
-
     enum class ErrorKind {
         /** Server overloaded / unavailable or timed out: wait and retry the same model. */
         BUSY,
@@ -156,7 +153,7 @@ object GeminiClient {
      */
     suspend fun chat(
         systemInstructionText: String,
-        history: List<ChatTurn>,
+        history: List<AiChatTurn>,
         message: String
     ): String = runWithFailover { modelName ->
         // Not cached: the coach's instructions carry today's live numbers, so they change often.
