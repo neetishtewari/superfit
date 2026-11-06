@@ -58,7 +58,7 @@ class RoastCardTest {
 
     @Test
     fun sleepJoinsThePoolButNotTheDayCard() {
-        val card = ShareCards.daily(java.time.LocalDate.of(2026, 11, 4), 3, 2, 64.0, 120.0, 71, 8432, null, null, sleepSeconds = 37_200)
+        val card = ShareCards.daily(kotlinx.datetime.LocalDate(2026, 11, 4), 3, 2, 64.0, 120.0, 71, 8432, null, null, sleepSeconds = 37_200)
         assertTrue(card.tiles.none { it.label == "SLEEP" })
         assertEquals("10h 20m", card.pool.first { it.label == "SLEEP" }.value)
     }

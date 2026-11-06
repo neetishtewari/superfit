@@ -77,6 +77,7 @@ import com.superfit.app.ui.camera.FoodCameraScreen
 import com.superfit.app.widget.WidgetPin
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinLocalDate
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -518,7 +519,7 @@ fun DashboardScreen(
                                 best = best,
                                 onShare = {
                                     shareBest = best
-                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now())
+                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now().toKotlinLocalDate())
                                 },
                                 onDismiss = { viewModel.acknowledgeBest(best) }
                             )

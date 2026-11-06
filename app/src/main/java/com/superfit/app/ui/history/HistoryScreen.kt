@@ -49,6 +49,7 @@ import com.superfit.app.ui.dashboard.WeighInDialog
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.datetime.toKotlinLocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,7 +160,7 @@ fun HistoryScreen(
                             },
                             bests = {
                                 PersonalBestsList(bests = bests?.all.orEmpty(), onShare = { best ->
-                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = false, today = LocalDate.now())
+                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = false, today = LocalDate.now().toKotlinLocalDate())
                                 })
                             },
                             trends = {
