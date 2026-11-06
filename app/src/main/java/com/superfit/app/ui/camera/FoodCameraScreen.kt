@@ -71,9 +71,9 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.ui.dashboard.NeonGreen
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.delay
 
 /**
  * Full-screen camera for logging food from a meal photo, a packet's barcode or its nutrition
