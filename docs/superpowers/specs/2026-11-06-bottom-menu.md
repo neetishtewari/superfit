@@ -75,6 +75,23 @@ switch sits under the big green log buttons, which take the eye first; "Log" rea
 - Macro bars: protein green, carbs slate blue, fat sand, fibre sage (quiet, not semantic colours).
 - Steps teal, coach purple, amber warnings, red delete only: unchanged.
 
+## "Ready to share" card for walks and runs (Neetish 2026-11-06 18:53Z)
+
+People miss share-worthy workouts because they don't open every one in Activity.
+
+- Card on Today under the log buttons, same pattern as NewBestCard (icon, one-line title,
+  stats, Share button, ✕). Calm green outline. Shown in both Food and Activity views.
+- Qualifies: any run; walks at or above the walk minimum (default 30 min; 20/30/45/60/off).
+  Health Connect and voice workouts. Workouts from today or yesterday.
+- One card at a time: the newest qualifying workout. Hidden once shared, dismissed (✕, remembered
+  per workout cloudId) or replaced by a newer one.
+- Priority: monthly recap card > new personal best > this card. A run that is a new best shows
+  only the personal best card.
+- Share opens the existing ShareCardSheet with ShareCards.activity(workout).
+- Settings > Sharing (SharingSettings.kt): "Suggest walks to share" with minimum minutes;
+  "Suggest runs to share" on/off.
+- Analytics: share_offer_shown / share_offer_tapped / share_offer_dismissed with type walk|run.
+
 ## Back button and full-screen pages
 
 - From Progress or Coach, the phone's back goes to Today. From Today it leaves the app (as now).
