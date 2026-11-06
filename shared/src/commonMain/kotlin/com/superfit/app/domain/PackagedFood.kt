@@ -69,26 +69,31 @@ object PackagedFoodParser {
         if (root.optInt("status", 0) != 1) return null
         val product = root.optJSONObject("product") ?: return null
         val n = product.optJSONObject("nutriments") ?: return null
+
+        // Some products (often drinks) only have "as prepared" values, e.g. energy-kcal_prepared_100g.
+        fun value(key: String, per: String): Double? = num(n, "${key}_$per") ?: num(n, "${key}_prepared_$per")
+        fun kcal(per: String): Double? = value("energy-kcal", per) ?: value("energy", per)?.div(4.184)
+
         // Zero is a real answer: diet sodas, black coffee and water have 0 kcal. Only a missing
         // value means the product has no calories on record.
-        val kcal100 = num(n, "energy-kcal_100g") ?: num(n, "energy_100g")?.div(4.184) ?: return null
+        val kcal100 = kcal("100g") ?: return null
         val per100g = Nutrients(
             kcal100,
-            num(n, "proteins_100g") ?: 0.0,
-            num(n, "carbohydrates_100g") ?: 0.0,
-            num(n, "fat_100g") ?: 0.0,
-            num(n, "fiber_100g") ?: 0.0
+            value("proteins", "100g") ?: 0.0,
+            value("carbohydrates", "100g") ?: 0.0,
+            value("fat", "100g") ?: 0.0,
+            value("fiber", "100g") ?: 0.0
         )
         val serving = num(product, "serving_quantity")?.takeIf { it > 0.0 }
-        val kcalServing = num(n, "energy-kcal_serving") ?: num(n, "energy_serving")?.div(4.184)
+        val kcalServing = kcal("serving")
         val perServing = when {
             serving == null -> null
             kcalServing != null && kcalServing > 0.0 -> Nutrients(
                 kcalServing,
-                num(n, "proteins_serving") ?: per100g.protein * serving / 100.0,
-                num(n, "carbohydrates_serving") ?: per100g.carbs * serving / 100.0,
-                num(n, "fat_serving") ?: per100g.fat * serving / 100.0,
-                num(n, "fiber_serving") ?: per100g.fiber * serving / 100.0
+                value("proteins", "serving") ?: per100g.protein * serving / 100.0,
+                value("carbohydrates", "serving") ?: per100g.carbs * serving / 100.0,
+                value("fat", "serving") ?: per100g.fat * serving / 100.0,
+                value("fiber", "serving") ?: per100g.fiber * serving / 100.0
             )
             else -> per100g.times(serving / 100.0)
         }
