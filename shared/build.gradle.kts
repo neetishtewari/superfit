@@ -1,6 +1,7 @@
-// Code shared by the Android app and, later, the iPhone app. See
+// Code shared by the Android app and the iPhone app. See
 // docs/superpowers/specs/2026-11-04-iphone-groundwork.md. Only code with no Android or iPhone
-// parts goes in commonMain. The iPhone targets are added once the Mac builds them.
+// parts goes in commonMain. The iPhone parts only build on a Mac (CI's ios-shared job); on
+// Linux Gradle skips them.
 plugins {
   alias(libs.plugins.kotlin.multiplatform)
   alias(libs.plugins.android.kotlin.multiplatform.library)
@@ -20,12 +21,24 @@ kotlin {
   // Runs the shared tests quickly on the computer, without Android.
   jvm()
 
+  // iPhones and the iPhone simulator on Apple-chip Macs. The app links the "Shared" framework.
+  listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+    target.binaries.framework {
+      baseName = "Shared"
+      isStatic = true
+    }
+  }
+
   sourceSets {
     commonMain.dependencies {
       // The on-device database (tables, queries). Each app opens it its own way.
       api(libs.androidx.room.runtime)
       // Dates and time zones that work on Android and iPhone alike (replaces java.time).
       api(libs.kotlinx.datetime)
+    }
+    iosMain.dependencies {
+      // SQLite built into the app, so the iPhone gets the same database engine as Android.
+      implementation(libs.androidx.sqlite.bundled)
     }
     commonTest.dependencies {
       implementation(kotlin("test"))
