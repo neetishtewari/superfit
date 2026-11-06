@@ -902,7 +902,8 @@ class DashboardViewModel(
             today = LocalDate.now().toKotlinLocalDate(),
             runsOn = sharePrefs.offerRuns,
             walkMinMinutes = sharePrefs.offerWalkMinutes,
-            handledIds = sharePrefs.handledOffers
+            handledIds = sharePrefs.handledOffers,
+            othersOn = sharePrefs.offerOthers
         )
     }.stateIn(
         scope = viewModelScope,

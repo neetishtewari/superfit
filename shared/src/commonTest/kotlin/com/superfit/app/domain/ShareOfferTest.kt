@@ -57,7 +57,33 @@ class ShareOfferTest {
     }
 
     @Test
-    fun otherWorkoutsAreNotOffered() {
-        assertNull(pick(listOf(workout("c", ExerciseTypes.BIKING, 100, 60))))
+    fun otherWorkoutsFromAWatchAreOffered() {
+        assertEquals("c", pick(listOf(workout("c", ExerciseTypes.BIKING, 100, 60)))?.merged?.primary?.id)
+        assertEquals("s", pick(listOf(workout("s", ExerciseTypes.STRENGTH_TRAINING, 99, 45, hour = 19)))?.merged?.primary?.id)
+    }
+
+    @Test
+    fun veryShortOtherWorkoutsAreNot() {
+        assertNull(pick(listOf(workout("c", ExerciseTypes.STRETCHING, 100, 8))))
+        assertEquals("c", pick(listOf(workout("c", ExerciseTypes.STRETCHING, 100, 10)))?.merged?.primary?.id)
+    }
+
+    @Test
+    fun otherWorkoutsCanBeTurnedOff() {
+        assertNull(ShareOffer.pick(listOf(workout("c", ExerciseTypes.BIKING, 100, 60)), today, true, 30, emptySet(), TimeZone.UTC, othersOn = false))
+    }
+
+    @Test
+    fun theNewestWinsAcrossKinds() {
+        val run = workout("r", ExerciseTypes.RUNNING, 100, 30, hour = 6)
+        val gym = workout("g", ExerciseTypes.STRENGTH_TRAINING, 100, 50, hour = 18)
+        assertEquals("g", pick(listOf(run, gym))?.merged?.primary?.id)
+    }
+
+    @Test
+    fun kindNamesTheWorkout() {
+        assertEquals("run", ShareOffer.kind(workout("r", ExerciseTypes.RUNNING, 100, 30)))
+        assertEquals("walk", ShareOffer.kind(workout("w", ExerciseTypes.WALKING, 100, 30)))
+        assertEquals("workout", ShareOffer.kind(workout("b", ExerciseTypes.BIKING, 100, 30)))
     }
 }

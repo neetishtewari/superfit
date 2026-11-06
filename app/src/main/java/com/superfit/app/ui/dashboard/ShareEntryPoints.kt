@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -126,7 +127,7 @@ private val BestPurple = Color(0xFF5B3FC4)
  */
 @Composable
 fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> Unit) {
-    val run = com.superfit.app.domain.ShareOffer.isRun(workout)
+    val kind = com.superfit.app.domain.ShareOffer.kind(workout)
     val yesterday = java.time.Instant.ofEpochMilli(workout.startTime).atZone(java.time.ZoneId.systemDefault()).toLocalDate() != LocalDate.now()
     Row(
         modifier = Modifier
@@ -138,7 +139,11 @@ fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> U
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            if (run) Icons.AutoMirrored.Rounded.DirectionsRun else Icons.AutoMirrored.Rounded.DirectionsWalk,
+            when (kind) {
+                "run" -> Icons.AutoMirrored.Rounded.DirectionsRun
+                "walk" -> Icons.AutoMirrored.Rounded.DirectionsWalk
+                else -> Icons.Rounded.FitnessCenter
+            },
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size(30.dp)
@@ -146,7 +151,11 @@ fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> U
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                if (run) "Your run is ready to share" else "Nice long walk",
+                when (kind) {
+                    "run" -> "Your run is ready to share"
+                    "walk" -> "Nice long walk"
+                    else -> "Your ${workout.noun} is ready to share"
+                },
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.9f),
                 fontWeight = FontWeight.Bold
