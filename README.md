@@ -5,7 +5,7 @@ Superfit is an Android app for tracking food, training and recovery. You log mea
 ## Stack
 
 - Kotlin, Jetpack Compose and Navigation 3
-- Room for on-device storage (schemas are exported to `app/schemas`)
+- Room for on-device storage (schemas are exported to `shared/schemas`)
 - Firebase Auth and Firestore for sign-in and cloud sync (`firestore.rules`)
 - Health Connect for activity and sleep
 - WorkManager for background sync and reminders
@@ -33,7 +33,7 @@ Requirements: JDK 17 and the Android SDK (compileSdk 36).
 scripts/ktlint.sh --format    # format the Kotlin code (rules in .editorconfig)
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of these on every pull request and every push to `main`, and fails on a formatting problem or an Android Lint error (lint warnings are only reported). It also fails if the build changes a Room schema file under `app/schemas`, so commit those files with any entity change.
+CI (`.github/workflows/ci.yml`) runs all of these on every pull request and every push to `main`, and fails on a formatting problem or an Android Lint error (lint warnings are only reported). It also fails if the build changes a Room schema file under `shared/schemas`, so commit those files with any entity change.
 
 ### Testing what the Play build will do
 
@@ -66,4 +66,4 @@ When you change an entity:
 1. Bump `version` in `SuperfitDatabase`.
 2. Add a `Migration` and include it in `SuperfitDatabase.ALL_MIGRATIONS`.
 3. Extend `SuperfitDatabaseMigrationTest` to cover the new version.
-4. Commit the new schema JSON that the build writes to `app/schemas`.
+4. Commit the new schema JSON that the build writes to `shared/schemas`.

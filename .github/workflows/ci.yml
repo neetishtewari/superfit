@@ -57,10 +57,10 @@ jobs:
 
       - name: Check Room schemas are committed
         run: |
-          if [ -n "$(git status --porcelain app/schemas)" ]; then
-            echo "::error::Room schema files changed during the build. Commit the files under app/schemas."
-            git status --porcelain app/schemas
-            for f in $(git status --porcelain --untracked-files=all app/schemas | awk '{print $2}'); do
+          if [ -n "$(git status --porcelain shared/schemas)" ]; then
+            echo "::error::Room schema files changed during the build. Commit the files under shared/schemas."
+            git status --porcelain shared/schemas
+            for f in $(git status --porcelain --untracked-files=all shared/schemas | awk '{print $2}'); do
               echo "----- $f"
               cat "$f"
             done
