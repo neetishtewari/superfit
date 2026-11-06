@@ -78,6 +78,7 @@ class CoachingEngine {
         historyWeights: List<WeightEntryEntity>,
         memory: List<CoachMemoryEntry>,
         notes: List<CoachNote> = emptyList(),
+        stepGoal: Int? = null,
         zone: TimeZone = TimeZone.currentSystemDefault(),
         today: LocalDate = Clock.System.now().toLocalDateTime(zone).date,
         now: LocalTime = Clock.System.now().toLocalDateTime(zone).time
@@ -94,7 +95,9 @@ class CoachingEngine {
             activity = historyActivity,
             sleep = historySleep,
             weights = historyWeights,
-            targetWeightKg = profile.targetWeightKg
+            targetWeightKg = profile.targetWeightKg,
+            age = profile.age,
+            stepGoal = stepGoal
         )
         val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today, zone)
         val focus = chooseFocus(report, memory, today, plans, lastTreatDay(historyNutrition, zone))

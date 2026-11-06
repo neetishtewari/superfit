@@ -299,6 +299,9 @@ fun DashboardScreen(
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
     val pendingScaleReading by viewModel.pendingScaleReading.collectAsState()
     val personalBests by viewModel.personalBests.collectAsState()
+    val stepGoal by viewModel.stepGoal.collectAsState()
+    val stepGoalNoteDismissedOn by viewModel.stepGoalNoteDismissedOn.collectAsState()
+    var showStepGoalSheet by remember { mutableStateOf(false) }
     // The card in the share preview, and the new best it shows (remembered once it's shared).
     var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
     var shareBest by remember { mutableStateOf<com.superfit.app.domain.PersonalBest?>(null) }
@@ -351,6 +354,16 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(ThemeBgStart)
     ) {
+        if (showStepGoalSheet) {
+            stepGoal?.let { goal ->
+                StepGoalSheet(
+                    goal = goal,
+                    onSetOwn = { viewModel.setOwnStepGoal(it) },
+                    onDismiss = { showStepGoalSheet = false }
+                )
+            }
+        }
+
         if (showFoodCamera) {
             Dialog(
                 onDismissRequest = { showFoodCamera = false },
@@ -528,7 +541,12 @@ fun DashboardScreen(
                         if (logType == "MEAL") {
                             // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
                             // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
-                            CalorieRingsCard(state = state)
+                            CalorieRingsCard(state = state, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
+
+                            val stepDay = LocalDate.now().toKotlinLocalDate()
+                            stepGoal?.takeIf { it.raisedOn(stepDay) && stepGoalNoteDismissedOn != stepDay.toString() }?.let { goal ->
+                                StepGoalRaisedNote(goal = goal, onDismiss = viewModel::dismissStepGoalNote)
+                            }
 
                             // One-time tip offering the home-screen widget
                             val widgetTipEligible = remember(state.totalMealsLogged) {

@@ -110,7 +110,10 @@ object CoachPatternEngine {
         sleep: List<SleepTelemetryEntity>,
         weights: List<WeightEntryEntity> = emptyList(),
         targetWeightKg: Double? = null,
-        zone: TimeZone = TimeZone.currentSystemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault(),
+        // Age (0 if unknown) and today's step goal, so step tips fit the person.
+        age: Int = 0,
+        stepGoal: Int? = null
     ): CoachReport {
         val byDate = nutrition.groupBy { dateOf(it.timestamp, zone) }
         val rawDays = (1..LOOKBACK_DAYS).map { offset ->
@@ -134,7 +137,7 @@ object CoachPatternEngine {
         checkTreats(today, byDate, lastWeek, targets.calories, zone, goal, lastWeek.any { it.status == DayLogStatus.BLANK }, findings, checked)
         checkVegAndFruit(completeLastWeek, findings, checked)
         checkFibre(completeLastWeek, targets, findings, checked)
-        checkSteps(today, activity, weightKg, findings, checked)
+        checkSteps(today, activity, weightKg, age, stepGoal, findings, checked)
         checkSleep(today, sleep, findings, checked)
         checkWorkouts(today, workouts, zone, findings, checked)
         val keptHabits = checkKeptHabits(today, workouts, zone, findings)
@@ -765,6 +768,8 @@ object CoachPatternEngine {
         today: LocalDate,
         activity: List<ActivityTelemetryEntity>,
         weightKg: Double,
+        age: Int,
+        stepGoal: Int?,
         out: MutableList<CoachFinding>,
         checked: MutableSet<String>
     ) {
@@ -776,7 +781,9 @@ object CoachPatternEngine {
         checked += "steps"
         val recentAvg = recent.average()
         val baseline = window(8, 35)
-        val meaning = "Most of the health benefit of walking comes up to about 7,000 to 10,000 steps a day, and it's one of the biggest drivers of calories burned outside workouts."
+        val range = if (age > 0) StepGoal.healthyRangeText(age) else "7,000 to 10,000"
+        val meaning = "Most of the health benefit of walking comes up to about $range steps a day, and it's one of the biggest drivers of calories burned outside workouts."
+        val goalNote = stepGoal?.let { " Your goal is ${num(it)}." } ?: ""
 
         if (baseline.size >= 7) {
             val baseAvg = baseline.average()
@@ -811,7 +818,7 @@ object CoachPatternEngine {
                 area = "steps",
                 kind = FindingKind.CONCERN,
                 priority = 45,
-                fact = "Steps averaged ${num(recentAvg.roundToInt())} a day this week.",
+                fact = "Steps averaged ${num(recentAvg.roundToInt())} a day this week.$goalNote",
                 meaning = meaning,
                 suggestion = "Add a 15 to 20-minute walk today."
             )

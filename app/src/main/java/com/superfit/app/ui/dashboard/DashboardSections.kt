@@ -163,7 +163,11 @@ private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVecto
 }
 
 @Composable
-internal fun CalorieRingsCard(state: DashboardUiState.Success) {
+internal fun CalorieRingsCard(
+    state: DashboardUiState.Success,
+    stepGoal: com.superfit.app.domain.StepGoalResult? = null,
+    onStepsClick: () -> Unit = {}
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -187,7 +191,8 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            val stepsTarget = 10000.0
+            // The person's own step goal (see StepGoal); the age starter until it's worked out.
+            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.age)).toDouble()
             val caloriesTarget = state.macroTargets.calories
 
             val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
@@ -206,18 +211,40 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 val fmt = java.text.NumberFormat.getIntegerInstance()
-                RingLegendItem(
-                    label = "Eaten, kcal",
-                    value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
-                    color = NeonGreen
-                )
-                RingLegendItem(
-                    label = "Steps",
-                    value = "${fmt.format(state.activity.steps)} of 10,000",
-                    color = ElectricCyan
-                )
-                workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)?.let {
-                    Text(text = it, fontSize = 12.sp, color = ThemeTextSecondary)
+                // How workouts raised today's target, shown only when the person taps to ask why.
+                val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
+                var showKcalMath by remember { mutableStateOf(false) }
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (kcalMath != null) {
+                                Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    RingLegendItem(
+                        label = "Eaten, kcal",
+                        value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
+                        color = NeonGreen
+                    )
+                    if (showKcalMath && kcalMath != null) {
+                        Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
+                ) {
+                    RingLegendItem(
+                        label = "Steps",
+                        value = "${fmt.format(state.activity.steps)} of ${fmt.format(stepsTarget.toInt())}",
+                        color = ElectricCyan
+                    )
                 }
             }
         }

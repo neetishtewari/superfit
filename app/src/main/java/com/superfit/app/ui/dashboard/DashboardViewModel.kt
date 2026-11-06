@@ -23,6 +23,9 @@ import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RepeatMealCache
 import com.superfit.app.domain.SpokenInput
+import com.superfit.app.domain.StepGoal
+import com.superfit.app.domain.StepGoalReason
+import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutParser
@@ -457,7 +460,9 @@ class DashboardViewModel(
             activity = repository.getAllActivityTelemetry(),
             sleep = repository.getAllSleepTelemetry(),
             weights = repository.getAllWeightEntries(),
-            targetWeightKg = profile.targetWeightKg
+            targetWeightKg = profile.targetWeightKg,
+            age = profile.age,
+            stepGoal = stepGoal.value?.goal
         )
 
         val live = """
@@ -709,8 +714,10 @@ class DashboardViewModel(
             val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
             val workoutMins = (workouts.size * 25)
 
+            val todayStepGoal = StepGoalStore.ownGoal(appContext) ?: StepGoalStore.load(appContext)?.goal ?: StepGoal.starter(profile.age)
+
             val habitEntry = (rawHabit ?: HabitEntryEntity(date = todayStr)).copy(
-                stepsCompleted = currentSteps >= 8000,
+                stepsCompleted = currentSteps >= todayStepGoal,
                 sleepCompleted = currentSleepSecs >= (7 * 3600),
                 workoutMins = workoutMins
             )
@@ -826,6 +833,53 @@ class DashboardViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = BestsUiState()
     )
+
+    private val stepGoalTrigger = MutableStateFlow(0L)
+
+    /**
+     * Today's daily step goal, worked out from the last two weeks of steps and the person's age
+     * (see StepGoal), or their own number from Settings. Saved so it holds steady all week.
+     */
+    val stepGoal: StateFlow<StepGoalResult?> = combine(
+        repository.profileFlow,
+        repository.allActivityTelemetryFlow,
+        stepGoalTrigger
+    ) { profile, activity, _ ->
+        if (profile == null) return@combine null
+        val steps = activity.mapNotNull { row -> runCatching { kotlinx.datetime.LocalDate.parse(row.date) to row.steps }.getOrNull() }.toMap()
+        val saved = StepGoalStore.load(appContext)
+        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(appContext), LocalDate.now().toKotlinLocalDate())
+        // An own number is kept apart, so switching back to automatic starts from the steps again.
+        if (result.reason != StepGoalReason.OWN && result.saved != saved) {
+            StepGoalStore.save(appContext, result.saved)
+            if (saved != null && result.goal != saved.goal) {
+                AppAnalytics.stepGoalChanged(if (result.goal > saved.goal) "up" else "down", "auto")
+            }
+        }
+        result
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+    private val _stepGoalNoteDismissedOn = MutableStateFlow(StepGoalStore.noteDismissedOn(appContext))
+    val stepGoalNoteDismissedOn: StateFlow<String?> = _stepGoalNoteDismissedOn.asStateFlow()
+
+    /** Hides today's "New step goal" note on Home. */
+    fun dismissStepGoalNote() {
+        val today = LocalDate.now().toKotlinLocalDate()
+        StepGoalStore.dismissNote(appContext, today)
+        _stepGoalNoteDismissedOn.value = today.toString()
+    }
+
+    /** Sets the person's own daily step goal, or null to go back to the automatic one. */
+    fun setOwnStepGoal(steps: Int?) {
+        val clamped = steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX)
+        StepGoalStore.setOwnGoal(appContext, clamped)
+        AppAnalytics.stepGoalChanged("set", if (clamped == null) "auto" else "own")
+        stepGoalTrigger.value = System.currentTimeMillis()
+    }
 
     /** A best was shared or dismissed: remember it so it's offered only once. */
     fun acknowledgeBest(best: PersonalBest) {
@@ -1195,6 +1249,7 @@ class DashboardViewModel(
                     historyActivity = repository.getAllActivityTelemetry(),
                     historySleep = repository.getAllSleepTelemetry(),
                     historyWeights = repository.getAllWeightEntries(),
+                    stepGoal = stepGoal.value?.goal,
                     memory = CoachInsightStore.memory(sharedPrefs),
                     notes = _coachNotes.value
                 )
