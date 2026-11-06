@@ -63,6 +63,25 @@ class PackagedFoodTest {
     }
 
     @Test
+    fun `zero calorie drink is found, not treated as unknown`() {
+        val json = """{"status":1,"product":{"product_name":"Diet Coke","serving_quantity":300,
+            "nutriments":{"energy-kcal_100g":0,"energy_100g":0,"proteins_100g":0,"carbohydrates_100g":0,"fat_100g":0}}}"""
+        val food = PackagedFoodParser.fromOpenFoodFacts(json)!!
+        assertEquals("Diet Coke", food.name)
+        assertEquals(0.0, food.per100g.kcal, 0.001)
+        assertEquals(0.0, food.perServing!!.kcal, 0.001)
+    }
+
+    @Test
+    fun `zero calorie label with a name is read`() {
+        val food = PackagedFoodParser.fromLabelJson(
+            """{"name":"Diet Coke","per100g":{"kcal":0,"protein":0,"carbs":0,"fat":0,"fiber":0},"servingGrams":300,"perServing":null}"""
+        )!!
+        assertEquals(0.0, food.per100g.kcal, 0.001)
+        assertEquals(0.0, food.perServing!!.kcal, 0.001)
+    }
+
+    @Test
     fun `label JSON is read`() {
         val json = """```json
             {"name":"Digestive biscuits","per100g":{"kcal":480,"protein":7,"carbs":65,"fat":21,"fiber":4},

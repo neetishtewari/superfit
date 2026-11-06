@@ -112,6 +112,7 @@ class FoodCameraController : ViewModel() {
         if (code == ignoredCode && now < ignoreUntil) return false
         scanLocked = true
         lastCode = code
+        android.util.Log.i("FoodCamera", "Scanned barcode $code")
         banner = null
         state = CameraState.Working("Looking up product…")
         job = viewModelScope.launch {
