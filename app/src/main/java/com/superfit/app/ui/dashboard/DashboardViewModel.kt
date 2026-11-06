@@ -287,9 +287,9 @@ class DashboardViewModel(
             _chatLoading.value = true
             try {
                 val history = com.superfit.app.domain.CoachChat.historyForAi(before, System.currentTimeMillis()).map {
-                    GeminiClient.ChatTurn(fromUser = it.fromUser, text = it.text)
+                    com.superfit.app.domain.AiChatTurn(fromUser = it.fromUser, text = it.text)
                 }
-                val raw = GeminiClient.chat(
+                val raw = com.superfit.app.domain.Ai.chat(
                     systemInstructionText = coachChatInstruction(currentState, before),
                     history = history,
                     message = question

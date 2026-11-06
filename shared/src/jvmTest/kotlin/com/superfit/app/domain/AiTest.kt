@@ -34,4 +34,30 @@ class AiTest {
         assertTrue(asked!!.second!!.contains("exercise physiology"))
         assertTrue(asked!!.third)
     }
+
+    @Test
+    fun photosAndChatGoThroughTheAppsClientsToo() {
+        val sent = AiPhoto(byteArrayOf(1, 2, 3))
+        var gotPhoto: AiPhoto? = null
+        Ai.photoText = AiPhotoText { photo, _, _, _ ->
+            gotPhoto = photo
+            """{"foodText": "2 roti and dal", "calories": 420, "protein": 16, "carbs": 60, "fat": 10}"""
+        }
+        val meal = now { FoodPhotoParser().parseMeal(sent) }
+        assertTrue(gotPhoto === sent)
+        assertEquals("2 roti and dal", meal.foodText)
+        assertEquals(420.0, meal.calories)
+
+        Ai.photoText = AiPhotoText { _, _, _, _ -> """{"foodText": "a wall", "calories": 0}""" }
+        assertEquals("invalid", now { FoodPhotoParser().parseMeal(sent) }.foodText)
+
+        var gotHistory: List<AiChatTurn>? = null
+        Ai.chatText = AiChat { _, history, message ->
+            gotHistory = history
+            "You said: $message"
+        }
+        val history = listOf(AiChatTurn(fromUser = true, text = "hi"), AiChatTurn(fromUser = false, text = "Hello"))
+        assertEquals("You said: more?", now { Ai.chat("rules", history, "more?") })
+        assertEquals(history, gotHistory)
+    }
 }
