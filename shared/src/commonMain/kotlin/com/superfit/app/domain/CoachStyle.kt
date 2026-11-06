@@ -1,5 +1,7 @@
 package com.superfit.app.domain
 
+import kotlin.concurrent.Volatile
+
 /**
  * How the AI coach talks: the user picks it in Settings. Only the tone changes; the facts, numbers
  * and advice stay the same. Added to the daily tip's and the chat's instructions.
