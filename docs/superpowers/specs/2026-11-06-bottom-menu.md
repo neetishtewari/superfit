@@ -108,6 +108,14 @@ People miss share-worthy workouts because they don't open every one in Activity.
   "Suggest runs to share" on/off.
 - Analytics: share_offer_shown / share_offer_tapped / share_offer_dismissed with type walk|run.
 
+## Icons (Neetish 2026-11-06 19:09Z: never emoji, premium look)
+
+Material icons only, Rounded style, filled when selected and outlined when not:
+menu Today `Today`, Progress `Insights`, Coach `AutoAwesome`; Food `Restaurant`, Activity
+`DirectionsRun`; Insights `Lightbulb`, Journey `Flag`, History `History`; share card walk
+`DirectionsWalk`, run `DirectionsRun`. Needs material-icons-extended (check it's already a
+dependency; R8 strips unused icons). No emoji anywhere in the UI.
+
 ## Back button and full-screen pages
 
 - From Progress or Coach, the phone's back goes to Today. From Today it leaves the app (as now).
