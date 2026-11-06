@@ -565,7 +565,8 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
         }
     }
     Spacer(Modifier.weight(1f))
-    if (card.previous != null) {
+    val previous = card.previous
+    if (previous != null) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -576,7 +577,7 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("PREVIOUS BEST", color = TextSoft, fontSize = 11.sp, letterSpacing = 1.sp)
-                Text(card.previous, color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(previous, color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
             card.gain?.let { Text(it, color = accent, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         }
