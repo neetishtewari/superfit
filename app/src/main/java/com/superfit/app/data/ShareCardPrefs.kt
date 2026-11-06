@@ -26,6 +26,12 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
     }
 
     /** Off unless the user turns it on: weight stays private. */
+
+    /** The card style last picked ("poster", "glow", "bib", "classic"); null before the first pick. */
+    var style: String?
+        get() = prefs.getString(KEY_STYLE, null)
+        set(value) = prefs.edit().putString(KEY_STYLE, value).apply()
+
     var showWeight: Boolean
         get() = prefs.getBoolean(KEY_SHOW_WEIGHT, false)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_WEIGHT, value).apply()
@@ -75,6 +81,7 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         private const val KEY_CHIPS_PHOTO = "chips_photo"
         private const val KEY_CHIPS_PLAIN = "chips_plain"
         private const val KEY_SHOW_WEIGHT = "show_weight"
+        private const val KEY_STYLE = "card_style"
         private const val KEY_LINES = "ai_lines"
         private const val KEY_AGAIN_DAY = "roast_again_day"
         private const val KEY_AGAIN_COUNT = "roast_again_count"

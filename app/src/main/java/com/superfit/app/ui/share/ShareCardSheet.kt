@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -61,8 +63,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -104,7 +108,7 @@ const val CARD_HEIGHT_PX = 1920
 private val CardDensity = Density(density = 3f, fontScale = 1f)
 
 private const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
-private val accentNames = listOf("Orange", "Mint", "Cyan", "Violet")
+private val accentNames = listOf("Orange", "Mint", "Cyan", "Violet", "Pink")
 
 // Whether the photo hint was seen; the rest of the saved share choices live in ShareCardPrefs.
 private const val KEY_HINT_SHOWN = "photo_hint_shown"
@@ -128,6 +132,8 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     var busy by remember { mutableStateOf(false) }
     // Light background by default (Neetish, 2026-11-03).
     var light by remember { mutableStateOf(true) }
+    // The card's look, remembered from the last share; Poster for someone who hasn't picked one.
+    var style by remember { mutableStateOf(CardStyle.of(cardPrefs.style)) }
     // The user's photo lives only in memory while the sheet is open; it is never saved or uploaded.
     var photo by remember(card) { mutableStateOf<ImageBitmap?>(null) }
     var frame by remember(card) { mutableStateOf(PhotoFrame()) }
@@ -262,7 +268,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 val current = photo
                 val preview: @Composable (Modifier) -> Unit = { m ->
                     if (current == null) {
-                        CapturableCard(shown, accent, null, light, frame, layer, m)
+                        CapturableCard(shown, accent, null, light, style, frame, layer, m)
                     } else {
                         // Pinch to zoom, drag to move, double-tap to reset. Grid lines show while a finger
                         // is down; they sit on top of the preview, outside the picture that gets shared.
@@ -292,7 +298,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                     }
                                 }
                         ) {
-                            CapturableCard(shown, accent, current, light, frame, layer, Modifier.fillMaxWidth())
+                            CapturableCard(shown, accent, current, light, style, frame, layer, Modifier.fillMaxWidth())
                             if (touching) {
                                 Canvas(Modifier.matchParentSize()) {
                                     val line = Color.White.copy(alpha = 0.45f)
@@ -326,11 +332,11 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                             )
                         }
                         Spacer(Modifier.height(6.dp))
-                        if (current == null) {
-                            // Dark or light background; a photo card always keeps its dark fade.
+                        if (current == null && style == CardStyle.CLASSIC) {
+                            // Classic keeps its dark or light background; a photo card always keeps its dark fade.
                             MiniChoice("Dark", !light, accent) { light = false }
                             MiniChoice("Light", light, accent) { light = true }
-                        } else {
+                        } else if (current != null) {
                             Text("Stats", color = SuperfitTheme.colors.textSecondary, fontSize = 10.sp)
                             MiniChoice("Top", frame.statsTop, accent) { frame = frame.copy(statsTop = true) }
                             MiniChoice("Bottom", !frame.statsTop, accent) { frame = frame.copy(statsTop = false) }
@@ -339,6 +345,17 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 }
                 if (showHint && current != null) {
                     Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
+                }
+                if (current == null) {
+                    // The look of the card: every style shows the same numbers and add-ons.
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CardStyle.entries.forEach { s ->
+                            StyleThumb(s, picked = s == style, accent = accent, modifier = Modifier.weight(1f)) {
+                                style = s
+                                cardPrefs.style = s.key
+                            }
+                        }
+                    }
                 }
                 if (current == null) {
                     OptionPill("Add your photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
@@ -479,7 +496,8 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                 chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } }
                                     ?: roastCard?.let { dayChips.joinToString(",") { it.key } },
                                 statsPlace = if (frame.statsTop) "top" else "bottom",
-                                heartLine = activity?.shownHeart != null
+                                heartLine = activity?.shownHeart != null,
+                                style = if (photo != null) "photo" else style.key
                             )
                             onShared()
                         } catch (e: Exception) {
@@ -591,11 +609,73 @@ private fun CapturableCard(
     accent: Color,
     photo: ImageBitmap?,
     light: Boolean,
+    style: CardStyle,
     frame: PhotoFrame,
     layer: GraphicsLayer,
     modifier: Modifier
 ) {
-    CapturableStory(layer, modifier) { ShareCardView(card, accent, photo = photo, light = light, frame = frame) }
+    CapturableStory(layer, modifier) { ShareCardView(card, accent, photo = photo, light = light, frame = frame, style = style) }
+}
+
+/** A small picture of a card style, in the picked colour, with its name under it. */
+@Composable
+private fun StyleThumb(style: CardStyle, picked: Boolean, accent: Color, modifier: Modifier, onPick: () -> Unit) {
+    val ink = inkOn(accent)
+    Column(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onPick)
+            .semantics { contentDescription = "${style.label} style${if (picked) ", chosen" else ""}" },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.75f)
+                .clip(RoundedCornerShape(8.dp))
+                .then(if (picked) Modifier.border(2.dp, SuperfitTheme.colors.textPrimary, RoundedCornerShape(8.dp)) else Modifier)
+                .background(
+                    when (style) {
+                        CardStyle.POSTER -> SolidColor(accent)
+                        CardStyle.GLOW -> Brush.radialGradient(listOf(accent, Color(0xFF0A0B10)), radius = 120f)
+                        CardStyle.BIB -> SolidColor(Color(0xFFECEBE6))
+                        CardStyle.CLASSIC -> Brush.horizontalGradient(0.5f to Color(0xFF0D0D14), 0.5f to Color(0xFFF6F6F9))
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            when (style) {
+                CardStyle.POSTER -> Text("5", color = ink, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                CardStyle.GLOW -> Text("5", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                CardStyle.BIB -> Column(
+                    Modifier
+                        .fillMaxWidth(0.72f)
+                        .fillMaxHeight(0.7f)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.White)
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .background(accent)
+                    )
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("5", color = Color(0xFF121212), fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                CardStyle.CLASSIC -> Unit
+            }
+        }
+        Text(
+            style.label,
+            color = if (picked) SuperfitTheme.colors.textPrimary else SuperfitTheme.colors.textSecondary,
+            fontSize = 11.sp,
+            fontWeight = if (picked) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1
+        )
+    }
 }
 
 /**
