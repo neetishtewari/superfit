@@ -30,6 +30,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
+import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -41,6 +43,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -77,15 +81,19 @@ import com.superfit.app.ui.camera.FoodCameraScreen
 import com.superfit.app.widget.WidgetPin
 import java.time.LocalDate
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinLocalDate
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToOnboarding: () -> Unit,
-    onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens the Coach tab; with [roast] it first asks the coach to roast the day. */
+    onOpenCoach: (roast: Boolean) -> Unit = {},
+    /** Goes up by one each time the Today tab is tapped while already on it: scroll back to the top. */
+    reselectCount: Int = 0,
     onOpenRecap: (java.time.YearMonth) -> Unit = {},
     triggerVoiceLog: Boolean = false,
     triggerFavoritesLog: Boolean = false,
@@ -108,12 +116,14 @@ fun DashboardScreen(
         onPauseOrDispose { }
     }
     val scrollState = rememberScrollState()
+    LaunchedEffect(reselectCount) {
+        if (reselectCount > 0) scrollState.animateScrollTo(0)
+    }
 
-    var logType by remember { mutableStateOf("MEAL") }
+    var logType by rememberSaveable { mutableStateOf("MEAL") }
     // Hidden for the rest of the visit once Add or Not now is tapped, even across tab switches.
     var widgetTipHidden by rememberSaveable { mutableStateOf(false) }
 
-    var showChatBottomSheet by remember { mutableStateOf(false) }
     val coachStyle by viewModel.coachStyle.collectAsState()
     var foodInputText by remember { mutableStateOf("") }
 
@@ -298,9 +308,15 @@ fun DashboardScreen(
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
     val pendingScaleReading by viewModel.pendingScaleReading.collectAsState()
     val personalBests by viewModel.personalBests.collectAsState()
+    val stepGoal by viewModel.stepGoal.collectAsState()
+    val stepGoalNoteDismissedOn by viewModel.stepGoalNoteDismissedOn.collectAsState()
+    var showStepGoalSheet by remember { mutableStateOf(false) }
     // The card in the share preview, and the new best it shows (remembered once it's shared).
     var shareCard by remember { mutableStateOf<com.superfit.app.domain.ShareCard?>(null) }
     var shareBest by remember { mutableStateOf<com.superfit.app.domain.PersonalBest?>(null) }
+    // The workout from the ready-to-share card, marked done once its card is shared.
+    var shareOfferWorkout by remember { mutableStateOf<com.superfit.app.domain.WorkoutView?>(null) }
+    val shareOffer by viewModel.shareOffer.collectAsState()
 
     // Auto sync on entry
     LaunchedEffect(Unit) {
@@ -350,6 +366,16 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(ThemeBgStart)
     ) {
+        if (showStepGoalSheet) {
+            stepGoal?.let { goal ->
+                StepGoalSheet(
+                    goal = goal,
+                    onSetOwn = { viewModel.setOwnStepGoal(it) },
+                    onDismiss = { showStepGoalSheet = false }
+                )
+            }
+        }
+
         if (showFoodCamera) {
             Dialog(
                 onDismissRequest = { showFoodCamera = false },
@@ -470,15 +496,16 @@ fun DashboardScreen(
                         DashboardHeader(
                             grantedPermissions = grantedPermissions,
                             hasHealthConnectPermissions = hasHealthConnectPermissions,
-                            onNavigateToHistory = onNavigateToHistory,
                             onNavigateToSettings = onNavigateToSettings
                         )
+
+                        // Food / Activity: which part of today the cards below are about.
+                        TodaySwitch(logType = logType, onSelect = { logType = it })
 
                         // Voice Quick Log Card (MEAL / WORKOUT tab switcher)
                         val isProcessing = parsingState is ParsingState.Loading || workoutParsingState is ParsingState.Loading
                         VoiceQuickLogCard(
                             logType = logType,
-                            onLogTypeChange = { logType = it },
                             isListening = isListening,
                             isProcessing = isProcessing,
                             isChecking = voiceChecking,
@@ -513,12 +540,27 @@ fun DashboardScreen(
                             com.superfit.app.ui.recap.RecapReadyCard(month, onOpen = { onOpenRecap(month) })
                         }
 
+                        // The ready-to-share card waits while the recap or a new best is offered.
+                        shareOffer?.takeIf { recapOffer == null && personalBests.toOffer == null }?.let { workout ->
+                            LaunchedEffect(workout.merged.primary.id) {
+                                com.superfit.app.data.AppAnalytics.shareOffer("shown", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+                            }
+                            ShareOfferCard(
+                                workout = workout,
+                                onShare = {
+                                    shareOfferWorkout = workout
+                                    shareCard = com.superfit.app.domain.ShareCards.activity(workout)
+                                },
+                                onDismiss = { viewModel.handleShareOffer(workout, shared = false) }
+                            )
+                        }
+
                         personalBests.toOffer?.let { best ->
                             NewBestCard(
                                 best = best,
                                 onShare = {
                                     shareBest = best
-                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now())
+                                    shareCard = com.superfit.app.domain.ShareCards.best(best, isNew = true, today = LocalDate.now().toKotlinLocalDate())
                                 },
                                 onDismiss = { viewModel.acknowledgeBest(best) }
                             )
@@ -527,7 +569,12 @@ fun DashboardScreen(
                         if (logType == "MEAL") {
                             // MEAL VIEW: Concentric Rings, Streak, Macros, Coach, and Track Your Meals
                             // 1. Concentric Activity & Target Rings (ABOVE THE FOLD)
-                            CalorieRingsCard(state = state)
+                            CalorieRingsCard(state = state, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
+
+                            val stepDay = LocalDate.now().toKotlinLocalDate()
+                            stepGoal?.takeIf { it.raisedOn(stepDay) && stepGoalNoteDismissedOn != stepDay.toString() }?.let { goal ->
+                                StepGoalRaisedNote(goal = goal, onDismiss = viewModel::dismissStepGoalNote)
+                            }
 
                             // One-time tip offering the home-screen widget
                             val widgetTipEligible = remember(state.totalMealsLogged) {
@@ -566,11 +613,8 @@ fun DashboardScreen(
                             CoachInsightsCard(
                                 coachingState = coachingState,
                                 onRefresh = { viewModel.refreshCoachingInsight() },
-                                onOpenChat = { showChatBottomSheet = true },
-                                onRoast = {
-                                    viewModel.sendChatMessage(DashboardViewModel.ROAST_MY_DAY, how = "chip")
-                                    showChatBottomSheet = true
-                                }.takeIf { coachStyle == com.superfit.app.domain.CoachStyle.ROAST }
+                                onOpenChat = { onOpenCoach(false) },
+                                onRoast = { onOpenCoach(true) }.takeIf { coachStyle == com.superfit.app.domain.CoachStyle.ROAST }
                             )
 
                             // Diet Quality (a 7-day score) lives in Insights; Home stays about today.
@@ -635,8 +679,12 @@ fun DashboardScreen(
                 onDismiss = {
                     shareCard = null
                     shareBest = null
+                    shareOfferWorkout = null
                 },
-                onShared = { shareBest?.let { viewModel.acknowledgeBest(it) } }
+                onShared = {
+                    shareBest?.let { viewModel.acknowledgeBest(it) }
+                    shareOfferWorkout?.let { viewModel.handleShareOffer(it, shared = true) }
+                }
             )
         }
 
@@ -656,18 +704,28 @@ fun DashboardScreen(
                 onKeepBoth = { viewModel.keepBothWorkouts() }
             )
         }
-
-        if (showChatBottomSheet && dashboardState is DashboardUiState.Success) {
-            val dayState = dashboardState as DashboardUiState.Success
-            CoachChatSheet(
-                viewModel = viewModel,
-                onDismiss = { showChatBottomSheet = false },
-                // Any roast can go on a card, even one about an empty log.
-                onShareRoast = { line: String ->
-                    showChatBottomSheet = false
-                    shareCard = com.superfit.app.domain.ShareCards.roast(dailyShareCard(dayState, coachingState), line)
-                }
-            )
-        }
     }
+}
+
+/** Food / Activity on Today, with icons, and a dot on Activity until it has been opened once. */
+@Composable
+private fun TodaySwitch(logType: String, onSelect: (String) -> Unit) {
+    val context = LocalContext.current
+    var unseen by remember { mutableStateOf(com.superfit.app.data.SeenTabs.unseen(context, listOf("today_activity"))) }
+    SegmentedPills(
+        options = listOf("MEAL" to "Food", "WORKOUT" to "Activity"),
+        selected = logType,
+        onSelect = { key ->
+            if (key == "WORKOUT" && unseen.isNotEmpty()) {
+                com.superfit.app.data.SeenTabs.markSeen(context, "today_activity")
+                unseen = emptySet()
+            }
+            onSelect(key)
+        },
+        icons = mapOf(
+            "MEAL" to (Icons.Rounded.Restaurant to Icons.Outlined.Restaurant),
+            "WORKOUT" to (Icons.AutoMirrored.Rounded.DirectionsRun to Icons.AutoMirrored.Outlined.DirectionsRun)
+        ),
+        unseen = if (unseen.isEmpty()) emptySet() else setOf("WORKOUT")
+    )
 }

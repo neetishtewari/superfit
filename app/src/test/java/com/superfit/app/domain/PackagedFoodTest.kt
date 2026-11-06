@@ -8,7 +8,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// Robolectric so org.json works.
+// Robolectric for the Android parts these tests touch.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class PackagedFoodTest {
@@ -60,6 +60,43 @@ class PackagedFoodTest {
         assertNull(PackagedFoodParser.fromOpenFoodFacts("""{"status":1,"product":{"nutriments":{"proteins_100g":3}}}"""))
         assertNull(PackagedFoodParser.fromOpenFoodFacts("""{"status":0,"status_verbose":"product not found"}"""))
         assertNull(PackagedFoodParser.fromOpenFoodFacts("not json"))
+    }
+
+    @Test
+    fun `zero calorie drink is found, not treated as unknown`() {
+        val json = """{"status":1,"product":{"product_name":"Diet Coke","serving_quantity":300,
+            "nutriments":{"energy-kcal_100g":0,"energy_100g":0,"proteins_100g":0,"carbohydrates_100g":0,"fat_100g":0}}}"""
+        val food = PackagedFoodParser.fromOpenFoodFacts(json)!!
+        assertEquals("Diet Coke", food.name)
+        assertEquals(0.0, food.per100g.kcal, 0.001)
+        assertEquals(0.0, food.perServing!!.kcal, 0.001)
+    }
+
+    @Test
+    fun `prepared values are used when plain ones are missing`() {
+        // Diet Coke India (8901764061103) on Open Food Facts only has "_prepared" values.
+        val json = """{"status":1,"product":{"product_name":"Diet Coke","serving_quantity":200,
+            "nutriments":{"energy-kcal_prepared":0,"energy-kcal_prepared_100g":0,"energy-kcal_prepared_serving":0,
+            "energy_prepared_100g":0,"carbohydrates_prepared_100g":0}}}"""
+        val food = PackagedFoodParser.fromOpenFoodFacts(json)!!
+        assertEquals("Diet Coke", food.name)
+        assertEquals(0.0, food.per100g.kcal, 0.001)
+        assertEquals(200.0, food.servingGrams!!, 0.001)
+
+        val juice = PackagedFoodParser.fromOpenFoodFacts(
+            """{"status":1,"product":{"nutriments":{"energy_prepared_100g":184.1,"carbohydrates_prepared_100g":10}}}"""
+        )!!
+        assertEquals(44.0, juice.per100g.kcal, 0.01)
+        assertEquals(10.0, juice.per100g.carbs, 0.001)
+    }
+
+    @Test
+    fun `zero calorie label with a name is read`() {
+        val food = PackagedFoodParser.fromLabelJson(
+            """{"name":"Diet Coke","per100g":{"kcal":0,"protein":0,"carbs":0,"fat":0,"fiber":0},"servingGrams":300,"perServing":null}"""
+        )!!
+        assertEquals(0.0, food.per100g.kcal, 0.001)
+        assertEquals(0.0, food.perServing!!.kcal, 0.001)
     }
 
     @Test

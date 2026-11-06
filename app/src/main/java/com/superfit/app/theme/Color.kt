@@ -58,6 +58,18 @@ data class SuperfitColors(
     val amberSoft: Color,
     // Fill of text boxes and small tiles inside a card
     val fieldBg: Color,
+    // The chosen option in a switch and the chosen menu tab: calm, so solid green stays for the log buttons
+    val selectedBg: Color,
+    val selectedFg: Color,
+    val selectedLine: Color,
+    // The chosen option in an in-page switch: neutral, so the page itself isn't green
+    val switchBg: Color,
+    val switchFg: Color,
+    val switchLine: Color,
+    // Quiet colours for carbs, fat and fibre bars (protein keeps the brand green)
+    val carbs: Color,
+    val fat: Color,
+    val fibre: Color,
     val isDark: Boolean
 )
 
@@ -79,6 +91,15 @@ val DarkColors = SuperfitColors(
     coachSoft = Color(0xFF1C2230),
     amberSoft = Color(0xFF3A2C12),
     fieldBg = Color(0xFF1C2724),
+    selectedBg = Color(0xFF1F6B53),
+    selectedFg = Color.White,
+    selectedLine = Color(0xFF2E8A6C),
+    switchBg = Color(0xFF2E3A36),
+    switchFg = Color.White,
+    switchLine = Color(0xFF475651),
+    carbs = Color(0xFF86A6CC),
+    fat = Color(0xFFD2AD72),
+    fibre = Color(0xFF97BC7C),
     isDark = true
 )
 
@@ -100,6 +121,15 @@ val LightColors = SuperfitColors(
     coachSoft = CoachPurpleSoft,
     amberSoft = AmberSoft,
     fieldBg = Color(0xFFEDF2F0),
+    selectedBg = BrandGreenSoft,
+    selectedFg = BrandGreenDeep,
+    selectedLine = Color(0xFF9FD9C3),
+    switchBg = Color.White,
+    switchFg = Color(0xFF10201A),
+    switchLine = Color(0xFFD3DCD8),
+    carbs = Color(0xFF5B7FA6),
+    fat = Color(0xFFB08A4F),
+    fibre = Color(0xFF6F9455),
     isDark = false
 )
 

@@ -1,0 +1,130 @@
+package com.superfit.app.data
+
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "user_profile")
+data class UserProfileEntity(
+    @PrimaryKey val id: Int = 0, // Single user profile row
+    val age: Int,
+    val heightCm: Double,
+    val weightKg: Double,
+    val isMale: Boolean,
+    val activityMultiplier: Double = 1.2,
+    val goal: String = "LOSE_WEIGHT",
+    val calorieOffset: Int = -500,
+    val startingWeightKg: Double = 75.0,
+    val targetWeightKg: Double = 70.0,
+    val startDateTimestamp: Long = Now.millis(),
+    // "BEGINNER", "INTERMEDIATE", "ADVANCED"
+    val fitnessLevel: String = "INTERMEDIATE"
+)
+
+@Entity(tableName = "weight_entries", indices = [Index(value = ["cloudId"], unique = true)])
+data class WeightEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    // The entry's name in the cloud backup, the same on every phone and never reused (see CloudIds).
+    val cloudId: String = CloudIds.newId(),
+    val weightKg: Double,
+    val timestamp: Long,
+    val note: String = ""
+)
+
+@Entity(tableName = "streak_state")
+data class StreakStateEntity(
+    @PrimaryKey val id: Int = 0,
+    val currentStreak: Int = 0,
+    val longestStreak: Int = 0,
+    val masteryStreak: Int = 0,
+    val graceDaysRemaining: Int = 1,
+    val lastLoggedDate: String = "",
+    val lastGraceUsedDate: String = ""
+)
+
+@Entity(tableName = "habit_entries")
+data class HabitEntryEntity(
+    @PrimaryKey val date: String, // YYYY-MM-DD
+    val waterMl: Int = 0,
+    val workoutMins: Int = 0,
+    val cleanEatsCompleted: Boolean = false,
+    val stepsCompleted: Boolean = false,
+    val sleepCompleted: Boolean = false
+)
+
+@Entity(tableName = "activity_telemetry")
+data class ActivityTelemetryEntity(
+    @PrimaryKey val date: String, // format YYYY-MM-DD
+    val steps: Int,
+    val activeCalories: Double
+)
+
+@Entity(tableName = "sleep_telemetry")
+data class SleepTelemetryEntity(
+    @PrimaryKey val date: String, // format YYYY-MM-DD
+    val sleepDurationSeconds: Long,
+    val deepSleepDurationSeconds: Long,
+    // 0-100% computed daily score
+    val readinessScore: Int
+)
+
+@Entity(tableName = "nutrition_entries", indices = [Index(value = ["cloudId"], unique = true)])
+data class NutritionEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    // The entry's name in the cloud backup, the same on every phone and never reused (see CloudIds).
+    val cloudId: String = CloudIds.newId(),
+    val foodText: String,
+    val calories: Double,
+    val proteinG: Double,
+    val carbsG: Double,
+    val fatG: Double,
+    val timestamp: Long, // epoch millis
+    // What kind of food this is (see MealTags), set by the AI when the meal is logged. Null for older meals.
+    val qualityTags: String? = null,
+    // The meal's separate foods with their amounts and oil/sugar levels (see MealItems). Null for
+    // meals logged before items existed, and when the AI gave no usable item list.
+    val items: String? = null
+)
+
+@Entity(tableName = "workout_entries", indices = [Index(value = ["cloudId"], unique = true)])
+data class WorkoutEntryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    // The entry's name in the cloud backup, the same on every phone and never reused (see CloudIds).
+    val cloudId: String = CloudIds.newId(),
+    val description: String,
+    val caloriesBurned: Double,
+    val workoutType: String, // "Cardio" or "Strength"
+    val setsCount: Int,
+    val repsCount: Int,
+    val timestamp: Long, // epoch millis
+    // "EASY", "JUST_RIGHT", "HARD"
+    val difficultyRating: String = "JUST_RIGHT"
+)
+
+/**
+ * A workout another app (Samsung Health, Strava, a watch) shared through Health Connect. One row
+ * per app's copy; WorkoutMerge shows each workout once. Not backed up to the cloud, because it
+ * can always be read again from Health Connect.
+ */
+@Entity(tableName = "imported_workouts")
+data class ImportedWorkoutEntity(
+    @PrimaryKey val id: String, // Health Connect's record id
+    val sourcePackage: String,
+    val exerciseType: Int, // Health Connect's ExerciseSessionRecord type
+    val startTime: Long, // epoch millis
+    val endTime: Long,
+    val distanceMeters: Double? = null,
+    val totalKcal: Double? = null,
+    val avgHeartRate: Long? = null,
+    // False until distance, calories and heart rate have been read, so a cut-short import fills them in later.
+    val detailsRead: Boolean = false
+)
+
+data class PredictedFood(
+    val foodText: String,
+    val calories: Double,
+    val proteinG: Double,
+    val carbsG: Double,
+    val fatG: Double,
+    val score: Double
+)

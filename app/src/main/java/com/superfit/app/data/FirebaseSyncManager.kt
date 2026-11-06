@@ -122,29 +122,31 @@ class FirebaseSyncManager(private val context: Context) {
 
             // 4. Nutrition Entries
             val nutritionSnap = firestore.collection("users").document(userId).collection("nutrition").get().await()
-            val entries = nutritionSnap.documents.mapNotNull { it.data?.toNutritionEntry() }
+            val entries = nutritionSnap.documents.mapNotNull { doc -> doc.data?.toNutritionEntry(doc.id) }
             // Merge only: add what the phone is missing and never delete or overwrite what it has.
+            // Restored entries get a new local number and keep their cloud id, which the insert
+            // uses to skip entries the phone already has.
             // The cloud copy can be incomplete (older versions backed up just the latest entry),
             // so treating it as the full history would throw away the user's own log.
             val localNutritionTimes = database.nutritionDao().getAllEntries().map { it.timestamp }.toSet()
             database.nutritionDao().insertEntriesIfMissing(
-                withoutLegacyDuplicates(entries, localNutritionTimes, { it.id }, { it.timestamp })
+                withoutLegacyDuplicates(entries, localNutritionTimes, { it.cloudId }, { it.timestamp })
             )
 
             // 5. Workout Entries
             val workoutSnap = firestore.collection("users").document(userId).collection("workouts").get().await()
-            val workouts = workoutSnap.documents.mapNotNull { it.data?.toWorkoutEntry() }
+            val workouts = workoutSnap.documents.mapNotNull { doc -> doc.data?.toWorkoutEntry(doc.id) }
             val localWorkoutTimes = database.workoutDao().getAllEntries().map { it.timestamp }.toSet()
             database.workoutDao().insertEntriesIfMissing(
-                withoutLegacyDuplicates(workouts, localWorkoutTimes, { it.id }, { it.timestamp })
+                withoutLegacyDuplicates(workouts, localWorkoutTimes, { it.cloudId }, { it.timestamp })
             )
 
             // 6. Weight Entries
             val weightSnap = firestore.collection("users").document(userId).collection("weights").get().await()
-            val weights = weightSnap.documents.mapNotNull { it.data?.toWeightEntry() }
+            val weights = weightSnap.documents.mapNotNull { doc -> doc.data?.toWeightEntry(doc.id) }
             val localWeightTimes = database.weightDao().getAllWeightEntries().map { it.timestamp }.toSet()
             database.weightDao().insertWeightsIfMissing(
-                withoutLegacyDuplicates(weights, localWeightTimes, { it.id }, { it.timestamp })
+                withoutLegacyDuplicates(weights, localWeightTimes, { it.cloudId }, { it.timestamp })
             )
 
             // 7. Streak State
@@ -238,14 +240,14 @@ class FirebaseSyncManager(private val context: Context) {
         try {
             val userDoc = firestore.collection("users").document(userId)
             val writes = mutableListOf<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any>>>()
-            database.nutritionDao().getAllEntries().filter { it.id != 0L }.forEach {
-                writes += userDoc.collection("nutrition").document(it.id.toString()) to it.toMap()
+            database.nutritionDao().getAllEntries().filter { it.cloudId != CloudIds.LEGACY_UNNUMBERED }.forEach {
+                writes += userDoc.collection("nutrition").document(it.cloudId) to it.toMap()
             }
-            database.workoutDao().getAllEntries().filter { it.id != 0L }.forEach {
-                writes += userDoc.collection("workouts").document(it.id.toString()) to it.toMap()
+            database.workoutDao().getAllEntries().filter { it.cloudId != CloudIds.LEGACY_UNNUMBERED }.forEach {
+                writes += userDoc.collection("workouts").document(it.cloudId) to it.toMap()
             }
-            database.weightDao().getAllWeightEntries().filter { it.id != 0L }.forEach {
-                writes += userDoc.collection("weights").document(it.id.toString()) to it.toMap()
+            database.weightDao().getAllWeightEntries().filter { it.cloudId != CloudIds.LEGACY_UNNUMBERED }.forEach {
+                writes += userDoc.collection("weights").document(it.cloudId) to it.toMap()
             }
             // Firestore allows at most 500 writes per batch.
             for (chunk in writes.chunked(400)) {
@@ -298,8 +300,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("nutrition").document(entry.id.toString()).set(entry.toMap()).await()
-            Log.d(tag, "Nutrition entry uploaded with ID: ${entry.id}.")
+                .collection("nutrition").document(entry.cloudId).set(entry.toMap()).await()
+            Log.d(tag, "Nutrition entry uploaded as ${entry.cloudId}.")
         } catch (e: Exception) {
             Log.e(tag, "Error uploading nutrition: ${e.message}")
         }
@@ -309,8 +311,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("nutrition").document(entry.id.toString()).delete().await()
-            Log.d(tag, "Nutrition entry deleted from Firestore with ID: ${entry.id}.")
+                .collection("nutrition").document(entry.cloudId).delete().await()
+            Log.d(tag, "Nutrition entry ${entry.cloudId} deleted from Firestore.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting nutrition: ${e.message}")
         }
@@ -320,8 +322,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("workouts").document(entry.id.toString()).set(entry.toMap()).await()
-            Log.d(tag, "Workout entry uploaded with ID: ${entry.id}.")
+                .collection("workouts").document(entry.cloudId).set(entry.toMap()).await()
+            Log.d(tag, "Workout entry uploaded as ${entry.cloudId}.")
         } catch (e: Exception) {
             Log.e(tag, "Error uploading workout: ${e.message}")
         }
@@ -331,8 +333,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("workouts").document(entry.id.toString()).delete().await()
-            Log.d(tag, "Workout entry deleted from Firestore with ID: ${entry.id}.")
+                .collection("workouts").document(entry.cloudId).delete().await()
+            Log.d(tag, "Workout entry ${entry.cloudId} deleted from Firestore.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting workout: ${e.message}")
         }
@@ -342,8 +344,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("weights").document(entry.id.toString()).set(entry.toMap()).await()
-            Log.d(tag, "Weight entry uploaded with ID: ${entry.id}.")
+                .collection("weights").document(entry.cloudId).set(entry.toMap()).await()
+            Log.d(tag, "Weight entry uploaded as ${entry.cloudId}.")
         } catch (e: Exception) {
             Log.e(tag, "Error uploading weight: ${e.message}")
         }
@@ -353,8 +355,8 @@ class FirebaseSyncManager(private val context: Context) {
         val userId = auth.currentUser?.uid ?: return
         try {
             firestore.collection("users").document(userId)
-                .collection("weights").document(entry.id.toString()).delete().await()
-            Log.d(tag, "Weight entry deleted from Firestore with ID: ${entry.id}.")
+                .collection("weights").document(entry.cloudId).delete().await()
+            Log.d(tag, "Weight entry ${entry.cloudId} deleted from Firestore.")
         } catch (e: Exception) {
             Log.e(tag, "Error deleting weight: ${e.message}")
         }
@@ -562,8 +564,8 @@ class FirebaseSyncManager(private val context: Context) {
         items?.let { put("items", it) }
     }
 
-    private fun Map<String, Any>.toNutritionEntry(): NutritionEntryEntity = NutritionEntryEntity(
-        id = (this["id"] as? Number)?.toLong() ?: 0L,
+    private fun Map<String, Any>.toNutritionEntry(cloudId: String): NutritionEntryEntity = NutritionEntryEntity(
+        cloudId = cloudId,
         foodText = this["foodText"] as? String ?: "",
         calories = (this["calories"] as? Number)?.toDouble() ?: 0.0,
         proteinG = (this["proteinG"] as? Number)?.toDouble() ?: 0.0,
@@ -585,8 +587,8 @@ class FirebaseSyncManager(private val context: Context) {
         "difficultyRating" to difficultyRating
     )
 
-    private fun Map<String, Any>.toWorkoutEntry(): WorkoutEntryEntity = WorkoutEntryEntity(
-        id = (this["id"] as? Number)?.toLong() ?: 0L,
+    private fun Map<String, Any>.toWorkoutEntry(cloudId: String): WorkoutEntryEntity = WorkoutEntryEntity(
+        cloudId = cloudId,
         description = this["description"] as? String ?: "",
         caloriesBurned = (this["caloriesBurned"] as? Number)?.toDouble() ?: 0.0,
         workoutType = this["workoutType"] as? String ?: "Cardio",
@@ -603,8 +605,8 @@ class FirebaseSyncManager(private val context: Context) {
         "note" to note
     )
 
-    private fun Map<String, Any>.toWeightEntry(): WeightEntryEntity = WeightEntryEntity(
-        id = (this["id"] as? Number)?.toLong() ?: 0L,
+    private fun Map<String, Any>.toWeightEntry(cloudId: String): WeightEntryEntity = WeightEntryEntity(
+        cloudId = cloudId,
         weightKg = (this["weightKg"] as? Number)?.toDouble() ?: 0.0,
         timestamp = (this["timestamp"] as? Number)?.toLong() ?: 0L,
         note = this["note"] as? String ?: ""

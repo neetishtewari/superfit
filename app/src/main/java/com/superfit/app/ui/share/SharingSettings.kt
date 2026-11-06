@@ -39,14 +39,19 @@ import com.superfit.app.domain.CoachStyle
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 
-/** Settings > Sharing: what workout cards start with, and whether weight progress may appear. */
+/**
+ * Settings > Sharing: which runs and walks Today offers to share, what workout cards start with,
+ * and whether weight progress may appear.
+ */
 @Composable
-fun SharingSettingsCard() {
+fun SharingSettingsCard(onOffersChanged: () -> Unit = {}) {
     val context = LocalContext.current
     val prefs = remember { ShareCardPrefs.of(context) }
     var plain by remember { mutableStateOf(prefs.defaults(photo = false)) }
     var photo by remember { mutableStateOf(prefs.defaults(photo = true)) }
     var showWeight by remember { mutableStateOf(prefs.showWeight) }
+    var offerRuns by remember { mutableStateOf(prefs.offerRuns) }
+    var offerWalkMinutes by remember { mutableStateOf(prefs.offerWalkMinutes) }
     val order = remember { CardChip.order(CoachStyle.current) }
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -56,6 +61,39 @@ fun SharingSettingsCard() {
             .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Suggest runs to share", fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary, fontSize = 14.sp)
+                    Text(
+                        "After every run, Today shows a card you can share in one tap.",
+                        fontSize = 12.sp,
+                        color = SuperfitTheme.colors.textSecondary
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = offerRuns, onCheckedChange = {
+                    offerRuns = it
+                    prefs.offerRuns = it
+                    onOffersChanged()
+                })
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Suggest walks to share", fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary, fontSize = 14.sp)
+                Text(
+                    "When a walk is at least this many minutes long.",
+                    fontSize = 12.sp,
+                    color = SuperfitTheme.colors.textSecondary
+                )
+                com.superfit.app.ui.dashboard.SegmentedPills(
+                    options = listOf("0" to "Off") + com.superfit.app.domain.ShareOffer.WALK_CHOICES.map { "$it" to "$it" },
+                    selected = "${offerWalkMinutes ?: 0}",
+                    onSelect = { key ->
+                        offerWalkMinutes = key.toInt().takeIf { it > 0 }
+                        prefs.offerWalkMinutes = offerWalkMinutes
+                        onOffersChanged()
+                    }
+                )
+            }
             Text("Workout cards start with", fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary, fontSize = 14.sp)
             Text(
                 "You can still change these on each card before you share.",

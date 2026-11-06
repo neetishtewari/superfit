@@ -60,26 +60,26 @@ class HealthConnectManager(private val context: Context) {
     suspend fun readWeighIns(since: Instant): List<com.superfit.app.domain.ScaleReading> = readAll(WeightRecord::class, since).map {
         com.superfit.app.domain.ScaleReading(
             id = it.metadata.id,
-            time = it.time,
+            timeMs = it.time.toEpochMilli(),
             weightKg = it.weight.inKilograms,
             source = it.metadata.dataOrigin.packageName
         )
     }
 
     suspend fun readBodyFat(since: Instant) = readAll(BodyFatRecord::class, since).map {
-        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.percentage.value)
+        com.superfit.app.domain.BodyValue(it.time.toEpochMilli(), it.metadata.dataOrigin.packageName, it.percentage.value)
     }
 
     suspend fun readLeanMass(since: Instant) = readAll(LeanBodyMassRecord::class, since).map {
-        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.mass.inKilograms)
+        com.superfit.app.domain.BodyValue(it.time.toEpochMilli(), it.metadata.dataOrigin.packageName, it.mass.inKilograms)
     }
 
     suspend fun readBoneMass(since: Instant) = readAll(BoneMassRecord::class, since).map {
-        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.mass.inKilograms)
+        com.superfit.app.domain.BodyValue(it.time.toEpochMilli(), it.metadata.dataOrigin.packageName, it.mass.inKilograms)
     }
 
     suspend fun readScaleBmr(since: Instant) = readAll(BasalMetabolicRateRecord::class, since).map {
-        com.superfit.app.domain.BodyValue(it.time, it.metadata.dataOrigin.packageName, it.basalMetabolicRate.inKilocaloriesPerDay)
+        com.superfit.app.domain.BodyValue(it.time.toEpochMilli(), it.metadata.dataOrigin.packageName, it.basalMetabolicRate.inKilocaloriesPerDay)
     }
 
     /** All records of one type since [since], following pages. Empty when not allowed or on failure. */

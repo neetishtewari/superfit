@@ -5,6 +5,7 @@ import com.superfit.app.data.ImportedWorkoutEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -12,9 +13,11 @@ import org.junit.Test
 
 class ShareCardsTest {
 
-    private val utc = ZoneOffset.UTC
-    private val today = LocalDate.of(2026, 10, 19)
-    private val sixFortyTwo = today.atTime(6, 42).toInstant(utc).toEpochMilli()
+    private val jUtc = ZoneOffset.UTC
+    private val utc = kotlinx.datetime.TimeZone.UTC
+    private val jToday = LocalDate.of(2026, 10, 19)
+    private val today = jToday.toKotlinLocalDate()
+    private val sixFortyTwo = jToday.atTime(6, 42).toInstant(jUtc).toEpochMilli()
 
     private fun run(km: Double?, minutes: Long, hr: Long? = 152, kcal: Double? = 600.0): WorkoutView {
         val w = ImportedWorkoutEntity(
@@ -153,7 +156,7 @@ class ShareCardsTest {
 
     @Test
     fun weekStepsCardNamesTheWeek() {
-        val best = PersonalBest(BestKind.MOST_STEPS_WEEK, 84200.0, null, previousValue = 80000.0, previousTime = null, periodStart = LocalDate.of(2026, 10, 13))
+        val best = PersonalBest(BestKind.MOST_STEPS_WEEK, 84200.0, null, previousValue = 80000.0, previousTime = null, periodStart = kotlinx.datetime.LocalDate(2026, 10, 13))
         val card = ShareCards.best(best, isNew = true, today = today, zone = utc)
         assertEquals("Week of 13 Oct", card.dateLine)
         assertEquals("84,200", card.bigValue)

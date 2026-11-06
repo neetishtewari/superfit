@@ -80,10 +80,10 @@ class FoodCameraController : ViewModel() {
             state = try {
                 val parser = FoodPhotoParser()
                 if (photoMode == CameraMode.LABEL) {
-                    parser.parseLabel(bitmap)?.let { CameraState.PackResult(it) }
+                    parser.parseLabel(com.superfit.app.domain.AiPhoto(bitmap))?.let { CameraState.PackResult(it) }
                         ?: CameraState.Failed("We couldn't read this label. Try a straight, close-up photo.")
                 } else {
-                    val result = parser.parseMeal(bitmap)
+                    val result = parser.parseMeal(com.superfit.app.domain.AiPhoto(bitmap))
                     if (result.foodText == "invalid") {
                         CameraState.Failed("We couldn't see any food. Try again with more light.")
                     } else {
@@ -112,6 +112,7 @@ class FoodCameraController : ViewModel() {
         if (code == ignoredCode && now < ignoreUntil) return false
         scanLocked = true
         lastCode = code
+        android.util.Log.i("FoodCamera", "Scanned barcode $code")
         banner = null
         state = CameraState.Working("Looking up product…")
         job = viewModelScope.launch {

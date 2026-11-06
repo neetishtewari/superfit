@@ -1,7 +1,8 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
-import org.json.JSONArray
+import com.superfit.app.json.JSONArray
+import com.superfit.app.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -12,7 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// Robolectric so org.json works.
+// Robolectric for the Android parts these tests touch.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class MealItemsTest {
@@ -277,7 +278,7 @@ class MealItemsTest {
 
     @Test
     fun `typed meals remember what was said and photos do not`() {
-        val json = org.json.JSONObject().put("foodText", "chaas").put("items", JSONArray(drinkJson))
+        val json = JSONObject().put("foodText", "chaas").put("items", JSONArray(drinkJson))
         assertEquals("a glass of chaas", ParsedNutritionResult.fromJson(json, " a glass of chaas ").items!!.said)
         assertNull(ParsedNutritionResult.fromJson(json, "photo").items!!.said)
     }

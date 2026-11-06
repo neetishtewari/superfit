@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.minus
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinTimeZone
 
 enum class DayStatus {
     Deficit,
@@ -124,6 +128,32 @@ class HistoryViewModel(
     var body by mutableStateOf<com.superfit.app.domain.BodySummary?>(null)
         private set
 
+    /** Latest weight and its change over about 4 weeks, for "Your body now" on Insights. */
+    var latestWeightKg by mutableStateOf<Double?>(null)
+        private set
+    var weightChange4w by mutableStateOf<Double?>(null)
+        private set
+
+    /** Journey's body trends: period (3 months unless changed) and one series per measure the person has. */
+    var bodyPeriod by mutableStateOf(com.superfit.app.domain.BodyPeriod.fromLabel(sharedPrefs.getString(KEY_BODY_PERIOD, null)))
+        private set
+    var bodySeries by mutableStateOf<List<com.superfit.app.domain.BodySeries>>(emptyList())
+        private set
+
+    /** Goal weight minus start weight (0 without a goal): which way weight should move. */
+    var goalKgChange by mutableStateOf(0.0)
+        private set
+
+    var bodyHasHistory by mutableStateOf(false)
+        private set
+    private var bodyInputs: (() -> List<com.superfit.app.domain.BodySeries>)? = null
+
+    fun chooseBodyPeriod(period: com.superfit.app.domain.BodyPeriod) {
+        bodyPeriod = period
+        sharedPrefs.edit().putString(KEY_BODY_PERIOD, period.label).apply()
+        bodyInputs?.let { bodySeries = it() }
+    }
+
     /** Health Connect is on the phone but body measurements (body fat, BMR...) aren't allowed yet. */
     var canAskBodyAccess by mutableStateOf(false)
         private set
@@ -137,7 +167,7 @@ class HistoryViewModel(
     private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
     private var importedByDate: Map<LocalDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
     private var profile: UserProfileEntity? = null
-    private var dayTotals: Map<LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
+    private var dayTotals: Map<kotlinx.datetime.LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
     private var allMeals: List<NutritionEntryEntity> = emptyList()
 
     /** The day's calorie target, including that day's workouts for people who connected them. */
@@ -364,7 +394,7 @@ class HistoryViewModel(
             val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
             this@HistoryViewModel.dayTotals = dayTotals
             recapMonths = (1..12).map { YearMonth.from(today).minusMonths(it.toLong()) }.filter { m ->
-                val inMonth = dayTotals.values.filter { YearMonth.from(it.date) == m }
+                val inMonth = dayTotals.values.filter { YearMonth.from(it.date.toJavaLocalDate()) == m }
                 inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
             }
             allMeals = allNutrition
@@ -372,30 +402,31 @@ class HistoryViewModel(
             val scaleReadings = com.superfit.app.data.BodyImporter.mine(appContext)
             weekReport = com.superfit.app.domain.InsightsEngine.weekReport(
                 dayTotals,
-                today,
+                today.toKotlinLocalDate(),
                 loseGoal,
                 allNutrition,
-                body = com.superfit.app.domain.BodyTrend.fourWeeks(scaleReadings, today)
+                body = com.superfit.app.domain.BodyTrend.fourWeeks(scaleReadings, today.toKotlinLocalDate())
             )
             goalTargetDate = GoalDatePref.get(sharedPrefs)
             val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
             goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
             val journeyWeighIns = InsightsData.weighIns(repository.getAllWeightEntries())
+            val kJourneyWeighIns = journeyWeighIns.map { it.first.toKotlinLocalDate() to it.second }
             val journeyStart = com.superfit.app.domain.GoalForecast.startDate(
-                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() },
-                weighIns = journeyWeighIns,
-                firstLogged = allNutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() },
-                today = today
+                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() },
+                weighIns = kJourneyWeighIns,
+                firstLogged = allNutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() },
+                today = today.toKotlinLocalDate()
             )
             journey = com.superfit.app.domain.GoalForecast.compute(
                 startKg = profile.startingWeightKg,
                 targetKg = profile.targetWeightKg,
                 startDate = journeyStart,
-                weighIns = journeyWeighIns,
+                weighIns = kJourneyWeighIns,
                 days = dayTotals,
                 calorieOffset = profile.calorieOffset,
-                targetDate = goalTargetDate,
-                today = today,
+                targetDate = goalTargetDate?.toKotlinLocalDate(),
+                today = today.toKotlinLocalDate(),
                 fallbackCurrentKg = profile.weightKg
             )
 
@@ -403,8 +434,21 @@ class HistoryViewModel(
                 mine = scaleReadings,
                 latestWeightKg = repository.getAllWeightEntries().maxByOrNull { it.timestamp }?.weightKg ?: profile.weightKg,
                 heightCm = profile.heightCm,
-                today = today
+                today = today.toKotlinLocalDate()
             )
+            latestWeightKg = kJourneyWeighIns.lastOrNull()?.second ?: profile.weightKg
+            weightChange4w = kJourneyWeighIns.lastOrNull()?.let { (lastDay, lastKg) ->
+                kJourneyWeighIns.lastOrNull { it.first <= lastDay.minus(28, kotlinx.datetime.DateTimeUnit.DAY) }
+                    ?.let { lastKg - it.second }
+            }
+            goalKgChange = if (goalSet) profile.targetWeightKg - profile.startingWeightKg else 0.0
+            val todayK = today.toKotlinLocalDate()
+            val goalChange = goalKgChange
+            bodyInputs = {
+                com.superfit.app.domain.BodyHistory.series(kJourneyWeighIns, scaleReadings, profile.heightCm, goalChange, bodyPeriod, todayK)
+            }
+            bodySeries = bodyInputs!!()
+            bodyHasHistory = kJourneyWeighIns.size >= 2
             val hc = repository.healthConnectManager
             canAskBodyAccess = hc.isAvailable() && !hc.hasBodyPermissions()
 
@@ -434,7 +478,7 @@ class HistoryViewModel(
             val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val yesterday = today.minusDays(1)
             val dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
-                com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday, proteinTarget, calculateTargetCalories(yesterday), zone, weeksAgo)?.score
+                com.superfit.app.domain.DietScoreEngine.score(allMeals, yesterday.toKotlinLocalDate(), proteinTarget, calculateTargetCalories(yesterday), zone.toKotlinTimeZone(), weeksAgo)?.score
             }
             val report = com.superfit.app.domain.CoachExportBuilder.build(
                 header = com.superfit.app.domain.CoachExportHeader(
@@ -447,13 +491,13 @@ class HistoryViewModel(
                     targetKg = profile.targetWeightKg
                 ),
                 weeks = weeks,
-                today = today,
+                today = today.toKotlinLocalDate(),
                 days = dayTotals,
                 meals = allMeals,
-                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()),
+                weighIns = InsightsData.weighIns(repository.getAllWeightEntries()).map { it.first.toKotlinLocalDate() to it.second },
                 proteinTargetG = proteinTarget,
                 dietScores = dietScores,
-                zone = zone,
+                zone = zone.toKotlinTimeZone(),
                 body = body
             )
             com.superfit.app.ui.share.CoachExportPdf.share(context, report)
@@ -562,5 +606,9 @@ class HistoryViewModel(
                 _parsingState.value = HistoryParsingState.Error(friendlyMsg)
             }
         }
+    }
+
+    private companion object {
+        const val KEY_BODY_PERIOD = "body_trend_period"
     }
 }

@@ -409,7 +409,7 @@ fun MealItemRow(
             ) {
                 Text(
                     text = "${entry.calories.toInt()} kcal",
-                    color = NeonGreen,
+                    color = ThemeTextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )

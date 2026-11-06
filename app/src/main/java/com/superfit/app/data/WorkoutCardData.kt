@@ -33,6 +33,9 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinTimeZone
 
 /**
  * Fills in a workout card when its share screen opens: the heart-rate line from Health Connect
@@ -68,10 +71,10 @@ object WorkoutCardData {
             val heart = samples?.let { WorkoutHeart.line(it, primary.startTime, primary.endTime, profile?.age) }
             val moment = safe("moments") {
                 val sleep = repository.getAllSleepTelemetry()
-                    .mapNotNull { s -> runCatching { LocalDate.parse(s.date) }.getOrNull()?.let { it to s.sleepDurationSeconds / 3600.0 } }
+                    .mapNotNull { s -> runCatching { kotlinx.datetime.LocalDate.parse(s.date) }.getOrNull()?.let { it to s.sleepDurationSeconds / 3600.0 } }
                     .filter { it.second > 0 }
                     .toMap()
-                SleepLink.line(workout, imported, sleep, zone) ?: WorkoutMoments.line(workout, imported, zone)
+                SleepLink.line(workout, imported, sleep, zone.toKotlinTimeZone()) ?: WorkoutMoments.line(workout, imported, zone.toKotlinTimeZone())
             }
             out = ShareCards.withDetails(out, heart, moment)
         } else {
@@ -150,11 +153,11 @@ object WorkoutCardData {
         val weighIns = InsightsData.weighIns(repository.getAllWeightEntries(), zone)
         val firstMeal = repository.getAllNutritionEntries().minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
         val startDate = GoalForecast.startDate(
-            profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
-            weighIns = weighIns,
-            firstLogged = firstMeal,
-            today = today
-        )
+            profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toKotlinLocalDate() },
+            weighIns = weighIns.map { it.first.toKotlinLocalDate() to it.second },
+            firstLogged = firstMeal?.toKotlinLocalDate(),
+            today = today.toKotlinLocalDate()
+        ).toJavaLocalDate()
         val day = ChronoUnit.DAYS.between(startDate, today).coerceAtLeast(0) + 1
         val lose = profile.targetWeightKg < profile.startingWeightKg
         val dir = if (lose) -1.0 else 1.0

@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
@@ -78,12 +77,12 @@ import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 @Composable
 internal fun DashboardHeader(
     grantedPermissions: Set<String>,
     hasHealthConnectPermissions: Boolean,
-    onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
     val today = LocalDate.now()
@@ -98,7 +97,7 @@ internal fun DashboardHeader(
     // Only point at Settings when Health Connect needs attention.
     val needsHealthConnect = grantedPermissions.isNotEmpty() && !hasHealthConnectPermissions
 
-    // Date and the two buttons share the top line, so the greeting gets the full width under them.
+    // Date and the Settings button share the top line, so the greeting gets the full width under them.
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -113,7 +112,6 @@ internal fun DashboardHeader(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            HeaderNavButton(icon = Icons.Default.Insights, label = "Insights", onClick = onNavigateToHistory)
             Box {
                 HeaderNavButton(icon = Icons.Default.Settings, label = "Settings", onClick = onNavigateToSettings)
                 if (needsHealthConnect) {
@@ -162,7 +160,11 @@ private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVecto
 }
 
 @Composable
-internal fun CalorieRingsCard(state: DashboardUiState.Success) {
+internal fun CalorieRingsCard(
+    state: DashboardUiState.Success,
+    stepGoal: com.superfit.app.domain.StepGoalResult? = null,
+    onStepsClick: () -> Unit = {}
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,7 +188,8 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            val stepsTarget = 10000.0
+            // The person's own step goal (see StepGoal); the age starter until it's worked out.
+            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.age)).toDouble()
             val caloriesTarget = state.macroTargets.calories
 
             val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
@@ -205,18 +208,40 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 val fmt = java.text.NumberFormat.getIntegerInstance()
-                RingLegendItem(
-                    label = "Eaten, kcal",
-                    value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
-                    color = NeonGreen
-                )
-                RingLegendItem(
-                    label = "Steps",
-                    value = "${fmt.format(state.activity.steps)} of 10,000",
-                    color = ElectricCyan
-                )
-                workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)?.let {
-                    Text(text = it, fontSize = 12.sp, color = ThemeTextSecondary)
+                // How workouts raised today's target, shown only when the person taps to ask why.
+                val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
+                var showKcalMath by remember { mutableStateOf(false) }
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (kcalMath != null) {
+                                Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    RingLegendItem(
+                        label = "Eaten, kcal",
+                        value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
+                        color = NeonGreen
+                    )
+                    if (showKcalMath && kcalMath != null) {
+                        Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
+                ) {
+                    RingLegendItem(
+                        label = "Steps",
+                        value = "${fmt.format(state.activity.steps)} of ${fmt.format(stepsTarget.toInt())}",
+                        color = ElectricCyan
+                    )
                 }
             }
         }
@@ -265,7 +290,8 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Carbohydrates",
             eaten = state.carbsEaten,
             target = state.macroTargets.carbsG,
-            color = NeonGreen,
+            // Protein keeps the brand green; the others get quiet colours so Today isn't all green.
+            color = SuperfitTheme.colors.carbs,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.carbsG }
@@ -276,7 +302,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Fats",
             eaten = state.fatEaten,
             target = state.macroTargets.fatG,
-            color = NeonGreen,
+            color = SuperfitTheme.colors.fat,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.fatG }
@@ -288,7 +314,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Fibre",
             eaten = fibreEaten,
             target = CoachPatternEngine.fibreTargetG(state.macroTargets.calories),
-            color = NeonGreen,
+            color = SuperfitTheme.colors.fibre,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { MealTags.of(it).fiberG }
@@ -638,18 +664,18 @@ internal fun TrackMealsCard(
                             label = {
                                 Text(
                                     text = "See all",
-                                    color = NeonGreen,
+                                    color = ThemeTextPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
                             },
                             colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = NeonGreen.copy(alpha = 0.1f)
+                                containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
                             ),
                             border = SuggestionChipDefaults.suggestionChipBorder(
                                 enabled = true,
-                                borderColor = NeonGreen.copy(alpha = 0.3f)
+                                borderColor = ThemeGlassBorder
                             )
                         )
                     }
@@ -775,7 +801,7 @@ internal fun ActivityPerformanceCard(
             color = ThemeTextPrimary
         )
 
-        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(LocalDate.now(), state.activity.steps, emptyList(), null)
+        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(LocalDate.now().toKotlinLocalDate(), state.activity.steps, emptyList(), null)
         val usual = today.usual
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

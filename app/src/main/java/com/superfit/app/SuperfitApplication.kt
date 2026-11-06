@@ -19,6 +19,17 @@ class SuperfitApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installAppCheck()
+        // Shared code (meal and workout reading, routing, tagging) reaches the AI through here.
+        com.superfit.app.domain.Ai.text = com.superfit.app.domain.AiText { prompt, system, isJson ->
+            com.superfit.app.domain.GeminiClient.generateContent(prompt, system, isJson)
+        }
+        com.superfit.app.domain.Ai.photoText = com.superfit.app.domain.AiPhotoText { photo, prompt, system, isJson ->
+            com.superfit.app.domain.GeminiClient.generateContentWithImage(photo.bitmap, prompt, system, isJson)
+        }
+        com.superfit.app.domain.Ai.chatText = com.superfit.app.domain.AiChat { system, history, message ->
+            com.superfit.app.domain.GeminiClient.chat(system, history, message)
+        }
+        com.superfit.app.domain.Ai.friendlyError = { com.superfit.app.domain.GeminiClient.sanitizeError(it) }
         com.superfit.app.data.AppAnalytics.init(this)
         com.superfit.app.data.GeminiKeyStore.forgetOldKeys(this)
         com.superfit.app.data.BodyImporter.load(this)

@@ -29,6 +29,10 @@ jobs:
       - name: Unit tests
         run: ./gradlew --stacktrace testDebugUnitTest
 
+      # Code shared with the future iPhone app; its tests run on the JVM.
+      - name: Shared code tests
+        run: ./gradlew --stacktrace :shared:jvmTest
+
       - name: Build debug APK
         run: ./gradlew --stacktrace assembleDebug
 
@@ -53,10 +57,10 @@ jobs:
 
       - name: Check Room schemas are committed
         run: |
-          if [ -n "$(git status --porcelain app/schemas)" ]; then
-            echo "::error::Room schema files changed during the build. Commit the files under app/schemas."
-            git status --porcelain app/schemas
-            for f in $(git status --porcelain --untracked-files=all app/schemas | awk '{print $2}'); do
+          if [ -n "$(git status --porcelain shared/schemas)" ]; then
+            echo "::error::Room schema files changed during the build. Commit the files under shared/schemas."
+            git status --porcelain shared/schemas
+            for f in $(git status --porcelain --untracked-files=all shared/schemas | awk '{print $2}'); do
               echo "----- $f"
               cat "$f"
             done
@@ -71,3 +75,37 @@ jobs:
           path: |
             app/build/reports/tests/
             app/build/reports/lint-results-debug.html
+
+  # The shared code built and tested for iPhone. Needs a Mac, so it runs on GitHub's.
+  ios-shared:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Kotlin/Native compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+
+      # Shared tests on the iPhone simulator, then the framework the iPhone app will link.
+      - name: Shared code tests on the iPhone simulator
+        run: ./gradlew --stacktrace :shared:iosSimulatorArm64Test
+
+      - name: Build the iPhone framework
+        run: ./gradlew --stacktrace :shared:linkDebugFrameworkIosArm64
+
+      - name: Upload iPhone test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-reports
+          path: shared/build/reports/tests/

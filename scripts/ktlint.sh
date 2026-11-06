@@ -28,9 +28,9 @@ if [ ! -x "$BIN" ]; then
 fi
 
 if [ "${1:-}" = "--format" ]; then
-    "$BIN" --format --relative "app/src/**/*.kt"
+    "$BIN" --format --relative "app/src/**/*.kt" "shared/src/**/*.kt"
 else
-    "$BIN" --relative "app/src/**/*.kt" || {
+    "$BIN" --relative "app/src/**/*.kt" "shared/src/**/*.kt" || {
         echo "Formatting problems found. Run scripts/ktlint.sh --format and commit the result." >&2
         exit 1
     }

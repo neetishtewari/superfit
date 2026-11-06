@@ -5,7 +5,6 @@ plugins {
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
-  id("kotlin-kapt")
   alias(libs.plugins.google.services)
   alias(libs.plugins.firebase.crashlytics)
 }
@@ -25,8 +24,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 55
-        versionName = "1.0.51"
+        versionCode = 58
+        versionName = "1.0.54"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
@@ -106,14 +105,10 @@ kotlin {
     jvmToolchain(17)
 }
 
-kapt {
-    arguments {
-        // Room writes each schema version here; commit the JSON so schema changes show up in review.
-        arg("room.schemaLocation", "$projectDir/schemas")
-    }
-}
-
 dependencies {
+  // Code shared with the future iPhone app (see docs/superpowers/specs/2026-11-04-iphone-groundwork.md)
+  implementation(project(":shared"))
+
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
   androidTestImplementation(composeBom)
@@ -161,7 +156,6 @@ dependencies {
   // Room Database
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.room.ktx)
-  kapt(libs.androidx.room.compiler)
 
   // WorkManager
   implementation(libs.androidx.work.runtime)

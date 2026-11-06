@@ -23,6 +23,10 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlinx.datetime.toJavaYearMonth
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinTimeZone
+import kotlinx.datetime.toKotlinYearMonth
 import org.json.JSONObject
 
 /**
@@ -90,6 +94,7 @@ object MonthlyRecapData {
             }
         val days = InsightsData.days(nutrition, workouts, repository.getAllActivityTelemetry(), importedByDate, ::target, PhysiologyEngine.proteinTargetG(profile))
         val weighIns = InsightsData.weighIns(repository.getAllWeightEntries())
+        val kWeighIns = weighIns.map { it.first.toKotlinLocalDate() to it.second }
 
         // The goal as it stood at the end of the month (or today, for a month still going).
         val asOf = minOf(month.atEndOfMonth().plusDays(1), today)
@@ -99,25 +104,25 @@ object MonthlyRecapData {
             startKg = profile.startingWeightKg,
             targetKg = profile.targetWeightKg,
             startDate = GoalForecast.startDate(
-                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
-                weighIns = weighIns,
-                firstLogged = nutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
-                today = asOf
+                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toKotlinLocalDate() },
+                weighIns = kWeighIns,
+                firstLogged = nutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toKotlinLocalDate() },
+                today = asOf.toKotlinLocalDate()
             ),
-            weighIns = weighIns.filter { !it.first.isAfter(asOf) },
+            weighIns = kWeighIns.filter { it.first <= asOf.toKotlinLocalDate() },
             days = days,
             calorieOffset = profile.calorieOffset,
-            targetDate = GoalDatePref.get(prefs),
-            today = asOf,
+            targetDate = GoalDatePref.get(prefs)?.toKotlinLocalDate(),
+            today = asOf.toKotlinLocalDate(),
             fallbackCurrentKg = profile.weightKg
         )
         val strengthLogs = workouts.filter { it.workoutType == "Strength" }
         val tags = strengthTags(context, strengthLogs.filter { YearMonth.from(Instant.ofEpochMilli(it.timestamp).atZone(zone)) == month })
         val strength = strengthLogs.map { w ->
             val t = tags[tagKey(w)]
-            StrengthSession(Instant.ofEpochMilli(w.timestamp).atZone(zone).toLocalDate(), t?.second, t?.first.orEmpty())
+            StrengthSession(Instant.ofEpochMilli(w.timestamp).atZone(zone).toLocalDate().toKotlinLocalDate(), t?.second, t?.first.orEmpty())
         } + views.filter { it.title == "Strength workout" }.map { v ->
-            StrengthSession(Instant.ofEpochMilli(v.startTime).atZone(zone).toLocalDate(), v.minutes.toInt().takeIf { it > 0 })
+            StrengthSession(Instant.ofEpochMilli(v.startTime).atZone(zone).toLocalDate().toKotlinLocalDate(), v.minutes.toInt().takeIf { it > 0 })
         }
         val hc = repository.healthConnectManager
         val setup = RecapSetup(
@@ -125,8 +130,8 @@ object MonthlyRecapData {
             mic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
             widget = !WidgetPin.canPin(context) || WidgetPin.isPlaced(context)
         )
-        val body = BodyTrend.month(BodyImporter.mine(context), month, zone)
-        return MonthlyRecap.build(month, days, nutrition, strength, weighIns, journey, goalSet, setup, zone, body)
+        val body = BodyTrend.month(BodyImporter.mine(context), month.year, month.monthValue, zone.toKotlinTimeZone())
+        return MonthlyRecap.build(month.toKotlinYearMonth(), days, nutrition, strength, kWeighIns, journey, goalSet, setup, zone.toKotlinTimeZone(), body)
     }
 
     fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"
@@ -162,8 +167,9 @@ object MonthlyRecapData {
      */
     suspend fun words(context: Context, recap: MonthRecap, today: LocalDate = LocalDate.now()): Map<String, RecapWords> {
         val prefs = getUserSharedPrefs(context)
-        val key = KEY_WORDS + recap.month + "_" + CoachStyle.current.name
-        val finished = recap.month.isBefore(YearMonth.from(today))
+        val month = recap.month.toJavaYearMonth()
+        val key = KEY_WORDS + month + "_" + CoachStyle.current.name
+        val finished = month.isBefore(YearMonth.from(today))
         if (finished) prefs.getString(key, null)?.let { return RecapWriter.parse(it, recap) }
         val json = runCatching {
             GeminiClient.generateContent(

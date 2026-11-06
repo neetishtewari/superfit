@@ -4,6 +4,8 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import com.superfit.app.data.ImportedWorkoutEntity
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -14,6 +16,8 @@ class SleepLinkTest {
     private val today = LocalDate.of(2026, 11, 4)
     private var n = 0
     private val run = ExerciseSessionRecord.EXERCISE_TYPE_RUNNING
+
+    private fun kotlinDates(sleep: Map<LocalDate, Double>) = sleep.mapKeys { it.key.toKotlinLocalDate() }
 
     private fun workout(daysAgo: Long, minutes: Long, km: Double?, hr: Long? = 150, type: Int = run): WorkoutView {
         val id = "w${n++}"
@@ -41,20 +45,20 @@ class SleepLinkTest {
     fun provenAfterAGoodNight() {
         val (earlier, sleep) = history()
         val now = workout(0, 33, 6.0)
-        val line = SleepLink.line(now, earlier, sleep + (today to 7.67), utc)
+        val line = SleepLink.line(now, earlier, kotlinDates(sleep + (today to 7.67)), TimeZone.UTC)
         assertEquals("Slept 7h 40m. Your best runs follow 7+ hour nights.", line)
     }
 
     @Test
     fun neverAfterAShortNight() {
         val (earlier, sleep) = history()
-        assertNull(SleepLink.line(workout(0, 33, 6.0), earlier, sleep + (today to 6.0), utc))
+        assertNull(SleepLink.line(workout(0, 33, 6.0), earlier, kotlinDates(sleep + (today to 6.0)), TimeZone.UTC))
     }
 
     @Test
     fun needsTenEarlierWorkouts() {
         val (earlier, sleep) = history()
-        assertNull(SleepLink.line(workout(0, 33, 6.0), earlier.take(9), sleep + (today to 8.0), utc))
+        assertNull(SleepLink.line(workout(0, 33, 6.0), earlier.take(9), kotlinDates(sleep + (today to 8.0)), TimeZone.UTC))
     }
 
     @Test
@@ -64,7 +68,7 @@ class SleepLinkTest {
             sleep[today.minusDays(d)] = if (d % 2 == 0L) 7.8 else 5.5
             workout(d, minutes = 36, km = 6.0)
         }
-        assertNull(SleepLink.line(workout(0, 33, 6.0), earlier, sleep + (today to 8.0), utc))
+        assertNull(SleepLink.line(workout(0, 33, 6.0), earlier, kotlinDates(sleep + (today to 8.0)), TimeZone.UTC))
     }
 
     @Test

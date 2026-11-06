@@ -4,6 +4,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,16 +14,18 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// Robolectric so org.json works.
+// Robolectric for the Android parts these tests touch.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class CoachNotesTest {
 
-    private val today = LocalDate.of(2026, 10, 26)
-    private val zone = ZoneOffset.UTC
+    private val jToday = LocalDate.of(2026, 10, 26)
+    private val today = jToday.toKotlinLocalDate()
+    private val jZone = ZoneOffset.UTC
+    private val zone = kotlinx.datetime.TimeZone.UTC
 
     private fun note(id: String, text: String, kind: NoteKind = NoteKind.LASTING, daysAgo: Long = 1, lookFor: List<String> = emptyList(), log: PlanLog? = null) =
-        CoachNote(id, text, kind, today.minusDays(daysAgo), lookFor = lookFor, planLog = log)
+        CoachNote(id, text, kind, jToday.minusDays(daysAgo).toKotlinLocalDate(), lookFor = lookFor, planLog = log)
 
     private fun meal(daysAgo: Long, text: String) = NutritionEntryEntity(
         foodText = text,
@@ -30,7 +33,7 @@ class CoachNotesTest {
         proteinG = 20.0,
         carbsG = 40.0,
         fatG = 10.0,
-        timestamp = today.minusDays(daysAgo).atTime(9, 0).toInstant(zone).toEpochMilli()
+        timestamp = jToday.minusDays(daysAgo).atTime(9, 0).toInstant(jZone).toEpochMilli()
     )
 
     private fun workout(daysAgo: Long, text: String) = WorkoutEntryEntity(
@@ -39,7 +42,7 @@ class CoachNotesTest {
         workoutType = "Cardio",
         setsCount = 0,
         repsCount = 0,
-        timestamp = today.minusDays(daysAgo).atTime(19, 0).toInstant(zone).toEpochMilli()
+        timestamp = jToday.minusDays(daysAgo).atTime(19, 0).toInstant(jZone).toEpochMilli()
     )
 
     @Test

@@ -39,7 +39,7 @@ fun ScaleReadingDialog(reading: ScaleReading, onMe: () -> Unit, onNotMe: () -> U
 }
 
 private fun whenOf(reading: ScaleReading): String {
-    val time = reading.time.atZone(ZoneId.systemDefault())
+    val time = java.time.Instant.ofEpochMilli(reading.timeMs).atZone(ZoneId.systemDefault())
     val clock = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(time)
     val day = time.toLocalDate()
     val today = LocalDate.now()

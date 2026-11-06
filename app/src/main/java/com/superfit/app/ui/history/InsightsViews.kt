@@ -55,8 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.superfit.app.domain.BodyReadings
-import com.superfit.app.domain.BodySummary
 import com.superfit.app.domain.CalorieFood
 import com.superfit.app.domain.CalorieSources
 import com.superfit.app.domain.CalorieSourcesEngine
@@ -65,9 +63,7 @@ import com.superfit.app.domain.GoalForecast
 import com.superfit.app.domain.Insight
 import com.superfit.app.domain.InsightsEngine
 import com.superfit.app.domain.JourneyForecast
-import com.superfit.app.domain.MeasuredBody
 import com.superfit.app.domain.WeekReport
-import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
 import com.superfit.app.theme.ThemeAmberSoft
@@ -83,8 +79,12 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.datetime.toJavaLocalDate
 
 private val shortDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+
+/** Journey's dates come from the shared code as kotlinx dates; the screen formats them the Java way. */
+private fun kotlinx.datetime.LocalDate.format(formatter: DateTimeFormatter): String = toJavaLocalDate().format(formatter)
 private val Orange = SolarAmber
 
 @Composable
@@ -131,11 +131,14 @@ fun InsightsTab(
     onShareWithCoach: (weeks: Int) -> Unit,
     foodQuality: @Composable () -> Unit,
     bests: @Composable () -> Unit,
-    trends: @Composable () -> Unit
+    trends: @Composable () -> Unit,
+    /** "Your body now": the latest weight and scale readings, first thing on Progress. */
+    bodyNow: @Composable () -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        bodyNow()
         SectionCard {
-            SectionLabel("Your week · ${report.from.format(shortDate)} to ${report.to.format(shortDate)}", NeonMint)
+            SectionLabel("Your week · ${report.from.toJavaLocalDate().format(shortDate)} to ${report.to.toJavaLocalDate().format(shortDate)}", NeonMint)
             Text(report.verdict, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 24.sp)
             val s = report.thisWeek
             val l = report.lastWeek
@@ -371,7 +374,7 @@ private fun LegendDot(color: Color, label: String) {
 }
 
 @Composable
-private fun NetBars(days: List<Pair<LocalDate, Double?>>) {
+private fun NetBars(days: List<Pair<kotlinx.datetime.LocalDate, Double?>>) {
     val maxAbs = max(300.0, days.mapNotNull { it.second?.let(::abs) }.maxOrNull() ?: 0.0)
     val missing = ThemeGlassBorder
     val axis = ThemeTextSecondary.copy(alpha = 0.4f)
@@ -439,9 +442,8 @@ fun JourneyTab(
     goalSet: Boolean,
     onWeighIn: () -> Unit,
     onEditGoal: () -> Unit,
-    body: BodySummary? = null,
-    canAskBodyAccess: Boolean = false,
-    onAllowBody: () -> Unit = {}
+    /** "How your body has changed": trend lines for each measure the person has. */
+    bodyTrends: @Composable () -> Unit = {}
 ) {
     val lose = j.targetKg < j.startKg
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -462,8 +464,8 @@ fun JourneyTab(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) { Text("Set my goal", fontWeight = FontWeight.Bold) }
             }
-            body?.let { BodyCard(it, canAskBodyAccess, onAllowBody) }
             WeighInCard(j, onWeighIn)
+            bodyTrends()
             return@Column
         }
         SectionCard {
@@ -497,7 +499,7 @@ fun JourneyTab(
                 Text("Goal ${GoalForecast.fmt(j.targetKg)}", fontSize = 12.sp, color = ThemeTextSecondary)
             }
             TextButton(onClick = onEditGoal, modifier = Modifier.heightIn(min = 44.dp)) {
-                Text(if (j.targetDate == null) "Edit goal or add a target date" else "Edit goal · target ${j.targetDate.format(shortDate)}", color = NeonMint, fontWeight = FontWeight.Bold)
+                Text(j.targetDate?.let { "Edit goal · target ${it.format(shortDate)}" } ?: "Edit goal or add a target date", color = NeonMint, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -565,72 +567,9 @@ fun JourneyTab(
             }
         }
 
-        body?.let { BodyCard(it, canAskBodyAccess, onAllowBody) }
         WeighInCard(j, onWeighIn)
+        bodyTrends()
     }
-}
-
-/**
- * What the user's smart scale measures, and nothing it doesn't: body fat, muscle, bone, BMR, plus
- * BMI for everyone. Without a scale it says what would fill it in.
- */
-@Composable
-private fun BodyCard(b: BodySummary, canAskBodyAccess: Boolean, onAllowBody: () -> Unit) {
-    SectionCard {
-        SectionLabel("Body", ElectricCyan)
-        b.insight?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary, lineHeight = 21.sp) }
-        b.bodyFatPct?.let { BodyRow("Body fat", "${BodyReadings.fmt(it)}%", b.bodyFatChange?.let { c -> change(c, "pts", lowerIsGood = true) }) }
-        b.leanKg?.let { BodyRow("Muscle (lean mass)", "${BodyReadings.fmt(it)} kg", b.leanChange?.let { c -> change(c, "kg", lowerIsGood = false) }) }
-        b.boneKg?.let { BodyRow("Bone mass", "${BodyReadings.fmt(it)} kg", null) }
-        b.scaleBmr?.let { BodyRow("Resting burn (from scale)", "${it.toInt()} kcal", null) }
-        b.bmi?.let { BodyRow("BMI", BodyReadings.fmt(it), null) }
-        when {
-            b.hasScaleData -> {
-                val from = listOfNotNull(b.source?.let { "From $it" }, b.measuredOn?.let { "measured ${it.format(shortDate)}" }).joinToString(", ")
-                val usesIt = MeasuredBody.currentBodyFat() != null
-                Text(
-                    listOf(from, if (usesIt) "Your calorie target uses this body fat." else "").filter { it.isNotEmpty() }.joinToString(". "),
-                    fontSize = 12.sp,
-                    color = ThemeTextSecondary,
-                    lineHeight = 17.sp
-                )
-            }
-            canAskBodyAccess -> {
-                Text(
-                    "Use a smart scale? Let Superfit read body fat, muscle and more from it through Health Connect.",
-                    fontSize = 13.sp,
-                    color = ThemeTextSecondary,
-                    lineHeight = 18.sp
-                )
-                TextButton(onClick = onAllowBody, modifier = Modifier.heightIn(min = 44.dp)) {
-                    Text("Allow body measurements", color = NeonMint, fontWeight = FontWeight.Bold)
-                }
-            }
-            else -> Text(
-                "A smart scale app that saves to Health Connect (like FitDays) can add body fat and more here.",
-                fontSize = 13.sp,
-                color = ThemeTextSecondary,
-                lineHeight = 18.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun BodyRow(label: String, value: String, delta: Delta?) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 14.sp, color = ThemeTextSecondary, modifier = Modifier.weight(1f))
-        delta?.let { Text(it.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = it.color, modifier = Modifier.padding(end = 10.dp)) }
-        Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ThemeTextPrimary)
-    }
-}
-
-/** "▼ 1.2 pts in 4 wks", green when it moved the healthy way. */
-@Composable
-private fun change(diff: Double, unit: String, lowerIsGood: Boolean): Delta? {
-    if (abs(diff) < 0.1) return null
-    val good = (diff < 0) == lowerIsGood
-    return Delta("${if (diff > 0) "▲" else "▼"} ${BodyReadings.fmt(abs(diff))} $unit in 4 wks", if (good) NeonMint else SolarAmber)
 }
 
 @Composable
@@ -664,10 +603,12 @@ private fun WeighInCard(j: JourneyForecast, onWeighIn: () -> Unit) {
 /** Weigh-ins so far, the goal line, and a dashed line from today to the forecast date. */
 @Composable
 private fun JourneyChart(j: JourneyForecast, forecastColor: Color) {
-    val points = j.weighIns.takeLast(30)
+    val points = j.weighIns.takeLast(30).map { it.first.toJavaLocalDate() to it.second }
+    val forecastDate = j.forecastDate?.toJavaLocalDate()
+    val targetDate = j.targetDate?.toJavaLocalDate()
     val first = points.first().first
     val today = LocalDate.now()
-    val end = listOfNotNull(j.forecastDate, j.targetDate, today).maxOrNull()!!.coerceAtMost(today.plusDays(365))
+    val end = listOfNotNull(forecastDate, targetDate, today).maxOrNull()!!.coerceAtMost(today.plusDays(365))
     val span = max(1L, ChronoUnit.DAYS.between(first, end)).toFloat()
     val weights = points.map { it.second } + j.targetKg + j.currentKg
     val lo = weights.min() - 0.5
@@ -683,14 +624,14 @@ private fun JourneyChart(j: JourneyForecast, forecastColor: Color) {
         fun y(kg: Double) = ((hi - kg) / (hi - lo) * size.height).toFloat()
         val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))
         drawLine(SolarAmber, Offset(0f, y(j.targetKg)), Offset(size.width, y(j.targetKg)), strokeWidth = 1.5.dp.toPx(), pathEffect = dash)
-        j.targetDate?.let { td ->
+        targetDate?.let { td ->
             if (!td.isAfter(end)) drawLine(grid, Offset(x(td), 0f), Offset(x(td), size.height), strokeWidth = 1.dp.toPx(), pathEffect = dash)
         }
         val path = Path()
         points.forEachIndexed { i, (d, kg) -> if (i == 0) path.moveTo(x(d), y(kg)) else path.lineTo(x(d), y(kg)) }
         drawPath(path, NeonMint, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
         points.forEach { (d, kg) -> drawCircle(NeonMint, 3.dp.toPx(), Offset(x(d), y(kg))) }
-        j.forecastDate?.let { fd ->
+        forecastDate?.let { fd ->
             if (!fd.isAfter(end)) {
                 drawLine(forecastColor, Offset(x(today), y(j.currentKg)), Offset(x(fd), y(j.targetKg)), strokeWidth = 2.dp.toPx(), pathEffect = dash)
                 drawCircle(forecastColor, 5.dp.toPx(), Offset(x(fd), y(j.targetKg)))

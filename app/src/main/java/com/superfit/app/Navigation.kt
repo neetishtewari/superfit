@@ -26,6 +26,7 @@ import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.auth.LoginViewModel
+import com.superfit.app.ui.dashboard.CoachTab
 import com.superfit.app.ui.dashboard.DashboardScreen
 import com.superfit.app.ui.dashboard.DashboardViewModel
 import com.superfit.app.ui.dashboard.SettingsScreen
@@ -145,29 +146,49 @@ fun MainNavigation(
             }
             entry<Dashboard> {
                 AskForNotificationPermissionOnce()
-                LaunchedEffect(Unit) { AppAnalytics.screenOpened("home") }
                 val dashboardViewModel: DashboardViewModel = viewModel {
                     DashboardViewModel(repository, context.applicationContext)
                 }
-                DashboardScreen(
-                    viewModel = dashboardViewModel,
-                    triggerVoiceLog = triggerVoiceLog,
-                    triggerFavoritesLog = triggerFavoritesLog,
-                    onVoiceLogTriggeredHandled = onVoiceLogTriggeredHandled,
-                    onFavoritesLogTriggeredHandled = onFavoritesLogTriggeredHandled,
-                    triggerPhotoLog = triggerPhotoLog,
-                    onPhotoLogTriggeredHandled = onPhotoLogTriggeredHandled,
-                    onNavigateToOnboarding = {
-                        backStack.removeLastOrNull()
-                        backStack.add(Onboarding)
+                val historyViewModel: HistoryViewModel = viewModel {
+                    HistoryViewModel(repository, context.applicationContext)
+                }
+                MainTabs(
+                    goToToday = triggerVoiceLog || triggerPhotoLog || triggerFavoritesLog,
+                    today = { reselectCount, openCoach ->
+                        DashboardScreen(
+                            viewModel = dashboardViewModel,
+                            triggerVoiceLog = triggerVoiceLog,
+                            triggerFavoritesLog = triggerFavoritesLog,
+                            onVoiceLogTriggeredHandled = onVoiceLogTriggeredHandled,
+                            onFavoritesLogTriggeredHandled = onFavoritesLogTriggeredHandled,
+                            triggerPhotoLog = triggerPhotoLog,
+                            onPhotoLogTriggeredHandled = onPhotoLogTriggeredHandled,
+                            onNavigateToOnboarding = {
+                                backStack.removeLastOrNull()
+                                backStack.add(Onboarding)
+                            },
+                            onNavigateToSettings = {
+                                backStack.add(Settings)
+                            },
+                            onOpenRecap = { month -> backStack.add(Recap(month.toString())) },
+                            onOpenCoach = { roast ->
+                                if (roast) dashboardViewModel.sendChatMessage(DashboardViewModel.ROAST_MY_DAY, how = "chip")
+                                openCoach("card")
+                            },
+                            reselectCount = reselectCount
+                        )
                     },
-                    onNavigateToHistory = {
-                        backStack.add(History)
+                    progress = { reselectCount ->
+                        HistoryScreen(
+                            viewModel = historyViewModel,
+                            dashboardViewModel = dashboardViewModel,
+                            onBack = {},
+                            onOpenRecap = { month -> backStack.add(Recap(month.toString())) },
+                            asTab = true,
+                            reselectCount = reselectCount
+                        )
                     },
-                    onNavigateToSettings = {
-                        backStack.add(Settings)
-                    },
-                    onOpenRecap = { month -> backStack.add(Recap(month.toString())) }
+                    coach = { CoachTab(dashboardViewModel) }
                 )
             }
             entry<Recap> { key ->

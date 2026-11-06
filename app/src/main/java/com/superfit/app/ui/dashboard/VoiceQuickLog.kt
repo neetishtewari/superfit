@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -65,6 +66,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -470,7 +473,6 @@ class SpeechRecognizerHelper(
 @Composable
 fun VoiceQuickLogCard(
     logType: String,
-    onLogTypeChange: (String) -> Unit,
     isListening: Boolean,
     isProcessing: Boolean,
     onMicClick: () -> Unit,
@@ -547,13 +549,6 @@ fun VoiceQuickLogCard(
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
         }
-
-        // Food / Activity picks which cards show below.
-        SegmentedPills(
-            options = listOf("MEAL" to "Food", "WORKOUT" to "Activity"),
-            selected = logType,
-            onSelect = onLogTypeChange
-        )
     }
 }
 
@@ -577,18 +572,22 @@ private fun LogButton(
         animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
         label = "Scale"
     )
+    // Soft green tile with a solid green icon circle; turns solid deep green while listening.
+    val colors = com.superfit.app.theme.SuperfitTheme.colors
+    val titleColor = if (listening || colors.isDark) Color.White else colors.textPrimary
+    val hintColor = if (listening || colors.isDark) Color.White.copy(alpha = 0.9f) else colors.textSecondary
     val iconCircle: @Composable () -> Unit = {
         Box(
             modifier = Modifier
                 .size((44 * scale).dp)
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(if (listening) Color.White else NeonMint),
             contentAlignment = Alignment.Center
         ) {
             if (processing) {
-                CircularProgressIndicator(modifier = Modifier.size(22.dp), color = BrandGreenDeep, strokeWidth = 2.5.dp)
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), color = if (listening) BrandGreenDeep else Color.White, strokeWidth = 2.5.dp)
             } else {
-                Icon(icon, contentDescription = iconDescription, tint = BrandGreenDeep, modifier = Modifier.size(24.dp))
+                Icon(icon, contentDescription = iconDescription, tint = if (listening) BrandGreenDeep else Color.White, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -596,7 +595,7 @@ private fun LogButton(
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (vertical) {
                 // Half-width buttons: shrink the title a little rather than leave one word alone on a second line.
-                val titleStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White)
+                val titleStyle = MaterialTheme.typography.titleMedium.copy(color = titleColor)
                 BasicText(
                     text = title,
                     style = titleStyle,
@@ -605,15 +604,15 @@ private fun LogButton(
                     autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = titleStyle.fontSize)
                 )
             } else {
-                Text(text = title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(text = title, style = MaterialTheme.typography.titleMedium, color = titleColor)
             }
-            Text(text = hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
+            Text(text = hint, style = MaterialTheme.typography.bodySmall, color = hintColor)
         }
     }
     val shape = RoundedCornerShape(20.dp)
     val content = Modifier
         .clip(shape)
-        .background(if (listening) BrandGreenDeep else NeonMint)
+        .background(if (listening) BrandGreenDeep else colors.selectedBg)
         .clickable(enabled = enabled, onClick = onClick)
         .padding(14.dp)
     if (vertical) {
@@ -633,38 +632,72 @@ private fun LogButton(
     }
 }
 
-/** Pill-shaped switch used for Food / Activity and the Progress tabs. */
+/**
+ * Pill-shaped switch used for Food / Activity, the Progress tabs and settings. The chosen option is
+ * a raised neutral tile (white on light, lighter grey on dark) with dark text, so green stays for
+ * the log buttons and the page doesn't read as all green. With [icons], each option shows its icon above the label and is taller,
+ * so it reads as a place to go rather than a filter. Options in [unseen] get a small amber dot.
+ */
 @Composable
-fun SegmentedPills(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+fun SegmentedPills(
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    icons: Map<String, Pair<androidx.compose.ui.graphics.vector.ImageVector, androidx.compose.ui.graphics.vector.ImageVector>> = emptyMap(),
+    unseen: Set<String> = emptySet()
+) {
+    val colors = com.superfit.app.theme.SuperfitTheme.colors
+    val shape = RoundedCornerShape(if (icons.isEmpty()) 50 else 18)
+    val innerShape = RoundedCornerShape(if (icons.isEmpty()) 50 else 15)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(50))
+            .clip(shape)
             .background(ThemeFieldBg)
-            .padding(4.dp)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         options.forEach { (key, label) ->
             val isOn = key == selected
+            val tint = if (isOn) colors.switchFg else ThemeTextSecondary
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(50))
-                    // Solid brand green for the chosen option: a card-coloured pill was hard to see in dark mode.
-                    .background(if (isOn) NeonMint else Color.Transparent)
+                    .then(if (isOn) Modifier.shadow(2.dp, innerShape) else Modifier)
+                    .clip(innerShape)
+                    .background(if (isOn) colors.switchBg else Color.Transparent)
+                    .then(if (isOn) Modifier.border(1.dp, colors.switchLine, innerShape) else Modifier)
                     .clickable { onSelect(key) }
-                    .heightIn(min = 40.dp)
+                    .semantics { this.selected = isOn }
+                    .heightIn(min = if (icons.isEmpty()) 40.dp else 56.dp)
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isOn) Color.White else ThemeTextSecondary,
-                    fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    icons[key]?.let { (filled, outlined) ->
+                        Icon(if (isOn) filled else outlined, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                    }
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = tint,
+                        fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                }
+                if (key in unseen && !isOn) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 2.dp, end = 10.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(com.superfit.app.theme.SolarAmber)
+                    )
+                }
             }
         }
     }

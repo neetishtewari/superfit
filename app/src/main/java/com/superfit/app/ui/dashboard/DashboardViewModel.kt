@@ -23,6 +23,9 @@ import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RepeatMealCache
 import com.superfit.app.domain.SpokenInput
+import com.superfit.app.domain.StepGoal
+import com.superfit.app.domain.StepGoalReason
+import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutParser
@@ -41,6 +44,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinDayOfWeek
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinLocalTime
 
 class DashboardViewModel(
     private val repository: DataRepository,
@@ -247,7 +253,7 @@ class DashboardViewModel(
         val now = java.time.LocalDateTime.now()
         return com.superfit.app.domain.CoachQuestions.forNow(
             hour = now.hour,
-            day = now.dayOfWeek,
+            day = now.dayOfWeek.toKotlinDayOfWeek(),
             mealsToday = state?.nutritionList?.size ?: 0,
             proteinStillNeeded = state?.let { (it.macroTargets.proteinG - it.proteinEaten).toInt() } ?: 0,
             workedOutToday = state != null && (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()),
@@ -284,9 +290,9 @@ class DashboardViewModel(
             _chatLoading.value = true
             try {
                 val history = com.superfit.app.domain.CoachChat.historyForAi(before, System.currentTimeMillis()).map {
-                    GeminiClient.ChatTurn(fromUser = it.fromUser, text = it.text)
+                    com.superfit.app.domain.AiChatTurn(fromUser = it.fromUser, text = it.text)
                 }
-                val raw = GeminiClient.chat(
+                val raw = com.superfit.app.domain.Ai.chat(
                     systemInstructionText = coachChatInstruction(currentState, before),
                     history = history,
                     message = question
@@ -318,7 +324,7 @@ class DashboardViewModel(
         if (question.length < 12 || question == com.superfit.app.domain.CoachChat.TELL_ME_MORE) return
         viewModelScope.launch {
             try {
-                val today = LocalDate.now()
+                val today = LocalDate.now().toKotlinLocalDate()
                 val notes = _coachNotes.value
                 val response = GeminiClient.generateContent(
                     prompt = com.superfit.app.domain.CoachNotes.extractPrompt(notes, today, question, reply.text),
@@ -380,7 +386,7 @@ class DashboardViewModel(
 
     /** Adds what the user typed or pasted in Settings; each line becomes its own note. */
     fun addCoachNote(text: String) {
-        val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now(), System.currentTimeMillis())
+        val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now().toKotlinLocalDate(), System.currentTimeMillis())
         if (notes.isEmpty()) return
         saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(notes, emptyList())))
         notes.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = true) }
@@ -428,7 +434,7 @@ class DashboardViewModel(
             com.superfit.app.data.BodyImporter.mine(appContext),
             profile.weightKg,
             profile.heightCm,
-            today
+            today.toKotlinLocalDate()
         )
         val bodyText = if (body.hasScaleData) {
             listOfNotNull(
@@ -443,8 +449,8 @@ class DashboardViewModel(
         val allNutrition = repository.getAllNutritionEntries()
         val coachWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr)
         val report = CoachPatternEngine.analyze(
-            today = today,
-            now = now,
+            today = today.toKotlinLocalDate(),
+            now = now.toKotlinLocalTime(),
             weightKg = profile.weightKg,
             goal = profile.goal,
             targets = macroTargets,
@@ -454,7 +460,9 @@ class DashboardViewModel(
             activity = repository.getAllActivityTelemetry(),
             sleep = repository.getAllSleepTelemetry(),
             weights = repository.getAllWeightEntries(),
-            targetWeightKg = profile.targetWeightKg
+            targetWeightKg = profile.targetWeightKg,
+            age = profile.age,
+            stepGoal = stepGoal.value?.goal
         )
 
         val live = """
@@ -473,14 +481,14 @@ class DashboardViewModel(
         """.trimIndent()
 
         val personal = com.superfit.app.domain.CoachChatContext.personal(
-            today = today,
-            now = now,
+            today = today.toKotlinLocalDate(),
+            now = now.toKotlinLocalTime(),
             todayMeals = nutrition,
             report = report,
             workouts = coachWorkouts,
             targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(sharedPrefs) },
-            goalDate = GoalDatePref.get(sharedPrefs),
-            commonFoods = CoachingEngine.commonFoods(allNutrition, today),
+            goalDate = GoalDatePref.get(sharedPrefs)?.toKotlinLocalDate(),
+            commonFoods = CoachingEngine.commonFoods(allNutrition, today.toKotlinLocalDate()),
             notes = _coachNotes.value,
             todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(sharedPrefs, today),
             earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
@@ -493,7 +501,7 @@ class DashboardViewModel(
     /** Today's steps and workouts next to the usual for this weekday. */
     fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?) =
         com.superfit.app.domain.TodayVsUsual.of(
-            today = LocalDate.now(),
+            today = LocalDate.now().toKotlinLocalDate(),
             steps = state.activity.steps,
             workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
                 com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
@@ -706,8 +714,10 @@ class DashboardViewModel(
             val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
             val workoutMins = (workouts.size * 25)
 
+            val todayStepGoal = StepGoalStore.ownGoal(appContext) ?: StepGoalStore.load(appContext)?.goal ?: StepGoal.starter(profile.age)
+
             val habitEntry = (rawHabit ?: HabitEntryEntity(date = todayStr)).copy(
-                stepsCompleted = currentSteps >= 8000,
+                stepsCompleted = currentSteps >= todayStepGoal,
                 sleepCompleted = currentSleepSecs >= (7 * 3600),
                 workoutMins = workoutMins
             )
@@ -782,7 +792,7 @@ class DashboardViewModel(
             kcalTarget = { 0.0 },
             proteinTargetG = 0.0
         )
-        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now())
+        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now().toKotlinLocalDate())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -807,8 +817,8 @@ class DashboardViewModel(
         } else {
             emptyList()
         }
-        val steps = activity.mapNotNull { row -> runCatching { DaySteps(LocalDate.parse(row.date), row.steps) }.getOrNull() }
-        val bests = PersonalBests.compute(views, steps, LocalDate.now())
+        val steps = activity.mapNotNull { row -> runCatching { DaySteps(kotlinx.datetime.LocalDate.parse(row.date), row.steps) }.getOrNull() }
+        val bests = PersonalBests.compute(views, steps, LocalDate.now().toKotlinLocalDate())
         val baseline = prefs.bestBaseline
         val seen = prefs.bestPodiumSeen
         val check = PersonalBests.check(bests, baseline, seen, System.currentTimeMillis())
@@ -824,7 +834,94 @@ class DashboardViewModel(
         initialValue = BestsUiState()
     )
 
+    private val stepGoalTrigger = MutableStateFlow(0L)
+
+    /**
+     * Today's daily step goal, worked out from the last two weeks of steps and the person's age
+     * (see StepGoal), or their own number from Settings. Saved so it holds steady all week.
+     */
+    val stepGoal: StateFlow<StepGoalResult?> = combine(
+        repository.profileFlow,
+        repository.allActivityTelemetryFlow,
+        stepGoalTrigger
+    ) { profile, activity, _ ->
+        if (profile == null) return@combine null
+        val steps = activity.mapNotNull { row -> runCatching { kotlinx.datetime.LocalDate.parse(row.date) to row.steps }.getOrNull() }.toMap()
+        val saved = StepGoalStore.load(appContext)
+        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(appContext), LocalDate.now().toKotlinLocalDate())
+        // An own number is kept apart, so switching back to automatic starts from the steps again.
+        if (result.reason != StepGoalReason.OWN && result.saved != saved) {
+            StepGoalStore.save(appContext, result.saved)
+            if (saved != null && result.goal != saved.goal) {
+                AppAnalytics.stepGoalChanged(if (result.goal > saved.goal) "up" else "down", "auto")
+            }
+        }
+        result
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+    private val _stepGoalNoteDismissedOn = MutableStateFlow(StepGoalStore.noteDismissedOn(appContext))
+    val stepGoalNoteDismissedOn: StateFlow<String?> = _stepGoalNoteDismissedOn.asStateFlow()
+
+    /** Hides today's "New step goal" note on Home. */
+    fun dismissStepGoalNote() {
+        val today = LocalDate.now().toKotlinLocalDate()
+        StepGoalStore.dismissNote(appContext, today)
+        _stepGoalNoteDismissedOn.value = today.toString()
+    }
+
+    /** Sets the person's own daily step goal, or null to go back to the automatic one. */
+    fun setOwnStepGoal(steps: Int?) {
+        val clamped = steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX)
+        StepGoalStore.setOwnGoal(appContext, clamped)
+        AppAnalytics.stepGoalChanged("set", if (clamped == null) "auto" else "own")
+        stepGoalTrigger.value = System.currentTimeMillis()
+    }
+
     /** A best was shared or dismissed: remember it so it's offered only once. */
+    private val shareOfferTrigger = MutableStateFlow(0)
+
+    /**
+     * Today's "ready to share" card: the newest run, or walk long enough, from today or yesterday,
+     * unless it was already shared or dismissed. Recalculated when workouts come in.
+     */
+    val shareOffer: StateFlow<WorkoutView?> = combine(
+        repository.profileFlow,
+        repository.allImportedWorkoutsFlow,
+        shareOfferTrigger
+    ) { profile, rows, _ ->
+        val prefs = repository.workoutImportPrefs
+        if (profile == null || !prefs.enabled) return@combine null
+        val views = ImportedWorkouts.views(appContext, rows, prefs, PhysiologyEngine.calculateBmr(profile))
+        val sharePrefs = com.superfit.app.data.ShareCardPrefs.of(appContext)
+        com.superfit.app.domain.ShareOffer.pick(
+            workouts = views,
+            today = LocalDate.now().toKotlinLocalDate(),
+            runsOn = sharePrefs.offerRuns,
+            walkMinMinutes = sharePrefs.offerWalkMinutes,
+            handledIds = sharePrefs.handledOffers
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+    /** Shared or dismissed: the card goes and this workout isn't offered again. */
+    fun handleShareOffer(workout: WorkoutView, shared: Boolean) {
+        com.superfit.app.data.ShareCardPrefs.of(appContext).markOfferHandled(workout.merged.primary.id)
+        com.superfit.app.data.AppAnalytics.shareOffer(if (shared) "shared" else "dismissed", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+        shareOfferTrigger.value++
+    }
+
+    /** Settings > Sharing changed which workouts are offered. */
+    fun refreshShareOffer() {
+        shareOfferTrigger.value++
+    }
+
     fun acknowledgeBest(best: PersonalBest) {
         val prefs = repository.workoutImportPrefs
         prefs.bestBaseline = PersonalBests.acknowledge(best, prefs.bestBaseline)
@@ -1192,6 +1289,7 @@ class DashboardViewModel(
                     historyActivity = repository.getAllActivityTelemetry(),
                     historySleep = repository.getAllSleepTelemetry(),
                     historyWeights = repository.getAllWeightEntries(),
+                    stepGoal = stepGoal.value?.goal,
                     memory = CoachInsightStore.memory(sharedPrefs),
                     notes = _coachNotes.value
                 )

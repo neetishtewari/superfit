@@ -8,6 +8,8 @@ import com.superfit.app.domain.WorkoutView
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinTimeZone
 
 /** Turns the stored logs into one [DayTotals] per day for Insights, Journey and "vs your usual". */
 object InsightsData {
@@ -20,23 +22,24 @@ object InsightsData {
         kcalTarget: (LocalDate) -> Double,
         proteinTargetG: Double,
         zone: ZoneId = ZoneId.systemDefault()
-    ): Map<LocalDate, DayTotals> {
+    ): Map<kotlinx.datetime.LocalDate, DayTotals> {
         fun dateOf(millis: Long) = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
         val meals = nutrition.groupBy { dateOf(it.timestamp) }
         val voice = voiceWorkouts.groupBy { dateOf(it.timestamp) }
         val steps = activity.mapNotNull { a -> runCatching { LocalDate.parse(a.date) }.getOrNull()?.let { it to a.steps } }.toMap()
         val dates = meals.keys + voice.keys + steps.keys + imported.keys
-        return dates.associateWith { date ->
+        val kZone = zone.toKotlinTimeZone()
+        return dates.associate { date ->
             val dayMeals = meals[date].orEmpty()
-            DayTotals(
-                date = date,
+            date.toKotlinLocalDate() to DayTotals(
+                date = date.toKotlinLocalDate(),
                 kcalEaten = dayMeals.sumOf { it.calories },
                 kcalTarget = kcalTarget(date),
                 meals = dayMeals.size,
                 proteinG = dayMeals.sumOf { it.proteinG },
                 proteinTargetG = proteinTargetG,
                 steps = steps[date] ?: 0,
-                workouts = imported[date].orEmpty().map { ActivityFact.of(it, zone) } + voice[date].orEmpty().map { w ->
+                workouts = imported[date].orEmpty().map { ActivityFact.of(it, kZone) } + voice[date].orEmpty().map { w ->
                     ActivityFact(title = w.description, minutes = 0, distanceKm = null, kcal = w.caloriesBurned, paceSecondsPerKm = null, isRun = false, reps = w.repsCount.coerceAtLeast(0))
                 },
                 mealRating = dayMeals.mapNotNull { m -> MealTags.decode(m.qualityTags)?.takeIf { !it.estimated }?.let { DietScoreEngine.mealRating(m, it).toDouble() } }

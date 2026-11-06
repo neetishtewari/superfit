@@ -4,6 +4,8 @@ import com.superfit.app.data.NutritionEntryEntity
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinYearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -19,6 +21,9 @@ class MonthlyRecapTest {
 
     private val utc = ZoneOffset.UTC
     private val october = YearMonth.of(2026, 10)
+    private val kOctober = october.toKotlinYearMonth()
+    private val kUtc = kotlinx.datetime.TimeZone.UTC
+    private fun oct(day: Int) = kotlinx.datetime.LocalDate(2026, 10, day)
     private val allSet = RecapSetup(healthConnect = true, mic = true, widget = true)
 
     private fun day(
@@ -28,7 +33,7 @@ class MonthlyRecapTest {
         protein: Double = 100.0,
         steps: Int = 8000,
         workouts: List<ActivityFact> = emptyList()
-    ) = DayTotals(date, kcal, 1900.0, meals, protein, 110.0, steps, workouts)
+    ) = DayTotals(date.toKotlinLocalDate(), kcal, 1900.0, meals, protein, 110.0, steps, workouts)
 
     private fun run(km: Double, pace: Long) = ActivityFact("Run", (km * pace / 60).toLong(), km, 400.0, pace, isRun = true)
 
@@ -42,15 +47,15 @@ class MonthlyRecapTest {
         qualityTags = MealTags(processing = 1, fried = false, addedSugar = false, vegFruitServings = 1.0, fiberG = 8.0, treat = false, foodType = food, rating = rating).encode()
     )
 
-    private fun month(build: (LocalDate) -> DayTotals?): Map<LocalDate, DayTotals> =
+    private fun month(build: (LocalDate) -> DayTotals?): Map<kotlinx.datetime.LocalDate, DayTotals> =
         (1..31).mapNotNull { build(october.atDay(it)) }.associateBy { it.date }
 
     private fun recap(
-        days: Map<LocalDate, DayTotals>,
+        days: Map<kotlinx.datetime.LocalDate, DayTotals>,
         meals: List<NutritionEntryEntity> = emptyList(),
         strength: List<StrengthSession> = emptyList(),
         setup: RecapSetup = allSet
-    ) = MonthlyRecap.build(october, days, meals, strength, emptyList(), journey = null, goalSet = false, setup = setup, zone = utc)
+    ) = MonthlyRecap.build(kOctober, days, meals, strength, emptyList(), journey = null, goalSet = false, setup = setup, zone = kUtc)
 
     @Test
     fun aMonthWithAlmostNothingLoggedHasNoRecap() {
@@ -85,7 +90,7 @@ class MonthlyRecapTest {
         fun walk(bpm: Long) = ActivityFact("Walk", 60, 5.0, 250.0, 720, isRun = false, avgHeartRate = bpm)
         val days = (1..30).associate { i ->
             val sep = october.atDay(1).minusDays(i.toLong())
-            sep to day(sep, workouts = if (i % 5 == 0) listOf(walk(120)) else emptyList())
+            sep.toKotlinLocalDate() to day(sep, workouts = if (i % 5 == 0) listOf(walk(120)) else emptyList())
         } + month { d -> day(d, workouts = if (d.dayOfMonth % 5 == 0) listOf(walk(112)) else emptyList()) }
         val card = recap(days)!!.cards.filterIsInstance<RecapCard.Heart>().single()
         assertEquals(8, card.change.bpmDrop)
@@ -150,10 +155,10 @@ class MonthlyRecapTest {
     fun strengthCardSaysHowOftenHowLongAndWhatWasTrained() {
         val days = month { d -> day(d) }
         val sessions = listOf(
-            StrengthSession(october.atDay(2), 40, setOf(BodyArea.UPPER)),
-            StrengthSession(october.atDay(9), 40, setOf(BodyArea.UPPER)),
-            StrengthSession(october.atDay(16), 40, setOf(BodyArea.UPPER)),
-            StrengthSession(october.atDay(23), 40, setOf(BodyArea.UPPER))
+            StrengthSession(oct(2), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(oct(9), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(oct(16), 40, setOf(BodyArea.UPPER)),
+            StrengthSession(oct(23), 40, setOf(BodyArea.UPPER))
         )
         val d = recap(days, strength = sessions)!!.cards.filterIsInstance<RecapCard.Strength>().single().detail!!
         assertEquals(160, d.minutes)
@@ -166,9 +171,9 @@ class MonthlyRecapTest {
     fun bothHalvesTrainedIsNotFlagged() {
         val d = StrengthSessions.detail(
             listOf(
-                StrengthSession(october.atDay(1), null, setOf(BodyArea.UPPER)),
-                StrengthSession(october.atDay(4), null, setOf(BodyArea.LOWER)),
-                StrengthSession(october.atDay(8), null, emptySet())
+                StrengthSession(oct(1), null, setOf(BodyArea.UPPER)),
+                StrengthSession(oct(4), null, setOf(BodyArea.LOWER)),
+                StrengthSession(oct(8), null, emptySet())
             ),
             31
         )!!
@@ -194,8 +199,9 @@ class MonthlyRecapTest {
     @Test
     fun goalCardShowsThisMonthsChangeOutOfTheWholeGoal() {
         val weighIns = listOf(LocalDate.of(2026, 9, 1) to 86.0, LocalDate.of(2026, 9, 30) to 84.3, LocalDate.of(2026, 10, 12) to 83.7, LocalDate.of(2026, 10, 30) to 82.9)
-        val journey = GoalForecast.compute(86.0, 76.0, LocalDate.of(2026, 9, 1), weighIns, emptyMap(), -500, null, LocalDate.of(2026, 11, 1), 82.9)
-        val card = MonthlyRecap.goal(journey, weighIns, october.atDay(1), october.atEndOfMonth())
+        val kWeighIns = weighIns.map { it.first.toKotlinLocalDate() to it.second }
+        val journey = GoalForecast.compute(86.0, 76.0, LocalDate.of(2026, 9, 1).toKotlinLocalDate(), kWeighIns, emptyMap(), -500, null, LocalDate.of(2026, 11, 1).toKotlinLocalDate(), 82.9)
+        val card = MonthlyRecap.goal(journey, kWeighIns, kOctober.firstDay, kOctober.lastDay)
         assertEquals(1.4, card.monthKg!!, 0.001)
         assertEquals(3.1, card.kgDone, 0.001)
         assertEquals(10.0, card.kgTotal, 0.001)
@@ -224,7 +230,7 @@ class MonthlyRecapTest {
     @Test
     fun bodyCardOnlyWhenTheScaleSawAChange() {
         val days = month { d -> if (d.dayOfMonth <= 20) day(d) else null }
-        fun build(body: BodyChange?) = MonthlyRecap.build(october, days, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = utc, body = body)
+        fun build(body: BodyChange?) = MonthlyRecap.build(kOctober, days, emptyList(), emptyList(), emptyList(), journey = null, goalSet = false, setup = allSet, zone = kUtc, body = body)
         val moved = BodyChange(26.0, 24.8, 58.0, 58.2, null, null, 80.0, 78.6)
         val flat = BodyChange(26.0, 25.8, 58.0, 58.1, null, null, 80.0, 79.9)
         val card = build(moved)!!.cards.filterIsInstance<RecapCard.Body>().single()

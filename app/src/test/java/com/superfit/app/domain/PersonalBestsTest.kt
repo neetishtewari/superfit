@@ -2,8 +2,8 @@ package com.superfit.app.domain
 
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import com.superfit.app.data.ImportedWorkoutEntity
-import java.time.LocalDate
-import java.time.ZoneOffset
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,7 +12,7 @@ class PersonalBestsTest {
 
     private val day = 24L * 3600 * 1000
     private val now = 100 * day
-    private val today = LocalDate.ofEpochDay(100)
+    private val today = LocalDate.fromEpochDays(100)
     private val run = ExerciseSessionRecord.EXERCISE_TYPE_RUNNING
 
     private fun workout(id: String, type: Int, startDay: Long, km: Double, minutes: Long): WorkoutView {
@@ -28,7 +28,7 @@ class PersonalBestsTest {
     private fun best(bests: List<PersonalBest>, kind: BestKind) = bests.first { it.kind == kind }
 
     private fun compute(workouts: List<WorkoutView>, steps: List<DaySteps> = emptyList()) =
-        PersonalBests.compute(workouts, steps, today, ZoneOffset.UTC)
+        PersonalBests.compute(workouts, steps, today, TimeZone.UTC)
 
     @Test
     fun longestRunRemembersWhatItBeat() {
@@ -94,12 +94,12 @@ class PersonalBestsTest {
         // Day 100 (Sat 11 Apr 1970) is today; day 88 is Mon 30 Mar and day 95 is Mon 6 Apr, this week.
         // Every day from 1 Mar (day 59) to today has 3,000 steps, plus a few bigger days.
         val big = mapOf(88L to 9000, 89L to 12000, 95L to 15000, 100L to 30000)
-        val steps = (59L..100L).map { DaySteps(LocalDate.ofEpochDay(it), big[it] ?: 3000) }
+        val steps = (59L..100L).map { DaySteps(LocalDate.fromEpochDays(it.toInt()), big[it] ?: 3000) }
         val bests = compute(emptyList(), steps)
         assertEquals(15000.0, best(bests, BestKind.MOST_STEPS_DAY).value, 0.1)
         // Week of 30 Mar: 9,000 + 12,000 + 5 days of 3,000.
         assertEquals(36000.0, best(bests, BestKind.MOST_STEPS_WEEK).value, 0.1)
-        assertEquals(LocalDate.ofEpochDay(88), best(bests, BestKind.MOST_STEPS_WEEK).periodStart)
+        assertEquals(LocalDate.fromEpochDays(88), best(bests, BestKind.MOST_STEPS_WEEK).periodStart)
         // April isn't over yet, so the month best is March: 29 days of 3,000 + 9,000 + 12,000.
         assertEquals(108000.0, best(bests, BestKind.MOST_STEPS_MONTH).value, 0.1)
     }
@@ -107,7 +107,7 @@ class PersonalBestsTest {
     @Test
     fun weeksAndMonthsWithGapsInStepsDontCount() {
         // Only two days of the week of 30 Mar have steps, so that week can't be a best.
-        val steps = listOf(DaySteps(LocalDate.ofEpochDay(88), 9000), DaySteps(LocalDate.ofEpochDay(89), 12000))
+        val steps = listOf(DaySteps(LocalDate.fromEpochDays(88), 9000), DaySteps(LocalDate.fromEpochDays(89), 12000))
         val bests = compute(emptyList(), steps)
         assertTrue(bests.none { it.kind == BestKind.MOST_STEPS_WEEK || it.kind == BestKind.MOST_STEPS_MONTH })
         assertEquals(12000.0, best(bests, BestKind.MOST_STEPS_DAY).value, 0.1)
