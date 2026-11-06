@@ -38,7 +38,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
@@ -84,7 +83,6 @@ import kotlinx.datetime.toKotlinLocalDate
 internal fun DashboardHeader(
     grantedPermissions: Set<String>,
     hasHealthConnectPermissions: Boolean,
-    onNavigateToHistory: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
     val today = LocalDate.now()
@@ -99,7 +97,7 @@ internal fun DashboardHeader(
     // Only point at Settings when Health Connect needs attention.
     val needsHealthConnect = grantedPermissions.isNotEmpty() && !hasHealthConnectPermissions
 
-    // Date and the two buttons share the top line, so the greeting gets the full width under them.
+    // Date and the Settings button share the top line, so the greeting gets the full width under them.
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -114,7 +112,6 @@ internal fun DashboardHeader(
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            HeaderNavButton(icon = Icons.Default.Insights, label = "Insights", onClick = onNavigateToHistory)
             Box {
                 HeaderNavButton(icon = Icons.Default.Settings, label = "Settings", onClick = onNavigateToSettings)
                 if (needsHealthConnect) {
@@ -293,7 +290,8 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Carbohydrates",
             eaten = state.carbsEaten,
             target = state.macroTargets.carbsG,
-            color = NeonGreen,
+            // Protein keeps the brand green; the others get quiet colours so Today isn't all green.
+            color = SuperfitTheme.colors.carbs,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.carbsG }
@@ -304,7 +302,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Fats",
             eaten = state.fatEaten,
             target = state.macroTargets.fatG,
-            color = NeonGreen,
+            color = SuperfitTheme.colors.fat,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { it.fatG }
@@ -316,7 +314,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
             label = "Fibre",
             eaten = fibreEaten,
             target = CoachPatternEngine.fibreTargetG(state.macroTargets.calories),
-            color = NeonGreen,
+            color = SuperfitTheme.colors.fibre,
             unit = "g",
             entries = state.nutritionList,
             macroSelector = { MealTags.of(it).fiberG }

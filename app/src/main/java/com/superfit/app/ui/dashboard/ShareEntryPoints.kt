@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
+import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Share
@@ -33,7 +35,9 @@ import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
+import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.HyperViolet
+import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 import java.time.LocalDate
 import kotlinx.datetime.toKotlinLocalDate
@@ -92,6 +96,60 @@ fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) 
             }
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = SuperfitTheme.colors.textSecondary)
+            }
+        }
+    }
+}
+
+/**
+ * "Your run is ready to share" on Today, for the newest run or long walk from today or yesterday.
+ * Same shape as the personal best card, in calm green. Share opens the workout card; the close
+ * button hides it for good.
+ */
+@Composable
+fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> Unit) {
+    val colors = SuperfitTheme.colors
+    val run = com.superfit.app.domain.ShareOffer.isRun(workout)
+    val yesterday = java.time.Instant.ofEpochMilli(workout.startTime).atZone(java.time.ZoneId.systemDefault()).toLocalDate() != LocalDate.now()
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBg),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.5.dp, colors.selectedLine, RoundedCornerShape(20.dp))
+    ) {
+        Row(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (run) Icons.AutoMirrored.Rounded.DirectionsRun else Icons.AutoMirrored.Rounded.DirectionsWalk,
+                contentDescription = null,
+                tint = if (colors.isDark) colors.primaryAccent else colors.selectedFg,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (run) "Your run is ready to share" else "Nice long walk",
+                    fontSize = 12.sp,
+                    color = if (colors.isDark) colors.primaryAccent else colors.selectedFg,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    listOfNotNull(workout.detailLine.takeIf { it.isNotBlank() }, "yesterday".takeIf { yesterday }).joinToString(" · "),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    maxLines = 2
+                )
+            }
+            Button(
+                onClick = onShare,
+                colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.White),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Share", fontWeight = FontWeight.Bold)
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Default.Close, contentDescription = "Don't suggest this one", tint = colors.textSecondary)
             }
         }
     }

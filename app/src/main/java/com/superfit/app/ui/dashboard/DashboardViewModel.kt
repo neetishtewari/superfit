@@ -882,6 +882,46 @@ class DashboardViewModel(
     }
 
     /** A best was shared or dismissed: remember it so it's offered only once. */
+    private val shareOfferTrigger = MutableStateFlow(0)
+
+    /**
+     * Today's "ready to share" card: the newest run, or walk long enough, from today or yesterday,
+     * unless it was already shared or dismissed. Recalculated when workouts come in.
+     */
+    val shareOffer: StateFlow<WorkoutView?> = combine(
+        repository.profileFlow,
+        repository.allImportedWorkoutsFlow,
+        shareOfferTrigger
+    ) { profile, rows, _ ->
+        val prefs = repository.workoutImportPrefs
+        if (profile == null || !prefs.enabled) return@combine null
+        val views = ImportedWorkouts.views(appContext, rows, prefs, PhysiologyEngine.calculateBmr(profile))
+        val sharePrefs = com.superfit.app.data.ShareCardPrefs.of(appContext)
+        com.superfit.app.domain.ShareOffer.pick(
+            workouts = views,
+            today = LocalDate.now().toKotlinLocalDate(),
+            runsOn = sharePrefs.offerRuns,
+            walkMinMinutes = sharePrefs.offerWalkMinutes,
+            handledIds = sharePrefs.handledOffers
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+    /** Shared or dismissed: the card goes and this workout isn't offered again. */
+    fun handleShareOffer(workout: WorkoutView, shared: Boolean) {
+        com.superfit.app.data.ShareCardPrefs.of(appContext).markOfferHandled(workout.merged.primary.id)
+        com.superfit.app.data.AppAnalytics.shareOffer(if (shared) "shared" else "dismissed", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+        shareOfferTrigger.value++
+    }
+
+    /** Settings > Sharing changed which workouts are offered. */
+    fun refreshShareOffer() {
+        shareOfferTrigger.value++
+    }
+
     fun acknowledgeBest(best: PersonalBest) {
         val prefs = repository.workoutImportPrefs
         prefs.bestBaseline = PersonalBests.acknowledge(best, prefs.bestBaseline)

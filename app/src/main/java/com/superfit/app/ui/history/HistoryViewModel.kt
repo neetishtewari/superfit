@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.minus
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
@@ -126,6 +127,32 @@ class HistoryViewModel(
     /** The Body card in Journey: what the user's smart scale measures, plus BMI. */
     var body by mutableStateOf<com.superfit.app.domain.BodySummary?>(null)
         private set
+
+    /** Latest weight and its change over about 4 weeks, for "Your body now" on Insights. */
+    var latestWeightKg by mutableStateOf<Double?>(null)
+        private set
+    var weightChange4w by mutableStateOf<Double?>(null)
+        private set
+
+    /** Journey's body trends: period (3 months unless changed) and one series per measure the person has. */
+    var bodyPeriod by mutableStateOf(com.superfit.app.domain.BodyPeriod.fromLabel(sharedPrefs.getString(KEY_BODY_PERIOD, null)))
+        private set
+    var bodySeries by mutableStateOf<List<com.superfit.app.domain.BodySeries>>(emptyList())
+        private set
+
+    /** Goal weight minus start weight (0 without a goal): which way weight should move. */
+    var goalKgChange by mutableStateOf(0.0)
+        private set
+
+    var bodyHasHistory by mutableStateOf(false)
+        private set
+    private var bodyInputs: (() -> List<com.superfit.app.domain.BodySeries>)? = null
+
+    fun setBodyPeriod(period: com.superfit.app.domain.BodyPeriod) {
+        bodyPeriod = period
+        sharedPrefs.edit().putString(KEY_BODY_PERIOD, period.label).apply()
+        bodyInputs?.let { bodySeries = it() }
+    }
 
     /** Health Connect is on the phone but body measurements (body fat, BMR...) aren't allowed yet. */
     var canAskBodyAccess by mutableStateOf(false)
@@ -409,6 +436,19 @@ class HistoryViewModel(
                 heightCm = profile.heightCm,
                 today = today.toKotlinLocalDate()
             )
+            latestWeightKg = kJourneyWeighIns.lastOrNull()?.second ?: profile.weightKg
+            weightChange4w = kJourneyWeighIns.lastOrNull()?.let { (lastDay, lastKg) ->
+                kJourneyWeighIns.lastOrNull { it.first <= lastDay.minus(28, kotlinx.datetime.DateTimeUnit.DAY) }
+                    ?.let { lastKg - it.second }
+            }
+            goalKgChange = if (goalSet) profile.targetWeightKg - profile.startingWeightKg else 0.0
+            val todayK = today.toKotlinLocalDate()
+            val goalChange = goalKgChange
+            bodyInputs = {
+                com.superfit.app.domain.BodyHistory.series(kJourneyWeighIns, scaleReadings, profile.heightCm, goalChange, bodyPeriod, todayK)
+            }
+            bodySeries = bodyInputs!!()
+            bodyHasHistory = kJourneyWeighIns.size >= 2
             val hc = repository.healthConnectManager
             canAskBodyAccess = hc.isAvailable() && !hc.hasBodyPermissions()
 
@@ -566,5 +606,9 @@ class HistoryViewModel(
                 _parsingState.value = HistoryParsingState.Error(friendlyMsg)
             }
         }
+    }
+
+    private companion object {
+        const val KEY_BODY_PERIOD = "body_trend_period"
     }
 }
