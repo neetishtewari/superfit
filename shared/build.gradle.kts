@@ -38,8 +38,11 @@ room {
   schemaDirectory("$projectDir/schemas")
 }
 
-dependencies {
-  // Room writes the database code for each platform at build time.
-  add("kspAndroid", libs.androidx.room.compiler)
-  add("kspJvm", libs.androidx.room.compiler)
+// Room writes the database code for each platform at build time. KSP makes one configuration per
+// platform (kspAndroid, kspJvm, later the iPhone ones), some only once that platform is set up,
+// so add Room's compiler to each as it appears. Shared code and tests have nothing for Room.
+configurations.configureEach {
+  if (name.startsWith("ksp") && name != "ksp" && !name.contains("Test") && !name.contains("Metadata")) {
+    project.dependencies.add(name, libs.androidx.room.compiler)
+  }
 }
