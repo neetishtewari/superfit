@@ -79,11 +79,33 @@ tested on the dev app first.
      reading the answer) and the coach chat's picture of the user (meals, days, workouts, notes)
      move to `shared`. The tip asks the AI through `Ai`; a failed call shows the same friendly
      message, which each app supplies through `Ai.friendlyError`.
-   - 3r onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3r: photo reading (meal photos and nutrition labels) moves to `shared`, and coach chat
+     replies go through a shared `Ai.chat`. A photo is a small `AiPhoto` wrapper: a Bitmap on
+     Android, a UIImage on iPhone. Android still shrinks the photo to 1024 px and sends it through
+     Firebase AI Logic with the same model failover.
+   - 3s: calorie and macro targets (PhysiologyEngine, onboarding targets, height units), the
+     "log again" food suggestions, workout-card chips and journey line, and the recap's number
+     count-up move to `shared`.
+   - 3t: share-card text (ShareCards, CardLines, RoastCard) moves to `shared`. Dates, times and
+     grouped numbers stay in the phone's language through a small `LocalFormat` that each app
+     writes with its own formatters; km and pace use the shared `Decimals`.
+   - Later: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
-5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
-   iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
+   - 4a: Room's code generator switches from kapt to KSP (the multiplatform way). The database,
+     its tables and saved schema stay exactly the same; only the build tool changes.
+   - 4b: the DAOs and the database class move to `shared` (`@ConstructedBy`, KSP runs per
+     platform, schemas now in `shared/schemas`). Android keeps its existing database file,
+     per-user file name and migrations in `SuperfitDatabaseBuilder.kt`. Room's bundled SQLite
+     driver is added with the iPhone target in step 5; the iPhone starts with a fresh database.
+5. **Then the iPhone work.**
+   - 5a (no Apple account needed): `shared` also builds for iPhone (`iosArm64`,
+     `iosSimulatorArm64`) as a static `Shared` framework, with iPhone versions of `AppLog`,
+     `AiPhoto` (JPEG bytes), `LocalFormat` and `localWeekdayName`/`localMonthName` (Foundation's
+     formatters in the phone's language), and Room's bundled SQLite. CI's `ios-shared` job runs
+     the shared tests on the iPhone simulator and builds the framework on GitHub's Mac.
+   - 5b (needs Neetish's Mac with Xcode, an Apple Developer account and an iPhone): an `iosApp`
+     folder, shared screens, then the iPhone-only parts.
 
 ## Launch goal
 
@@ -109,6 +131,33 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 5a (reviewed 6 Nov): no iPhone app yet, so nothing ships to anyone. The iPhone log only
+writes debug text (no meals, weights or personal data), the same rule as Android. SQLite is built
+into the app from Google's Maven (androidx.sqlite 2.5.0); the database file will live in the
+app's own private folder, as on Android. No secrets, keys or network calls added; the CI job uses
+no secrets.
+
+Step 4b (reviewed 6 Nov): same tables, queries and schema (version 9), same file per signed-in
+user, so one person's data is never opened for another. All queries stay Room's bound
+parameters (no text pasted into SQL). Room's runtime and compiler come from Google's Maven at the
+same version as before. No new permissions, network calls or secrets.
+
+Step 4a (reviewed 6 Nov): build-tool change only. KSP comes from Google's official Maven
+repository; the generated database code and schema are unchanged. No new permissions, network
+calls or secrets.
+
+Step 3t (reviewed 6 Nov): card text built the same way; weight and calories eaten are still never
+on a card. The AI prompts for card lines are unchanged and still only get facts the app already
+shows. No new libraries, permissions, network calls or secrets.
+
+Step 3s (reviewed 6 Nov): pure calculations moved without behaviour changes. No new libraries,
+permissions, network calls or secrets; nothing here touches storage or the network.
+
+Step 3r (reviewed 6 Nov): photos still go only to Firebase AI Logic (App Check), shrunk first and
+never saved; the wrapper holds the photo in memory only. Chat history sent to the AI is the same
+as before. No new libraries, permissions, network calls or secrets; the camera permission is
+unchanged.
 
 Step 3q (reviewed 6 Nov): prompts, rules and topic choice moved without changes; the coach still
 reaches the AI only through Firebase AI Logic with App Check. Error text shown to people still goes

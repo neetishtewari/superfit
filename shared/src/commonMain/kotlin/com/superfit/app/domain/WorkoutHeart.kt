@@ -68,7 +68,7 @@ object WorkoutHeart {
 
         // Average the readings in equal slices of the workout; slices without readings are skipped.
         val buckets = usable.groupBy { ((it.timeMillis - startMillis) / span * points).toInt().coerceIn(0, points - 1) }
-            .toSortedMap()
+            .entries.sortedBy { it.key }.associate { it.key to it.value }
         val x = buckets.keys.map { (it + 0.5f) / points }
         val bpm = buckets.values.map { list -> list.map { it.bpm }.average().roundToInt() }
         val peak = usable.maxBy { it.bpm }

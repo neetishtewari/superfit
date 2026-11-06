@@ -12,6 +12,7 @@ coroutines = "1.10.2"
 junit = "4.13.2"
 robolectric = "4.17"
 kotlin = "2.2.21"
+ksp = "2.3.10"
 nav3Core = "1.0.1"
 lifecycleViewmodelNav3 = "2.10.0"
 room = "2.7.0"
@@ -61,6 +62,7 @@ androidx-room-common = { module = "androidx.room:room-common", version.ref = "ro
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version = "2.5.0" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 
 # WorkManager background tasks
@@ -105,3 +107,5 @@ kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref 
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidGradlePlugin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+androidx-room = { id = "androidx.room", version.ref = "room" }

@@ -36,11 +36,12 @@ import com.superfit.app.domain.ShareCards
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.SuperfitTheme
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /** The daily card from what Home is showing right now. Never calls the AI. */
 fun dailyShareCard(state: DashboardUiState.Success, coaching: CoachingInsightState): ShareCard.Daily =
     ShareCards.daily(
-        date = LocalDate.now(),
+        date = LocalDate.now().toKotlinLocalDate(),
         streakDays = state.streakState.currentStreak,
         mealsToday = state.nutritionList.size,
         proteinEatenG = state.proteinEaten,
@@ -55,7 +56,7 @@ fun dailyShareCard(state: DashboardUiState.Success, coaching: CoachingInsightSta
 /** "New personal best: Longest run, 12.40 km" with Share and a close button. Shows once per best. */
 @Composable
 fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) {
-    val card = ShareCards.best(best, isNew = true, today = LocalDate.now())
+    val card = ShareCards.best(best, isNew = true, today = LocalDate.now().toKotlinLocalDate())
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBgTranslucent),
@@ -116,7 +117,7 @@ fun PersonalBestsList(bests: List<PersonalBest>, onShare: (PersonalBest) -> Unit
 
 @Composable
 private fun BestRow(best: PersonalBest, onShare: (PersonalBest) -> Unit, modifier: Modifier = Modifier) {
-    val card = ShareCards.best(best, isNew = false, today = LocalDate.now())
+    val card = ShareCards.best(best, isNew = false, today = LocalDate.now().toKotlinLocalDate())
     val main = best.rank == 1
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
