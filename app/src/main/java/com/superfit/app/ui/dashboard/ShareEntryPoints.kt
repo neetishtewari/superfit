@@ -1,7 +1,10 @@
 package com.superfit.app.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
@@ -27,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +42,6 @@ import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
 import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.HyperViolet
-import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 import java.time.LocalDate
 import kotlinx.datetime.toKotlinLocalDate
@@ -103,57 +107,68 @@ fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) 
 
 /**
  * "Your run is ready to share" on Today, for the newest run or long walk from today or yesterday.
- * Same shape as the personal best card, in calm green. Share opens the workout card; the close
- * button hides it for good.
+ * A solid teal card (teal is the app's activity colour) so it stands apart from the green page, the
+ * way the monthly review card is solid amber. Share opens the workout card; the close button hides
+ * it for good.
  */
 @Composable
 fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> Unit) {
-    val colors = SuperfitTheme.colors
     val run = com.superfit.app.domain.ShareOffer.isRun(workout)
     val yesterday = java.time.Instant.ofEpochMilli(workout.startTime).atZone(java.time.ZoneId.systemDefault()).toLocalDate() != LocalDate.now()
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBg),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.5.dp, colors.selectedLine, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(ShareTeal)
+            .clickable(onClick = onShare)
+            .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 if (run) Icons.AutoMirrored.Rounded.DirectionsRun else Icons.AutoMirrored.Rounded.DirectionsWalk,
                 contentDescription = null,
-                tint = if (colors.isDark) colors.primaryAccent else colors.selectedFg,
-                modifier = Modifier.size(28.dp)
+                tint = ShareTeal,
+                modifier = Modifier.size(26.dp)
             )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (run) "Your run is ready to share" else "Nice long walk",
-                    fontSize = 12.sp,
-                    color = if (colors.isDark) colors.primaryAccent else colors.selectedFg,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    listOfNotNull(workout.detailLine.takeIf { it.isNotBlank() }, "yesterday".takeIf { yesterday }).joinToString(" · "),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
-                    maxLines = 2
-                )
-            }
-            Button(
-                onClick = onShare,
-                colors = ButtonDefaults.buttonColors(containerColor = NeonMint, contentColor = Color.White),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Share", fontWeight = FontWeight.Bold)
-            }
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = "Don't suggest this one", tint = colors.textSecondary)
-            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (run) "Your run is ready to share" else "Nice long walk",
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                listOfNotNull(workout.detailLine.takeIf { it.isNotBlank() }, "yesterday".takeIf { yesterday }).joinToString(" · "),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2
+            )
+        }
+        Button(
+            onClick = onShare,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = ShareTeal),
+            shape = RoundedCornerShape(50)
+        ) {
+            Text("Share", fontWeight = FontWeight.Bold)
+        }
+        IconButton(onClick = onDismiss) {
+            Icon(Icons.Default.Close, contentDescription = "Don't suggest this one", tint = Color.White.copy(alpha = 0.85f))
         }
     }
 }
+
+// Deep teal: the activity colour, dark enough for white text in light and dark mode.
+private val ShareTeal = Color(0xFF0B6E87)
 
 /** Every personal best, each shareable any time. The 2nd and 3rd best runs sit under the best. */
 @Composable

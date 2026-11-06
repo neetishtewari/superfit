@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -629,8 +630,8 @@ private fun LogButton(
 
 /**
  * Pill-shaped switch used for Food / Activity, the Progress tabs and settings. The chosen option is
- * pale green with dark green text (deeper green with white text in dark mode), so solid green stays
- * for the main buttons. With [icons], each option shows its icon above the label and is taller,
+ * a raised neutral tile (white on light, lighter grey on dark) with dark text, so green stays for
+ * the log buttons and the page doesn't read as all green. With [icons], each option shows its icon above the label and is taller,
  * so it reads as a place to go rather than a filter. Options in [unseen] get a small amber dot.
  */
 @Composable
@@ -655,13 +656,14 @@ fun SegmentedPills(
     ) {
         options.forEach { (key, label) ->
             val isOn = key == selected
-            val tint = if (isOn) colors.selectedFg else ThemeTextSecondary
+            val tint = if (isOn) colors.switchFg else ThemeTextSecondary
             Box(
                 modifier = Modifier
                     .weight(1f)
+                    .then(if (isOn) Modifier.shadow(2.dp, innerShape) else Modifier)
                     .clip(innerShape)
-                    .background(if (isOn) colors.selectedBg else Color.Transparent)
-                    .then(if (isOn) Modifier.border(1.5.dp, colors.selectedLine, innerShape) else Modifier)
+                    .background(if (isOn) colors.switchBg else Color.Transparent)
+                    .then(if (isOn) Modifier.border(1.dp, colors.switchLine, innerShape) else Modifier)
                     .clickable { onSelect(key) }
                     .semantics { this.selected = isOn }
                     .heightIn(min = if (icons.isEmpty()) 40.dp else 56.dp)

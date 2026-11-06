@@ -129,7 +129,7 @@ fun StreakHeaderCard(
                 } else if (streakState.currentStreak > 0) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = NeonMint.copy(alpha = 0.12f)
+                        color = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -146,7 +146,7 @@ fun StreakHeaderCard(
                                 text = "Active",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = NeonMint,
+                                color = SuperfitTheme.colors.textPrimary,
                                 maxLines = 1
                             )
                         }

@@ -664,18 +664,18 @@ internal fun TrackMealsCard(
                             label = {
                                 Text(
                                     text = "See all",
-                                    color = NeonGreen,
+                                    color = ThemeTextPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
                             },
                             colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = NeonGreen.copy(alpha = 0.1f)
+                                containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
                             ),
                             border = SuggestionChipDefaults.suggestionChipBorder(
                                 enabled = true,
-                                borderColor = NeonGreen.copy(alpha = 0.3f)
+                                borderColor = ThemeGlassBorder
                             )
                         )
                     }
