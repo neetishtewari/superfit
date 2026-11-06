@@ -1,6 +1,8 @@
 package com.superfit.app.domain
 
-import java.time.LocalDate
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,7 +15,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = android.app.Application::class)
 class CoachingEngineTest {
 
-    private val today = LocalDate.of(2026, 10, 14)
+    private val today = LocalDate(2026, 10, 14)
 
     private fun finding(id: String, priority: Int, kind: FindingKind = FindingKind.CONCERN) = CoachFinding(
         id = id,
@@ -37,7 +39,7 @@ class CoachingEngineTest {
     )
 
     private fun said(daysAgo: Long, id: String, kind: FindingKind = FindingKind.CONCERN) =
-        CoachMemoryEntry(today.minusDays(daysAgo), id, kind, "headline $id")
+        CoachMemoryEntry(today.minus(daysAgo.toInt(), DateTimeUnit.DAY), id, kind, "headline $id")
 
     @Test
     fun `the most important finding leads`() {
@@ -61,7 +63,7 @@ class CoachingEngineTest {
         val r = report(listOf(finding("treats_high", 72), finding("veg_low", 40)))
         val memory = listOf(said(2, "treats_high"), said(1, "habit_walk_after_meals", FindingKind.HABIT))
         // The cake was 3 days ago, before the coach mentioned treats.
-        assertEquals("veg_low", CoachingEngine.chooseFocus(r, memory, today, lastTreatDay = today.minusDays(3)).id)
+        assertEquals("veg_low", CoachingEngine.chooseFocus(r, memory, today, lastTreatDay = today.minus(3, DateTimeUnit.DAY)).id)
         // A treat logged since then brings the subject back.
         assertEquals("treats_high", CoachingEngine.chooseFocus(r, memory, today, lastTreatDay = today).id)
     }
@@ -141,7 +143,7 @@ class CoachingEngineTest {
     fun `memory survives a round trip and keeps one entry per day`() {
         val first = CoachMemory.remember(emptyList(), CoachMemoryEntry(today, "veg_low", FindingKind.CONCERN, "Eat\tmore\nveg"))
         val replaced = CoachMemory.remember(first, CoachMemoryEntry(today, "protein_low", FindingKind.CONCERN, "Protein"))
-        val withOlder = CoachMemory.remember(replaced, CoachMemoryEntry(today.minusDays(1), "sleep_low", FindingKind.CONCERN, "Sleep"))
+        val withOlder = CoachMemory.remember(replaced, CoachMemoryEntry(today.minus(1, DateTimeUnit.DAY), "sleep_low", FindingKind.CONCERN, "Sleep"))
 
         val decoded = CoachMemory.decode(CoachMemory.encode(withOlder))
         assertEquals(listOf("protein_low", "sleep_low"), decoded.map { it.focusId })

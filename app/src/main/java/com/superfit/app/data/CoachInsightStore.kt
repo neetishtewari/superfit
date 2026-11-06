@@ -6,6 +6,7 @@ import com.superfit.app.domain.CoachMemory
 import com.superfit.app.domain.CoachMemoryEntry
 import com.superfit.app.domain.FindingKind
 import java.time.LocalDate
+import kotlinx.datetime.toKotlinLocalDate
 
 /** Keeps today's coach message for the home screen, plus a short memory of past messages. */
 object CoachInsightStore {
@@ -45,7 +46,7 @@ object CoachInsightStore {
     fun save(prefs: SharedPreferences, date: LocalDate, insight: CoachInsight) {
         val memory = CoachMemory.remember(
             memory(prefs),
-            CoachMemoryEntry(date, insight.focusId, insight.focusKind, insight.headline)
+            CoachMemoryEntry(date.toKotlinLocalDate(), insight.focusId, insight.focusKind, insight.headline)
         )
         prefs.edit()
             .putString(KEY_DATE, date.toString())

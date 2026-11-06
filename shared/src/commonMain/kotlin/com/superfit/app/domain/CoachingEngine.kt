@@ -7,13 +7,17 @@ import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.json.JSONObject
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.util.Locale
-import kotlinx.datetime.toKotlinLocalDate
-import kotlinx.datetime.toKotlinLocalTime
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 /** What the coach card shows: one headline, one thing to do, and the numbers behind it. */
 data class CoachInsight(
@@ -62,6 +66,7 @@ object CoachMemory {
 
 class CoachingEngine {
 
+    @OptIn(ExperimentalTime::class)
     suspend fun generateDailyInsight(
         profile: UserProfileEntity,
         macroTargets: MacroTargets,
@@ -73,12 +78,13 @@ class CoachingEngine {
         historyWeights: List<WeightEntryEntity>,
         memory: List<CoachMemoryEntry>,
         notes: List<CoachNote> = emptyList(),
-        today: LocalDate = LocalDate.now(),
-        now: LocalTime = LocalTime.now()
+        zone: TimeZone = TimeZone.currentSystemDefault(),
+        today: LocalDate = Clock.System.now().toLocalDateTime(zone).date,
+        now: LocalTime = Clock.System.now().toLocalDateTime(zone).time
     ): CoachInsight {
         val report = CoachPatternEngine.analyze(
-            today = today.toKotlinLocalDate(),
-            now = now.toKotlinLocalTime(),
+            today = today,
+            now = now,
             weightKg = profile.weightKg,
             goal = profile.goal,
             targets = macroTargets,
@@ -90,22 +96,22 @@ class CoachingEngine {
             weights = historyWeights,
             targetWeightKg = profile.targetWeightKg
         )
-        val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today.toKotlinLocalDate())
-        val focus = chooseFocus(report, memory, today, plans, lastTreatDay(historyNutrition))
+        val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today, zone)
+        val focus = chooseFocus(report, memory, today, plans, lastTreatDay(historyNutrition, zone))
         val support = report.findings.firstOrNull { it.kind == FindingKind.WIN && it.id != focus.id }
         val why = whyLines(focus, report)
 
-        val prompt = PersonalNutrition.adviceLine() + buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition, notes)
+        val prompt = PersonalNutrition.adviceLine() + buildPrompt(profile, report, focus, support, memory, today, now, historyNutrition, notes, zone)
         return try {
-            val response = GeminiClient.generateContent(
+            val response = Ai.generate(
                 prompt = prompt,
                 systemInstructionText = SYSTEM_INSTRUCTION + CoachStyle.current.instruction(),
                 isJson = true
             )
             parseResponse(response, focus, why)
         } catch (e: Exception) {
-            android.util.Log.e("CoachingEngine", "Coach AI call failed, showing the plain summary", e)
-            fallbackInsight(focus, why, note = GeminiClient.sanitizeError(e))
+            AppLog.w("CoachingEngine", "Coach AI call failed, showing the plain summary", e)
+            fallbackInsight(focus, why, note = Ai.friendlyError(e))
         }
     }
 
@@ -221,7 +227,7 @@ class CoachingEngine {
         ): CoachFinding {
             val past = memory.filter { it.date < today }.sortedByDescending { it.date }
             val restingSince = past
-                .filter { ChronoUnit.DAYS.between(it.date, today) <= REST_DAYS }
+                .filter { it.date.daysUntil(today) <= REST_DAYS }
                 .groupBy { areaOf(it.focusId) }
                 .mapValues { (_, entries) -> entries.maxOf { it.date } }
 
@@ -250,21 +256,22 @@ class CoachingEngine {
             val recentIds = past.map { it.focusId }.toSet()
             val open = HABITS.filter { it.id !in kept }.ifEmpty { return null }
             val habit = open.firstOrNull { it.id !in recentIds }
-                ?: open[Math.floorMod(today.toEpochDay(), open.size.toLong()).toInt()]
-            val due = lastHabit == null || ChronoUnit.DAYS.between(lastHabit, today) > REST_DAYS
+                ?: open[today.toEpochDays().mod(open.size.toLong()).toInt()]
+            val due = lastHabit == null || lastHabit.daysUntil(today) > REST_DAYS
             return habit.copy(priority = if (due) HABIT_PRIORITY_DUE else HABIT_PRIORITY)
         }
 
         /** The day of the latest real-sized treat, so treats can come back as soon as there's a new one. */
-        fun lastTreatDay(nutrition: List<NutritionEntryEntity>): LocalDate? =
+        @OptIn(ExperimentalTime::class)
+        fun lastTreatDay(nutrition: List<NutritionEntryEntity>, zone: TimeZone = TimeZone.currentSystemDefault()): LocalDate? =
             nutrition.filter { Treats.isRealTreat(it) }
                 .maxOfOrNull { it.timestamp }
-                ?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
+                ?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(zone).date }
 
         /** Concerns the coach raised in the last two weeks that the latest logs no longer show. */
         fun followUps(report: CoachReport, past: List<CoachMemoryEntry>, today: LocalDate): List<CoachFinding> {
             val recentConcerns = past
-                .filter { it.focusKind == FindingKind.CONCERN && ChronoUnit.DAYS.between(it.date, today) <= 14 }
+                .filter { it.focusKind == FindingKind.CONCERN && it.date.daysUntil(today) <= 14 }
             return recentConcerns
                 .groupBy { areaOf(it.focusId) }
                 .mapNotNull { (area, entries) ->
@@ -276,7 +283,7 @@ class CoachingEngine {
                     // Only celebrate once per concern.
                     if (past.any { it.focusId == id && it.date >= flaggedOn }) return@mapNotNull null
                     val currentWin = report.findings.firstOrNull { it.area == area && it.kind == FindingKind.WIN }
-                    val daysAgo = ChronoUnit.DAYS.between(flaggedOn, today)
+                    val daysAgo = flaggedOn.daysUntil(today)
                     val whenText = if (daysAgo <= 1) "Yesterday" else "$daysAgo days ago"
                     CoachFinding(
                         id = id,
@@ -357,7 +364,8 @@ class CoachingEngine {
             today: LocalDate,
             now: LocalTime,
             nutrition: List<NutritionEntryEntity>,
-            notes: List<CoachNote> = emptyList()
+            notes: List<CoachNote> = emptyList(),
+            zone: TimeZone = TimeZone.currentSystemDefault()
         ): String {
             val t = report.today
             val goalText = when (profile.goal) {
@@ -367,13 +375,12 @@ class CoachingEngine {
             }
             val meals = if (t.mealsLogged.isEmpty()) "none yet" else t.mealsLogged.joinToString { it.name.lowercase() }
             val treats = if (t.treatsToday.isEmpty()) "none" else t.treatsToday.joinToString()
-            val dayName = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
             val recentMessages = memory.filter { it.date < today }.sortedByDescending { it.date }.take(5)
-                .joinToString("\n") { "- ${it.date.format(dayName)}: ${it.headline}" }
+                .joinToString("\n") { "- ${EnglishDates.weekdayShort(it.date)}: ${it.headline}" }
                 .ifBlank { "- none yet" }
 
             return buildString {
-                appendLine("Current time: ${now.format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))}")
+                appendLine("Current time: ${EnglishDates.time(now)}")
                 appendLine("User: goal is to $goalText. Age ${profile.age}, ${profile.weightKg.toInt()} kg.")
                 appendLine()
                 appendLine("THE FOCUS (${focus.kind.name.lowercase()}): ${focus.fact}")
@@ -393,10 +400,10 @@ class CoachingEngine {
                 appendLine("What their targets mean:")
                 report.targetMeanings.forEach { appendLine("- $it") }
                 appendLine()
-                appendLine("Foods they often eat: ${commonFoods(nutrition, today).ifBlank { "not enough logs yet" }}")
+                appendLine("Foods they often eat: ${commonFoods(nutrition, today, zone).ifBlank { "not enough logs yet" }}")
                 appendLine()
                 appendLine("What you know about them from your chats (respect these):")
-                appendLine(CoachNotes.promptLines(notes, today.toKotlinLocalDate()).ifBlank { "- nothing yet" })
+                appendLine(CoachNotes.promptLines(notes, today).ifBlank { "- nothing yet" })
                 appendLine()
                 appendLine("Your recent messages (newest first):")
                 appendLine(recentMessages)
@@ -404,8 +411,9 @@ class CoachingEngine {
         }
 
         /** The user's most-logged foods over the last two weeks, so tips fit what they actually eat. */
-        fun commonFoods(nutrition: List<NutritionEntryEntity>, today: LocalDate): String {
-            val cutoff = today.minusDays(14).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        @OptIn(ExperimentalTime::class)
+        fun commonFoods(nutrition: List<NutritionEntryEntity>, today: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): String {
+            val cutoff = today.minus(14, DateTimeUnit.DAY).atStartOfDayIn(zone).toEpochMilliseconds()
             return nutrition.filter { it.timestamp >= cutoff }
                 .groupingBy { it.foodText.trim().lowercase().take(40) }
                 .eachCount()

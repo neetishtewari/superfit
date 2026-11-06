@@ -2,16 +2,16 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
-import kotlinx.datetime.toJavaLocalDate
-import kotlinx.datetime.toKotlinLocalDate
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * What the coach chat knows about the user when it answers: their own meals, days, workouts,
@@ -19,9 +19,6 @@ import kotlinx.datetime.toKotlinLocalDate
  * puts it into words.
  */
 object CoachChatContext {
-
-    private val dayFormat = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
-    private val timeFormat = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
 
     val RULES = """
         Rules:
@@ -54,12 +51,12 @@ object CoachChatContext {
         notes: List<CoachNote>,
         todayTip: CoachInsight?,
         earlierTopics: List<String>,
-        zone: ZoneId = ZoneId.systemDefault()
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): String = buildString {
-        appendLine("Today is ${today.format(dayFormat)}, ${now.format(timeFormat)}.")
+        appendLine("Today is ${EnglishDates.short(today)}, ${EnglishDates.time(now)}.")
         if (targetWeightKg != null) {
             appendLine(
-                "Goal weight: ${fmt(targetWeightKg)} kg" + (goalDate?.let { ", by ${it.format(dayFormat)} ${it.year}" } ?: "") + "."
+                "Goal weight: ${fmt(targetWeightKg)} kg" + (goalDate?.let { ", by ${EnglishDates.short(it)} ${it.year}" } ?: "") + "."
             )
         }
         appendLine()
@@ -75,7 +72,7 @@ object CoachChatContext {
         appendLine("Foods they often eat: ${commonFoods.ifBlank { "not enough logs yet" }}")
         appendLine()
         appendLine("What you know about them (from earlier chats and their own notes; respect these):")
-        appendLine(CoachNotes.promptLines(notes, today.toKotlinLocalDate()).ifBlank { "- nothing yet" })
+        appendLine(CoachNotes.promptLines(notes, today).ifBlank { "- nothing yet" })
         if (todayTip != null) {
             appendLine()
             appendLine("Today's tip on their home screen, from you: ${todayTip.headline} ${todayTip.action}".trim())
@@ -87,15 +84,16 @@ object CoachChatContext {
         }
     }.trim()
 
-    fun mealLines(meals: List<NutritionEntryEntity>, zone: ZoneId): String =
+    @OptIn(ExperimentalTime::class)
+    fun mealLines(meals: List<NutritionEntryEntity>, zone: TimeZone): String =
         meals.sortedBy { it.timestamp }.joinToString("\n") { e ->
-            val time = Instant.ofEpochMilli(e.timestamp).atZone(zone).toLocalTime().format(timeFormat)
+            val time = EnglishDates.time(Instant.fromEpochMilliseconds(e.timestamp).toLocalDateTime(zone).time)
             val foods = MealItems.decode(e.items)?.items?.takeIf { it.isNotEmpty() }?.joinToString { it.label() } ?: e.foodText
             "- $time: $foods (${e.calories.roundToInt()} kcal, ${e.proteinG.roundToInt()} g protein)"
         }
 
     fun dayLines(days: List<DayLog>): String = days.joinToString("\n") { d ->
-        val day = d.date.toJavaLocalDate().format(dayFormat)
+        val day = EnglishDates.short(d.date)
         when (d.status) {
             DayLogStatus.BLANK -> "- $day: nothing logged (unknown, not a day without food)"
             else -> {
@@ -106,17 +104,18 @@ object CoachChatContext {
         }
     }
 
-    fun workoutLines(workouts: List<WorkoutEntryEntity>, today: LocalDate, zone: ZoneId, limit: Int = 15): String {
-        val since = today.minusDays(13)
+    @OptIn(ExperimentalTime::class)
+    fun workoutLines(workouts: List<WorkoutEntryEntity>, today: LocalDate, zone: TimeZone, limit: Int = 15): String {
+        val since = today.minus(13, DateTimeUnit.DAY)
         return workouts
-            .map { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() to it }
+            .map { Instant.fromEpochMilliseconds(it.timestamp).toLocalDateTime(zone).date to it }
             .filter { (date, _) -> date >= since && date <= today }
             .sortedByDescending { it.second.timestamp }
             .take(limit)
-            .joinToString("\n") { (date, w) -> "- ${date.format(dayFormat)}: ${w.description} (~${w.caloriesBurned.roundToInt()} kcal)" }
+            .joinToString("\n") { (date, w) -> "- ${EnglishDates.short(date)}: ${w.description} (~${w.caloriesBurned.roundToInt()} kcal)" }
     }
 
-    private fun fmt(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else String.format(Locale.US, "%.1f", v)
+    private fun fmt(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else Decimals.one(v)
 }
 
 /** Ready-made questions above the chat box that fit the moment. */

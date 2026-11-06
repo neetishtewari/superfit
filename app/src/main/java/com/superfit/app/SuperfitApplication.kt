@@ -23,6 +23,7 @@ class SuperfitApplication : Application() {
         com.superfit.app.domain.Ai.text = com.superfit.app.domain.AiText { prompt, system, isJson ->
             com.superfit.app.domain.GeminiClient.generateContent(prompt, system, isJson)
         }
+        com.superfit.app.domain.Ai.friendlyError = { com.superfit.app.domain.GeminiClient.sanitizeError(it) }
         com.superfit.app.data.AppAnalytics.init(this)
         com.superfit.app.data.GeminiKeyStore.forgetOldKeys(this)
         com.superfit.app.data.BodyImporter.load(this)

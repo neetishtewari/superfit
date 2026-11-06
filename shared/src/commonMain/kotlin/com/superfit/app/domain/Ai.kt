@@ -13,6 +13,9 @@ object Ai {
     /** Set once when the app starts, before any AI call. */
     lateinit var text: AiText
 
+    /** Turns an AI failure into a short message people can read. Each app sets its own at start-up. */
+    var friendlyError: (Throwable) -> String = { "The AI coach couldn't be reached. Please try again shortly." }
+
     suspend fun generate(prompt: String, systemInstructionText: String? = null, isJson: Boolean = true): String =
         text.generate(prompt, systemInstructionText, isJson)
 }
