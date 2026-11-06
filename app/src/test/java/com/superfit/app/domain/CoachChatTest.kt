@@ -1,8 +1,8 @@
 package com.superfit.app.domain
 
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.toKotlinLocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

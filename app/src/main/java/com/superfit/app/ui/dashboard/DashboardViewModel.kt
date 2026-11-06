@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toKotlinDayOfWeek
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinLocalTime
 
@@ -249,7 +250,7 @@ class DashboardViewModel(
         val now = java.time.LocalDateTime.now()
         return com.superfit.app.domain.CoachQuestions.forNow(
             hour = now.hour,
-            day = now.dayOfWeek,
+            day = now.dayOfWeek.toKotlinDayOfWeek(),
             mealsToday = state?.nutritionList?.size ?: 0,
             proteinStillNeeded = state?.let { (it.macroTargets.proteinG - it.proteinEaten).toInt() } ?: 0,
             workedOutToday = state != null && (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()),
