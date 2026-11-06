@@ -1,6 +1,6 @@
 # A daily step goal that fits the person
 
-Date: 2026-11-06. Status: design, waiting for Neetish's OK. Nothing built yet.
+Date: 2026-11-06. Status: approved by Neetish 2026-11-06 (with the recommended picks: 7,000 ceiling for 70+, very active people follow their own usual). Built for 1.0.53.
 Plan page: https://claude.ai/artifact/Nq5zmYK1H7pMnk7Bi746BY
 
 ## Why
@@ -79,9 +79,10 @@ Examples:
   Input: daily steps history, age, current goal and when it was set, today. Output: goal, usual,
   healthy aim, reason (starter / up / down / same / own number).
 - Daily steps already come from Health Connect into `activity_telemetry`, so **no new permission,
-  no database change**. Goal, date set and own-number choice are kept in app preferences and in
-  the existing Firestore profile backup so they survive a reinstall.
-- Analytics: one event `step_goal_changed` (direction up/down, auto/own). No step numbers sent.
+  no database change**. Goal, date set and own-number choice are kept in app preferences
+  (`StepGoalStore`), which Android's own backup covers. After a fresh install the automatic goal
+  is simply worked out again from the restored step history.
+- Analytics: one event `step_goal_changed` (direction up/down/set, mode auto/own). No step numbers sent.
 
 ## Not in this version
 

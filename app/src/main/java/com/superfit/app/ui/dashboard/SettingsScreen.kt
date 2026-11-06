@@ -54,6 +54,7 @@ fun SettingsScreen(
     val sharedPrefs = remember { getUserSharedPrefs(context) }
 
     val dashboardState by viewModel.dashboardState.collectAsState()
+    val stepGoal by viewModel.stepGoal.collectAsState()
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val scrollState = rememberScrollState()
@@ -363,6 +364,24 @@ fun SettingsScreen(
                             onSelect = { goal -> viewModel.updateGoal(goal.key, goal.calorieOffset) },
                             selectedDetail = "Today's target: ${"%,d".format(targets.calories.roundToInt())} kcal · ${targets.proteinG.roundToInt()} g protein"
                         )
+                    }
+
+                    stepGoal?.let { goal ->
+                        HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Daily step goal",
+                                fontWeight = FontWeight.Bold,
+                                color = SuperfitTheme.colors.textPrimary,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Today's goal: ${"%,d".format(goal.goal)} steps",
+                                color = SuperfitTheme.colors.textSecondary,
+                                fontSize = 12.sp
+                            )
+                            StepGoalChooser(goal = goal, onSetOwn = { viewModel.setOwnStepGoal(it) })
+                        }
                     }
 
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)

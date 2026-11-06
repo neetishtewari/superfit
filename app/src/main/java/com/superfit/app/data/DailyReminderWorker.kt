@@ -123,6 +123,7 @@ class DailyReminderWorker(
                     },
                     historyActivity = database.telemetryDao().getAllActivity(),
                     historySleep = database.telemetryDao().getAllSleep(),
+                    stepGoal = StepGoalStore.ownGoal(applicationContext) ?: StepGoalStore.load(applicationContext)?.goal,
                     historyWeights = database.weightDao().getAllWeightEntries(),
                     memory = CoachInsightStore.memory(sharedPrefs),
                     notes = CoachChatStore.loadNotes(applicationContext)

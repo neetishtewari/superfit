@@ -163,7 +163,11 @@ private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVecto
 }
 
 @Composable
-internal fun CalorieRingsCard(state: DashboardUiState.Success) {
+internal fun CalorieRingsCard(
+    state: DashboardUiState.Success,
+    stepGoal: com.superfit.app.domain.StepGoalResult? = null,
+    onStepsClick: () -> Unit = {}
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -187,7 +191,8 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            val stepsTarget = 10000.0
+            // The person's own step goal (see StepGoal); the age starter until it's worked out.
+            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.age)).toDouble()
             val caloriesTarget = state.macroTargets.calories
 
             val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
@@ -211,11 +216,17 @@ internal fun CalorieRingsCard(state: DashboardUiState.Success) {
                     value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
                     color = NeonGreen
                 )
-                RingLegendItem(
-                    label = "Steps",
-                    value = "${fmt.format(state.activity.steps)} of 10,000",
-                    color = ElectricCyan
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
+                ) {
+                    RingLegendItem(
+                        label = "Steps",
+                        value = "${fmt.format(state.activity.steps)} of ${fmt.format(stepsTarget.toInt())}",
+                        color = ElectricCyan
+                    )
+                }
                 workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)?.let {
                     Text(text = it, fontSize = 12.sp, color = ThemeTextSecondary)
                 }
