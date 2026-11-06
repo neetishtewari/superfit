@@ -68,7 +68,7 @@ switch sits under the big green log buttons, which take the eye first; "Log" rea
 ## Calmer green (Neetish 2026-11-06 18:50Z: yes)
 
 - Solid brand green only on the two log buttons on Today.
-- Selected switch option (Food/Activity, Insights/Journey/Past days) and selected menu tab:
+- Selected switch option (Food/Activity, Insights/Journey/History) and selected menu tab:
   light mode pale green (BrandGreenSoft) with dark green text (BrandGreenDeep) and a thin green
   outline; dark mode deeper green fill with white text (keeps the earlier dark-mode visibility fix).
 - Macro bars: protein green, carbs slate blue, fat sand, fibre sage (quiet, not semantic colours).
