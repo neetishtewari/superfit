@@ -8,4 +8,5 @@ plugins {
   alias(libs.plugins.android.kotlin.multiplatform.library) apply false
   alias(libs.plugins.google.services) apply false
   alias(libs.plugins.firebase.crashlytics) apply false
+  alias(libs.plugins.ksp) apply false
 }

@@ -92,6 +92,10 @@ tested on the dev app first.
    - Later: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
+   - 4a: Room's code generator switches from kapt to KSP (the multiplatform way). The database,
+     its tables and saved schema stay exactly the same; only the build tool changes.
+   - 4b: the DAOs and the database class move to `shared`, with Room's bundled SQLite driver for
+     the iPhone. Android keeps its existing database file and migrations.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
    iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
 
@@ -119,6 +123,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 4a (reviewed 6 Nov): build-tool change only. KSP comes from Google's official Maven
+repository; the generated database code and schema are unchanged. No new permissions, network
+calls or secrets.
 
 Step 3t (reviewed 6 Nov): card text built the same way; weight and calories eaten are still never
 on a card. The AI prompts for card lines are unchanged and still only get facts the app already

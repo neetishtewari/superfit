@@ -5,7 +5,7 @@ plugins {
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
-  id("kotlin-kapt")
+  alias(libs.plugins.ksp)
   alias(libs.plugins.google.services)
   alias(libs.plugins.firebase.crashlytics)
 }
@@ -106,11 +106,9 @@ kotlin {
     jvmToolchain(17)
 }
 
-kapt {
-    arguments {
-        // Room writes each schema version here; commit the JSON so schema changes show up in review.
-        arg("room.schemaLocation", "$projectDir/schemas")
-    }
+ksp {
+    // Room writes each schema version here; commit the JSON so schema changes show up in review.
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -164,7 +162,7 @@ dependencies {
   // Room Database
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.room.ktx)
-  kapt(libs.androidx.room.compiler)
+  ksp(libs.androidx.room.compiler)
 
   // WorkManager
   implementation(libs.androidx.work.runtime)
