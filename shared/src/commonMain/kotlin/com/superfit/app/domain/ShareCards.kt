@@ -1,16 +1,15 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.WorkoutEntryEntity
-import java.text.NumberFormat
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
-import kotlinx.datetime.toJavaLocalDate
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /** One number on a card: "PROTEIN 132 g", with an optional bar and a small line under it. */
 data class CardStat(
@@ -112,12 +111,14 @@ sealed interface ShareCard {
 }
 
 /** Builds share cards from what the app already shows. Anything missing is left out, never shown as zero. */
+@OptIn(ExperimentalTime::class)
 object ShareCards {
 
-    private val dayFormat = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())
-    private val shortDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
-    private val monthFormat = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
-    private val clock = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
+    private fun at(millis: Long, zone: TimeZone): LocalDateTime = Instant.fromEpochMilliseconds(millis).toLocalDateTime(zone)
+
+    private fun dateAndTime(t: LocalDateTime) = "${LocalFormat.dayLine(t.date)} · ${LocalFormat.clock(t.time)}"
+
+    private fun two(n: Long) = n.toString().padStart(2, '0')
 
     /** The day's longest workout for the daily card's workout tile. */
     data class DayWorkout(val value: String, val note: String)
@@ -150,7 +151,7 @@ object ShareCards {
                     add(CardStat("DIET QUALITY", "$dietScore", "/100", "7-day score", dietScore / 100f))
                 }
             }
-            if (steps > 0) add(CardStat("STEPS", NumberFormat.getIntegerInstance().format(steps)))
+            if (steps > 0) add(CardStat("STEPS", LocalFormat.integer(steps.toLong())))
             if (workout != null) add(CardStat("WORKOUT", workout.value, note = workout.note))
         }
         // Sleep isn't on the day card, but a roast about oversleeping can show it.
@@ -159,7 +160,7 @@ object ShareCards {
             CardStat("SLEEP", "${minutes / 60}h ${minutes % 60}m", note = "last night")
         }
         return ShareCard.Daily(
-            dateLine = date.format(dayFormat),
+            dateLine = LocalFormat.dayLine(date),
             streakDays = streakDays,
             tiles = tiles,
             pool = tiles + listOfNotNull(sleep),
@@ -168,9 +169,9 @@ object ShareCards {
     }
 
     /** The day's longest imported workout, or else the first voice-logged one. */
-    fun dayWorkout(imported: List<WorkoutView>, voiceLogged: List<WorkoutEntryEntity>, zone: ZoneId = ZoneId.systemDefault()): DayWorkout? {
+    fun dayWorkout(imported: List<WorkoutView>, voiceLogged: List<WorkoutEntryEntity>, zone: TimeZone = TimeZone.currentSystemDefault()): DayWorkout? {
         imported.maxByOrNull { it.minutes }?.let { w ->
-            val value = w.distanceKm?.let { String.format(Locale.US, "%.1f km", it) } ?: "${w.minutes} min"
+            val value = w.distanceKm?.let { Decimals.one(it) + " km" } ?: "${w.minutes} min"
             return DayWorkout(value, "${partOfDay(w.startTime, zone)} ${w.noun}")
         }
         voiceLogged.firstOrNull()?.let { e ->
@@ -179,21 +180,21 @@ object ShareCards {
         return null
     }
 
-    fun activity(w: WorkoutView, zone: ZoneId = ZoneId.systemDefault()): ShareCard.Activity {
-        val start = Instant.ofEpochMilli(w.startTime).atZone(zone)
+    fun activity(w: WorkoutView, zone: TimeZone = TimeZone.currentSystemDefault()): ShareCard.Activity {
+        val start = at(w.startTime, zone)
         val hasDistance = w.distanceKm != null
         val stats = buildList {
             if (hasDistance) add(CardStat("TIME", duration(w.merged.durationMillis)))
             w.paceSecondsPerKm?.let { add(CardStat("PACE", pace(it), "/km")) }
-            w.speedKmh?.let { add(CardStat("SPEED", String.format(Locale.US, "%.1f", it), "km/h")) }
+            w.speedKmh?.let { add(CardStat("SPEED", Decimals.one(it), "km/h")) }
             w.avgHeartRate?.let { add(CardStat("AVG HEART RATE", "$it", "bpm")) }
             w.exerciseKcal?.let { add(CardStat("BURNED", "${it.roundToInt()}", "kcal")) }
         }
         return ShareCard.Activity(
-            dateLine = "${start.format(dayFormat)} · ${start.format(clock)}",
+            dateLine = dateAndTime(start),
             // The workout's own name; only a workout of no known kind is named by the time of day.
-            heading = (if (w.title == "Workout") "${partOfDay(w.startTime, zone)} workout" else w.title).uppercase(Locale.getDefault()),
-            bigValue = w.distanceKm?.let { String.format(Locale.US, "%.2f", it) } ?: "${w.minutes}",
+            heading = (if (w.title == "Workout") "${partOfDay(w.startTime, zone)} workout" else w.title).let(LocalFormat::uppercase),
+            bigValue = w.distanceKm?.let { Decimals.fixed(it, 2) } ?: "${w.minutes}",
             bigUnit = if (hasDistance) "km" else "min",
             subtitle = null,
             stats = stats,
@@ -235,11 +236,11 @@ object ShareCards {
     }
 
     /** A voice-logged workout has what the user said and its calories, nothing more. */
-    fun activity(e: WorkoutEntryEntity, zone: ZoneId = ZoneId.systemDefault()): ShareCard.Activity {
-        val start = Instant.ofEpochMilli(e.timestamp).atZone(zone)
+    fun activity(e: WorkoutEntryEntity, zone: TimeZone = TimeZone.currentSystemDefault()): ShareCard.Activity {
+        val start = at(e.timestamp, zone)
         return ShareCard.Activity(
-            dateLine = "${start.format(dayFormat)} · ${start.format(clock)}",
-            heading = "${partOfDay(e.timestamp, zone)} workout".uppercase(Locale.getDefault()),
+            dateLine = dateAndTime(start),
+            heading = "${partOfDay(e.timestamp, zone)} workout".let(LocalFormat::uppercase),
             bigValue = "${e.caloriesBurned.roundToInt()}",
             bigUnit = "kcal",
             subtitle = e.description,
@@ -248,17 +249,17 @@ object ShareCards {
         )
     }
 
-    fun best(b: PersonalBest, isNew: Boolean, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): ShareCard.Best {
-        val date = b.workout?.let { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() } ?: b.periodStart?.toJavaLocalDate() ?: today
+    fun best(b: PersonalBest, isNew: Boolean, today: LocalDate, zone: TimeZone = TimeZone.currentSystemDefault()): ShareCard.Best {
+        val date = b.workout?.let { at(it.startTime, zone).date } ?: b.periodStart ?: today
         val dateLine = when (b.kind.period) {
-            BestPeriod.WEEK -> "Week of " + date.format(shortDate)
-            BestPeriod.MONTH -> date.format(monthFormat)
-            else -> date.format(dayFormat)
+            BestPeriod.WEEK -> "Week of " + LocalFormat.dayMonth(date)
+            BestPeriod.MONTH -> LocalFormat.monthYear(date)
+            else -> LocalFormat.dayLine(date)
         }
         // Week and month bests read fine without the date of the one they beat.
         val datedPrevious = b.kind.period == BestPeriod.WORKOUT || b.kind.period == BestPeriod.DAY
         val previousDate = b.previousTime?.takeIf { datedPrevious }
-            ?.let { " · " + Instant.ofEpochMilli(it).atZone(zone).toLocalDate().format(shortDate) }
+            ?.let { " · " + LocalFormat.dayMonth(at(it, zone).date) }
             .orEmpty()
         val prev = b.previousValue.takeIf { b.rank == 1 }
         return when {
@@ -270,7 +271,7 @@ object ShareCards {
                 bigUnit = "/km",
                 detail = b.workout?.let { w ->
                     listOfNotNull(
-                        w.distanceKm?.let { String.format(Locale.US, "%.2f km run", it) },
+                        w.distanceKm?.let { Decimals.fixed(it, 2) + " km run" },
                         duration(w.merged.durationMillis)
                     ).joinToString(" · ")
                 },
@@ -292,21 +293,21 @@ object ShareCards {
                 dateLine = dateLine,
                 isNew = isNew,
                 label = b.title,
-                bigValue = String.format(Locale.US, "%.2f", b.value),
+                bigValue = Decimals.fixed(b.value, 2),
                 bigUnit = "km",
                 detail = b.workout?.let { w ->
                     listOfNotNull(duration(w.merged.durationMillis), w.paceSecondsPerKm?.let { pace(it) + " /km" }).joinToString(" · ")
                 } ?: "running and walking",
-                previous = prev?.let { String.format(Locale.US, "%.2f km", it) + previousDate },
-                gain = prev?.let { String.format(Locale.US, "+%.2f km", abs(b.value - it)) },
+                previous = prev?.let { Decimals.fixed(it, 2) + " km" + previousDate },
+                gain = prev?.let { "+" + Decimals.fixed(abs(b.value - it), 2) + " km" },
                 podium = b.rank > 1
             )
         }
     }
 
     /** "Morning", "Afternoon", "Evening" or "Night", the way runners name workouts. */
-    fun partOfDay(millis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-        when (Instant.ofEpochMilli(millis).atZone(zone).hour) {
+    fun partOfDay(millis: Long, zone: TimeZone = TimeZone.currentSystemDefault()): String =
+        when (at(millis, zone).hour) {
             in 5..11 -> "Morning"
             in 12..16 -> "Afternoon"
             in 17..20 -> "Evening"
@@ -319,10 +320,10 @@ object ShareCards {
         val h = total / 3600
         val m = (total % 3600) / 60
         val s = total % 60
-        return if (h > 0) String.format(Locale.US, "%d:%02d:%02d", h, m, s) else String.format(Locale.US, "%d:%02d", m, s)
+        return if (h > 0) "$h:${two(m)}:${two(s)}" else "$m:${two(s)}"
     }
 
-    private fun pace(secondsPerKm: Long): String = String.format(Locale.US, "%d:%02d", secondsPerKm / 60, secondsPerKm % 60)
+    private fun pace(secondsPerKm: Long): String = "${secondsPerKm / 60}:${two(secondsPerKm % 60)}"
 
     /** The coach writes **bold**; a picture shows plain text. */
 

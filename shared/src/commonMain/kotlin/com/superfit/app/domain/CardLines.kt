@@ -1,7 +1,5 @@
 package com.superfit.app.domain
 
-import java.util.Locale
-
 /**
  * The AI-written lines a workout card can carry: a coach line in the user's style, or a roast.
  * The app hands the AI only the facts it already knows, and a line that brings in a number the app
@@ -36,8 +34,8 @@ object CardLines {
         val v = card.voice
         if (w != null) {
             add("Workout: ${w.title}, ${w.minutes} minutes")
-            w.distanceKm?.let { add(String.format(Locale.US, "Distance: %.2f km", it)) }
-            w.paceSecondsPerKm?.let { add("Pace: ${it / 60}:${"%02d".format(it % 60)} per km") }
+            w.distanceKm?.let { add("Distance: ${Decimals.fixed(it, 2)} km") }
+            w.paceSecondsPerKm?.let { add("Pace: ${it / 60}:${(it % 60).toString().padStart(2, '0')} per km") }
             w.avgHeartRate?.let { add("Average heart rate: $it bpm") }
         } else if (v != null) {
             add("Workout they logged by voice: \"${v.description.take(200)}\"")
@@ -50,7 +48,7 @@ object CardLines {
             }
         }
         card.heart?.effortMinutes?.takeIf { it.isNotEmpty() }?.let { m ->
-            add("Effort minutes: " + m.entries.joinToString(", ") { "${it.key.label.lowercase(Locale.US)} ${it.value}" })
+            add("Effort minutes: " + m.entries.joinToString(", ") { "${it.key.label.lowercase()} ${it.value}" })
         }
         weekCount?.takeIf { it.n > 0 }?.let { add("${it.plural.replaceFirstChar { c -> c.uppercase() }} this week so far, this one included: ${it.n}") }
         card.moment?.let { add("Stand-out: $it") }
@@ -84,7 +82,7 @@ object CardLines {
 
     /** The one fair, true line every roast ends with. */
     fun fairLine(moment: String?, weekCount: CardCount?): String = when {
-        moment != null -> "Still: ${moment.replaceFirstChar { it.lowercase(Locale.getDefault()) }}."
+        moment != null -> "Still: ${moment.replaceFirstChar { LocalFormat.lowercase(it.toString()) }}."
         weekCount != null && weekCount.n >= 2 -> "Still: ${weekCount.phrase()}."
         else -> "Still showed up. That counts."
     }
