@@ -14,8 +14,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -29,11 +31,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -58,11 +64,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.ZoomSuggestionOptions
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.ui.dashboard.NeonGreen
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 
@@ -156,9 +165,22 @@ fun FoodCameraScreen(
         }
 
         val state = controller.state
+        // If nothing has been read after a while, give a tip and a way out to the label.
+        var showScanHelp by remember { mutableStateOf(false) }
+        LaunchedEffect(controller.mode, state) {
+            showScanHelp = false
+            if (controller.mode == CameraMode.BARCODE && state == CameraState.Viewfinder) {
+                delay(SCAN_HELP_AFTER_MS)
+                showScanHelp = true
+            }
+        }
         if (hasPermission && state == CameraState.Viewfinder) {
             when (controller.mode) {
-                CameraMode.BARCODE -> FrameGuide(widthFraction = 0.78f, heightFraction = 0.22f, hint = "Point at the barcode")
+                CameraMode.BARCODE -> FrameGuide(
+                    widthFraction = 0.78f,
+                    heightFraction = 0.22f,
+                    hint = if (showScanHelp) "Hold steady, a hand's width away. Tap to focus." else "Point at the barcode"
+                )
                 CameraMode.LABEL -> FrameGuide(widthFraction = 0.8f, heightFraction = 0.55f, hint = "Fit the nutrition table here")
                 CameraMode.MEAL -> {}
             }
@@ -197,7 +219,16 @@ fun FoodCameraScreen(
             ) {
                 if (controller.mode == CameraMode.BARCODE) {
                     // Keeps the mode switcher in the same place in every mode.
-                    Spacer(modifier = Modifier.size(76.dp))
+                    Box(modifier = Modifier.height(76.dp), contentAlignment = Alignment.Center) {
+                        if (showScanHelp) {
+                            Button(
+                                onClick = { controller.changeMode(CameraMode.LABEL) },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
+                            ) {
+                                Text("Can't scan? Snap the label", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 } else {
                     ShutterButton(onClick = {
                         takePhoto(context, imageCapture, onPhoto = controller::onPhoto, onError = {
@@ -245,25 +276,18 @@ private fun CameraPreview(
         }
     }
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
-    val scanner = remember {
-        BarcodeScanning.getClient(
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
-                .build()
-        )
-    }
     DisposableEffect(Unit) {
-        onDispose {
-            analysisExecutor.shutdown()
-            scanner.close()
-        }
+        onDispose { analysisExecutor.shutdown() }
     }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var torchOn by remember { mutableStateOf(false) }
 
     // Barcode mode only needs the live analysis; Meal and Label only need photos.
     val scanning = mode == CameraMode.BARCODE
     DisposableEffect(scanning, lifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
+        var scanner: BarcodeScanner? = null
         var disposed = false
         future.addListener({
             if (disposed) return@addListener
@@ -271,14 +295,27 @@ private fun CameraPreview(
                 val cameraProvider = future.get().also { provider = it }
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
                 cameraProvider.unbindAll()
+                torchOn = false
                 if (scanning) {
+                    // The default analysis picture is only 640x480, too blurry for the thin bars on
+                    // small packets. Ask for a sharper one; ML Kit reads barcodes best at 720p-1080p.
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setResolutionSelector(
+                            ResolutionSelector.Builder()
+                                .setResolutionStrategy(
+                                    ResolutionStrategy(Size(1920, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER)
+                                )
+                                .build()
+                        )
                         .build()
-                        .also { it.setAnalyzer(analysisExecutor, BarcodeAnalyzer(scanner) { code -> currentOnBarcode(code) }) }
-                    cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                    val bound = cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                    camera = bound
+                    val barcodeScanner = createScanner(bound).also { scanner = it }
+                    analysis.setAnalyzer(analysisExecutor, BarcodeAnalyzer(barcodeScanner) { code -> currentOnBarcode(code) })
+                    focusOnCentre(previewView, bound)
                 } else {
-                    cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                    camera = cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
                 }
             } catch (e: Exception) {
                 android.util.Log.w("FoodCamera", "Camera could not start", e)
@@ -288,11 +325,83 @@ private fun CameraPreview(
         onDispose {
             disposed = true
             provider?.unbindAll()
+            scanner?.close()
+            camera = null
         }
     }
 
-    AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+    Box(
+        modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+            // Tap anywhere to focus there, like the phone's own camera.
+            detectTapGestures { offset ->
+                val cam = camera ?: return@detectTapGestures
+                val point = previewView.meteringPointFactory.createPoint(offset.x, offset.y)
+                cam.cameraControl.startFocusAndMetering(
+                    FocusMeteringAction.Builder(point).setAutoCancelDuration(4, TimeUnit.SECONDS).build()
+                )
+            }
+        }
+    ) {
+        AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+        val cam = camera
+        if (scanning && cam != null && cam.cameraInfo.hasFlashUnit()) {
+            IconButton(
+                onClick = {
+                    torchOn = !torchOn
+                    cam.cameraControl.enableTorch(torchOn)
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(16.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f))
+            ) {
+                Icon(
+                    if (torchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = if (torchOn) "Turn light off" else "Turn light on",
+                    tint = Color.White
+                )
+            }
+        }
+    }
 }
+
+/**
+ * A scanner for packet barcodes. ML Kit also spots barcodes too small to read and asks to zoom
+ * in on them, so a packet held at arm's length still scans.
+ */
+private fun createScanner(camera: Camera): BarcodeScanner {
+    val maxZoom = camera.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
+    val builder = BarcodeScannerOptions.Builder()
+        .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
+    if (maxZoom > 1f) {
+        builder.setZoomSuggestionOptions(
+            ZoomSuggestionOptions.Builder { ratio ->
+                camera.cameraControl.setZoomRatio(ratio.coerceAtMost(MAX_AUTO_ZOOM))
+                true
+            }
+                .setMaxSupportedZoomRatio(minOf(maxZoom, MAX_AUTO_ZOOM))
+                .build()
+        )
+    }
+    return BarcodeScanning.getClient(builder.build())
+}
+
+/** Focuses on the barcode frame in the middle of the screen; the camera goes back to its own focus after a few seconds. */
+private fun focusOnCentre(previewView: PreviewView, camera: Camera) {
+    previewView.post {
+        if (previewView.width == 0 || previewView.height == 0) return@post
+        val point = previewView.meteringPointFactory.createPoint(previewView.width / 2f, previewView.height / 2f)
+        camera.cameraControl.startFocusAndMetering(
+            FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF).setAutoCancelDuration(3, TimeUnit.SECONDS).build()
+        )
+    }
+}
+
+private const val MAX_AUTO_ZOOM = 3f
+private const val SCAN_HELP_AFTER_MS = 8_000L
 
 /** Hands each frame's barcode number, or null for none, to [onCode]. ML Kit calls back on the main thread. */
 private class BarcodeAnalyzer(
