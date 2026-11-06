@@ -1,6 +1,6 @@
 # A daily step goal that fits the person
 
-Date: 2026-11-06. Status: approved by Neetish 2026-11-06 (with the recommended picks: 7,000 ceiling for 70+, very active people follow their own usual). Built for 1.0.53.
+Date: 2026-11-06. Status: approved by Neetish 2026-11-06 (with the recommended picks: 7,000 ceiling for 70+, very active people follow their own usual). Built for 1.0.53. Changed 2026-11-06 11:40Z after phone test (Neetish): the goal is capped at the healthy aim for everyone; people above it just keep walking.
 Plan page: https://claude.ai/artifact/Nq5zmYK1H7pMnk7Bi746BY
 
 ## Why
@@ -34,9 +34,9 @@ healthy aim for their age.
    - usual under 5,000: +500
    - usual 5,000 and up: +1,000
    - never more than the healthy aim, never under 2,000.
-4. **Already at or above the aim?** Goal = your usual, rounded down to the nearest 500, capped at
-   15,000. The ring stays a fair challenge for very active people, and the app says they're at a
-   healthy level ("Keep it up").
+4. **Already at or above the aim?** The goal stays at the aim. Walking more is a bonus, and the
+   app says they're already above the healthy level. (First built as "follow your own usual, up to
+   15,000"; Neetish chose the cap after trying it.)
 5. **Changes once a week, on Monday**, so the target doesn't move during a day.
    - Goes up only if you reached the current goal on at least 4 of the last 7 days.
    - Goes down if your usual has fallen more than 1,500 below the goal (illness, travel, bad

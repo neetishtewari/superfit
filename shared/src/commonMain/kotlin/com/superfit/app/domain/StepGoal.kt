@@ -68,7 +68,6 @@ object StepGoal {
     const val USUAL_WINDOW_DAYS = 14
     const val MIN_DAYS = 5
     const val FLOOR = 2_000
-    const val CEILING = 15_000
     const val DAYS_TO_RISE = 4
     const val DROP_GAP = 1_500
     const val OWN_MIN = 1_000
@@ -104,7 +103,7 @@ object StepGoal {
     /** The goal for someone whose usual day is [usual] steps. */
     fun target(usual: Int, age: Int): Int {
         val aim = healthyAim(age)
-        if (usual >= aim) return maxOf(aim, usual / 500 * 500).coerceAtMost(CEILING)
+        // Walking more than the aim is great, but the goal itself stops there (Neetish, 2026-11-06).
         return roundTo500(usual + stepUp(usual)).coerceIn(FLOOR, aim)
     }
 
@@ -144,6 +143,9 @@ object StepGoal {
         if (base == null || base.reason == StepGoalReason.STARTER) {
             return result(target(usual, age), StepGoalReason.FIRST, today)
         }
+
+        // A goal saved above the aim (an older rule, or a birthday into a new age band) comes down to it.
+        if (base.goal > aim) return result(aim, StepGoalReason.SAME, today)
 
         // Checked already this week: keep it steady.
         if (base.setOn >= weekStart(today)) return result(base.goal, base.reason, base.setOn)

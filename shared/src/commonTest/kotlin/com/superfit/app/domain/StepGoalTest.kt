@@ -51,10 +51,10 @@ class StepGoalTest {
     }
 
     @Test
-    fun veryActivePeopleFollowTheirOwnUsual() {
-        assertEquals(14_000, StepGoal.target(14_300, 40))
-        assertEquals(15_000, StepGoal.target(22_000, 40))
-        assertEquals(10_000, StepGoal.target(10_200, 40))
+    fun veryActivePeopleStayAtTheHealthyAim() {
+        assertEquals(10_000, StepGoal.target(12_300, 40))
+        assertEquals(10_000, StepGoal.target(22_000, 40))
+        assertEquals(8_000, StepGoal.target(11_000, 65))
     }
 
     @Test
@@ -113,9 +113,16 @@ class StepGoalTest {
         val saved = SavedStepGoal(7_000, StepGoalReason.UP, monday.minus(DatePeriod(days = 7)))
         val r = StepGoal.update(flat(monday, 7_200), 71, saved, null, monday)
         assertEquals(7_200, r.usual)
-        // Above the aim the goal follows the usual, rounded down: 7,000.
+        // Walking above the aim, the goal stays at the aim.
         assertEquals(7_000, r.goal)
         assertTrue(r.atHealthyLevel)
+    }
+
+    @Test
+    fun aGoalSavedAboveTheAimComesDownToIt() {
+        val saved = SavedStepGoal(12_000, StepGoalReason.FIRST, wednesday.minus(DatePeriod(days = 1)))
+        val r = StepGoal.update(flat(wednesday, 12_300), 40, saved, null, wednesday)
+        assertEquals(10_000, r.goal)
     }
 
     @Test

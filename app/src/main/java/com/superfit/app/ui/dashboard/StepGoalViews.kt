@@ -115,7 +115,7 @@ internal fun stepGoalExplanation(goal: StepGoalResult): List<String> {
             if (goal.goal < goal.healthyAim) {
                 lines += "It goes up ${steps(goal.stepUp)} when you reach it on ${StepGoal.DAYS_TO_RISE} days in a week. It's checked each Monday."
             } else if (goal.atHealthyLevel) {
-                lines += "You're already at a healthy level for your age. Your goal follows your own usual day, so it stays a fair daily challenge."
+                lines += "You're already walking more than the healthy level for your age, so your goal stays there. Every step above it is a bonus."
             }
         }
     }
