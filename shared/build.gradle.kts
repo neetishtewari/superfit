@@ -4,6 +4,8 @@
 plugins {
   alias(libs.plugins.kotlin.multiplatform)
   alias(libs.plugins.android.kotlin.multiplatform.library)
+  alias(libs.plugins.ksp)
+  alias(libs.plugins.androidx.room)
 }
 
 kotlin {
@@ -20,8 +22,8 @@ kotlin {
 
   sourceSets {
     commonMain.dependencies {
-      // Room's annotations only (no database code), so the entities can live here.
-      api(libs.androidx.room.common)
+      // The on-device database (tables, queries). Each app opens it its own way.
+      api(libs.androidx.room.runtime)
       // Dates and time zones that work on Android and iPhone alike (replaces java.time).
       api(libs.kotlinx.datetime)
     }
@@ -29,4 +31,15 @@ kotlin {
       implementation(kotlin("test"))
     }
   }
+}
+
+// Room writes each schema version here; commit the JSON so schema changes show up in review.
+room {
+  schemaDirectory("$projectDir/schemas")
+}
+
+dependencies {
+  // Room writes the database code for each platform at build time.
+  add("kspAndroid", libs.androidx.room.compiler)
+  add("kspJvm", libs.androidx.room.compiler)
 }

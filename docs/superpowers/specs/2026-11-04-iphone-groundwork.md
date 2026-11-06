@@ -94,8 +94,10 @@ tested on the dev app first.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
    - 4a: Room's code generator switches from kapt to KSP (the multiplatform way). The database,
      its tables and saved schema stay exactly the same; only the build tool changes.
-   - 4b: the DAOs and the database class move to `shared`, with Room's bundled SQLite driver for
-     the iPhone. Android keeps its existing database file and migrations.
+   - 4b: the DAOs and the database class move to `shared` (`@ConstructedBy`, KSP runs per
+     platform, schemas now in `shared/schemas`). Android keeps its existing database file,
+     per-user file name and migrations in `SuperfitDatabaseBuilder.kt`. Room's bundled SQLite
+     driver is added with the iPhone target in step 5; the iPhone starts with a fresh database.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
    iPhone): an `iosApp` folder, shared screens, then the iPhone-only parts.
 
@@ -123,6 +125,11 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 4b (reviewed 6 Nov): same tables, queries and schema (version 9), same file per signed-in
+user, so one person's data is never opened for another. All queries stay Room's bound
+parameters (no text pasted into SQL). Room's runtime and compiler come from Google's Maven at the
+same version as before. No new permissions, network calls or secrets.
 
 Step 4a (reviewed 6 Nov): build-tool change only. KSP comes from Google's official Maven
 repository; the generated database code and schema are unchanged. No new permissions, network
