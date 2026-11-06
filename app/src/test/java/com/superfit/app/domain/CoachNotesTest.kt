@@ -145,7 +145,7 @@ class CoachNotesTest {
             today = TodaySnapshot(800, 40, 90, listOf(MealSlot.BREAKFAST), emptyList(), 13),
             targetMeanings = listOf("meaning")
         )
-        assertEquals("plan_w", CoachingEngine.chooseFocus(report, emptyList(), jToday, plans).id)
+        assertEquals("plan_w", CoachingEngine.chooseFocus(report, emptyList(), today, plans).id)
     }
 
     @Test

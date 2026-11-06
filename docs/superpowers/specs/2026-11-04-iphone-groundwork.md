@@ -75,7 +75,11 @@ tested on the dev app first.
      when short notes and plans fade, plan follow-ups) move to `shared`, with a small shared
      `EnglishDates` for "Sat 10 Oct" style wording. Saved notes keep the same format, so nothing
      anyone saved changes.
-   - 3q onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3q: the coach's daily tip (choosing today's topic, habit tips, follow-ups, the prompt and
+     reading the answer) and the coach chat's picture of the user (meals, days, workouts, notes)
+     move to `shared`. The tip asks the AI through `Ai`; a failed call shows the same friendly
+     message, which each app supplies through `Ai.friendlyError`.
+   - 3r onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -105,6 +109,11 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3q (reviewed 6 Nov): prompts, rules and topic choice moved without changes; the coach still
+reaches the AI only through Firebase AI Logic with App Check. Error text shown to people still goes
+through GeminiClient's sanitiser, so no raw server errors or ids reach the screen. Coach memory is
+stored in the same prefs key and format. No new libraries, permissions, network calls or secrets.
 
 Step 3p (reviewed 6 Nov): code moved without behaviour changes. Notes are stored, backed up and
 cleared exactly as before (same prefs key and Firestore documents); the note text sent to the AI is

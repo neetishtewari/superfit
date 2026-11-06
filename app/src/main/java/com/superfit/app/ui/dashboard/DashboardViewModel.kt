@@ -475,14 +475,14 @@ class DashboardViewModel(
         """.trimIndent()
 
         val personal = com.superfit.app.domain.CoachChatContext.personal(
-            today = today,
-            now = now,
+            today = today.toKotlinLocalDate(),
+            now = now.toKotlinLocalTime(),
             todayMeals = nutrition,
             report = report,
             workouts = coachWorkouts,
             targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(sharedPrefs) },
-            goalDate = GoalDatePref.get(sharedPrefs),
-            commonFoods = CoachingEngine.commonFoods(allNutrition, today),
+            goalDate = GoalDatePref.get(sharedPrefs)?.toKotlinLocalDate(),
+            commonFoods = CoachingEngine.commonFoods(allNutrition, today.toKotlinLocalDate()),
             notes = _coachNotes.value,
             todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(sharedPrefs, today),
             earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
