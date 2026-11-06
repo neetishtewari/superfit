@@ -1,6 +1,5 @@
 package com.superfit.app.domain
 
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -59,10 +58,10 @@ object RecapAutoplay {
         val f = fraction.coerceIn(0f, 1f)
         val v = if (f >= 1f) n.value else n.value * f
         val body = if (n.decimals > 0) {
-            String.format(Locale.US, "%.${n.decimals}f", v)
+            Decimals.fixed(v, n.decimals)
         } else {
             val whole = v.roundToInt()
-            if (n.grouped) String.format(Locale.US, "%,d", whole) else whole.toString()
+            if (n.grouped) Decimals.grouped(whole.toLong()) else whole.toString()
         }
         return n.prefix + body + n.suffix
     }

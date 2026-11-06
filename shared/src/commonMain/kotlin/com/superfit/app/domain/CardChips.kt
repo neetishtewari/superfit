@@ -1,5 +1,7 @@
 package com.superfit.app.domain
 
+import kotlin.math.roundToLong
+
 /** What the user can add to a workout card. Only the heart-rate graph starts on (see ShareCardPrefs). */
 enum class CardChip(val key: String, val label: String) {
     HEART("heart", "Heart rate"),
@@ -102,7 +104,7 @@ object ShareJourney {
     }
 
     private fun kg(v: Double): String {
-        val r = Math.round(v * 10) / 10.0
+        val r = (v * 10).roundToLong() / 10.0
         return if (r % 1.0 == 0.0) r.toInt().toString() else r.toString()
     }
 }

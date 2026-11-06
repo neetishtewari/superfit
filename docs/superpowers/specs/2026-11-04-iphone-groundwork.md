@@ -83,7 +83,11 @@ tested on the dev app first.
      replies go through a shared `Ai.chat`. A photo is a small `AiPhoto` wrapper: a Bitmap on
      Android, a UIImage on iPhone. Android still shrinks the photo to 1024 px and sends it through
      Firebase AI Logic with the same model failover.
-   - 3s onwards: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
+   - 3s: calorie and macro targets (PhysiologyEngine, onboarding targets, height units), the
+     "log again" food suggestions, workout-card chips and journey line, and the recap's number
+     count-up move to `shared`.
+   - 3t onwards: share-card text (ShareCards, CardLines, RoastCard) and anything else left.
+   - Later: files that need `java.time` swapped for kotlinx-datetime, `String.format` for a
      shared formatter, and the AI calls behind a small shared interface.
 4. **Move the database.** Room supports Kotlin Multiplatform, so the entities and DAOs move to `shared`.
 5. **Then the iPhone work** (needs Neetish's Mac with Xcode, an Apple Developer account and an
@@ -113,6 +117,9 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 3s (reviewed 6 Nov): pure calculations moved without behaviour changes. No new libraries,
+permissions, network calls or secrets; nothing here touches storage or the network.
 
 Step 3r (reviewed 6 Nov): photos still go only to Firebase AI Logic (App Check), shrunk first and
 never saved; the wrapper holds the photo in memory only. Chat history sent to the AI is the same

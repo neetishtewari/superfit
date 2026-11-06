@@ -2,13 +2,22 @@ package com.superfit.app.domain
 
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
-import java.util.Calendar
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 object FoodPredictor {
+    @OptIn(ExperimentalTime::class)
     fun predict(
         allEntries: List<NutritionEntryEntity>,
         currentHour: Int,
-        nowMs: Long = System.currentTimeMillis()
+        nowMs: Long = Clock.System.now().toEpochMilliseconds(),
+        zone: TimeZone = TimeZone.currentSystemDefault()
     ): List<PredictedFood> {
         if (allEntries.isEmpty()) return emptyList()
 
@@ -34,13 +43,12 @@ object FoodPredictor {
 
             // Time-of-day affinity: minimum hour difference to currentHour
             val minHourDiff = entries.map { entry ->
-                val cal = Calendar.getInstance().apply { timeInMillis = entry.timestamp }
-                val loggedHour = cal.get(Calendar.HOUR_OF_DAY)
-                val diff = Math.abs(currentHour - loggedHour)
-                Math.min(diff, 24 - diff)
+                val loggedHour = Instant.fromEpochMilliseconds(entry.timestamp).toLocalDateTime(zone).hour
+                val diff = abs(currentHour - loggedHour)
+                min(diff, 24 - diff)
             }.minOrNull() ?: 12
 
-            val timeScore = Math.max(0.0, 1.0 - (minHourDiff / 4.0))
+            val timeScore = max(0.0, 1.0 - (minHourDiff / 4.0))
 
             // Score incorporates frequency, recency, and time score
             val score = frequency * (1.0 + recencyScore) * (1.0 + timeScore * 1.5)
