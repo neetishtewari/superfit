@@ -572,18 +572,22 @@ private fun LogButton(
         animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
         label = "Scale"
     )
+    // Soft green tile with a solid green icon circle; turns solid deep green while listening.
+    val colors = com.superfit.app.theme.SuperfitTheme.colors
+    val titleColor = if (listening || colors.isDark) Color.White else colors.textPrimary
+    val hintColor = if (listening || colors.isDark) Color.White.copy(alpha = 0.9f) else colors.textSecondary
     val iconCircle: @Composable () -> Unit = {
         Box(
             modifier = Modifier
                 .size((44 * scale).dp)
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(if (listening) Color.White else NeonMint),
             contentAlignment = Alignment.Center
         ) {
             if (processing) {
-                CircularProgressIndicator(modifier = Modifier.size(22.dp), color = BrandGreenDeep, strokeWidth = 2.5.dp)
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), color = if (listening) BrandGreenDeep else Color.White, strokeWidth = 2.5.dp)
             } else {
-                Icon(icon, contentDescription = iconDescription, tint = BrandGreenDeep, modifier = Modifier.size(24.dp))
+                Icon(icon, contentDescription = iconDescription, tint = if (listening) BrandGreenDeep else Color.White, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -591,7 +595,7 @@ private fun LogButton(
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (vertical) {
                 // Half-width buttons: shrink the title a little rather than leave one word alone on a second line.
-                val titleStyle = MaterialTheme.typography.titleMedium.copy(color = Color.White)
+                val titleStyle = MaterialTheme.typography.titleMedium.copy(color = titleColor)
                 BasicText(
                     text = title,
                     style = titleStyle,
@@ -600,15 +604,15 @@ private fun LogButton(
                     autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = titleStyle.fontSize)
                 )
             } else {
-                Text(text = title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(text = title, style = MaterialTheme.typography.titleMedium, color = titleColor)
             }
-            Text(text = hint, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
+            Text(text = hint, style = MaterialTheme.typography.bodySmall, color = hintColor)
         }
     }
     val shape = RoundedCornerShape(20.dp)
     val content = Modifier
         .clip(shape)
-        .background(if (listening) BrandGreenDeep else NeonMint)
+        .background(if (listening) BrandGreenDeep else colors.selectedBg)
         .clickable(enabled = enabled, onClick = onClick)
         .padding(14.dp)
     if (vertical) {
