@@ -211,11 +211,30 @@ internal fun CalorieRingsCard(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 val fmt = java.text.NumberFormat.getIntegerInstance()
-                RingLegendItem(
-                    label = "Eaten, kcal",
-                    value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
-                    color = NeonGreen
-                )
+                // How workouts raised today's target, shown only when the person taps to ask why.
+                val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
+                var showKcalMath by remember { mutableStateOf(false) }
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (kcalMath != null) {
+                                Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    RingLegendItem(
+                        label = "Eaten, kcal",
+                        value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
+                        color = NeonGreen
+                    )
+                    if (showKcalMath && kcalMath != null) {
+                        Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -226,9 +245,6 @@ internal fun CalorieRingsCard(
                         value = "${fmt.format(state.activity.steps)} of ${fmt.format(stepsTarget.toInt())}",
                         color = ElectricCyan
                     )
-                }
-                workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)?.let {
-                    Text(text = it, fontSize = 12.sp, color = ThemeTextSecondary)
                 }
             }
         }
