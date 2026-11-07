@@ -14,14 +14,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,12 +44,16 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -83,7 +90,11 @@ private data class CardPalette(
     val textSoft: Color,
     val textDate: Color,
     val badgeBackground: Color,
-    val badgeBorder: Color
+    val badgeBorder: Color,
+    /** "SUPERFIT" on the badge; the main text colour unless the badge is inverted. */
+    val badgeText: Color = textMain,
+    /** The face for the big number; null keeps the app's own (Classic). */
+    val display: FontFamily? = null
 )
 
 private val DarkCard = CardPalette(
@@ -118,10 +129,81 @@ private val TextSoft: Color @Composable get() = LocalCardPalette.current.textSof
 private val TextDate: Color @Composable get() = LocalCardPalette.current.textDate
 private val BadgeBackground: Color @Composable get() = LocalCardPalette.current.badgeBackground
 private val BadgeBorder: Color @Composable get() = LocalCardPalette.current.badgeBorder
+private val BigFont: FontFamily? @Composable get() = LocalCardPalette.current.display
+
+/** A condensed face is narrower, so the big number can be this much taller in the same width. */
+private val BigScale: Float @Composable get() = if (LocalCardPalette.current.display != null) 1.25f else 1f
+
+private val ShouldersBlack = FontFamily(Font(R.font.big_shoulders_black, FontWeight.Black))
+
+/**
+ * The look of a share card. The colour the user picks drives each one: Poster is filled with it,
+ * Glow is a dark card lit by it, Race bib prints the number on a bib with a band in it, and Classic
+ * is the plain dark or light card. Every style shows the same numbers and the same add-ons.
+ */
+enum class CardStyle(val key: String, val label: String) {
+    CLASSIC("classic", "Classic"),
+    POSTER("poster", "Poster"),
+    GLOW("glow", "Glow"),
+    BIB("bib", "Race bib");
+
+    companion object {
+        val DEFAULT = CLASSIC
+        fun of(key: String?): CardStyle = entries.firstOrNull { it.key == key } ?: DEFAULT
+    }
+}
+
+/** Black on a bright colour, white on a deep one (violet, pink). */
+fun inkOn(color: Color): Color = if (color.luminance() > 0.33f) Color(0xFF111111) else Color.White
+
+private fun posterPalette(accent: Color): CardPalette {
+    val ink = inkOn(accent)
+    return CardPalette(
+        background = accent,
+        tile = ink.copy(alpha = 0.1f),
+        divider = ink.copy(alpha = 0.22f),
+        textMain = ink,
+        textSoft = ink.copy(alpha = 0.72f),
+        textDate = ink.copy(alpha = 0.85f),
+        badgeBackground = ink,
+        badgeBorder = ink,
+        badgeText = accent,
+        display = ShouldersBlack
+    )
+}
+
+private val GlowCard = CardPalette(
+    background = Color(0xFF0A0B10),
+    tile = Color.White.copy(alpha = 0.07f),
+    divider = Color.White.copy(alpha = 0.14f),
+    textMain = Color(0xFFF7F7FA),
+    textSoft = Color(0xFFB4B4C4),
+    textDate = Color(0xFFD0D0DC),
+    badgeBackground = Color.White.copy(alpha = 0.1f),
+    badgeBorder = Color.White.copy(alpha = 0.18f),
+    display = ShouldersBlack
+)
+
+private val BibCard = CardPalette(
+    background = Color(0xFFFFFFFF),
+    tile = Color(0xFFF3F2EE),
+    divider = Color(0xFFE2E1DB),
+    textMain = Color(0xFF121212),
+    textSoft = Color(0xFF5F5F66),
+    textDate = Color(0xFF3F3F46),
+    badgeBackground = Color(0xFF121212),
+    badgeBorder = Color(0xFF121212),
+    badgeText = Color.White,
+    display = ShouldersBlack
+)
+
+/** The beige the race bib sits on. */
+private val BibGround = Color(0xFFECEBE6)
 
 /** The colours the user can pick in the preview. */
 val CardOrange = Color(0xFFFF7A1A)
-val CardAccents = listOf(CardOrange, NeonMint, ElectricCyan, HyperViolet)
+val CardPink = Color(0xFFFF4F8B)
+val CardAccents = listOf(CardOrange, NeonMint, ElectricCyan, HyperViolet, CardPink)
 
 /** Orange by default (Neetish, 2026-11-03); the user can pick another. */
 fun defaultAccent(card: ShareCard): Color = CardOrange
@@ -134,7 +216,8 @@ fun ShareCardView(
     modifier: Modifier = Modifier,
     photo: ImageBitmap? = null,
     light: Boolean = false,
-    frame: PhotoFrame = PhotoFrame()
+    frame: PhotoFrame = PhotoFrame(),
+    style: CardStyle = CardStyle.CLASSIC
 ) {
     // Every card can sit on the user's photo.
     if (photo != null) {
@@ -143,23 +226,120 @@ fun ShareCardView(
         }
         return
     }
-    CompositionLocalProvider(LocalCardPalette provides if (light) LightCard else DarkCard) {
-        // The bright accents are hard to read on white, so the light card uses a deeper shade.
-        CardOnBackground(card, if (light) lerp(accent, Color.Black, 0.3f) else accent, modifier)
+    when (style) {
+        CardStyle.CLASSIC -> CompositionLocalProvider(LocalCardPalette provides if (light) LightCard else DarkCard) {
+            // The bright accents are hard to read on white, so the light card uses a deeper shade.
+            CardOnBackground(card, if (light) lerp(accent, Color.Black, 0.3f) else accent, modifier)
+        }
+        // On a Poster the colour is the background, so everything drawn "in the colour" is drawn in ink.
+        CardStyle.POSTER -> CompositionLocalProvider(LocalCardPalette provides posterPalette(accent)) {
+            CardOnBackground(card, inkOn(accent), modifier, style)
+        }
+        CardStyle.GLOW -> CompositionLocalProvider(LocalCardPalette provides GlowCard) {
+            CardOnBackground(card, accent, modifier, style, glow = accent)
+        }
+        CardStyle.BIB -> CompositionLocalProvider(LocalCardPalette provides BibCard) {
+            BibCardView(card, accent, modifier)
+        }
+    }
+}
+
+/** The day, workout or best's own words for the bib's band. */
+private fun bandLabel(card: ShareCard): String = when (card) {
+    is ShareCard.Daily -> if (card.shownRoast != null) "ROAST MY DAY" else "MY DAY"
+    is ShareCard.Activity -> card.heading
+    is ShareCard.Best -> if (card.podium) "TOP 3" else "PERSONAL BEST"
+}
+
+/** The card's body: the same for every style, so every style carries the same numbers and add-ons. */
+@Composable
+private fun ColumnScope.CardBody(card: ShareCard, accent: Color) {
+    when (card) {
+        is ShareCard.Daily -> card.asDay.let { day ->
+            // The roast shrinks its own text to fit; the day's numbers scale down like the others.
+            if (day.roast) RoastBody(day, accent) else FitBody { DailyBody(day, accent) }
+        }
+        is ShareCard.Activity -> FitBody { ActivityBody(card, accent) }
+        is ShareCard.Best -> FitBody { BestBody(card, accent) }
+    }
+}
+
+/**
+ * Race bib: the header on a beige ground, then a white bib with a band in the user's colour, two
+ * pin holes and the card's usual body, then the Superfit footer under the bib.
+ */
+@Composable
+private fun BibCardView(card: ShareCard, accent: Color, modifier: Modifier) {
+    val deep = lerp(accent, Color.Black, 0.25f)
+    val ink = inkOn(accent)
+    Column(
+        modifier = modifier
+            .size(360.dp, 640.dp)
+            .background(BibGround)
+            .padding(start = 18.dp, end = 18.dp, top = SAFE_TOP, bottom = 96.dp)
+    ) {
+        CardHeader(card.dateLine)
+        Spacer(Modifier.height(12.dp))
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardBackground)
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(accent)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("SUPERFIT", color = ink, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                    Text(bandLabel(card), color = ink, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            // Two pin holes, like a real bib.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                repeat(2) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(BibGround)
+                    )
+                }
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
+            ) {
+                CardBody(card, deep)
+            }
+        }
+        CardFooter(showDivider = false, roasted = roasted(card))
     }
 }
 
 @Composable
-private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier) {
+private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier, style: CardStyle = CardStyle.CLASSIC, glow: Color? = null) {
     Box(
         modifier = modifier
             .size(360.dp, 640.dp)
             .background(CardBackground)
     ) {
-        when (card) {
-            is ShareCard.Daily -> DailyGlow(accent)
-            is ShareCard.Activity -> ActivityWaves(accent)
-            is ShareCard.Best -> BestGlow(accent)
+        when {
+            glow != null -> GlowLights(glow)
+            style == CardStyle.POSTER -> PosterGhost(card)
+            card is ShareCard.Daily -> DailyGlow(accent)
+            card is ShareCard.Activity -> ActivityWaves(accent)
+            card is ShareCard.Best -> BestGlow(accent)
         }
         Column(
             modifier = Modifier
@@ -168,14 +348,7 @@ private fun CardOnBackground(card: ShareCard, accent: Color, modifier: Modifier)
                 .padding(start = 24.dp, end = 24.dp, top = SAFE_TOP, bottom = 96.dp)
         ) {
             CardHeader(card.dateLine)
-            when (card) {
-                is ShareCard.Daily -> card.asDay.let { day ->
-                    // The roast shrinks its own text to fit; the day's numbers scale down like the others.
-                    if (day.roast) RoastBody(day, accent) else FitBody { DailyBody(day, accent) }
-                }
-                is ShareCard.Activity -> FitBody { ActivityBody(card, accent) }
-                is ShareCard.Best -> FitBody { BestBody(card, accent) }
-            }
+            CardBody(card, accent)
             CardFooter(showDivider = card !is ShareCard.Daily, roasted = roasted(card))
         }
     }
@@ -267,7 +440,7 @@ private fun CardFooter(showDivider: Boolean, roasted: Boolean = false) {
     }
     Spacer(Modifier.height(16.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        BrandBadge(background = BadgeBackground, border = BadgeBorder)
+        BrandBadge(background = BadgeBackground, border = BadgeBorder, textColor = LocalCardPalette.current.badgeText)
         FooterNote(roasted, TextMain, TextDate)
     }
 }
@@ -276,14 +449,14 @@ private fun CardFooter(showDivider: Boolean, roasted: Boolean = false) {
 @Composable
 private fun FooterNote(roasted: Boolean, main: Color, soft: Color) {
     Column(horizontalAlignment = Alignment.End) {
-        if (roasted) Text("🔥 Roasted by Superfit", color = main, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        if (roasted) RoastLabelRow("Roasted by Superfit", main, 12.sp, spacing = 0.sp)
         Text("Get it on Google Play", color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
 /** The logo and name in a pill, big enough to read in a story at a glance. */
 @Composable
-private fun BrandBadge(background: Color, border: Color) {
+private fun BrandBadge(background: Color, border: Color, textColor: Color = TextMain) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
@@ -300,7 +473,7 @@ private fun BrandBadge(background: Color, border: Color) {
                 .clip(RoundedCornerShape(9.dp))
         )
         Spacer(Modifier.width(10.dp))
-        Text("SUPERFIT", color = TextMain, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.5.sp)
+        Text("SUPERFIT", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.5.sp)
     }
 }
 
@@ -311,7 +484,7 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
     Spacer(Modifier.height(6.dp))
     if (card.streakDays > 0) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("${card.streakDays}", color = accent, fontSize = 58.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 58.sp)
+            Text("${card.streakDays}", color = accent, fontSize = 58.sp * BigScale, fontWeight = FontWeight.ExtraBold, fontFamily = BigFont, lineHeight = 58.sp * BigScale)
             Spacer(Modifier.width(10.dp))
             Text(
                 "day streak",
@@ -322,7 +495,7 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
             )
         }
     } else {
-        Text("Day 1", color = accent, fontSize = 52.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 58.sp)
+        Text("Day 1", color = accent, fontSize = 52.sp * BigScale, fontWeight = FontWeight.ExtraBold, fontFamily = BigFont, lineHeight = 58.sp * BigScale)
     }
     Spacer(Modifier.height(16.dp))
     // Tiles left out (no meals, rest day) close up, so there are never empty boxes.
@@ -345,7 +518,7 @@ private fun ColumnScope.DailyBody(card: ShareCard.Daily, accent: Color) {
         )
         Spacer(Modifier.height(12.dp))
         if (card.roast) {
-            Text("🔥 ROAST MY DAY", color = SolarAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            RoastLabelRow("ROAST MY DAY", SolarAmber, 11.sp)
             Spacer(Modifier.height(6.dp))
             Text(line, color = TextMain, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, maxLines = 6, overflow = TextOverflow.Ellipsis)
         } else {
@@ -369,7 +542,7 @@ private fun ColumnScope.RoastBody(card: ShareCard.Daily, accent: Color) {
     val tiles = card.roastTiles
     val bodySize = if (rest != null) 17.sp else 22.sp
     Spacer(Modifier.height(20.dp))
-    Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+    RoastLabelRow("ROAST MY DAY", accent, 12.sp)
     Spacer(Modifier.height(12.dp))
     if (rest != null) {
         Text(headline, color = TextMain, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
@@ -487,7 +660,8 @@ private fun ColumnScope.ActivityBody(card: ShareCard.Activity, accent: Color) {
     }
     Spacer(Modifier.height(8.dp))
     Row(verticalAlignment = Alignment.Bottom) {
-        Text(card.bigValue, color = TextMain, fontSize = big, fontWeight = FontWeight.ExtraBold, lineHeight = big, maxLines = 1)
+        val shown = big * BigScale
+        Text(card.bigValue, color = TextMain, fontSize = shown, fontWeight = if (BigFont != null) FontWeight.Black else FontWeight.ExtraBold, fontFamily = BigFont, lineHeight = shown, maxLines = 1)
         Spacer(Modifier.width(8.dp))
         Text(card.bigUnit, color = accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = if (busy) 10.dp else 14.dp))
     }
@@ -546,8 +720,8 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
         Text(card.label, color = TextMain, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            val size = bigValueSize(card.bigValue, 88)
-            Text(card.bigValue, color = TextMain, fontSize = size.sp, fontWeight = FontWeight.ExtraBold, lineHeight = size.sp, maxLines = 1)
+            val size = bigValueSize(card.bigValue, 88) * BigScale
+            Text(card.bigValue, color = TextMain, fontSize = size.sp, fontWeight = if (BigFont != null) FontWeight.Black else FontWeight.ExtraBold, fontFamily = BigFont, lineHeight = size.sp, maxLines = 1)
             Spacer(Modifier.width(8.dp))
             Text(
                 card.bigUnit,
@@ -582,6 +756,64 @@ private fun ColumnScope.BestBody(card: ShareCard.Best, accent: Color) {
             card.gain?.let { Text(it, color = accent, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** The flame icon and a label, for roasts (an icon, never an emoji). */
+@Composable
+private fun RoastLabelRow(text: String, color: Color, size: TextUnit, spacing: TextUnit = 2.sp) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.LocalFireDepartment, contentDescription = null, tint = color, modifier = Modifier.size(with(LocalDensity.current) { (size * 1.3f).toDp() }))
+        Spacer(Modifier.width(4.dp))
+        Text(text, color = color, fontSize = size, fontWeight = FontWeight.Bold, letterSpacing = spacing)
+    }
+}
+
+/** Glow: two soft lights in the user's colour on a near-black card. */
+@Composable
+private fun GlowLights(accent: Color) {
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(
+            Brush.radialGradient(
+                listOf(accent.copy(alpha = 0.75f), accent.copy(alpha = 0.18f), Color.Transparent),
+                center = Offset(size.width * 0.88f, size.height * 0.16f),
+                radius = size.width * 1.0f
+            )
+        )
+        drawRect(
+            Brush.radialGradient(
+                listOf(accent.copy(alpha = 0.35f), Color.Transparent),
+                center = Offset(0f, size.height),
+                radius = size.width * 0.95f
+            )
+        )
+    }
+}
+
+/** Poster: the first figure of the big number, huge and faint behind everything, for texture. */
+@Composable
+private fun PosterGhost(card: ShareCard) {
+    val figure = when (card) {
+        is ShareCard.Activity -> card.bigValue
+        is ShareCard.Best -> card.bigValue
+        is ShareCard.Daily -> card.streakDays.takeIf { it > 0 }?.toString()
+    }?.firstOrNull { it.isDigit() } ?: return
+    Box(
+        Modifier
+            .fillMaxSize()
+            .clipToBounds()
+    ) {
+        Text(
+            figure.toString(),
+            color = TextMain.copy(alpha = 0.08f),
+            fontSize = 340.sp,
+            lineHeight = 340.sp,
+            fontFamily = ShouldersBlack,
+            fontWeight = FontWeight.Black,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 24.dp, y = (-40).dp)
+        )
     }
 }
 
@@ -847,7 +1079,7 @@ private fun PhotoDay(card: ShareCard.Daily, accent: Color) {
     val roast = card.shownRoast
     val tiles = if (roast != null) card.roastTiles else card.tiles.take(4)
     if (roast != null) {
-        Text("🔥 ROAST MY DAY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        RoastLabelRow("ROAST MY DAY", accent, 12.sp)
         Spacer(Modifier.height(8.dp))
         BasicText(
             text = card.shortRoast ?: ShareCards.photoRoast(roast),
