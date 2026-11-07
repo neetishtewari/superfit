@@ -9,7 +9,7 @@ package com.superfit.app.data
  * the same meal twice. Entries with a real cloud id are always kept; the insert itself skips cloud
  * ids the phone already has.
  */
-internal fun <T> withoutLegacyDuplicates(
+fun <T> withoutLegacyDuplicates(
     cloudEntries: List<T>,
     localTimestamps: Set<Long>,
     cloudId: (T) -> String,
