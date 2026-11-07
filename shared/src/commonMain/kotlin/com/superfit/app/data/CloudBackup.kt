@@ -5,7 +5,6 @@ import com.superfit.app.domain.ChatEntry
 import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachNotes
-import com.superfit.app.domain.Now
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
