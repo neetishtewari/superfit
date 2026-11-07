@@ -17,12 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.superfit.app.R
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.shared.resources.Res
+import com.superfit.shared.resources.superfit_logo
+import org.jetbrains.compose.resources.painterResource
 
 /** The main action on a screen: solid brand green with white text, the same everywhere. */
 @Composable
@@ -59,7 +60,7 @@ fun PrimaryButton(
 @Composable
 fun SuperfitLogo(modifier: Modifier = Modifier, size: Int = 64) {
     Image(
-        painter = painterResource(R.drawable.ic_superfit_launcher),
+        painter = painterResource(Res.drawable.superfit_logo),
         contentDescription = "Superfit",
         modifier = modifier
             .size(size.dp)

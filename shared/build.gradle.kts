@@ -48,6 +48,8 @@ kotlin {
       api(compose.material3)
       api(compose.ui)
       api(compose.components.resources)
+      // The same Material icons the Android app uses. Unused icons are left out of the iPhone app.
+      api(libs.compose.material.icons.extended)
     }
     iosMain.dependencies {
       // SQLite built into the app, so the iPhone gets the same database engine as Android.

@@ -1,10 +1,5 @@
 package com.superfit.app.ui.components
 
-import android.content.ActivityNotFoundException
-import android.speech.RecognizerIntent
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,14 +29,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.superfit.app.domain.NumberInput
 import com.superfit.app.theme.SuperfitTheme
-import com.superfit.app.ui.dashboard.SpeechRecognizerHelper
 
 private val FieldShape = RoundedCornerShape(16.dp)
 
@@ -129,27 +122,6 @@ fun SuperfitField(
             unfocusedLeadingIconColor = colors.textSecondary
         )
     )
-}
-
-/**
- * Opens the phone's voice typing box and hands back what was said.
- * Returns the function to call when the mic is tapped.
- */
-@Composable
-fun rememberVoiceTyping(prompt: String, onText: (String) -> Unit): () -> Unit {
-    val context = LocalContext.current
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            ?.takeIf { it.isNotBlank() }
-            ?.let(onText)
-    }
-    return {
-        try {
-            launcher.launch(SpeechRecognizerHelper.systemDialogIntent(context).putExtra(RecognizerIntent.EXTRA_PROMPT, prompt))
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
-        }
-    }
 }
 
 /** The mic button, the same everywhere: a green mic on a soft green circle. */
