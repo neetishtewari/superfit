@@ -142,13 +142,13 @@ private val ShouldersBlack = FontFamily(Font(R.font.big_shoulders_black, FontWei
  * is the plain dark or light card. Every style shows the same numbers and the same add-ons.
  */
 enum class CardStyle(val key: String, val label: String) {
+    CLASSIC("classic", "Classic"),
     POSTER("poster", "Poster"),
     GLOW("glow", "Glow"),
-    BIB("bib", "Race bib"),
-    CLASSIC("classic", "Classic");
+    BIB("bib", "Race bib");
 
     companion object {
-        val DEFAULT = POSTER
+        val DEFAULT = CLASSIC
         fun of(key: String?): CardStyle = entries.firstOrNull { it.key == key } ?: DEFAULT
     }
 }
