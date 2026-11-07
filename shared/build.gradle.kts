@@ -42,6 +42,8 @@ kotlin {
       api(libs.androidx.room.runtime)
       // Dates and time zones that work on Android and iPhone alike (replaces java.time).
       api(libs.kotlinx.datetime)
+      // Background work (already used by Room); listed so shared code can rely on it directly.
+      api(libs.kotlinx.coroutines.core)
       // Screens: the same Compose the Android app uses, also drawn on iPhone.
       api(compose.runtime)
       api(compose.foundation)
@@ -57,6 +59,7 @@ kotlin {
     }
     commonTest.dependencies {
       implementation(kotlin("test"))
+      implementation(libs.kotlinx.coroutines.test)
     }
   }
 }
