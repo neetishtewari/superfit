@@ -123,6 +123,13 @@ tested on the dev app first.
        `Typography` are now `@Composable` getters; the unused wallpaper-colour option removed) with a
        stand-in `ThemePreview` screen on iPhone; then the shared components. The PDF report keeps
        its own copy of the fonts in `app/res/font` until it moves.
+       Part two (5b-2b): SuperfitField, MicButton, FieldActionButton, SuperfitCard, IconBadge,
+       PrimaryButton, logo and brand header, GoalPicker and SegmentedPills move to commonMain with
+       the same names and packages, so no Android screen changes. The Android voice typing box
+       (`rememberVoiceTyping`) stays in the app. Shared code gets the Material icons library
+       (JetBrains build of the same icons); the logo is a 288 px copy in shared resources (the
+       1 MB original stays for the launcher, share cards and PDF). The iPhone stand-in screen now
+       shows these pieces.
      - 5b-3: Firebase on iPhone. Neetish registers an iPhone app in the Firebase console
        (`GoogleService-Info.plist`); Auth (Google sign-in + Sign in with Apple, which Apple
        requires next to Google) and Firestore through a Kotlin Multiplatform Firebase library;
@@ -164,6 +171,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 5b-2b (reviewed 7 Nov): look-and-feel pieces only. The mic button on iPhone does nothing
+yet (no microphone access asked for). Material icons come from JetBrains on Maven Central. No new
+permissions, network calls, data or secrets on either phone.
 
 Step 5b-2a (reviewed 7 Nov): colours, fonts and shapes only. Compose Multiplatform and its
 resources library come from JetBrains on Maven Central; fonts are the same Manrope files. No new
