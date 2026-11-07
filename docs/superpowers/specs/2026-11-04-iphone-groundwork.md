@@ -118,6 +118,11 @@ tested on the dev app first.
      - 5b-2: Compose Multiplatform in `shared`; theme (colours, Manrope fonts, type scale) and the
        shared components (SuperfitField, MicButton, SegmentedPills...) move to commonMain; the
        iPhone shell shows them through `ComposeUIViewController`.
+       Done in two parts: first the theme (Color, Type, Theme; Compose Multiplatform 1.10.3 to match
+       the app's Compose 1.10; Manrope from shared `composeResources`, so `Manrope` and
+       `Typography` are now `@Composable` getters; the unused wallpaper-colour option removed) with a
+       stand-in `ThemePreview` screen on iPhone; then the shared components. The PDF report keeps
+       its own copy of the fonts in `app/res/font` until it moves.
      - 5b-3: Firebase on iPhone. Neetish registers an iPhone app in the Firebase console
        (`GoogleService-Info.plist`); Auth (Google sign-in + Sign in with Apple, which Apple
        requires next to Google) and Firestore through a Kotlin Multiplatform Firebase library;
@@ -159,6 +164,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 5b-2a (reviewed 7 Nov): colours, fonts and shapes only. Compose Multiplatform and its
+resources library come from JetBrains on Maven Central; fonts are the same Manrope files. No new
+permissions, network calls, data or secrets on either phone.
 
 Step 5b-1 (reviewed 7 Nov): placeholder screen only; no sign-in, data, network calls,
 permissions or secrets. No signing team, certificates or provisioning profiles in the repo; CI

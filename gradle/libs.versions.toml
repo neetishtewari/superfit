@@ -17,6 +17,8 @@ nav3Core = "1.0.1"
 lifecycleViewmodelNav3 = "2.10.0"
 room = "2.7.0"
 kotlinx-datetime = "0.7.1"
+# Compose Multiplatform 1.10 matches the app's Compose 1.10, so Android keeps the same Compose.
+composeMultiplatform = "1.10.3"
 work = "2.9.0"
 healthConnect = "1.1.0-alpha11"
 firebaseBom = "34.19.0"
@@ -109,3 +111,4 @@ google-services = { id = "com.google.gms.google-services", version.ref = "google
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidx-room = { id = "androidx.room", version.ref = "room" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

@@ -7,6 +7,9 @@ plugins {
   alias(libs.plugins.android.kotlin.multiplatform.library)
   alias(libs.plugins.ksp)
   alias(libs.plugins.androidx.room)
+  // Screens shared with the iPhone (Compose Multiplatform).
+  alias(libs.plugins.compose.multiplatform)
+  alias(libs.plugins.compose.compiler)
 }
 
 kotlin {
@@ -16,6 +19,10 @@ kotlin {
     namespace = "com.superfit.shared"
     compileSdk = 36
     minSdk = 26
+    // Shared fonts and images (composeResources) are packed into the Android app too.
+    androidResources {
+      enable = true
+    }
   }
 
   // Runs the shared tests quickly on the computer, without Android.
@@ -35,6 +42,12 @@ kotlin {
       api(libs.androidx.room.runtime)
       // Dates and time zones that work on Android and iPhone alike (replaces java.time).
       api(libs.kotlinx.datetime)
+      // Screens: the same Compose the Android app uses, also drawn on iPhone.
+      api(compose.runtime)
+      api(compose.foundation)
+      api(compose.material3)
+      api(compose.ui)
+      api(compose.components.resources)
     }
     iosMain.dependencies {
       // SQLite built into the app, so the iPhone gets the same database engine as Android.
@@ -44,6 +57,12 @@ kotlin {
       implementation(kotlin("test"))
     }
   }
+}
+
+// The generated Res class (fonts, images) for shared code.
+compose.resources {
+  packageOfResClass = "com.superfit.shared.resources"
+  publicResClass = false
 }
 
 // Room writes each schema version here; commit the JSON so schema changes show up in review.
