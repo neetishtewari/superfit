@@ -23,6 +23,8 @@ targets:
         CFBundleDisplayName: Superfit
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
+        CADisableMinimumFrameDurationOnPhone: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superfit.aifitness

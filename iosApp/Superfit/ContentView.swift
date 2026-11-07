@@ -1,16 +1,19 @@
 import Shared
 import SwiftUI
+import UIKit
 
-// First iPhone screen: shows numbers worked out by the shared Kotlin code, to prove the app
-// links it. Replaced by the real screens in the next steps.
+// Hosts Superfit's shared Compose screens (Compose Multiplatform) inside the iPhone app.
+struct ComposeView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        MainViewControllerKt.MainViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+}
+
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Superfit")
-                .font(.largeTitle.bold())
-            Text("Shared code says: \(Decimals.shared.one(x: 72.46)) kg")
-            Text("Steps: \(LocalFormat.shared.integer(n: 8432))")
-        }
-        .padding()
+        ComposeView()
+            .ignoresSafeArea()
     }
 }
