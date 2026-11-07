@@ -11,12 +11,29 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     # Neetish's Apple Developer team goes here (Xcode > Signing & Capabilities), not in the repo.
     DEVELOPMENT_TEAM: ""
+# Google's own Firebase iPhone SDK (Swift Package Manager). Products are added as each part
+# (sign-in, backup, AI) moves over.
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "12.0.0"
 targets:
   Superfit:
     type: application
     platform: iOS
     sources:
       - Superfit
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseAppCheck
+    entitlements:
+      path: Superfit/Superfit.entitlements
+      properties:
+        # App Attest proves requests come from the real Superfit app (App Check), like Play
+        # Integrity on Android.
+        com.apple.developer.devicecheck.appattest-environment: production
     info:
       path: Superfit/Info.plist
       properties:
