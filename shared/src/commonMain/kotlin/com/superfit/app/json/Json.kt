@@ -1,5 +1,8 @@
 package com.superfit.app.json
 
+import kotlin.experimental.ExperimentalObjCName
+import kotlin.native.ObjCName
+
 /*
  * A small JSON library that works on Android and iPhone alike. It copies the parts of Android's
  * org.json that Superfit uses, with the same forgiving rules, so the AI's answers and the app's
@@ -98,6 +101,9 @@ class JSONObject() {
 
     companion object {
         /** JSON's null, kept so a saved null stays distinct from a missing name. */
+        // NULL is a reserved word in the iPhone's Objective-C headers, so it has another name there.
+        @OptIn(ExperimentalObjCName::class)
+        @ObjCName("jsonNull")
         val NULL: Any = object {
             override fun equals(other: Any?): Boolean = other == null || other === this
             override fun hashCode(): Int = 0
