@@ -132,9 +132,21 @@ tested on the dev app first.
        shows these pieces.
      - 5b-3: Firebase on iPhone. Neetish registers an iPhone app in the Firebase console
        (`GoogleService-Info.plist`); Auth (Google sign-in + Sign in with Apple, which Apple
-       requires next to Google) and Firestore through a Kotlin Multiplatform Firebase library;
-       Firebase AI Logic through Firebase's iPhone SDK behind the shared `Ai` interface; App Check
-       with App Attest.
+       requires next to Google) and Firestore; Firebase AI Logic behind the shared `Ai` interface;
+       App Check with App Attest.
+       Decided 7 Nov: the iPhone uses Google's own Firebase iPhone SDK (Swift Package Manager in
+       `project.yml`), wrapped in small Swift classes that implement shared Kotlin interfaces
+       (cloud store, sign-in, AI). No third-party Kotlin Firebase wrapper: fewer moving parts and
+       only Google's code touches accounts and data. The Swift side turns iPhone number types into
+       Kotlin Long/Double before shared code reads them.
+       - 5b-3a: the backup format moves to shared: `CloudMaps.kt` (how each table row is written to
+         and read from Firestore, field names unchanged) and `withoutLegacyDuplicates`, with
+         round-trip tests. Android's FirebaseSyncManager uses them; behaviour unchanged.
+       - 5b-3b: Firebase iPhone SDK + `GoogleService-Info.plist` (committed like Android's
+         google-services.json; it identifies the project, it is not a secret) and App Check.
+       - 5b-3c: the sync logic itself moves to shared behind a `CloudStore` interface; the iPhone
+         implements it in Swift.
+       - 5b-3d: sign-in on iPhone (Google + Sign in with Apple) and the AI client.
      - 5b-4: data layer to shared: DataRepository, backup/restore (FirebaseSyncManager), settings
        stores (a multiplatform key-value store in place of SharedPreferences).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
@@ -171,6 +183,10 @@ workout share cards and the PDF report. Nothing is held back for a later version
 ## Security (Neetish, 4 Nov 2026: security review after every step, for both apps)
 
 Each step gets a security review before merge, on top of the release checklist's security section.
+
+Step 5b-3a (reviewed 7 Nov): moves code only. The backup still goes to the same place
+(users/{uid}/..., only the signed-in user's own uid; Firestore rules unchanged) with the same
+fields, so nothing new is stored or sent. No new libraries, permissions or secrets.
 
 Step 5b-2b (reviewed 7 Nov): look-and-feel pieces only. The mic button on iPhone does nothing
 yet (no microphone access asked for). Material icons come from JetBrains on Maven Central. No new
