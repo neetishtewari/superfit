@@ -52,6 +52,7 @@ fun SharingSettingsCard(onOffersChanged: () -> Unit = {}) {
     var showWeight by remember { mutableStateOf(prefs.showWeight) }
     var offerRuns by remember { mutableStateOf(prefs.offerRuns) }
     var offerWalkMinutes by remember { mutableStateOf(prefs.offerWalkMinutes) }
+    var offerOthers by remember { mutableStateOf(prefs.offerOthers) }
     val order = remember { CardChip.order(CoachStyle.current) }
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -93,6 +94,22 @@ fun SharingSettingsCard(onOffersChanged: () -> Unit = {}) {
                         onOffersChanged()
                     }
                 )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Suggest other workouts to share", fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary, fontSize = 14.sp)
+                    Text(
+                        "Gym, cycling, yoga and more from your watch or fitness app, when at least 10 minutes long.",
+                        fontSize = 12.sp,
+                        color = SuperfitTheme.colors.textSecondary
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = offerOthers, onCheckedChange = {
+                    offerOthers = it
+                    prefs.offerOthers = it
+                    onOffersChanged()
+                })
             }
             Text("Workout cards start with", fontWeight = FontWeight.Bold, color = SuperfitTheme.colors.textPrimary, fontSize = 14.sp)
             Text(

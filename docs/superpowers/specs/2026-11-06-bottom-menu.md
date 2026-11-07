@@ -147,3 +147,10 @@ of weekly active users who open Progress and Coach, two weeks before and after.
 
 Next version after 1.0.53 (code 57). Release notes line: "New bottom menu: Today, Progress and
 your AI coach are now one tap away."
+
+## Follow-up: other workouts on the ready-to-share card (Neetish 2026-11-07)
+A watch workout that is not a run or walk (gym, cycling, yoga...) reached Superfit but no card showed.
+Now any imported workout of at least 10 minutes is offered, with the same today/yesterday, newest-only
+and dismiss rules. Voice-logged workouts are not imported workouts, so they stay out. The card says
+"Your <workout name> is ready to share" with a dumbbell icon. Settings > Sharing gets "Suggest other
+workouts to share" (on by default). Analytics `share_offer` type is now run, walk or workout.
