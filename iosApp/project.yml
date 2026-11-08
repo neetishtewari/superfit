@@ -28,6 +28,8 @@ targets:
         product: FirebaseCore
       - package: Firebase
         product: FirebaseAppCheck
+      - package: Firebase
+        product: FirebaseFirestore
     entitlements:
       path: Superfit/Superfit.entitlements
       properties:

@@ -154,7 +154,8 @@ tested on the dev app first.
          Firestore's Android SDK; deleting the Firebase account stays per app.
        - 5b-3d: the iPhone's CloudStore in Swift (Firestore iPhone SDK). Swift can't implement
          Kotlin suspend functions, so iosMain adds a callback version that Swift implements.
-       - 5b-3d: sign-in on iPhone (Google + Sign in with Apple) and the AI client.
+       - 5b-3e: sign-in on iPhone (Google + Sign in with Apple), CloudBackup wired up on iPhone,
+         and the AI client.
      - 5b-4: data layer to shared: DataRepository, backup/restore (FirebaseSyncManager), settings
        stores (a multiplatform key-value store in place of SharedPreferences).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
@@ -197,6 +198,13 @@ uid, nothing written when signed out) and fields as before; Firestore rules unch
 deletion still clears every collection under the user before the account is deleted. Tests
 cover paths, signed-out, failed writes and that a wipe touches only that user's data. No new
 permissions or secrets; kotlinx-coroutines (already in the app) is now listed in shared.
+
+Step 5b-3d (reviewed 8 Nov): the iPhone's Firestore store only adds the Swift side of the same
+CloudStore; it writes nothing on its own and is not called until iPhone sign-in (5b-3e), so the
+same users/{uid}/ paths and unchanged Firestore rules apply. Values keep their types both ways
+(true/false stay booleans, whole numbers stay whole, decimals stay decimals) so Android reads
+iPhone backups the same. No secrets, no new permissions; Firestore traffic is HTTPS and goes
+through App Check like the rest of Firebase.
 
 Step 5b-3b (reviewed 7 Nov): GoogleService-Info.plist is committed like Android's
 google-services.json: its API key only identifies the Firebase project; access is guarded by
