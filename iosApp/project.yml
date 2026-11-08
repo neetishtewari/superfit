@@ -17,6 +17,10 @@ packages:
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk
     from: "12.0.0"
+  # Google's own sign-in sheet for iPhone (Continue with Google).
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "9.0.0"
 targets:
   Superfit:
     type: application
@@ -30,12 +34,18 @@ targets:
         product: FirebaseAppCheck
       - package: Firebase
         product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseAuth
+      - package: GoogleSignIn
+        product: GoogleSignIn
     entitlements:
       path: Superfit/Superfit.entitlements
       properties:
         # App Attest proves requests come from the real Superfit app (App Check), like Play
         # Integrity on Android.
         com.apple.developer.devicecheck.appattest-environment: production
+        # Sign in with Apple (Continue with Apple on the sign-in screen).
+        com.apple.developer.applesignin: [Default]
     info:
       path: Superfit/Info.plist
       properties:
@@ -44,6 +54,11 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true
+        # Google's sign-in sheet returns to the app through this link (REVERSED_CLIENT_ID in
+        # GoogleService-Info.plist). It identifies the app, it is not a secret.
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - com.googleusercontent.apps.797661593902-pustbaj3606h9qdt5jeo0tq0epeqp03n
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superfit.aifitness

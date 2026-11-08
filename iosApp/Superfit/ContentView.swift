@@ -5,7 +5,7 @@ import UIKit
 // Hosts Superfit's shared Compose screens (Compose Multiplatform) inside the iPhone app.
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.MainViewController()
+        MainViewControllerKt.MainViewController(auth: FirebaseAuthBridge())
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}

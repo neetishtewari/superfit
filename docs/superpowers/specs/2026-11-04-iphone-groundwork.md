@@ -154,8 +154,15 @@ tested on the dev app first.
          Firestore's Android SDK; deleting the Firebase account stays per app.
        - 5b-3d: the iPhone's CloudStore in Swift (Firestore iPhone SDK). Swift can't implement
          Kotlin suspend functions, so iosMain adds a callback version that Swift implements.
-       - 5b-3e: sign-in on iPhone (Google + Sign in with Apple), CloudBackup wired up on iPhone,
-         and the AI client.
+       - 5b-3e: the sign-in screen moves to shared (LoginScreen + LoginModel over an `AuthClient`
+         for email; each app runs its own Google sheet). iPhone signs in with Firebase's iPhone SDK:
+         email, Google (GoogleSignIn-iOS) and Sign in with Apple, shown first on iPhone because App
+         Review asks for it whenever Google sign-in is offered. Android looks and works the same;
+         its backup restore after sign-in now runs once (it used to run twice at the same time).
+         Apple accounts can't sign in on Android yet: adding "Continue with Apple" to Android
+         (Firebase's web flow, needs an Apple Services ID) is a follow-up before the iPhone launch.
+       - 5b-3f: the iPhone's database and CloudBackup wired up (restore after sign-in, saves).
+       - 5b-3g: the AI client (Firebase AI Logic) on iPhone.
      - 5b-4: data layer to shared: DataRepository, backup/restore (FirebaseSyncManager), settings
        stores (a multiplatform key-value store in place of SharedPreferences).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
@@ -205,6 +212,15 @@ same users/{uid}/ paths and unchanged Firestore rules apply. Values keep their t
 (true/false stay booleans, whole numbers stay whole, decimals stay decimals) so Android reads
 iPhone backups the same. No secrets, no new permissions; Firestore traffic is HTTPS and goes
 through App Check like the rest of Firebase.
+
+Step 5b-3e (reviewed 8 Nov): sign-in stays on Firebase Auth for both apps, so the same accounts,
+uid-scoped Firestore rules and App Check apply. Passwords go only to Firebase and are never
+stored or logged; error text shown to people is the shared plain wording, never raw Firebase
+text. Sign in with Apple uses a fresh random nonce per attempt (SecRandomCopyBytes; SHA-256 to
+Apple, raw to Firebase) so an Apple token can't be replayed. Google uses Google's own sheet with
+the iPhone client id from GoogleService-Info.plist; its REVERSED_CLIENT_ID URL scheme is an app
+identifier, not a secret. No new Android permissions; the iPhone adds the Sign in with Apple
+entitlement only. Sign-out also signs out of Google so the next person picks their own account.
 
 Step 5b-3b (reviewed 7 Nov): GoogleService-Info.plist is committed like Android's
 google-services.json: its API key only identifies the Firebase project; access is guarded by
