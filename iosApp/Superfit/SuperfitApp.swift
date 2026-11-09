@@ -1,5 +1,6 @@
 import FirebaseAppCheck
 import FirebaseCore
+import GoogleSignIn
 import SwiftUI
 
 @main
@@ -14,6 +15,8 @@ struct SuperfitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // Google's sign-in sheet comes back to the app through this link.
+                .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
         }
     }
 }

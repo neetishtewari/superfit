@@ -1,12 +1,27 @@
 package com.superfit.app.ui.auth
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,37 +30,56 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
-import com.google.firebase.auth.GoogleAuthProvider
-import com.superfit.app.theme.*
+import androidx.compose.ui.unit.sp
+import com.superfit.app.theme.NeonMint
+import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.components.PrimaryButton
 import com.superfit.app.ui.components.SuperfitBrandHeader
 import com.superfit.app.ui.components.SuperfitField
+import com.superfit.shared.resources.Res
+import com.superfit.shared.resources.ic_google_logo
+import org.jetbrains.compose.resources.painterResource
 
+/**
+ * The sign-in screen, the same on Android and iPhone. Each app runs its own Google sheet
+ * ([onGoogle]); the iPhone also passes [onApple] for Sign in with Apple.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    viewModel: LoginViewModel,
+    model: LoginModel,
     onLoginSuccess: () -> Unit,
-    modifier: Modifier = Modifier
+    onGoogle: () -> Unit,
+    modifier: Modifier = Modifier,
+    onApple: (() -> Unit)? = null
 ) {
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }
@@ -58,49 +92,11 @@ fun LoginScreen(
 
     val colors = SuperfitTheme.colors
 
-    val context = LocalContext.current
-    val resources = LocalResources.current
-    val webClientId = try {
-        resources.getString(com.superfit.app.R.string.default_web_client_id)
-    } catch (e: Exception) {
-        null
-    }
-
-    val googleSignInClient = remember(webClientId) {
-        if (webClientId != null) {
-            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(webClientId)
-                .requestEmail()
-                .build()
-            GoogleSignIn.getClient(context, gso)
-        } else {
-            null
-        }
-    }
-
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val idToken = account.idToken
-            if (idToken != null) {
-                val credential = GoogleAuthProvider.getCredential(idToken, null)
-                viewModel.signInWithCredential(credential, onLoginSuccess)
-            } else {
-                viewModel.setCustomErrorMessage(AuthMessages.forGoogle(-1))
-            }
-        } catch (e: ApiException) {
-            viewModel.setCustomErrorMessage(AuthMessages.forGoogle(e.statusCode))
-        }
-    }
-
-    val isLogin = viewModel.isLoginMode
+    val isLogin = model.isLoginMode
     val passwordHint: @Composable () -> Unit = { Text("At least 6 characters") }
     val submit = {
         focusManager.clearFocus()
-        viewModel.authenticate(onLoginSuccess)
+        model.authenticate(onLoginSuccess)
     }
 
     Box(
@@ -136,17 +132,24 @@ fun LoginScreen(
                 color = colors.textSecondary
             )
 
-            // Google first: one tap for most people, and it works for new and returning accounts alike.
+            // iPhone: Sign in with Apple first (Apple asks for it whenever Google sign-in is offered).
+            if (onApple != null) {
+                AppleSignInButton(
+                    onClick = {
+                        focusManager.clearFocus()
+                        onApple()
+                    },
+                    enabled = !model.isLoading
+                )
+            }
+
+            // Google: one tap for most people, and it works for new and returning accounts alike.
             OutlinedButton(
                 onClick = {
                     focusManager.clearFocus()
-                    if (webClientId != null && googleSignInClient != null) {
-                        googleSignInLauncher.launch(googleSignInClient.signInIntent)
-                    } else {
-                        viewModel.setCustomErrorMessage(AuthMessages.NOT_SET_UP)
-                    }
+                    onGoogle()
                 },
-                enabled = !viewModel.isLoading,
+                enabled = !model.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 54.dp),
@@ -158,7 +161,7 @@ fun LoginScreen(
                 border = BorderStroke(1.dp, colors.textTertiary.copy(alpha = 0.35f))
             ) {
                 Icon(
-                    painter = painterResource(id = com.superfit.app.R.drawable.ic_google_logo),
+                    painter = painterResource(Res.drawable.ic_google_logo),
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = Color.Unspecified
@@ -182,8 +185,8 @@ fun LoginScreen(
             }
 
             SuperfitField(
-                value = viewModel.email,
-                onValueChange = { viewModel.onEmailChange(it) },
+                value = model.email,
+                onValueChange = { model.onEmailChange(it) },
                 label = { Text("Email") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
@@ -191,8 +194,8 @@ fun LoginScreen(
             )
 
             SuperfitField(
-                value = viewModel.password,
-                onValueChange = { viewModel.onPasswordChange(it) },
+                value = model.password,
+                onValueChange = { model.onPasswordChange(it) },
                 label = { Text("Password") },
                 supportingText = if (isLogin) null else passwordHint,
                 trailingIcon = {
@@ -219,8 +222,8 @@ fun LoginScreen(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 SuperfitField(
-                    value = viewModel.confirmPassword,
-                    onValueChange = { viewModel.onConfirmPasswordChange(it) },
+                    value = model.confirmPassword,
+                    onValueChange = { model.onConfirmPasswordChange(it) },
                     label = { Text("Password again") },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
@@ -239,7 +242,7 @@ fun LoginScreen(
                         .align(Alignment.End)
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
-                            resetEmail = viewModel.email
+                            resetEmail = model.email
                             resetSuccessMessage = null
                             resetErrorMessage = null
                             showForgotPasswordDialog = true
@@ -248,7 +251,7 @@ fun LoginScreen(
                 )
             }
 
-            viewModel.errorMessage?.let { message ->
+            model.errorMessage?.let { message ->
                 Text(
                     text = message,
                     color = colors.errorColor,
@@ -265,7 +268,7 @@ fun LoginScreen(
             PrimaryButton(
                 text = if (isLogin) "Sign in" else "Create account",
                 onClick = submit,
-                loading = viewModel.isLoading
+                loading = model.isLoading
             )
 
             Row(
@@ -286,7 +289,7 @@ fun LoginScreen(
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { viewModel.toggleMode() }
+                        .clickable { model.toggleMode() }
                         .padding(horizontal = 4.dp, vertical = 6.dp)
                 )
             }
@@ -348,7 +351,7 @@ fun LoginScreen(
                             if (resetSuccessMessage != null) {
                                 showForgotPasswordDialog = false
                             } else {
-                                viewModel.resetPassword(resetEmail) { success, msg ->
+                                model.resetPassword(resetEmail) { success, msg ->
                                     if (success) {
                                         resetSuccessMessage = msg
                                         resetErrorMessage = null
@@ -382,5 +385,29 @@ fun LoginScreen(
                 }
             )
         }
+    }
+}
+
+/**
+ * Apple's own look for its button (black, or white in dark mode, with the Apple logo), so it
+ * passes App Review. The logo is the Apple symbol in the iPhone's system font.
+ */
+@Composable
+private fun AppleSignInButton(onClick: () -> Unit, enabled: Boolean) {
+    val dark = SuperfitTheme.colors.isDark
+    val background = if (dark) Color.White else Color.Black
+    val content = if (dark) Color.Black else Color.White
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = background, contentColor = content)
+    ) {
+        Text("\uF8FF", fontFamily = FontFamily.Default, fontSize = 20.sp)
+        Spacer(modifier = Modifier.width(10.dp))
+        Text("Continue with Apple", style = MaterialTheme.typography.titleMedium)
     }
 }

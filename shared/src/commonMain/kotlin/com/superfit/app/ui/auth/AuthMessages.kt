@@ -11,6 +11,8 @@ object AuthMessages {
     const val NOT_SET_UP = "Sign-in isn't working right now. Please try again in a few minutes."
     const val GOOGLE_CANCELLED = "Google sign-in didn't finish. Try again, or use your email."
     const val NO_INTERNET = "No internet. Check your connection and try again."
+    const val APPLE_CANCELLED = "Apple sign-in didn't finish. Try again, or use your email."
+    const val ACCOUNT_EXISTS = "That email already has a Superfit account. Sign in the way you did before (Google, Apple or email)."
 
     // Google Play services status codes (GoogleSignInStatusCodes / CommonStatusCodes).
     private const val GOOGLE_CANCELLED_CODE = 12501
@@ -35,7 +37,7 @@ object AuthMessages {
             "ERROR_WEAK_PASSWORD" -> "Use a password with at least 6 characters."
             "ERROR_TOO_MANY_REQUESTS" -> "Too many tries. Wait a few minutes, then try again."
             "ERROR_USER_DISABLED" -> "This account has been turned off. Email us if you think that's a mistake."
-            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" -> "That email is already set up with a password. Sign in with your email instead."
+            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" -> ACCOUNT_EXISTS
             else -> if (creatingAccount) "Couldn't create your account. Please try again." else "Couldn't sign you in. Please try again."
         }
     }
@@ -45,5 +47,19 @@ object AuthMessages {
         GOOGLE_CANCELLED_CODE -> GOOGLE_CANCELLED
         GOOGLE_NETWORK_CODE -> NO_INTERNET
         else -> "Google sign-in didn't work. Try again, or use your email."
+    }
+
+    /**
+     * The iPhone's sign-in problems. Swift hands over Firebase's error as the same names Android
+     * uses (ERROR_WRONG_PASSWORD...), or its own GOOGLE_* / APPLE_* / NOT_SET_UP for the Google
+     * and Apple sheets.
+     */
+    fun forIphone(code: String?, message: String?, isNetwork: Boolean, creatingAccount: Boolean): String = when (code) {
+        "GOOGLE_CANCELLED" -> GOOGLE_CANCELLED
+        "GOOGLE_FAILED" -> forGoogle(-1)
+        "APPLE_CANCELLED" -> APPLE_CANCELLED
+        "APPLE_FAILED" -> "Apple sign-in didn't work. Try again, or use your email."
+        "NOT_SET_UP" -> NOT_SET_UP
+        else -> forFirebase(code, message, isNetwork, creatingAccount)
     }
 }

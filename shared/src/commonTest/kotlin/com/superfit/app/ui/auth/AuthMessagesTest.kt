@@ -1,8 +1,8 @@
 package com.superfit.app.ui.auth
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class AuthMessagesTest {
 
@@ -40,5 +40,17 @@ class AuthMessagesTest {
         assertEquals(AuthMessages.GOOGLE_CANCELLED, AuthMessages.forGoogle(12501))
         assertEquals(AuthMessages.NO_INTERNET, AuthMessages.forGoogle(7))
         assertFalse(AuthMessages.forGoogle(10).contains("10"))
+    }
+
+    @Test
+    fun appleCancelAndAccountClashGetPlainSentences() {
+        assertEquals(AuthMessages.APPLE_CANCELLED, AuthMessages.forIphone("APPLE_CANCELLED", null, isNetwork = false, creatingAccount = false))
+        assertEquals(AuthMessages.GOOGLE_CANCELLED, AuthMessages.forIphone("GOOGLE_CANCELLED", "raw", isNetwork = false, creatingAccount = false))
+        assertEquals(AuthMessages.NO_INTERNET, AuthMessages.forIphone(null, "raw", isNetwork = true, creatingAccount = false))
+        assertFalse(AuthMessages.forIphone("APPLE_FAILED", "ASAuthorizationError 1000", isNetwork = false, creatingAccount = false).contains("1000"))
+        assertEquals(
+            AuthMessages.ACCOUNT_EXISTS,
+            AuthMessages.forFirebase("ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL", "x")
+        )
     }
 }
