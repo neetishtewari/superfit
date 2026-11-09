@@ -161,7 +161,11 @@ tested on the dev app first.
          its backup restore after sign-in now runs once (it used to run twice at the same time).
          Apple accounts can't sign in on Android yet: adding "Continue with Apple" to Android
          (Firebase's web flow, needs an Apple Services ID) is a follow-up before the iPhone launch.
-       - 5b-3f: the iPhone's database and CloudBackup wired up (restore after sign-in, saves).
+       - 5b-3f: the iPhone's database (Room with bundled SQLite, one file per account in the app's
+         private Application Support folder) and CloudBackup wired up: after sign-in the iPhone
+         restores the backup (merge only, same code as Android) and the placeholder shows how many
+         meals, workouts and weigh-ins arrived, to compare with the Android app. Coach chat and
+         notes go to per-account files there too. Saving new entries comes with the screens.
        - 5b-3g: the AI client (Firebase AI Logic) on iPhone.
      - 5b-4: data layer to shared: DataRepository, backup/restore (FirebaseSyncManager), settings
        stores (a multiplatform key-value store in place of SharedPreferences).
@@ -350,3 +354,8 @@ For the iPhone app, before TestFlight:
   App Store privacy answers and the Health permission text.
 - The widget and app share data through an App Group, readable only by Superfit.
 - Same Firestore rules for both apps; any rules change is reviewed and deployed once.
+
+Step 5b-3f (reviewed 9 Nov): the iPhone database and coach files live in the app's own
+Application Support folder (sandboxed, not shared with other apps, removed with the app), one
+file per account so a second person on the same iPhone never sees the first one's data. The
+restore only reads users/{signed-in uid}; nothing is uploaded in this step. No new permissions.
