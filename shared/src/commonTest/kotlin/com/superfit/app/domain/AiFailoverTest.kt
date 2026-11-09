@@ -1,19 +1,13 @@
 package com.superfit.app.domain
 
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.fail
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-// Robolectric so android.util.Log calls inside GeminiClient work.
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = android.app.Application::class)
-class GeminiClientTest {
+class AiFailoverTest {
 
     // Stand-ins named like the SDK's exception types, which classifyError matches by name.
     private class ServerException(message: String) : Exception(message)
@@ -24,9 +18,9 @@ class GeminiClientTest {
     private val models = listOf("model-a", "model-b")
 
     @Test
-    fun `overloaded model is retried and succeeds without switching`() = runTest {
+    fun overloadedModelIsRetriedAndSucceedsWithoutSwitching() = runTest {
         val calls = mutableListOf<String>()
-        val result = GeminiClient.runWithFailover(models) { model ->
+        val result = AiFailover.run(models) { model ->
             calls += model
             if (calls.size < 3) throw ServerException("The model is overloaded. Please try again later.")
             "ok"
@@ -36,9 +30,9 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `rate limit moves to the next model`() = runTest {
+    fun rateLimitMovesToTheNextModel() = runTest {
         val calls = mutableListOf<String>()
-        val result = GeminiClient.runWithFailover(models) { model ->
+        val result = AiFailover.run(models) { model ->
             calls += model
             if (model == "model-a") throw QuotaExceededException("Resource has been exhausted")
             "ok"
@@ -48,10 +42,10 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `used-up credit stops at once instead of trying every model`() = runTest {
+    fun usedUpCreditStopsAtOnce() = runTest {
         var callCount = 0
         try {
-            GeminiClient.runWithFailover(models) {
+            AiFailover.run(models) {
                 callCount++
                 throw QuotaExceededException("429 RESOURCE_EXHAUSTED: Your prepayment credits are depleted.")
             }
@@ -63,10 +57,10 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `refused key stops immediately with a friendly message`() = runTest {
+    fun refusedKeyStopsImmediatelyWithAFriendlyMessage() = runTest {
         var callCount = 0
         try {
-            GeminiClient.runWithFailover(models) {
+            AiFailover.run(models) {
                 callCount++
                 throw InvalidAPIKeyException("API key not valid. Please pass a valid API key.")
             }
@@ -78,10 +72,10 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `slow call times out and falls through to a busy message`() = runTest {
+    fun slowCallTimesOutAndFallsThroughToABusyMessage() = runTest {
         var callCount = 0
         try {
-            GeminiClient.runWithFailover(models, timeoutMs = 1_000L, totalBudgetMs = 10_000L) {
+            AiFailover.run(models, timeoutMs = 1_000L, totalBudgetMs = 10_000L) {
                 callCount++
                 delay(5_000L)
                 "too late"
@@ -90,22 +84,22 @@ class GeminiClientTest {
         } catch (e: Exception) {
             assertEquals("The AI took too long to respond. Please check your connection and try again.", e.message)
         }
-        assertTrue("budget should cap attempts, got $callCount", callCount in 2..6)
+        assertTrue(callCount in 2..6, "budget should cap attempts, got $callCount")
     }
 
     @Test
-    fun `classifies typical Gemini errors`() {
-        assertEquals(GeminiClient.ErrorKind.BUSY, GeminiClient.classifyError(ServerException("This model is currently experiencing high demand.")))
-        assertEquals(GeminiClient.ErrorKind.RATE_LIMITED, GeminiClient.classifyError(QuotaExceededException("Quota exceeded")))
-        assertEquals(GeminiClient.ErrorKind.MODEL_UNAVAILABLE, GeminiClient.classifyError(Exception("models/x is not found for API version v1beta")))
-        assertEquals(GeminiClient.ErrorKind.FATAL, GeminiClient.classifyError(InvalidAPIKeyException("bad key")))
+    fun classifiesTypicalGeminiErrors() {
+        assertEquals(AiFailover.ErrorKind.BUSY, AiFailover.classifyError(ServerException("This model is currently experiencing high demand.")))
+        assertEquals(AiFailover.ErrorKind.RATE_LIMITED, AiFailover.classifyError(QuotaExceededException("Quota exceeded")))
+        assertEquals(AiFailover.ErrorKind.MODEL_UNAVAILABLE, AiFailover.classifyError(Exception("models/x is not found for API version v1beta")))
+        assertEquals(AiFailover.ErrorKind.FATAL, AiFailover.classifyError(InvalidAPIKeyException("bad key")))
     }
 
     @Test
-    fun `Firebase AI being switched off stops at once without blaming the user's key`() = runTest {
+    fun firebaseAiSwitchedOffStopsAtOnce() = runTest {
         var callCount = 0
         try {
-            GeminiClient.runWithFailover(models) {
+            AiFailover.run(models) {
                 callCount++
                 throw ServiceDisabledException("Firebase AI Logic API has not been used in project superfit before or it is disabled.")
             }
@@ -117,10 +111,10 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `rejected App Check token stops at once instead of retrying as busy`() = runTest {
+    fun rejectedAppCheckTokenStopsAtOnce() = runTest {
         var callCount = 0
         try {
-            GeminiClient.runWithFailover(models) {
+            AiFailover.run(models) {
                 callCount++
                 throw ServerException("Firebase App Check token is invalid.")
             }
@@ -132,9 +126,9 @@ class GeminiClientTest {
     }
 
     @Test
-    fun `photos are shrunk to 1024 px on the long edge`() {
-        assertEquals(1024 to 768, GeminiClient.scaledSize(4000, 3000))
-        assertEquals(768 to 1024, GeminiClient.scaledSize(3000, 4000))
-        assertEquals(800 to 600, GeminiClient.scaledSize(800, 600))
+    fun photosAreShrunkToTheLongEdgeLimit() {
+        assertEquals(1024 to 768, AiFailover.scaledSize(4000, 3000))
+        assertEquals(768 to 1024, AiFailover.scaledSize(3000, 4000))
+        assertEquals(800 to 600, AiFailover.scaledSize(800, 600))
     }
 }

@@ -26,19 +26,26 @@ import com.superfit.app.data.IosBackupLocal
 import com.superfit.app.data.IosCloudStore
 import com.superfit.app.data.IosCloudStoreAdapter
 import com.superfit.app.data.openIosDatabase
+import com.superfit.app.domain.Ai
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.IosAi
+import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.components.PrimaryButton
 import com.superfit.app.ui.components.SuperfitBrandHeader
+import kotlinx.coroutines.launch
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore): UIViewController = ComposeUIViewController {
-    SuperfitTheme(darkTheme = isSystemInDarkTheme()) {
-        IosRoot(auth, cloudStore)
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi): UIViewController {
+    installIosAi(ai)
+    return ComposeUIViewController {
+        SuperfitTheme(darkTheme = isSystemInDarkTheme()) {
+            IosRoot(auth, cloudStore)
+        }
     }
 }
 
@@ -115,6 +122,27 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = SuperfitTheme.colors.textSecondary
             )
+            // A one-off check that the AI answers on this iPhone (placeholder until the coach moves over).
+            var aiReply by remember { mutableStateOf<String?>(null) }
+            var aiBusy by remember { mutableStateOf(false) }
+            PrimaryButton(
+                text = "Test the AI coach",
+                loading = aiBusy,
+                onClick = {
+                    aiBusy = true
+                    scope.launch {
+                        aiReply = try {
+                            Ai.generate("Greet a Superfit user in one short, friendly sentence.", isJson = false).trim()
+                        } catch (e: Exception) {
+                            Ai.friendlyError(e)
+                        }
+                        aiBusy = false
+                    }
+                }
+            )
+            aiReply?.let {
+                Text(text = it, style = MaterialTheme.typography.bodyLarge, color = SuperfitTheme.colors.textPrimary)
+            }
             PrimaryButton(
                 text = "Sign out",
                 onClick = {

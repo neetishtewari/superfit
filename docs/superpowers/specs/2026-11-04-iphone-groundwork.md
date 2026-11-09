@@ -166,7 +166,11 @@ tested on the dev app first.
          restores the backup (merge only, same code as Android) and the placeholder shows how many
          meals, workouts and weigh-ins arrived, to compare with the Android app. Coach chat and
          notes go to per-account files there too. Saving new entries comes with the screens.
-       - 5b-3g: the AI client (Firebase AI Logic) on iPhone.
+       - 5b-3g: the AI client on iPhone. Model order, retries, timeouts and the wording of AI errors
+         move to shared (AiFailover; Android's GeminiClient keeps only its Firebase calls). Swift
+         makes each single call with Firebase AI Logic's iPhone SDK (FirebaseAiBridge), so both
+         apps use the same models, App Check and billing. The placeholder gets a "Test the AI
+         coach" button until the coach screen moves over.
      - 5b-4: data layer to shared: DataRepository, backup/restore (FirebaseSyncManager), settings
        stores (a multiplatform key-value store in place of SharedPreferences).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
@@ -359,3 +363,9 @@ Step 5b-3f (reviewed 9 Nov): the iPhone database and coach files live in the app
 Application Support folder (sandboxed, not shared with other apps, removed with the app), one
 file per account so a second person on the same iPhone never sees the first one's data. The
 restore only reads users/{signed-in uid}; nothing is uploaded in this step. No new permissions.
+
+Step 5b-3g (reviewed 9 Nov): the iPhone calls Gemini only through Firebase AI Logic with App
+Check (enforced for AI Logic), exactly like Android: no API key in the app or repo, billed to
+the Superfit project. Photos are sent as JPEG and never stored. Raw AI errors stay in the logs;
+people only see the shared plain messages. Android behaviour is unchanged (same models, retries
+and messages, now from shared code with the same tests).
