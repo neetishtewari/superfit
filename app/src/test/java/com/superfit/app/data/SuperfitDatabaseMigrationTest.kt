@@ -86,7 +86,7 @@ class SuperfitDatabaseMigrationTest {
         try {
             // Opening the database runs the migrations and Room's schema validation.
             val db = database.openHelper.writableDatabase
-            assertEquals(9, db.version)
+            assertEquals(10, db.version)
 
             db.query("SELECT weightKg, startingWeightKg, fitnessLevel FROM user_profile WHERE id = 0").use { cursor ->
                 assertEquals(1, cursor.count)

@@ -521,7 +521,8 @@ class DashboardViewModel(
             workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
                 com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
             },
-            usual = usual
+            usual = usual,
+            distanceKm = state.activity.distanceMeters?.div(1000)
         )
 
     private fun loadCachedCoachingInsight() {

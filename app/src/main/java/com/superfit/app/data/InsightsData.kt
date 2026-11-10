@@ -27,6 +27,10 @@ object InsightsData {
         val meals = nutrition.groupBy { dateOf(it.timestamp) }
         val voice = voiceWorkouts.groupBy { dateOf(it.timestamp) }
         val steps = activity.mapNotNull { a -> runCatching { LocalDate.parse(a.date) }.getOrNull()?.let { it to a.steps } }.toMap()
+        val distanceKm = activity.mapNotNull { a ->
+            val km = a.distanceMeters?.div(1000) ?: return@mapNotNull null
+            runCatching { LocalDate.parse(a.date) }.getOrNull()?.let { it to km }
+        }.toMap()
         val dates = meals.keys + voice.keys + steps.keys + imported.keys
         val kZone = zone.toKotlinTimeZone()
         return dates.associate { date ->
@@ -43,7 +47,8 @@ object InsightsData {
                     ActivityFact(title = w.description, minutes = 0, distanceKm = null, kcal = w.caloriesBurned, paceSecondsPerKm = null, isRun = false, reps = w.repsCount.coerceAtLeast(0))
                 },
                 mealRating = dayMeals.mapNotNull { m -> MealTags.decode(m.qualityTags)?.takeIf { !it.estimated }?.let { DietScoreEngine.mealRating(m, it).toDouble() } }
-                    .takeIf { it.isNotEmpty() }?.average()
+                    .takeIf { it.isNotEmpty() }?.average(),
+                distanceKm = distanceKm[date]
             )
         }
     }

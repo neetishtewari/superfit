@@ -580,7 +580,7 @@ fun ActivityPerformanceCard(
             color = ThemeTextPrimary
         )
 
-        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(Now.today(), state.activity.steps, emptyList(), null)
+        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(Now.today(), state.activity.steps, emptyList(), null, state.activity.distanceMeters?.div(1000))
         val usual = today.usual
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -593,7 +593,7 @@ fun ActivityPerformanceCard(
                     modifier = Modifier.weight(1f)
                 )
                 TodayTile(
-                    label = "Distance (est.)",
+                    label = if (today.distanceEstimated) "Distance (est.)" else "Distance",
                     value = "${Decimals.one(today.distanceKm)} km",
                     usual = usual?.let { "${Decimals.one(it.distanceKm)} km" },
                     ahead = usual != null && usual.distanceKm > 0 && today.distanceKm >= usual.distanceKm,

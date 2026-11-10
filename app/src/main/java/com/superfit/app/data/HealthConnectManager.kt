@@ -2,17 +2,20 @@ package com.superfit.app.data
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BasalMetabolicRateRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.BoneMassRecord
+import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.HeightRecord
 import androidx.health.connect.client.records.LeanBodyMassRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -133,11 +136,13 @@ class HealthConnectManager(private val context: Context) {
             return null
         }
         val activeCalories = readActiveCaloriesAggregate(client, startTime, endTime)
+        val distanceMeters = readDistanceTotal(client, startTime, endTime)
 
         return ActivityTelemetryEntity(
             date = localDate.toString(),
             steps = steps.toInt(),
-            activeCalories = activeCalories
+            activeCalories = activeCalories,
+            distanceMeters = distanceMeters
         )
     }
 
@@ -201,17 +206,53 @@ class HealthConnectManager(private val context: Context) {
         return null
     }
 
-    // Health Connect's own daily total: the same number its Steps screen shows, with steps
-    // recorded by several apps (phone, watch, Samsung Health) counted once.
-    private suspend fun readStepsTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long {
-        val response = client.aggregate(
-            AggregateRequest(
-                metrics = setOf(StepsRecord.COUNT_TOTAL),
-                timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
-            )
-        )
-        return response[StepsRecord.COUNT_TOTAL] ?: 0L
+    // The day's steps from the one app that counted the most. Health Connect's merged total can
+    // add apps together (for example Samsung Health, which already merges watch and phone, plus
+    // Google Fit counting the same walk on the phone), which showed ~30,600 for a 23,500-step day.
+    private suspend fun readStepsTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long =
+        largestSingleSource(client, StepsRecord.COUNT_TOTAL, startTime, endTime, compare = { it.toDouble() }) ?: 0L
+
+    /**
+     * The day's distance in meters from the one app that recorded the most, or null when no app
+     * records distance or distance access is off (then the app estimates it from steps).
+     */
+    private suspend fun readDistanceTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Double? {
+        val permission = HealthPermission.getReadPermission(DistanceRecord::class)
+        return try {
+            if (permission !in client.permissionController.getGrantedPermissions()) return null
+            largestSingleSource(client, DistanceRecord.DISTANCE_TOTAL, startTime, endTime, compare = { it.inMeters })
+                ?.inMeters?.takeIf { it > 0 }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("HealthConnectManager", "Reading distance failed", e)
+            null
+        }
     }
+
+    /** [metric] for the day per app that wrote it, keeping the largest. Throws if the first read fails. */
+    private suspend fun <T : Any> largestSingleSource(
+        client: HealthConnectClient,
+        metric: AggregateMetric<T>,
+        startTime: Instant,
+        endTime: Instant,
+        compare: (T) -> Double
+    ): T? {
+        val range = TimeRangeFilter.between(startTime, endTime)
+        val merged = client.aggregate(AggregateRequest(setOf(metric), range))
+        val origins = merged.dataOrigins
+        if (origins.size <= 1) return merged[metric]
+        return pickLargest(origins.map { origin -> readFrom(client, metric, range, origin) }, compare) ?: merged[metric]
+    }
+
+    private suspend fun <T : Any> readFrom(client: HealthConnectClient, metric: AggregateMetric<T>, range: TimeRangeFilter, origin: DataOrigin): T? =
+        try {
+            client.aggregate(AggregateRequest(setOf(metric), range, setOf(origin)))[metric]
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
 
     private suspend fun readActiveCaloriesAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Double {
         return try {
@@ -261,5 +302,10 @@ class HealthConnectManager(private val context: Context) {
         } catch (e: Exception) {
             null
         }
+    }
+
+    companion object {
+        /** The largest of the per-app values, skipping apps whose read failed. */
+        internal fun <T : Any> pickLargest(values: List<T?>, compare: (T) -> Double): T? = values.filterNotNull().maxByOrNull(compare)
     }
 }

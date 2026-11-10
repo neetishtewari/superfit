@@ -36,16 +36,18 @@ fun Map<String, Any>.toUserProfileEntity(): UserProfileEntity = UserProfileEntit
     fitnessLevel = this["fitnessLevel"] as? String ?: "INTERMEDIATE"
 )
 
-fun ActivityTelemetryEntity.toMap(): Map<String, Any> = mapOf(
-    "date" to date,
-    "steps" to steps,
-    "activeCalories" to activeCalories
-)
+fun ActivityTelemetryEntity.toMap(): Map<String, Any> = buildMap {
+    put("date", date)
+    put("steps", steps)
+    put("activeCalories", activeCalories)
+    distanceMeters?.let { put("distanceMeters", it) }
+}
 
 fun Map<String, Any>.toActivityTelemetry(): ActivityTelemetryEntity = ActivityTelemetryEntity(
     date = this["date"] as? String ?: "",
     steps = (this["steps"] as? Number)?.toInt() ?: 0,
-    activeCalories = (this["activeCalories"] as? Number)?.toDouble() ?: 0.0
+    activeCalories = (this["activeCalories"] as? Number)?.toDouble() ?: 0.0,
+    distanceMeters = (this["distanceMeters"] as? Number)?.toDouble()
 )
 
 fun SleepTelemetryEntity.toMap(): Map<String, Any> = mapOf(

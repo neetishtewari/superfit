@@ -60,8 +60,13 @@ data class DayTotals(
     val steps: Int,
     val workouts: List<ActivityFact>,
     /** Average of the AI's 1-10 meal ratings that day; null when no meal was rated. */
-    val mealRating: Double? = null
+    val mealRating: Double? = null,
+    /** Distance recorded by a watch or phone app; null when none recorded it. */
+    val distanceKm: Double? = null
 ) {
+    /** Recorded distance, or an estimate from steps when no app recorded one. */
+    val distanceOrEstimateKm: Double get() = distanceKm ?: (steps * UsualDay.STEP_KM)
+
     val logged: Boolean get() = meals >= 2
     val net: Double get() = kcalEaten - kcalTarget
     val proteinHit: Boolean get() = logged && proteinTargetG > 0 && proteinG >= proteinTargetG * 0.9
@@ -379,7 +384,7 @@ data class UsualDay(val steps: Int, val distanceKm: Double, val moveMinutes: Lon
             if (same.size < 2) return null
             return UsualDay(
                 steps = same.map { it.steps }.average().roundToInt(),
-                distanceKm = same.map { it.steps * STEP_KM }.average(),
+                distanceKm = same.map { it.distanceOrEstimateKm }.average(),
                 moveMinutes = same.map { it.moveMinutes }.average().roundToLong(),
                 workoutKcal = same.map { it.workoutKcal }.average(),
                 samples = same.size
@@ -398,7 +403,9 @@ data class TodayVsUsual(
     val moveMinutes: Long,
     val workoutKcal: Double,
     val usual: UsualDay?,
-    val weekday: String
+    val weekday: String,
+    /** True when [distanceKm] is worked out from steps because no app recorded distance. */
+    val distanceEstimated: Boolean = true
 ) {
     /** A short line for Home, or null when there's nothing worth saying yet. */
     fun coachLine(hour: Int): String? {
@@ -426,9 +433,10 @@ data class TodayVsUsual(
     }
 
     companion object {
-        fun of(today: LocalDate, steps: Int, workouts: List<ActivityFact>, usual: UsualDay?) = TodayVsUsual(
+        fun of(today: LocalDate, steps: Int, workouts: List<ActivityFact>, usual: UsualDay?, distanceKm: Double? = null) = TodayVsUsual(
             steps = steps,
-            distanceKm = steps * UsualDay.STEP_KM,
+            distanceKm = distanceKm ?: (steps * UsualDay.STEP_KM),
+            distanceEstimated = distanceKm == null,
             moveMinutes = workouts.sumOf { it.minutes },
             workoutKcal = workouts.sumOf { it.kcal },
             usual = usual,
