@@ -10,6 +10,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -20,6 +21,8 @@ import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.data.SuperfitDatabase
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.theme.ThemeConfig
+import com.superfit.app.ui.components.LocalVoiceTyping
+import com.superfit.app.ui.dashboard.androidVoiceTyping
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
@@ -57,26 +60,29 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
             SuperfitTheme(darkTheme = isDark) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val triggerVoice by triggerVoiceLog.collectAsState()
-                    val triggerFavs by triggerFavoritesLog.collectAsState()
-                    val triggerPhoto by triggerPhotoLog.collectAsState()
-                    val recapMonth by openRecap.collectAsState()
-                    MainNavigation(
-                        healthConnectManager = healthConnectManager,
-                        repository = repository,
-                        triggerVoiceLog = triggerVoice,
-                        triggerFavoritesLog = triggerFavs,
-                        triggerPhotoLog = triggerPhoto,
-                        onVoiceLogTriggeredHandled = { triggerVoiceLog.value = false },
-                        onFavoritesLogTriggeredHandled = { triggerFavoritesLog.value = false },
-                        onPhotoLogTriggeredHandled = { triggerPhotoLog.value = false },
-                        openRecapMonth = recapMonth,
-                        onOpenRecapHandled = { openRecap.value = null }
-                    )
+                // Shared screens use Android's voice typing for short answers.
+                CompositionLocalProvider(LocalVoiceTyping provides { prompt, onText -> androidVoiceTyping(prompt, onText) }) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        val triggerVoice by triggerVoiceLog.collectAsState()
+                        val triggerFavs by triggerFavoritesLog.collectAsState()
+                        val triggerPhoto by triggerPhotoLog.collectAsState()
+                        val recapMonth by openRecap.collectAsState()
+                        MainNavigation(
+                            healthConnectManager = healthConnectManager,
+                            repository = repository,
+                            triggerVoiceLog = triggerVoice,
+                            triggerFavoritesLog = triggerFavs,
+                            triggerPhotoLog = triggerPhoto,
+                            onVoiceLogTriggeredHandled = { triggerVoiceLog.value = false },
+                            onFavoritesLogTriggeredHandled = { triggerFavoritesLog.value = false },
+                            onPhotoLogTriggeredHandled = { triggerPhotoLog.value = false },
+                            openRecapMonth = recapMonth,
+                            onOpenRecapHandled = { openRecap.value = null }
+                        )
+                    }
                 }
             }
         }
