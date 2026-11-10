@@ -514,15 +514,22 @@ class DashboardViewModel(
     }
 
     /** Today's steps and workouts next to the usual for this weekday. */
-    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?) =
+    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?, distance: TodayDistance? = todayDistance.value) =
         com.superfit.app.domain.TodayVsUsual.of(
             today = LocalDate.now().toKotlinLocalDate(),
             steps = state.activity.steps,
             workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
                 com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
             },
-            usual = usual
+            usual = usual,
+            distanceKm = distance?.takeIf { it.date == LocalDate.now() }?.km
         )
+
+    /** Today's recorded distance, read live from Health Connect and kept only in memory (not stored). */
+    data class TodayDistance(val date: LocalDate, val km: Double)
+
+    private val _todayDistance = MutableStateFlow<TodayDistance?>(null)
+    val todayDistance: StateFlow<TodayDistance?> = _todayDistance
 
     private fun loadCachedCoachingInsight() {
         CoachInsightStore.loadForDay(sharedPrefs, LocalDate.now())?.let {
@@ -930,7 +937,16 @@ class DashboardViewModel(
 
     fun syncTelemetry() {
         viewModelScope.launch {
-            repository.syncHealthConnectTelemetry(LocalDate.now())
+            val today = LocalDate.now()
+            repository.syncHealthConnectTelemetry(today)
+            // Yesterday too, so a day that was still being counted at midnight gets its final total.
+            repository.refreshActivity(today.minusDays(1))
+            // Once: days saved before the single-app steps fix could hold two apps added together.
+            if (!sharedPrefs.getBoolean(PAST_STEPS_CORRECTED, false)) {
+                repository.correctPastSteps(fromDaysAgo = 2, toDaysAgo = 30)
+                sharedPrefs.edit().putBoolean(PAST_STEPS_CORRECTED, true).apply()
+            }
+            _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()
             sharedPrefs.edit().putLong("last_telemetry_sync", now).apply()
@@ -1298,6 +1314,8 @@ class DashboardViewModel(
     }
 
     companion object {
+        private const val PAST_STEPS_CORRECTED = "past_steps_watch_first_v2"
+
         /** First chat chip in Roast me style. */
         const val ROAST_MY_DAY = "Roast"
 

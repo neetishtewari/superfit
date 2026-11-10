@@ -398,7 +398,9 @@ data class TodayVsUsual(
     val moveMinutes: Long,
     val workoutKcal: Double,
     val usual: UsualDay?,
-    val weekday: String
+    val weekday: String,
+    /** True when [distanceKm] is worked out from steps because no app recorded distance. */
+    val distanceEstimated: Boolean = true
 ) {
     /** A short line for Home, or null when there's nothing worth saying yet. */
     fun coachLine(hour: Int): String? {
@@ -426,9 +428,10 @@ data class TodayVsUsual(
     }
 
     companion object {
-        fun of(today: LocalDate, steps: Int, workouts: List<ActivityFact>, usual: UsualDay?) = TodayVsUsual(
+        fun of(today: LocalDate, steps: Int, workouts: List<ActivityFact>, usual: UsualDay?, distanceKm: Double? = null) = TodayVsUsual(
             steps = steps,
-            distanceKm = steps * UsualDay.STEP_KM,
+            distanceKm = distanceKm ?: (steps * UsualDay.STEP_KM),
+            distanceEstimated = distanceKm == null,
             moveMinutes = workouts.sumOf { it.minutes },
             workoutKcal = workouts.sumOf { it.kcal },
             usual = usual,
