@@ -215,7 +215,7 @@ class HealthConnectManager(private val context: Context) {
     // add apps together (for example Samsung Health, which already merges watch and phone, plus
     // Google Fit counting the same walk on the phone), which showed ~30,600 for a 23,500-step day.
     private suspend fun readStepsTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long =
-        largestSingleSource(client, StepsRecord.COUNT_TOTAL, startTime, endTime, compare = { it.toDouble() }) ?: 0L
+        largestSingleSource(client, StepsRecord.COUNT_TOTAL, startTime, endTime, "steps", compare = { it.toDouble() }) ?: 0L
 
     /**
      * The day's distance in meters from the one app that recorded the most, or null when no app
@@ -225,7 +225,7 @@ class HealthConnectManager(private val context: Context) {
         val permission = HealthPermission.getReadPermission(DistanceRecord::class)
         return try {
             if (permission !in client.permissionController.getGrantedPermissions()) return null
-            largestSingleSource(client, DistanceRecord.DISTANCE_TOTAL, startTime, endTime, compare = { it.inMeters })
+            largestSingleSource(client, DistanceRecord.DISTANCE_TOTAL, startTime, endTime, "distance", compare = { it.inMeters })
                 ?.inMeters?.takeIf { it > 0 }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -241,13 +241,16 @@ class HealthConnectManager(private val context: Context) {
         metric: AggregateMetric<T>,
         startTime: Instant,
         endTime: Instant,
+        label: String,
         compare: (T) -> Double
     ): T? {
         val range = TimeRangeFilter.between(startTime, endTime)
         val merged = client.aggregate(AggregateRequest(setOf(metric), range))
         val origins = merged.dataOrigins
         if (origins.size <= 1) return merged[metric]
-        return pickLargest(origins.map { origin -> readFrom(client, metric, range, origin) }, compare) ?: merged[metric]
+        val perApp = origins.map { origin -> origin.packageName to readFrom(client, metric, range, origin) }
+        android.util.Log.i("HealthConnectManager", "$label $startTime: merged=${merged[metric]} " + perApp.joinToString { "${it.first}=${it.second}" })
+        return pickLargest(perApp.map { it.second }, compare) ?: merged[metric]
     }
 
     private suspend fun <T : Any> readFrom(client: HealthConnectClient, metric: AggregateMetric<T>, range: TimeRangeFilter, origin: DataOrigin): T? =
