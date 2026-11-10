@@ -255,12 +255,6 @@ fun HistoryScreen(
                                     androidx.compose.material3.TextButton(onClick = { onOpenRecap(java.time.YearMonth.now()) }) {
                                         Text("Preview this month's recap (dev app)")
                                     }
-                                    // Dev app only: which workouts come with a GPS route (for route share cards).
-                                    var showRouteCheck by remember { mutableStateOf(false) }
-                                    androidx.compose.material3.TextButton(onClick = { showRouteCheck = true }) {
-                                        Text("Check workout routes (dev app)")
-                                    }
-                                    if (showRouteCheck) RouteCheckDialog(onDismiss = { showRouteCheck = false })
                                 }
                             }
                             1 -> viewModel.journey?.let { journey ->
