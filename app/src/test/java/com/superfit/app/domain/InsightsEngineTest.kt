@@ -158,4 +158,15 @@ class InsightsEngineTest {
         assertTrue(busy.chatLine().contains("steps 9000 vs 8000"))
         assertNull(TodayVsUsual.of(kToday, 9000, emptyList(), null).coachLine(20))
     }
+
+    @Test
+    fun recordedDistanceIsUsedOverTheStepsEstimate() {
+        val recorded = TodayVsUsual.of(kToday, 23534, emptyList(), null, distanceKm = 19.25)
+        assertEquals(19.25, recorded.distanceKm, 0.001)
+        assertFalse(recorded.distanceEstimated)
+
+        val estimated = TodayVsUsual.of(kToday, 10000, emptyList(), null)
+        assertEquals(7.5, estimated.distanceKm, 0.001)
+        assertTrue(estimated.distanceEstimated)
+    }
 }

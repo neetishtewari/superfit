@@ -149,6 +149,41 @@ class DataRepository(
 
     val allActivityTelemetryFlow: Flow<List<ActivityTelemetryEntity>> get() = log.allActivityTelemetryFlow
 
+    /** Re-reads one day's steps from Health Connect and saves them; keeps the saved value if the read fails. */
+    suspend fun refreshActivity(date: LocalDate) {
+        if (!healthConnectManager.isAvailable()) return
+        try {
+            healthConnectManager.readDailyTelemetry(date)?.let { log.saveActivity(it) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("DataRepository", "Refreshing steps for $date failed", e)
+        }
+    }
+
+    /**
+     * One-time clean-up after the single-app steps fix: re-reads the saved days from [fromDaysAgo]
+     * to [toDaysAgo] and saves the watch app's count, up or down. A day Health Connect no longer
+     * has (or reads as zero) keeps its saved count, so nothing is wiped.
+     */
+    suspend fun correctPastSteps(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedDays = log.getAllActivityTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedDays[date.toString()] ?: continue
+            val fresh = try {
+                healthConnectManager.readDailyTelemetry(date)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            if (fresh.steps > 0 && fresh.steps != saved.steps) log.saveActivity(saved.copy(steps = fresh.steps))
+        }
+    }
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()

@@ -593,7 +593,7 @@ fun ActivityPerformanceCard(
                     modifier = Modifier.weight(1f)
                 )
                 TodayTile(
-                    label = "Distance (est.)",
+                    label = if (today.distanceEstimated) "Distance (est.)" else "Distance",
                     value = "${Decimals.one(today.distanceKm)} km",
                     usual = usual?.let { "${Decimals.one(it.distanceKm)} km" },
                     ahead = usual != null && usual.distanceKm > 0 && today.distanceKm >= usual.distanceKm,
