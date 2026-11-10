@@ -15,6 +15,10 @@ actual object LocalFormat {
 
     actual fun dayLine(date: LocalDate): String = date.toJavaLocalDate().format(pattern("EEE, d MMM"))
 
+    actual fun longDay(date: LocalDate): String = date.toJavaLocalDate().format(pattern("EEEE, d MMMM"))
+
+    actual fun weekday(date: LocalDate): String = date.toJavaLocalDate().format(pattern("EEE"))
+
     actual fun dayMonth(date: LocalDate): String = date.toJavaLocalDate().format(pattern("d MMM"))
 
     actual fun monthYear(date: LocalDate): String = date.toJavaLocalDate().format(pattern("MMMM yyyy"))

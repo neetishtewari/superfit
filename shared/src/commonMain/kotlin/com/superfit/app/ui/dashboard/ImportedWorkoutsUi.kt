@@ -38,14 +38,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.SuperfitTheme
-import java.text.NumberFormat
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 /** One-time card on the Activity view offering to bring in workouts from other apps. */
 @Composable
@@ -180,14 +177,10 @@ fun workoutTargetLine(targetCalories: Double, workoutKcal: Double, source: Strin
     val added = workoutKcal.toInt()
     if (added < 1) return null
     val total = targetCalories.toInt()
-    val fmt = NumberFormat.getIntegerInstance()
-    return "${fmt.format(total - added)} + ${fmt.format(added)} $source = ${fmt.format(total)} today"
+    fun fmt(n: Int) = LocalFormat.integer(n.toLong())
+    return "${fmt(total - added)} + ${fmt(added)} $source = ${fmt(total)} today"
 }
 
-private fun dayAndTimeOf(millis: Long): String {
-    val time = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
-    return "${time.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} ${timeOf(millis)}"
-}
+private fun dayAndTimeOf(millis: Long): String = "${LocalFormat.weekday(Now.local(millis).date)} ${timeOf(millis)}"
 
-private fun timeOf(millis: Long): String =
-    DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()))
+private fun timeOf(millis: Long): String = LocalFormat.shortClock(Now.local(millis).time)

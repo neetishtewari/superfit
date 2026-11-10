@@ -32,6 +32,10 @@ actual object LocalFormat {
 
     actual fun dayLine(date: LocalDate): String = format(nsDate(date), "EEE, d MMM")
 
+    actual fun longDay(date: LocalDate): String = format(nsDate(date), "EEEE, d MMMM")
+
+    actual fun weekday(date: LocalDate): String = format(nsDate(date), "EEE")
+
     actual fun dayMonth(date: LocalDate): String = format(nsDate(date), "d MMM")
 
     actual fun monthYear(date: LocalDate): String = format(nsDate(date), "MMMM yyyy")

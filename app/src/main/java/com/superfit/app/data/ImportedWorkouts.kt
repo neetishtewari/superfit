@@ -31,15 +31,7 @@ object ImportedWorkouts {
         prefs: WorkoutImportPrefs,
         imported: List<WorkoutView>,
         voiceLogged: List<WorkoutEntryEntity>
-    ): DailyTarget = PhysiologyEngine.dailyTarget(
-        profile = profile,
-        workoutsConnected = prefs.enabled,
-        addBack = prefs.addBack,
-        exerciseKcal = WorkoutDisplay.dayExerciseKcal(
-            if (prefs.enabled) imported else emptyList(),
-            voiceLogged.sumOf { it.caloriesBurned }
-        )
-    )
+    ): DailyTarget = com.superfit.app.ui.dashboard.TodayState.target(profile, prefs, imported, voiceLogged)
 
     /** The shape the coach already understands; calories are the exercise part only. */
     fun coachEntry(view: WorkoutView): WorkoutEntryEntity = WorkoutEntryEntity(
