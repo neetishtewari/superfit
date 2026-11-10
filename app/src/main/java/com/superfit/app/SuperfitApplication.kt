@@ -12,6 +12,7 @@ import com.google.firebase.appcheck.appCheck
 import com.google.firebase.initialize
 import com.superfit.app.data.DailyReminderWorker
 import com.superfit.app.data.TelemetrySyncWorker
+import com.superfit.app.data.userPrefs
 import java.util.concurrent.TimeUnit
 
 class SuperfitApplication : Application() {
@@ -33,8 +34,8 @@ class SuperfitApplication : Application() {
         com.superfit.app.data.AppAnalytics.init(this)
         com.superfit.app.data.GeminiKeyStore.forgetOldKeys(this)
         com.superfit.app.data.BodyImporter.load(this)
-        com.superfit.app.data.NutritionAdviceStore.load(this)
-        com.superfit.app.data.CoachStyleStore.load(this)
+        com.superfit.app.data.NutritionAdviceStore.load(userPrefs(this))
+        com.superfit.app.data.CoachStyleStore.load(userPrefs(this))
         com.superfit.app.data.ReminderNotifications.ensureChannel(this)
         scheduleTelemetrySync()
         scheduleDailyReminder()

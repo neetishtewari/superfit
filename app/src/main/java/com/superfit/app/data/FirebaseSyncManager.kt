@@ -120,7 +120,7 @@ private class AndroidBackupLocal(private val context: Context) : CloudBackupLoca
         CoachChatStore.saveNotes(context, notes)
     }
     override fun restoreWorkoutImportSettings(data: Map<String, Any>) =
-        WorkoutImportPrefs(getUserSharedPrefs(context)).restore(data)
+        WorkoutImportPrefs(userPrefs(context)).restore(data)
     override fun isEntryBackupRepaired(): Boolean =
         getUserSharedPrefs(context).getBoolean(PREF_ENTRY_BACKUP_REPAIRED, false)
     override fun markEntryBackupRepaired() =

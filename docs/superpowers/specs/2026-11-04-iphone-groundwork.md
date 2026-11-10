@@ -173,6 +173,12 @@ tested on the dev app first.
          coach" button until the coach screen moves over.
      - 5b-4: data layer to shared: DataRepository, backup/restore (FirebaseSyncManager), settings
        stores (a multiplatform key-value store in place of SharedPreferences).
+       - 5b-4a: a shared settings store (Prefs). Android wraps the user's existing
+         SharedPreferences file (superfit_prefs_<uid>, same keys and types, so nothing moves or
+         resets). iPhone uses a UserDefaults suite of the same name. The first stores move to
+         shared on it: coach style, step goal, nutritionist advice and "Fine for me" foods, and the
+         choices for workouts from other apps. The iPhone's coach notes, restored workout choices
+         and backup-repair flag now sit in that store too, under Android's keys.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -369,3 +375,9 @@ Check (enforced for AI Logic), exactly like Android: no API key in the app or re
 the Superfit project. Photos are sent as JPEG and never stored. Raw AI errors stay in the logs;
 people only see the shared plain messages. Android behaviour is unchanged (same models, retries
 and messages, now from shared code with the same tests).
+
+Step 5b-4a (reviewed 10 Nov): settings stay on the phone, one file (Android) or UserDefaults
+suite (iPhone) per account, inside each app's own sandbox and not shared with other apps. Android
+reads and writes exactly the keys it did before; Android's own device backup of preferences is
+unchanged. No secrets are stored in settings (the old own-Gemini-key store is untouched and still
+only clears itself). Nothing new is sent anywhere. No new permissions.

@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.HealthConnectManager
+import com.superfit.app.data.userPrefs
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 
@@ -82,7 +83,7 @@ fun OnboardingScreen(
     var currentStep by rememberSaveable { mutableIntStateOf(STEP_WELCOME) }
     // Supportive starts selected: Roast me is there for people who pick it themselves.
     var coachStyle by remember {
-        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(context)) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.SUPPORTIVE)
+        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(userPrefs(context))) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.SUPPORTIVE)
     }
     var aboutYouErrors by remember { mutableStateOf(AboutYouErrors()) }
     // Spoken guidance is opt-in: it starts off and the speaker button turns it on.
@@ -270,7 +271,7 @@ fun OnboardingScreen(
                             selected = coachStyle,
                             onSelect = { coachStyle = it },
                             onNext = {
-                                com.superfit.app.data.CoachStyleStore.save(context, coachStyle)
+                                com.superfit.app.data.CoachStyleStore.save(userPrefs(context), coachStyle)
                                 currentStep = STEP_ALL_SET
                             }
                         )

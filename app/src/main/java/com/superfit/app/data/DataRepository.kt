@@ -15,6 +15,9 @@ fun getUserSharedPrefs(context: Context): SharedPreferences {
     return context.getSharedPreferences("superfit_prefs_$userId", Context.MODE_PRIVATE)
 }
 
+/** The signed-in user's settings, for the shared stores. */
+fun userPrefs(context: Context): Prefs = AndroidPrefs(getUserSharedPrefs(context))
+
 class DataRepository(
     private val context: Context,
     val healthConnectManager: HealthConnectManager
@@ -219,7 +222,7 @@ class DataRepository(
 
     // --- Workouts from other apps (Health Connect) ---
 
-    val workoutImportPrefs: WorkoutImportPrefs get() = WorkoutImportPrefs(getUserSharedPrefs(context))
+    val workoutImportPrefs: WorkoutImportPrefs get() = WorkoutImportPrefs(userPrefs(context))
 
     fun getImportedWorkoutsForDay(date: LocalDate): Flow<List<ImportedWorkoutEntity>> {
         val zoneId = ZoneId.systemDefault()

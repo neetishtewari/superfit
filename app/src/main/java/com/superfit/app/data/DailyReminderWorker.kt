@@ -25,7 +25,7 @@ class DailyReminderWorker(
 
     override suspend fun doWork(): Result {
         val sharedPrefs = getUserSharedPrefs(applicationContext)
-        CoachStyleStore.load(applicationContext)
+        CoachStyleStore.load(userPrefs(applicationContext))
         try {
             remind(sharedPrefs)
         } catch (e: CancellationException) {
@@ -67,7 +67,7 @@ class DailyReminderWorker(
         // Determine target calories, with today's workouts added for people who connected them
         val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
         val profile = database.profileDao().getProfile()
-        val workoutPrefs = WorkoutImportPrefs(sharedPrefs)
+        val workoutPrefs = WorkoutImportPrefs(AndroidPrefs(sharedPrefs))
         suspend fun todayTarget(p: UserProfileEntity): com.superfit.app.domain.DailyTarget {
             val imported = if (workoutPrefs.enabled) {
                 ImportedWorkouts.views(
@@ -123,7 +123,7 @@ class DailyReminderWorker(
                     },
                     historyActivity = database.telemetryDao().getAllActivity(),
                     historySleep = database.telemetryDao().getAllSleep(),
-                    stepGoal = StepGoalStore.ownGoal(applicationContext) ?: StepGoalStore.load(applicationContext)?.goal,
+                    stepGoal = StepGoalStore.ownGoal(userPrefs(applicationContext)) ?: StepGoalStore.load(userPrefs(applicationContext))?.goal,
                     historyWeights = database.weightDao().getAllWeightEntries(),
                     memory = CoachInsightStore.memory(sharedPrefs),
                     notes = CoachChatStore.loadNotes(applicationContext)

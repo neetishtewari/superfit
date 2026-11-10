@@ -44,7 +44,7 @@ class TelemetrySyncWorker(
 
             // Workouts from other apps. Health Connect may refuse reads in the background; the
             // next app open catches up.
-            val workoutPrefs = WorkoutImportPrefs(getUserSharedPrefs(applicationContext))
+            val workoutPrefs = WorkoutImportPrefs(userPrefs(applicationContext))
             val client = healthConnectManager.healthConnectClient
             if (workoutPrefs.enabled && client != null) {
                 WorkoutImporter.import(client, database.importedWorkoutDao(), workoutPrefs)
