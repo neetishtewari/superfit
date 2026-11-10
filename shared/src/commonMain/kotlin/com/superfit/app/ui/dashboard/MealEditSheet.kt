@@ -1,10 +1,5 @@
 package com.superfit.app.ui.dashboard
 
-import android.content.ActivityNotFoundException
-import android.speech.RecognizerIntent
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,16 +23,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.NutritionEntryEntity
-import com.superfit.app.domain.GeminiClient
+import com.superfit.app.data.UsageEvents
+import com.superfit.app.domain.AiFailover
+import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.Level
 import com.superfit.app.domain.MealItem
 import com.superfit.app.domain.MealItemReplacer
@@ -52,8 +48,8 @@ import com.superfit.app.theme.ThemeFieldBg
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
+import com.superfit.app.ui.components.LocalVoiceTyping
 import com.superfit.app.ui.components.SuperfitField
-import java.util.Locale
 import kotlinx.coroutines.launch
 
 /**
@@ -118,7 +114,7 @@ fun MealEditSheet(
  * Any item can be changed to a different food; only that item gets new numbers.
  */
 @Composable
-internal fun MealItemsEditor(
+fun MealItemsEditor(
     meal: MealItems,
     onChange: (MealItems) -> Unit,
     replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> List<MealItem> = MealItemReplacer()::replace
@@ -149,16 +145,16 @@ internal fun MealItemsEditor(
                             try {
                                 val replaced = replaceItem(item, newName, meal.items.filterIndexed { i, _ -> i != index })
                                 onChange(meal.replace(index, replaced))
-                                AppAnalytics.mealItemChanged(typed = true)
+                                UsageEvents.mealItemChanged(typed = true)
                                 changing = null
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 throw e
                             } catch (e: Exception) {
-                                android.util.Log.w("MealItemsEditor", "Changing item failed", e)
+                                AppLog.w("MealItemsEditor", "Changing item failed", e)
                                 failed = if (e is MealItemReplacer.UnreadableAnswer) {
                                     "Couldn't work out that food. Try saying it a bit differently, like \"1 oats chilla\"."
                                 } else {
-                                    GeminiClient.sanitizeError(e)
+                                    AiFailover.sanitizeError(e)
                                 }
                             } finally {
                                 busy = false
@@ -177,15 +173,15 @@ internal fun MealItemsEditor(
                     },
                     onSwitchUnit = {
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.switchUnit() }))
-                        AppAnalytics.mealAmountChanged(how = "switch")
+                        UsageEvents.mealAmountChanged(how = "switch")
                     },
                     onTypeAmount = { qty ->
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
-                        AppAnalytics.mealAmountChanged(how = "typed")
+                        UsageEvents.mealAmountChanged(how = "typed")
                     },
                     onChoose = { choice ->
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.choose(choice) }))
-                        AppAnalytics.mealItemChanged(typed = false)
+                        UsageEvents.mealItemChanged(typed = false)
                     },
                     onChangeName = {
                         changing = index
@@ -270,7 +266,7 @@ private fun MealItemEditRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = item.name.replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                    text = item.name.replaceFirstChar { it.titlecase() },
                     color = ThemeTextPrimary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
@@ -345,7 +341,7 @@ private fun MealItemEditRow(
                     FilterChip(
                         selected = choice.name.equals(item.name, ignoreCase = true),
                         onClick = { onChoose(i) },
-                        label = { Text(choice.name.replaceFirstChar { it.titlecase(Locale.getDefault()) }, fontSize = 13.sp) },
+                        label = { Text(choice.name.replaceFirstChar { it.titlecase() }, fontSize = 13.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = NeonGreen.copy(alpha = 0.18f),
                             selectedLabelColor = NeonGreen
@@ -436,13 +432,10 @@ private fun ChangeItemBox(
     onChange: (String) -> Unit
 ) {
     var text by remember(item) { mutableStateOf("") }
-    val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let {
-            text = it
-            if (it.isNotBlank()) onChange(it)
-        }
+    val startVoice = LocalVoiceTyping.current("Say what it was") {
+        text = it
+        if (it.isNotBlank()) onChange(it)
     }
-    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -471,18 +464,14 @@ private fun ChangeItemBox(
             onValueChange = { text = it },
             singleLine = true,
             placeholder = { Text("e.g. the right name of the food") },
-            trailingIcon = {
-                com.superfit.app.ui.components.MicButton(
-                    onClick = {
-                        try {
-                            voice.launch(SpeechRecognizerHelper.systemDialogIntent(context).putExtra(RecognizerIntent.EXTRA_PROMPT, "Say what it was"))
-                        } catch (e: ActivityNotFoundException) {
-                            Toast.makeText(context, "Voice typing isn't available. Please type it.", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.padding(end = 6.dp),
-                    contentDescription = "Say it"
-                )
+            trailingIcon = startVoice?.let { start ->
+                {
+                    com.superfit.app.ui.components.MicButton(
+                        onClick = start,
+                        modifier = Modifier.padding(end = 6.dp),
+                        contentDescription = "Say it"
+                    )
+                }
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onChange(text) }),
@@ -511,7 +500,7 @@ private fun ChangeItemBox(
 }
 
 @Composable
-internal fun StepButton(icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
+fun StepButton(icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
     FilledTonalIconButton(
         onClick = onClick,
         enabled = enabled,
@@ -559,7 +548,7 @@ private fun LevelPicker(label: String, selected: Level, onSelect: (Level) -> Uni
 }
 
 private fun formatAmount(qty: Double): String =
-    if (qty == Math.floor(qty)) qty.toLong().toString() else String.format(Locale.US, "%.1f", qty)
+    if (qty == kotlin.math.floor(qty)) qty.toLong().toString() else Decimals.one(qty)
 
 private fun unitLabel(unit: String): String = when (unit) {
     "piece" -> "pc"
