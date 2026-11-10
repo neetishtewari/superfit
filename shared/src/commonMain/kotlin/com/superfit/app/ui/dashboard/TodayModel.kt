@@ -15,6 +15,8 @@ import com.superfit.app.data.WorkoutImportPrefs
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.NutritionParser
+import com.superfit.app.domain.TodayVsUsual
+import com.superfit.app.domain.UsualDay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -28,9 +30,9 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 
 /**
- * The Food side of Today for the iPhone, built from the same shared pieces as Android: today's
- * meals, targets, streak and weigh-ins from [log], worked out by [TodayState.build]. Health data
- * (steps, sleep, workouts from other apps) joins when the iPhone reads Apple Health.
+ * Today for the iPhone, built from the same shared pieces as Android: today's meals, targets,
+ * streak, weigh-ins and voice-logged workouts from [log], worked out by [TodayState.build]. Health
+ * data (steps, sleep, workouts from other apps) joins when the iPhone reads Apple Health.
  */
 class TodayModel(
     private val log: LogRepository,
@@ -81,6 +83,28 @@ class TodayModel(
             prefs = prefs
         )
     }.stateIn(scope, SharingStarted.Eagerly, DashboardUiState.Loading)
+
+    /**
+     * The same weekday's usual activity over the last 4 weeks, for "vs your usual" on Activity.
+     * Re-read when today's steps or workouts change.
+     */
+    val usualDay: StateFlow<UsualDay?> = combine(
+        log.profileFlow,
+        log.getActivityFlow(today.toString()),
+        log.getWorkoutEntriesForDay(today)
+    ) { profile, _, _ ->
+        if (profile == null) return@combine null
+        TodayState.usualDay(
+            voiceWorkouts = log.getAllWorkoutEntries(),
+            activity = log.getAllActivityTelemetry(),
+            imported = emptyList(),
+            today = today,
+            zone = zone()
+        )
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /** Today's activity next to [usualDay]; the distance is estimated from steps until Apple Health joins. */
+    fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?): TodayVsUsual = TodayState.vsUsual(state, usual, today)
 
     init {
         loadPredictedFoods()
@@ -137,6 +161,10 @@ class TodayModel(
 
     fun deleteMeal(entry: NutritionEntryEntity) {
         scope.launch { log.deleteNutritionEntry(entry) }
+    }
+
+    fun deleteWorkout(entry: WorkoutEntryEntity) {
+        scope.launch { log.deleteWorkoutEntry(entry) }
     }
 
     fun logWeight(weightKg: Double, note: String) {

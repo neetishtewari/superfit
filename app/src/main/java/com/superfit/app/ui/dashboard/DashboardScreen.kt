@@ -30,8 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
-import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -43,8 +41,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -719,9 +715,8 @@ fun DashboardScreen(
 private fun TodaySwitch(logType: String, onSelect: (String) -> Unit) {
     val context = LocalContext.current
     var unseen by remember { mutableStateOf(com.superfit.app.data.SeenTabs.unseen(context, listOf("today_activity"))) }
-    SegmentedPills(
-        options = listOf("MEAL" to "Food", "WORKOUT" to "Activity"),
-        selected = logType,
+    FoodActivitySwitch(
+        side = logType,
         onSelect = { key ->
             if (key == "WORKOUT" && unseen.isNotEmpty()) {
                 com.superfit.app.data.SeenTabs.markSeen(context, "today_activity")
@@ -729,10 +724,6 @@ private fun TodaySwitch(logType: String, onSelect: (String) -> Unit) {
             }
             onSelect(key)
         },
-        icons = mapOf(
-            "MEAL" to (Icons.Rounded.Restaurant to Icons.Outlined.Restaurant),
-            "WORKOUT" to (Icons.AutoMirrored.Rounded.DirectionsRun to Icons.AutoMirrored.Outlined.DirectionsRun)
-        ),
-        unseen = if (unseen.isEmpty()) emptySet() else setOf("WORKOUT")
+        unseenActivity = unseen.isNotEmpty()
     )
 }

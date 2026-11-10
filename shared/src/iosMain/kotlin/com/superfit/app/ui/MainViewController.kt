@@ -32,8 +32,8 @@ import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.components.PrimaryButton
-import com.superfit.app.ui.dashboard.TodayFoodScreen
 import com.superfit.app.ui.dashboard.TodayModel
+import com.superfit.app.ui.dashboard.TodayScreen
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
@@ -109,7 +109,7 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
         val today = remember(uid) {
             TodayModel(LogRepository(database = { database }, backup = backup), IosPrefs.forUser(uid), accountScope)
         }
-        TodayFoodScreen(today) {
+        TodayScreen(today) {
             // What the iPhone still shows below Today until Settings moves over.
             Text(
                 text = when {

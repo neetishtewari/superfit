@@ -1,6 +1,7 @@
 package com.superfit.app.ui.dashboard
 
 import com.superfit.app.data.ActivityTelemetryEntity
+import com.superfit.app.data.DayTotalsBuilder
 import com.superfit.app.data.HabitEntryEntity
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.Prefs
@@ -10,6 +11,7 @@ import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
+import com.superfit.app.domain.ActivityFact
 import com.superfit.app.domain.DailyTarget
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.MacroTargets
@@ -17,11 +19,14 @@ import com.superfit.app.domain.PersonalNutrition
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StreakEngine
+import com.superfit.app.domain.TodayVsUsual
+import com.superfit.app.domain.UsualDay
 import com.superfit.app.domain.WeightTrendEngine
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutView
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -158,4 +163,39 @@ object TodayState {
             workoutTargetSource = WorkoutDisplay.boostSource(imported, workouts.size)
         )
     }
+
+    /**
+     * Today's steps and workouts next to the usual for this weekday. [distanceKm] is the distance
+     * the phone's health app recorded today; null falls back to an estimate from steps.
+     */
+    fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?, today: LocalDate, distanceKm: Double? = null): TodayVsUsual =
+        TodayVsUsual.of(
+            today = today,
+            steps = state.activity.steps,
+            workouts = state.importedWorkouts.map { ActivityFact.of(it) } + state.workoutList.map {
+                ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
+            },
+            usual = usual,
+            distanceKm = distanceKm
+        )
+
+    /** The same weekday's usual activity over the last 4 weeks, or null without enough history. */
+    fun usualDay(
+        voiceWorkouts: List<WorkoutEntryEntity>,
+        activity: List<ActivityTelemetryEntity>,
+        imported: List<WorkoutView>,
+        today: LocalDate,
+        zone: TimeZone
+    ): UsualDay? = UsualDay.forDay(
+        DayTotalsBuilder.days(
+            nutrition = emptyList(),
+            voiceWorkouts = voiceWorkouts,
+            activity = activity,
+            imported = DayTotalsBuilder.byDate(imported, zone),
+            kcalTarget = { 0.0 },
+            proteinTargetG = 0.0,
+            zone = zone
+        ),
+        today
+    )
 }

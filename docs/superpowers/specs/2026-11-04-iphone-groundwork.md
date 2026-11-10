@@ -217,6 +217,13 @@ tested on the dev app first.
          the state with TodayState.build; logging uses the shared NutritionParser. Steps,
          sleep and other apps' workouts wait for Apple Health. Android is unchanged (only the
          food history dialog moved to shared).
+       - 5b-5h: Today's Activity side on iPhone. The Food / Activity switch (FoodActivitySwitch),
+         the per-day totals behind "vs your usual" (DayTotalsBuilder; Android's InsightsData
+         hands its work to it) and the usual-weekday sums (TodayState.usualDay/vsUsual) move to
+         shared. The iPhone shows steps and workouts next to the usual, voice-logged workouts
+         (delete works) and sleep, from data already on the phone or restored from backup.
+         Sharing a workout card waits for share cards; steps, sleep and other apps' workouts
+         keep coming from Android's backup until Apple Health. Android shows the same as before.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -446,3 +453,7 @@ Step 5b-5g (reviewed 10 Nov): from this step the iPhone writes too. Meals, edits
 weigh-ins made on the iPhone are saved in its own database and backed up to users/{signed-in
 uid} only, exactly as Android does (CloudBackup checks the uid on every call). Meal text goes to
 Gemini through Firebase AI Logic with App Check, as on Android. No new permissions.
+
+Step 5b-5h (reviewed 11 Nov): the same sums on the same on-phone data, moved; the iPhone adds
+deleting a voice-logged workout, which removes it from users/{signed-in uid} only, the same call
+Android makes. Nothing new is read, stored or sent. No new permissions.
