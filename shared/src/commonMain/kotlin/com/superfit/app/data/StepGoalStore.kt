@@ -1,6 +1,5 @@
 package com.superfit.app.data
 
-import android.content.Context
 import com.superfit.app.domain.SavedStepGoal
 import com.superfit.app.domain.StepGoalReason
 import kotlinx.datetime.LocalDate
@@ -17,34 +16,31 @@ object StepGoalStore {
     private const val KEY_OWN = "step_goal_own"
     private const val KEY_NOTE_DISMISSED = "step_goal_note_dismissed_on"
 
-    fun load(context: Context): SavedStepGoal? {
-        val prefs = getUserSharedPrefs(context)
+    fun load(prefs: Prefs): SavedStepGoal? {
         val goal = prefs.getInt(KEY_GOAL, 0).takeIf { it > 0 } ?: return null
         val reason = StepGoalReason.fromName(prefs.getString(KEY_REASON, null)) ?: return null
         val setOn = prefs.getString(KEY_SET_ON, null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
         return SavedStepGoal(goal, reason, setOn)
     }
 
-    fun save(context: Context, saved: SavedStepGoal) {
-        getUserSharedPrefs(context).edit()
-            .putInt(KEY_GOAL, saved.goal)
-            .putString(KEY_REASON, saved.reason.name)
-            .putString(KEY_SET_ON, saved.setOn.toString())
-            .apply()
+    fun save(prefs: Prefs, saved: SavedStepGoal) {
+        prefs.edit {
+            putInt(KEY_GOAL, saved.goal)
+            putString(KEY_REASON, saved.reason.name)
+            putString(KEY_SET_ON, saved.setOn.toString())
+        }
     }
 
     /** The user's own number, or null for the automatic goal. */
-    fun ownGoal(context: Context): Int? = getUserSharedPrefs(context).getInt(KEY_OWN, 0).takeIf { it > 0 }
+    fun ownGoal(prefs: Prefs): Int? = prefs.getInt(KEY_OWN, 0).takeIf { it > 0 }
 
-    fun setOwnGoal(context: Context, steps: Int?) {
-        val edit = getUserSharedPrefs(context).edit()
-        if (steps == null) edit.remove(KEY_OWN) else edit.putInt(KEY_OWN, steps)
-        edit.apply()
+    fun setOwnGoal(prefs: Prefs, steps: Int?) {
+        prefs.edit { if (steps == null) remove(KEY_OWN) else putInt(KEY_OWN, steps) }
     }
 
-    fun noteDismissedOn(context: Context): String? = getUserSharedPrefs(context).getString(KEY_NOTE_DISMISSED, null)
+    fun noteDismissedOn(prefs: Prefs): String? = prefs.getString(KEY_NOTE_DISMISSED, null)
 
-    fun dismissNote(context: Context, day: LocalDate) {
-        getUserSharedPrefs(context).edit().putString(KEY_NOTE_DISMISSED, day.toString()).apply()
+    fun dismissNote(prefs: Prefs, day: LocalDate) {
+        prefs.edit { putString(KEY_NOTE_DISMISSED, day.toString()) }
     }
 }

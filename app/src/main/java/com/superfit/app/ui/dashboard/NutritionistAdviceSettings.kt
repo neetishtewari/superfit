@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.data.NutritionAdviceStore
+import com.superfit.app.data.userPrefs
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
@@ -42,7 +43,7 @@ import kotlinx.coroutines.launch
 fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var saved by remember { mutableStateOf(NutritionAdviceStore.advice(context)) }
+    var saved by remember { mutableStateOf(NutritionAdviceStore.advice(userPrefs(context))) }
     var text by remember { mutableStateOf(saved) }
     var saving by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }

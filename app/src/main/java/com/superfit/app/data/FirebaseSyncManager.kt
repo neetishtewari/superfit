@@ -19,7 +19,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class FirebaseSyncManager(private val context: Context) {
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
 
-    private val backup = CloudBackup(
+    // Also used by the shared LogRepository.
+    val backup = CloudBackup(
         store = AndroidCloudStore(FirebaseFirestore.getInstance()),
         uid = { auth.currentUser?.uid },
         database = { SuperfitDatabase.getDatabase(context) },
@@ -120,7 +121,7 @@ private class AndroidBackupLocal(private val context: Context) : CloudBackupLoca
         CoachChatStore.saveNotes(context, notes)
     }
     override fun restoreWorkoutImportSettings(data: Map<String, Any>) =
-        WorkoutImportPrefs(getUserSharedPrefs(context)).restore(data)
+        WorkoutImportPrefs(userPrefs(context)).restore(data)
     override fun isEntryBackupRepaired(): Boolean =
         getUserSharedPrefs(context).getBoolean(PREF_ENTRY_BACKUP_REPAIRED, false)
     override fun markEntryBackupRepaired() =

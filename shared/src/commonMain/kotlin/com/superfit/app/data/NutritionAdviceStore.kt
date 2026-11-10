@@ -1,10 +1,9 @@
 package com.superfit.app.data
 
-import android.content.Context
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.domain.DietNote
 import com.superfit.app.domain.PersonalNutrition
-import org.json.JSONArray
+import com.superfit.app.json.JSONArray
 
 /**
  * The user's own nutritionist's advice, the targets from it they confirmed, and the foods they
@@ -20,8 +19,7 @@ object NutritionAdviceStore {
     private const val KEY_NOTE_STAMP = "diet_note_stamp"
 
     /** Loads everything into [PersonalNutrition]. Call when the signed-in user may have changed. */
-    fun load(context: Context) {
-        val prefs = getUserSharedPrefs(context)
+    fun load(prefs: Prefs) {
         PersonalNutrition.advice = prefs.getString(KEY_ADVICE, null)?.takeIf { it.isNotBlank() }
         PersonalNutrition.targets = AdviceTargets.decode(prefs.getString(KEY_TARGETS, null))
         PersonalNutrition.approvedFoods = prefs.getString(KEY_FINE_FOODS, null)?.let { raw ->
@@ -29,46 +27,51 @@ object NutritionAdviceStore {
         }.orEmpty()
     }
 
-    fun advice(context: Context): String = getUserSharedPrefs(context).getString(KEY_ADVICE, "").orEmpty()
+    fun advice(prefs: Prefs): String = prefs.getString(KEY_ADVICE, "").orEmpty()
 
-    fun saveAdvice(context: Context, text: String) {
+    fun saveAdvice(prefs: Prefs, text: String) {
         val clean = text.trim().take(2000)
         PersonalNutrition.advice = clean.takeIf { it.isNotEmpty() }
-        getUserSharedPrefs(context).edit().putString(KEY_ADVICE, clean).remove(KEY_NOTE_STAMP).apply()
+        prefs.edit {
+            putString(KEY_ADVICE, clean)
+            remove(KEY_NOTE_STAMP)
+        }
     }
 
     fun targets(): AdviceTargets? = PersonalNutrition.targets
 
     /** Uses [targets] in place of the app's own (null stops using them). */
-    fun applyTargets(context: Context, targets: AdviceTargets?) {
+    fun applyTargets(prefs: Prefs, targets: AdviceTargets?) {
         PersonalNutrition.targets = targets?.takeIf { !it.isEmpty }
-        getUserSharedPrefs(context).edit().apply {
+        prefs.edit {
             if (targets == null || targets.isEmpty) remove(KEY_TARGETS) else putString(KEY_TARGETS, targets.encode())
-        }.apply()
+        }
     }
 
-    fun setFineForMe(context: Context, key: String, fine: Boolean) {
+    fun setFineForMe(prefs: Prefs, key: String, fine: Boolean) {
         val k = PersonalNutrition.key(key)
         if (k.isEmpty()) return
         val updated = if (fine) PersonalNutrition.approvedFoods + k else PersonalNutrition.approvedFoods - k
         PersonalNutrition.approvedFoods = updated
-        getUserSharedPrefs(context).edit()
-            .putString(KEY_FINE_FOODS, JSONArray(updated.sorted()).toString())
-            .remove(KEY_NOTE_STAMP)
-            .apply()
+        prefs.edit {
+            putString(KEY_FINE_FOODS, JSONArray(updated.sorted()).toString())
+            remove(KEY_NOTE_STAMP)
+        }
     }
 
     /** The saved weekly note when it was written for [stamp] (today plus the score), else null. */
-    fun note(context: Context, stamp: String): DietNote? {
-        val prefs = getUserSharedPrefs(context)
+    fun note(prefs: Prefs, stamp: String): DietNote? {
         if (prefs.getString(KEY_NOTE_STAMP, null) != stamp) return null
         return DietNote.decode(prefs.getString(KEY_NOTE, null))
     }
 
     /** The last note written, whatever it was written for; shown while a fresh one is on its way. */
-    fun lastNote(context: Context): DietNote? = DietNote.decode(getUserSharedPrefs(context).getString(KEY_NOTE, null))
+    fun lastNote(prefs: Prefs): DietNote? = DietNote.decode(prefs.getString(KEY_NOTE, null))
 
-    fun saveNote(context: Context, stamp: String, note: DietNote) {
-        getUserSharedPrefs(context).edit().putString(KEY_NOTE, note.encode()).putString(KEY_NOTE_STAMP, stamp).apply()
+    fun saveNote(prefs: Prefs, stamp: String, note: DietNote) {
+        prefs.edit {
+            putString(KEY_NOTE, note.encode())
+            putString(KEY_NOTE_STAMP, stamp)
+        }
     }
 }
