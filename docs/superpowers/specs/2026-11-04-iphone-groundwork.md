@@ -192,6 +192,8 @@ tested on the dev app first.
          Diet Quality card and detail sheet, coach style chooser, widget tip card, and the
          dashboard colour tokens. Numbers with decimals use LocalFormat.decimal (the phone's own
          style, as String.format did on Android); step counts keep "12,000".
+         Also the Home "Log weight" row and the "Is this you?" scale dialog, on kotlinx-datetime;
+         the dialog's time uses LocalFormat.shortClock (the phone's 12/24-hour style, as before).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.

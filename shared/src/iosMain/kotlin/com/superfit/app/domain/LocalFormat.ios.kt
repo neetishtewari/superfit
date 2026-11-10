@@ -9,6 +9,8 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
+import platform.Foundation.NSDateFormatterNoStyle
+import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.NSLocale
 import platform.Foundation.NSNumber
 import platform.Foundation.NSNumberFormatter
@@ -37,6 +39,15 @@ actual object LocalFormat {
     actual fun clock(time: LocalTime): String {
         val instant = LocalDateTime(LocalDate(2000, 1, 1), time).toInstant(TimeZone.currentSystemDefault())
         return format(NSDate.dateWithTimeIntervalSince1970(instant.epochSeconds.toDouble()), "h:mm a")
+    }
+
+    actual fun shortClock(time: LocalTime): String {
+        val instant = LocalDateTime(LocalDate(2000, 1, 1), time).toInstant(TimeZone.currentSystemDefault())
+        return NSDateFormatter().apply {
+            locale = NSLocale.currentLocale
+            dateStyle = NSDateFormatterNoStyle
+            timeStyle = NSDateFormatterShortStyle
+        }.stringFromDate(NSDate.dateWithTimeIntervalSince1970(instant.epochSeconds.toDouble()))
     }
 
     actual fun integer(n: Long): String = NSNumberFormatter().apply {

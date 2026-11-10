@@ -6,11 +6,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import com.superfit.app.domain.BodyReadings
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.ScaleReading
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 /**
  * "Is this you?" for a scale reading that's far from the user's own weight or body fat, so a
@@ -38,14 +43,15 @@ fun ScaleReadingDialog(reading: ScaleReading, onMe: () -> Unit, onNotMe: () -> U
     )
 }
 
+@OptIn(ExperimentalTime::class)
 private fun whenOf(reading: ScaleReading): String {
-    val time = java.time.Instant.ofEpochMilli(reading.timeMs).atZone(ZoneId.systemDefault())
-    val clock = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(time)
-    val day = time.toLocalDate()
-    val today = LocalDate.now()
-    return when (day) {
+    val zone = TimeZone.currentSystemDefault()
+    val time = Instant.fromEpochMilliseconds(reading.timeMs).toLocalDateTime(zone)
+    val clock = LocalFormat.shortClock(time.time)
+    val today = Clock.System.todayIn(zone)
+    return when (time.date) {
         today -> "today at $clock"
-        today.minusDays(1) -> "yesterday at $clock"
-        else -> "${DateTimeFormatter.ofPattern("d MMM").format(day)} at $clock"
+        today.minus(1, DateTimeUnit.DAY) -> "yesterday at $clock"
+        else -> "${LocalFormat.dayMonth(time.date)} at $clock"
     }
 }

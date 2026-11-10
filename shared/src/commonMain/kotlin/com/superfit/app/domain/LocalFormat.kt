@@ -20,6 +20,9 @@ expect object LocalFormat {
     /** "6:05 am" (h:mm a). */
     fun clock(time: LocalTime): String
 
+    /** The time the way the phone shows it, 12 or 24 hour ("6:05 am" or "06:05"). */
+    fun shortClock(time: LocalTime): String
+
     /** "8,432", grouped the way the phone groups numbers. */
     fun integer(n: Long): String
 
