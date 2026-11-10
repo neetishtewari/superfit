@@ -19,7 +19,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class FirebaseSyncManager(private val context: Context) {
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
 
-    private val backup = CloudBackup(
+    // Also used by the shared LogRepository.
+    val backup = CloudBackup(
         store = AndroidCloudStore(FirebaseFirestore.getInstance()),
         uid = { auth.currentUser?.uid },
         database = { SuperfitDatabase.getDatabase(context) },

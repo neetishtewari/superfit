@@ -61,6 +61,10 @@ kotlin {
       implementation(kotlin("test"))
       implementation(libs.kotlinx.coroutines.test)
     }
+    jvmTest.dependencies {
+      // A real database in memory for the shared data tests.
+      implementation(libs.androidx.sqlite.bundled)
+    }
   }
 }
 

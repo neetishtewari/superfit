@@ -179,6 +179,13 @@ tested on the dev app first.
          shared on it: coach style, step goal, nutritionist advice and "Fine for me" foods, and the
          choices for workouts from other apps. The iPhone's coach notes, restored workout choices
          and backup-repair flag now sit in that store too, under Android's keys.
+       - 5b-4b: the log itself moves to shared (LogRepository): profile, meals, logged workouts,
+         weigh-ins (including the one-scale-reading-a-day rule), streak, water and habits, and
+         saving steps and sleep read from the health app. Each change is saved to the database,
+         then backed up, exactly as before. Android's DataRepository keeps its signatures and
+         passes these through; it still owns Health Connect, the widget refresh (run after each
+         meal change), imported workouts, coach chat files and clearing data. Tested on a real
+         in-memory database (bundled SQLite) on the computer.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -381,3 +388,8 @@ suite (iPhone) per account, inside each app's own sandbox and not shared with ot
 reads and writes exactly the keys it did before; Android's own device backup of preferences is
 unchanged. No secrets are stored in settings (the old own-Gemini-key store is untouched and still
 only clears itself). Nothing new is sent anywhere. No new permissions.
+
+Step 5b-4b (reviewed 10 Nov): no change to what is stored or backed up, or where. Every write
+still goes only to users/{signed-in uid}; signed out, nothing is uploaded (CloudBackup checks
+the uid on every call). The new test library (bundled SQLite) is used by the computer tests only
+and is not in either app. No new permissions.

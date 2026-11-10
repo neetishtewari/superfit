@@ -9,6 +9,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.datetime.toKotlinLocalDate
 
 fun getUserSharedPrefs(context: Context): SharedPreferences {
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
@@ -25,62 +26,40 @@ class DataRepository(
     private val database: SuperfitDatabase get() = SuperfitDatabase.getDatabase(context)
     val firebaseSyncManager get() = FirebaseSyncManager(context)
 
-    val profileFlow: Flow<UserProfileEntity?> get() = database.profileDao().getProfileFlow()
+    // The log itself (database plus cloud backup) is shared with the iPhone app.
+    private val log: LogRepository
+        get() = LogRepository(
+            database = { database },
+            backup = firebaseSyncManager.backup,
+            mealsChanged = { refreshWidget() },
+            isImportedWeight = BodyImporter::isImported
+        )
 
-    suspend fun getProfile(): UserProfileEntity? = database.profileDao().getProfile()
+    val profileFlow: Flow<UserProfileEntity?> get() = log.profileFlow
 
-    suspend fun saveProfile(profile: UserProfileEntity) {
-        database.profileDao().insertProfile(profile)
-        firebaseSyncManager.uploadProfile(profile)
-    }
+    suspend fun getProfile(): UserProfileEntity? = log.getProfile()
 
-    fun getActivityFlow(date: String): Flow<ActivityTelemetryEntity?> {
-        return database.telemetryDao().getActivityFlow(date)
-    }
+    suspend fun saveProfile(profile: UserProfileEntity) = log.saveProfile(profile)
 
-    fun getSleepFlow(date: String): Flow<SleepTelemetryEntity?> {
-        return database.telemetryDao().getSleepFlow(date)
-    }
+    fun getActivityFlow(date: String): Flow<ActivityTelemetryEntity?> = log.getActivityFlow(date)
 
-    fun getRecentSleepFlow(): Flow<List<SleepTelemetryEntity>> {
-        return database.telemetryDao().getRecentSleepFlow()
-    }
+    fun getSleepFlow(date: String): Flow<SleepTelemetryEntity?> = log.getSleepFlow(date)
 
-    fun getNutritionEntriesForDay(date: LocalDate): Flow<List<NutritionEntryEntity>> {
-        val zoneId = ZoneId.systemDefault()
-        val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
-        val endOfDay = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-        return database.nutritionDao().getEntriesForDayFlow(startOfDay, endOfDay)
-    }
+    fun getRecentSleepFlow(): Flow<List<SleepTelemetryEntity>> = log.getRecentSleepFlow()
+
+    fun getNutritionEntriesForDay(date: LocalDate): Flow<List<NutritionEntryEntity>> =
+        log.getNutritionEntriesForDay(date.toKotlinLocalDate())
 
     /** Returns the new meal's id. */
-    suspend fun addNutritionEntry(entry: NutritionEntryEntity): Long {
-        // Back up under the id Room just assigned. A new entry still has id 0 here, and uploading
-        // it as-is wrote every meal to the same cloud document, so only the latest one was kept.
-        val id = database.nutritionDao().insertEntry(entry)
-        firebaseSyncManager.uploadNutrition(entry.copy(id = id))
-        refreshWidget()
-        return id
-    }
+    suspend fun addNutritionEntry(entry: NutritionEntryEntity): Long = log.addNutritionEntry(entry)
 
     /** Saves the AI's quality tags on an existing meal and updates its cloud backup. */
-    suspend fun saveMealTags(entry: NutritionEntryEntity, tags: String) {
-        database.nutritionDao().setQualityTags(entry.id, tags)
-        firebaseSyncManager.uploadNutrition(entry.copy(qualityTags = tags))
-    }
+    suspend fun saveMealTags(entry: NutritionEntryEntity, tags: String) = log.saveMealTags(entry, tags)
 
     /** Saves an edited meal (amounts, oil or sugar changed) and updates its cloud backup. */
-    suspend fun updateNutritionEntry(entry: NutritionEntryEntity) {
-        database.nutritionDao().updateEntry(entry)
-        firebaseSyncManager.uploadNutrition(entry)
-        refreshWidget()
-    }
+    suspend fun updateNutritionEntry(entry: NutritionEntryEntity) = log.updateNutritionEntry(entry)
 
-    suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) {
-        database.nutritionDao().deleteEntry(entry)
-        firebaseSyncManager.deleteNutrition(entry)
-        refreshWidget()
-    }
+    suspend fun deleteNutritionEntry(entry: NutritionEntryEntity) = log.deleteNutritionEntry(entry)
 
     /** Keeps the home-screen widget right after a meal is added, edited or deleted from any screen. */
     private suspend fun refreshWidget() {
@@ -107,10 +86,7 @@ class DataRepository(
                 // Separate sync steps to support partial permissions gracefully
                 try {
                     val activity = healthConnectManager.readDailyTelemetry(date)
-                    if (activity != null) {
-                        database.telemetryDao().insertActivity(activity)
-                        firebaseSyncManager.uploadActivity(activity)
-                    }
+                    if (activity != null) log.saveActivity(activity)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -125,10 +101,7 @@ class DataRepository(
 
                 try {
                     val sleep = healthConnectManager.readSleepTelemetry(date)
-                    if (sleep != null) {
-                        database.telemetryDao().insertSleep(sleep)
-                        firebaseSyncManager.uploadSleep(sleep)
-                    }
+                    if (sleep != null) log.saveSleep(sleep)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -170,55 +143,33 @@ class DataRepository(
 
     suspend fun deleteAccount(): AccountDeletion = firebaseSyncManager.deleteAccount()
 
-    val allNutritionEntriesFlow: Flow<List<NutritionEntryEntity>> = database.nutritionDao().getAllEntriesFlow()
+    val allNutritionEntriesFlow: Flow<List<NutritionEntryEntity>> = log.allNutritionEntriesFlow
 
-    suspend fun getAllNutritionEntries(): List<NutritionEntryEntity> {
-        return database.nutritionDao().getAllEntries()
-    }
+    suspend fun getAllNutritionEntries(): List<NutritionEntryEntity> = log.getAllNutritionEntries()
 
-    val allActivityTelemetryFlow: Flow<List<ActivityTelemetryEntity>> get() = database.telemetryDao().getAllActivityFlow()
+    val allActivityTelemetryFlow: Flow<List<ActivityTelemetryEntity>> get() = log.allActivityTelemetryFlow
 
-    suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> {
-        return database.telemetryDao().getAllActivity()
-    }
+    suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
-    suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> {
-        return database.telemetryDao().getAllSleep()
-    }
+    suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()
 
-    suspend fun getFrequentFoodTexts(limit: Int): List<String> {
-        return database.nutritionDao().getFrequentFoodTexts(limit)
-    }
+    suspend fun getFrequentFoodTexts(limit: Int): List<String> = log.getFrequentFoodTexts(limit)
 
-    suspend fun getPredictedFoods(currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)): List<PredictedFood> {
-        val allEntries = getAllNutritionEntries()
-        return com.superfit.app.domain.FoodPredictor.predict(allEntries, currentHour)
-    }
+    suspend fun getPredictedFoods(
+        currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    ): List<PredictedFood> = log.getPredictedFoods(currentHour)
 
-    fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> {
-        val zoneId = ZoneId.systemDefault()
-        val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
-        val endOfDay = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-        return database.workoutDao().getEntriesForDayFlow(startOfDay, endOfDay)
-    }
+    fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> =
+        log.getWorkoutEntriesForDay(date.toKotlinLocalDate())
 
     /** Returns the new workout's id. */
-    suspend fun addWorkoutEntry(entry: WorkoutEntryEntity): Long {
-        val id = database.workoutDao().insertEntry(entry)
-        firebaseSyncManager.uploadWorkout(entry.copy(id = id))
-        return id
-    }
+    suspend fun addWorkoutEntry(entry: WorkoutEntryEntity): Long = log.addWorkoutEntry(entry)
 
-    suspend fun getWorkoutEntry(id: Long): WorkoutEntryEntity? = database.workoutDao().getEntry(id)
+    suspend fun getWorkoutEntry(id: Long): WorkoutEntryEntity? = log.getWorkoutEntry(id)
 
-    suspend fun deleteWorkoutEntry(entry: WorkoutEntryEntity) {
-        database.workoutDao().deleteEntry(entry)
-        firebaseSyncManager.deleteWorkout(entry)
-    }
+    suspend fun deleteWorkoutEntry(entry: WorkoutEntryEntity) = log.deleteWorkoutEntry(entry)
 
-    suspend fun getAllWorkoutEntries(): List<WorkoutEntryEntity> {
-        return database.workoutDao().getAllEntries()
-    }
+    suspend fun getAllWorkoutEntries(): List<WorkoutEntryEntity> = log.getAllWorkoutEntries()
 
     // --- Workouts from other apps (Health Connect) ---
 
@@ -276,83 +227,32 @@ class DataRepository(
         firebaseSyncManager.uploadWorkoutImportSettings(workoutImportPrefs.toBackup())
     }
 
-    val weightEntriesFlow: Flow<List<WeightEntryEntity>> get() = database.weightDao().getAllWeightEntriesFlow()
+    val weightEntriesFlow: Flow<List<WeightEntryEntity>> get() = log.weightEntriesFlow
 
-    suspend fun addWeightEntry(weightKg: Double, note: String = "") {
-        val entry = WeightEntryEntity(
-            weightKg = weightKg,
-            timestamp = System.currentTimeMillis(),
-            note = note
-        )
-        val id = database.weightDao().insertWeight(entry)
-        firebaseSyncManager.uploadWeight(entry.copy(id = id))
-        // Also update current weight on UserProfile
-        val profile = getProfile()
-        if (profile != null) {
-            saveProfile(profile.copy(weightKg = weightKg))
-        }
-    }
+    suspend fun addWeightEntry(weightKg: Double, note: String = "") = log.addWeightEntry(weightKg, note)
 
     /**
      * Adds a smart scale weigh-in at the time it was taken. One reading a day: a weight the user
      * typed that day wins, and a later scale reading replaces an earlier one.
      */
-    suspend fun addImportedWeight(weightKg: Double, timestamp: Long, note: String) {
-        val zone = java.time.ZoneId.systemDefault()
-        fun dayOf(ms: Long) = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
-        val day = dayOf(timestamp)
-        val sameDay = database.weightDao().getAllWeightEntries().filter { dayOf(it.timestamp) == day }
-        if (sameDay.any { !BodyImporter.isImported(it) }) return
-        if (sameDay.any { it.timestamp >= timestamp }) return
-        sameDay.forEach { deleteWeightEntry(it) }
-        val entry = WeightEntryEntity(weightKg = weightKg, timestamp = timestamp, note = note)
-        val id = database.weightDao().insertWeight(entry)
-        firebaseSyncManager.uploadWeight(entry.copy(id = id))
-        val latest = database.weightDao().getLatestWeightEntry()
-        val profile = getProfile()
-        if (profile != null && latest?.timestamp == timestamp) saveProfile(profile.copy(weightKg = weightKg))
-    }
+    suspend fun addImportedWeight(weightKg: Double, timestamp: Long, note: String) =
+        log.addImportedWeight(weightKg, timestamp, note)
 
-    suspend fun deleteWeightEntry(entry: WeightEntryEntity) {
-        database.weightDao().deleteWeight(entry)
-        firebaseSyncManager.deleteWeight(entry)
-    }
+    suspend fun deleteWeightEntry(entry: WeightEntryEntity) = log.deleteWeightEntry(entry)
 
-    suspend fun getAllWeightEntries(): List<WeightEntryEntity> {
-        return database.weightDao().getAllWeightEntries()
-    }
+    suspend fun getAllWeightEntries(): List<WeightEntryEntity> = log.getAllWeightEntries()
 
-    val streakStateFlow: Flow<StreakStateEntity?> get() = database.streakDao().getStreakStateFlow()
+    val streakStateFlow: Flow<StreakStateEntity?> get() = log.streakStateFlow
 
-    suspend fun saveStreakState(state: StreakStateEntity) {
-        database.streakDao().insertStreakState(state)
-        firebaseSyncManager.uploadStreakState(state)
-    }
+    suspend fun saveStreakState(state: StreakStateEntity) = log.saveStreakState(state)
 
-    fun getHabitEntryFlow(date: String): Flow<HabitEntryEntity?> {
-        return database.habitDao().getHabitEntryFlow(date)
-    }
+    fun getHabitEntryFlow(date: String): Flow<HabitEntryEntity?> = log.getHabitEntryFlow(date)
 
-    suspend fun getHabitEntry(date: String): HabitEntryEntity? {
-        return database.habitDao().getHabitEntry(date)
-    }
+    suspend fun getHabitEntry(date: String): HabitEntryEntity? = log.getHabitEntry(date)
 
-    suspend fun saveHabitEntry(entry: HabitEntryEntity) {
-        database.habitDao().insertHabitEntry(entry)
-        firebaseSyncManager.uploadHabitEntry(entry)
-    }
+    suspend fun saveHabitEntry(entry: HabitEntryEntity) = log.saveHabitEntry(entry)
 
-    suspend fun addWater(date: String, addMl: Int) {
-        val current = database.habitDao().getHabitEntry(date) ?: HabitEntryEntity(date = date)
-        val updated = current.copy(waterMl = current.waterMl + addMl)
-        database.habitDao().insertHabitEntry(updated)
-        firebaseSyncManager.uploadHabitEntry(updated)
-    }
+    suspend fun addWater(date: String, addMl: Int) = log.addWater(date, addMl)
 
-    suspend fun toggleCleanEats(date: String) {
-        val current = database.habitDao().getHabitEntry(date) ?: HabitEntryEntity(date = date)
-        val updated = current.copy(cleanEatsCompleted = !current.cleanEatsCompleted)
-        database.habitDao().insertHabitEntry(updated)
-        firebaseSyncManager.uploadHabitEntry(updated)
-    }
+    suspend fun toggleCleanEats(date: String) = log.toggleCleanEats(date)
 }
