@@ -937,8 +937,10 @@ class DashboardViewModel(
 
     fun syncTelemetry() {
         viewModelScope.launch {
-            repository.syncHealthConnectTelemetry(LocalDate.now())
             val today = LocalDate.now()
+            repository.syncHealthConnectTelemetry(today)
+            // Yesterday too, so a day that was still being counted at midnight gets its final total.
+            repository.refreshActivity(today.minusDays(1))
             _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()

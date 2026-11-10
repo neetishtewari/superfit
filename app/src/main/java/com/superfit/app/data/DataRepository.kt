@@ -149,6 +149,18 @@ class DataRepository(
 
     val allActivityTelemetryFlow: Flow<List<ActivityTelemetryEntity>> get() = log.allActivityTelemetryFlow
 
+    /** Re-reads one day's steps from Health Connect and saves them; keeps the saved value if the read fails. */
+    suspend fun refreshActivity(date: LocalDate) {
+        if (!healthConnectManager.isAvailable()) return
+        try {
+            healthConnectManager.readDailyTelemetry(date)?.let { log.saveActivity(it) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("DataRepository", "Refreshing steps for $date failed", e)
+        }
+    }
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()
