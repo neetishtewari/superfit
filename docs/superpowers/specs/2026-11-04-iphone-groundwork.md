@@ -194,6 +194,9 @@ tested on the dev app first.
          style, as String.format did on Android); step counts keep "12,000".
          Also the Home "Log weight" row and the "Is this you?" scale dialog, on kotlinx-datetime;
          the dialog's time uses LocalFormat.shortClock (the phone's 12/24-hour style, as before).
+       - 5b-5b: what the Today screen shows (DashboardUiState and its parts) moves to shared, so
+         both apps describe Today the same way. The rings, macro bars, sleep pills, meal row and
+         activity bar move too; the calories-left number uses LocalFormat.integer ("1,230").
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -403,3 +406,6 @@ the uid on every call). The new test library (bundled SQLite) is used by the com
 and is not in either app. No new permissions.
 
 Step 5b-5a (reviewed 10 Nov): display code only; no data, storage, network or permission changes.
+
+Step 5b-5b (reviewed 10 Nov): display code and state types only; no data, storage, network or
+permission changes.
