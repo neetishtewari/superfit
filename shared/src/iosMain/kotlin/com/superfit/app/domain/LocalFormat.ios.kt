@@ -13,6 +13,7 @@ import platform.Foundation.NSLocale
 import platform.Foundation.NSNumber
 import platform.Foundation.NSNumberFormatter
 import platform.Foundation.NSNumberFormatterDecimalStyle
+import platform.Foundation.NSNumberFormatterRoundHalfUp
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 
@@ -43,6 +44,15 @@ actual object LocalFormat {
         numberStyle = NSNumberFormatterDecimalStyle
         maximumFractionDigits = 0u
     }.stringFromNumber(NSNumber(longLong = n)) ?: n.toString()
+
+    actual fun decimal(x: Double, digits: Int): String = NSNumberFormatter().apply {
+        locale = NSLocale.currentLocale
+        numberStyle = NSNumberFormatterDecimalStyle
+        usesGroupingSeparator = false
+        roundingMode = NSNumberFormatterRoundHalfUp
+        minimumFractionDigits = digits.toULong()
+        maximumFractionDigits = digits.toULong()
+    }.stringFromNumber(NSNumber(double = x)) ?: Decimals.fixed(x, digits)
 
     // Kotlin's own case rules; the same as the phone's for every language except Turkish dotted i.
     actual fun uppercase(text: String): String = text.uppercase()

@@ -23,6 +23,9 @@ expect object LocalFormat {
     /** "8,432", grouped the way the phone groups numbers. */
     fun integer(n: Long): String
 
+    /** [x] with exactly [digits] decimals in the phone's style ("79.5", or "79,5" in Portuguese), not grouped. Same as String.format("%.1f"). */
+    fun decimal(x: Double, digits: Int): String
+
     fun uppercase(text: String): String
 
     fun lowercase(text: String): String

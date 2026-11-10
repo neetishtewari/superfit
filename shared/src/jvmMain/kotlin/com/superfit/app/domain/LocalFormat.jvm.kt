@@ -22,6 +22,8 @@ actual object LocalFormat {
 
     actual fun integer(n: Long): String = NumberFormat.getIntegerInstance().format(n)
 
+    actual fun decimal(x: Double, digits: Int): String = String.format(Locale.getDefault(), "%.${digits}f", x)
+
     actual fun uppercase(text: String): String = text.uppercase(Locale.getDefault())
 
     actual fun lowercase(text: String): String = text.lowercase(Locale.getDefault())
