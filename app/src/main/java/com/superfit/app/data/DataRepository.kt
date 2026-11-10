@@ -161,6 +161,29 @@ class DataRepository(
         }
     }
 
+    /**
+     * One-time clean-up after the single-app steps fix: re-reads the saved days from [fromDaysAgo]
+     * to [toDaysAgo] and keeps the new count only when it is lower but not zero, so a day can only
+     * be corrected down, never wiped (Health Connect may no longer have older days).
+     */
+    suspend fun correctPastSteps(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedDays = log.getAllActivityTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedDays[date.toString()] ?: continue
+            val fresh = try {
+                healthConnectManager.readDailyTelemetry(date)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            if (fresh.steps in 1 until saved.steps) log.saveActivity(saved.copy(steps = fresh.steps))
+        }
+    }
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()

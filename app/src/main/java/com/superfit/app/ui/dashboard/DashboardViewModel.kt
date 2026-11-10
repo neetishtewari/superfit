@@ -941,6 +941,11 @@ class DashboardViewModel(
             repository.syncHealthConnectTelemetry(today)
             // Yesterday too, so a day that was still being counted at midnight gets its final total.
             repository.refreshActivity(today.minusDays(1))
+            // Once: days saved before the single-app steps fix could hold two apps added together.
+            if (!sharedPrefs.getBoolean(PAST_STEPS_CORRECTED, false)) {
+                repository.correctPastSteps(fromDaysAgo = 2, toDaysAgo = 30)
+                sharedPrefs.edit().putBoolean(PAST_STEPS_CORRECTED, true).apply()
+            }
             _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()
@@ -1309,6 +1314,8 @@ class DashboardViewModel(
     }
 
     companion object {
+        private const val PAST_STEPS_CORRECTED = "past_steps_single_app_v1"
+
         /** First chat chip in Roast me style. */
         const val ROAST_MY_DAY = "Roast"
 
