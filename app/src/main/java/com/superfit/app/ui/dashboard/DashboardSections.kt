@@ -1028,15 +1028,16 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
             else -> "Very little sleep. Rest today if you can."
         }
 
-        if (state.sleep != null) {
+        val sleep = state.sleep
+        if (sleep != null) {
             Text(
                 text = readinessDesc,
                 fontSize = 13.sp,
                 color = ThemeTextSecondary
             )
 
-            val hours = state.sleep.sleepDurationSeconds / 3600
-            val minutes = (state.sleep.sleepDurationSeconds % 3600) / 60
+            val hours = sleep.sleepDurationSeconds / 3600
+            val minutes = (sleep.sleepDurationSeconds % 3600) / 60
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -1046,8 +1047,8 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
                     value = "${hours}h ${minutes}m",
                     modifier = Modifier.weight(1.0f)
                 )
-                val deepHours = state.sleep.deepSleepDurationSeconds / 3600
-                val deepMins = (state.sleep.deepSleepDurationSeconds % 3600) / 60
+                val deepHours = sleep.deepSleepDurationSeconds / 3600
+                val deepMins = (sleep.deepSleepDurationSeconds % 3600) / 60
                 SleepMetricPill(
                     label = "Est. deep sleep",
                     value = "${deepHours}h ${deepMins}m",
