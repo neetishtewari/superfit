@@ -623,7 +623,12 @@ fun DashboardScreen(
                             // 5. Track Your Meals Card (With Text Box, Chips, and Logged List)
                             TrackMealsCard(
                                 state = state,
-                                viewModel = viewModel,
+                                predictedFoods = viewModel.predictedFoods.collectAsState().value,
+                                canRetryLastMeal = viewModel.canRetryLastMeal,
+                                onLogMeal = viewModel::parseAndAddMeal,
+                                onRetryLastMeal = viewModel::retryLastMeal,
+                                onDeleteMeal = viewModel::deleteMeal,
+                                onUpdateMeal = viewModel::updateMeal,
                                 parsingState = parsingState,
                                 foodInputText = foodInputText,
                                 onFoodInputChange = { foodInputText = it },

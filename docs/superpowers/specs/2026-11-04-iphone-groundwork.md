@@ -209,6 +209,8 @@ tested on the dev app first.
          things: voice typing for "what was it instead?" (LocalVoiceTyping; Android's voice
          typing box as before) and usage counts (UsageEvents; Android sends them through
          AppAnalytics, so the same off switch and dev-app silence apply).
+       - 5b-5f: the meals card (type a meal, usual foods, logged list, edit) moves to shared; it
+         takes its data and actions as parameters instead of the Android ViewModel.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -430,3 +432,6 @@ Step 5b-5d (reviewed 10 Nov): display code only; no data, storage, network or pe
 Step 5b-5e (reviewed 10 Nov): the same two anonymous events (meal_item_changed, meal_amount_changed)
 with the same "how" values; still nothing about the food. Voice words stay on the phone until the
 person taps Change, as before. No new permissions.
+
+Step 5b-5f (reviewed 10 Nov): display code only; the same actions are wired to the same ViewModel calls.
+No data, storage, network or permission changes.
