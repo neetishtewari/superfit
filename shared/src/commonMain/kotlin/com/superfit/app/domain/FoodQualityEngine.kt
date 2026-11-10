@@ -106,32 +106,33 @@ object FoodQualityEngine {
         }.distinct()
         val totalDistinctDaysLogged = max(1, distinctDays.size)
 
-        // Group entries by sanitized food name
-        val grouped = entriesToAnalyze.groupBy { sanitizeFoodName(it.foodText) }
-        // The AI's tags for each food, newest first, so its latest reason and swap are used
-        val tagsByFood = grouped.mapValues { (_, entries) ->
-            entries.sortedByDescending { it.timestamp }.mapNotNull { MealTags.decode(it.qualityTags) }
-        }
+        // Group by food: whole meals by their name, and each food of a meal the AI rated food by
+        // food on its own, so "eggs and beer" shows as eggs and as beer.
+        val grouped = entriesToAnalyze.flatMap { RatedFoods.of(it) }.groupBy { it.key }
+        val swapByFood = mutableMapOf<String, MealSwap>()
 
-        val ratedItems = grouped.map { (foodName, entries) ->
-            val totalCount = entries.size
-            val avgCals = entries.map { it.calories }.average().toInt()
-            val avgProtein = entries.map { it.proteinG }.average()
+        val ratedItems = grouped.map { (_, foods) ->
+            // Newest first, so the AI's latest reason and swap are used
+            val byNewest = foods.sortedByDescending { it.entry.timestamp }
+            val newest = byNewest.first()
+            val totalCount = foods.size
+            val avgCals = foods.map { it.kcal }.average().toInt()
+            val avgProtein = foods.map { it.proteinG }.average()
             val proteinCalsRatio = if (avgCals > 0) (avgProtein * 4.0) / avgCals else 0.0
             val isHighProtein = avgProtein >= 14.0 || proteinCalsRatio >= 0.25
 
             // The AI's nutritionist rating, which weighs the amount, the goal and the user's own advice
-            val tags = tagsByFood[foodName]?.firstOrNull()
-            val newest = entries.maxBy { it.timestamp }
-            val approved = PersonalNutrition.isApproved(newest, tags)
+            val approved = newest.approved
+            val isRated = newest.rating != null
             // Meals the AI hasn't rated yet sit in the middle: never praised, flagged or swapped.
-            val baseScore = tags?.let { DietScoreEngine.mealRating(newest, it) } ?: UNRATED_SCORE
+            val baseScore = newest.rating ?: UNRATED_SCORE
             val tier = evaluateTier(baseScore)
+            val verdict = newest.verdict ?: FoodVerdict.GOOD
 
             // Number of distinct calendar days this specific food was logged
-            val foodDistinctDays = entries.map { entry ->
+            val foodDistinctDays = foods.map { food ->
                 runCatching {
-                    Instant.fromEpochMilliseconds(entry.timestamp).toLocalDateTime(zoneId).date
+                    Instant.fromEpochMilliseconds(food.entry.timestamp).toLocalDateTime(zoneId).date
                 }.getOrElse { Clock.System.todayIn(zoneId) }
             }.distinct().size
 
@@ -140,16 +141,16 @@ object FoodQualityEngine {
             val portionFactor = max(0.5, avgCals / 250.0)
 
             // Habit Risk: A food is a genuine habitual risk ONLY if consumed across multiple distinct days and is lower quality (score <= 5)
-            val isHabitual = !approved && (baseScore <= 5 || tags?.verdict == FoodVerdict.AVOID.key) && foodDistinctDays >= 2
+            val isHabitual = !approved && (baseScore <= 5 || verdict == FoodVerdict.AVOID) && foodDistinctDays >= 2
             val habitDoseMultiplier = if (foodDistinctDays >= 2) (1.0 + (foodDistinctDays - 1) * 0.5) else 1.0
             val rawRisk = (11 - baseScore) * habitDoseMultiplier * portionFactor
 
             // Determine frequency and quality recommendation with fitness coach insight
             val (recommendation, colorType) = if (approved) {
                 Pair("Fine for you, as you marked it", "GREEN")
-            } else if (tags?.verdict == FoodVerdict.AVOID.key) {
+            } else if (isRated && verdict == FoodVerdict.AVOID) {
                 Pair("Best skipped until you reach your goal", "RED")
-            } else if (tags == null) {
+            } else if (!isRated) {
                 Pair("Not rated yet — the AI rates new meals within a day", "YELLOW")
             } else {
                 evaluateRecommendation(
@@ -163,13 +164,16 @@ object FoodQualityEngine {
             }
 
             // Objective rationale explaining why the food is good, ok, or bad
-            val rationale = tagsByFood[foodName]?.firstNotNullOfOrNull { it.why }
-                ?: tags?.let { describe(it) }
-                ?: "Waiting for the AI to rate this meal"
+            val rationale = byNewest.firstNotNullOfOrNull { it.why }
+                ?: newest.tags?.takeIf { !newest.isItem }?.let { describe(it) }
+                ?: if (newest.isItem) "Part of a meal: ${newest.entry.foodText.trim().lowercase()}" else "Waiting for the AI to rate this meal"
+
+            // The key is cut to 30 characters for grouping; show the full name of the latest log.
+            val displayName = newest.name.lowercase().capitalizeWords()
+            byNewest.firstNotNullOfOrNull { it.swap }?.let { swapByFood[displayName.lowercase()] = it }
 
             FoodItemRating(
-                // The key is cut to 30 characters for grouping; show the full name of the latest log.
-                foodText = newest.foodText.trim().lowercase().capitalizeWords(),
+                foodText = displayName,
                 cleanlinessScore = baseScore,
                 tier = tier,
                 weeklyFrequency = weeklyFreq,
@@ -180,10 +184,10 @@ object FoodQualityEngine {
                 scoreRationale = rationale,
                 actionRecommendation = recommendation,
                 actionColorType = colorType,
-                rated = tags != null,
-                approvalKey = PersonalNutrition.key(tags?.foodType?.takeIf { it.isNotBlank() } ?: foodName),
+                rated = isRated,
+                approvalKey = newest.approvalKey,
                 approved = approved,
-                verdict = tags?.let { FoodVerdict.of(it, baseScore, approved) } ?: FoodVerdict.GOOD
+                verdict = verdict
             )
         }.sortedWith(
             // Biggest calorie sources first: pizza twice a week can outweigh chai twice a day.
@@ -234,7 +238,7 @@ object FoodQualityEngine {
         val swapSuggestions = mutableListOf<FoodSwapSuggestion>()
 
         for (item in candidateItemsForSwap) {
-            val swap = tagsByFood[sanitizeFoodName(item.foodText)]?.firstNotNullOfOrNull { it.swap }
+            val swap = swapByFood[item.foodText.lowercase()]
                 ?.takeIf { it.alternative.capitalizeWords() !in usedAlternatives }
                 ?.let { FoodSwapSuggestion(item.foodText, it.alternative.capitalizeWords(), it.kcalSaved, it.benefit) }
             if (swap != null) {
@@ -355,10 +359,6 @@ object FoodQualityEngine {
             score >= 5 -> FoodCleanlinessTier.MODERATE_RISK
             else -> FoodCleanlinessTier.HIGH_RISK
         }
-    }
-
-    private fun sanitizeFoodName(foodText: String): String {
-        return foodText.trim().lowercase().take(30)
     }
 
     private fun String.capitalizeWords(): String {

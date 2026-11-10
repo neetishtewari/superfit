@@ -41,8 +41,16 @@ data class MealTags(
      * The foods in this meal (by item name, lower case) that are the treat or best avoided, e.g. the
      * gulab jamun in a home thali. Null for meals rated before this existed; empty when none is.
      */
-    val treatItems: List<String>? = null
+    val treatItems: List<String>? = null,
+    /**
+     * Each food's own 1 to 10 rating when the meal has two or more foods, so the eggs in "eggs and
+     * beer" are judged as eggs. Null for meals rated before this existed; see [itemRating].
+     */
+    val itemRatings: List<ItemRating>? = null
 ) {
+    /** The AI's own rating for the food named [name] in this meal, or null when it gave none. */
+    fun itemRating(name: String): ItemRating? = itemKey(name).let { k -> itemRatings?.firstOrNull { itemKey(it.name) == k } }
+
     /** True when the AI also gave its reason and swap, which meals tagged before those existed lack. */
     val hasAdvice: Boolean get() = why != null
 
@@ -75,12 +83,28 @@ data class MealTags(
             if (vegKinds > 0) "vk=$vegKinds" else null,
             adviceVersion?.let { "av=${clean(it, 8)}" },
             verdict?.let { "vd=${clean(it, 10)}" },
-            treatItems?.let { list -> "ti=" + list.joinToString(";") { clean(it.replace(';', ' '), 40) } }
+            treatItems?.let { list -> "ti=" + list.joinToString(";") { clean(it.replace(';', ' '), 40) } },
+            itemRatings?.let { list ->
+                "ir=" + list.joinToString(";") { r ->
+                    listOfNotNull(cleanPart(r.name, 40), r.rating.toString(), r.why?.let { cleanPart(it, 100) }).joinToString(":")
+                }
+            }
         )
     ).joinToString("|")
 
     companion object {
         private fun clean(text: String, max: Int) = text.replace(Regex("[|=\\n]"), " ").trim().take(max)
+        private fun cleanPart(text: String, max: Int) = clean(text.replace(Regex("[;:]"), " "), max)
+
+        /** How item names are matched: lower case, single spaces, without the characters tags can't store. */
+        fun itemKey(name: String): String = name.replace(Regex("[|=\\n;:]"), " ").trim().lowercase().replace(Regex("\\s+"), " ").take(40)
+
+        private fun decodeItemRatings(raw: String): List<ItemRating> = raw.split(';').mapNotNull { part ->
+            val bits = part.split(':')
+            val name = bits.getOrNull(0)?.trim().orEmpty()
+            val rating = bits.getOrNull(1)?.trim()?.toIntOrNull()?.coerceIn(1, 10)
+            if (name.isEmpty() || rating == null) null else ItemRating(name, rating, bits.getOrNull(2)?.trim()?.takeIf { it.isNotEmpty() })
+        }
 
         fun decode(raw: String?): MealTags? {
             if (raw.isNullOrBlank() || !raw.startsWith("v1|")) return null
@@ -106,7 +130,8 @@ data class MealTags(
                 vegKinds = fields["vk"]?.toIntOrNull() ?: 0,
                 adviceVersion = fields["av"],
                 verdict = fields["vd"]?.takeIf { it in FoodVerdict.KEYS },
-                treatItems = fields["ti"]?.let { raw -> raw.split(';').map { it.trim() }.filter { it.isNotEmpty() } }
+                treatItems = fields["ti"]?.let { raw -> raw.split(';').map { it.trim() }.filter { it.isNotEmpty() } },
+                itemRatings = fields["ir"]?.let { decodeItemRatings(it) }
             )
         }
 
@@ -138,6 +163,18 @@ data class MealTags(
                 verdict = json.optString("verdict", "").trim().lowercase().takeIf { it in FoodVerdict.KEYS },
                 treatItems = json.optJSONArray("treatItems")?.let { arr ->
                     (0 until arr.length()).mapNotNull { i -> arr.optString(i, "").trim().lowercase().takeIf { it.isNotEmpty() && it != "null" } }
+                },
+                itemRatings = json.optJSONArray("itemRatings")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i ->
+                        val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                        val name = o.optString("name", "").trim().lowercase()
+                        val rating = o.optInt("rating", 0).takeIf { it in 1..10 }
+                        if (name.isEmpty() || name == "null" || rating == null) {
+                            null
+                        } else {
+                            ItemRating(name, rating, o.optString("why", "").trim().takeIf { it.isNotEmpty() && it != "null" })
+                        }
+                    }
                 }
             )
         }
@@ -180,6 +217,10 @@ data class MealTags(
                 "- \"treatItems\": Array of Strings: the names of the foods in this meal that are a treat or best avoided, by the rules above, " +
                 "written exactly as in \"items\" when items are given. List them even when the rest of the meal is everyday food, e.g. the " +
                 "gulab jamun in a home thali. Never a food on their approved list. An empty array when no food in the meal is.\n" +
+                "- \"itemRatings\": Array, when the meal has two or more separate foods: one object per food, " +
+                "{\"name\": String (written exactly as in \"items\" when items are given), \"rating\": Int 1-10, \"why\": String (at most 12 words)}. " +
+                "Rate each food on its own, for its own amount, by the same rules as \"rating\", so eggs eaten with a beer still rate as eggs " +
+                "and the beer as a beer. \"rating\" stays the rating of the whole meal. An empty array when the meal is a single food.\n" +
                 "Write all text in English, even when the meal is described in Hindi or another language or script.\n"
 
         /**
@@ -202,6 +243,9 @@ data class MealTags(
         fun of(entry: NutritionEntryEntity): MealTags = decode(entry.qualityTags) ?: untagged()
     }
 }
+
+/** One food's own rating within a meal of several foods, with the AI's short reason. */
+data class ItemRating(val name: String, val rating: Int, val why: String? = null)
 
 /** A healthier swap for a meal, suggested by the AI. */
 data class MealSwap(val alternative: String, val kcalSaved: Int, val benefit: String)
