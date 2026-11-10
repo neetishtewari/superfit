@@ -12,6 +12,9 @@ android.permission.health.READ_BASAL_METABOLIC_RATE
 android.permission.health.READ_BODY_FAT
 android.permission.health.READ_BONE_MASS
 android.permission.health.READ_DISTANCE
+# Dev app only for now (app/src/debug/AndroidManifest.xml): route share card check.
+android.permission.health.READ_ELEVATION_GAINED
+android.permission.health.READ_EXERCISE_ROUTES
 android.permission.health.READ_EXERCISE
 android.permission.health.READ_HEALTH_DATA_HISTORY
 android.permission.health.READ_HEART_RATE

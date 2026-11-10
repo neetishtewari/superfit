@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dev app only. Exercise routes and climb are being tried out for route share cards; they move to
+     the main manifest (and the Play Health apps declaration) when that feature ships. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTES" />
+    <uses-permission android:name="android.permission.health.READ_ELEVATION_GAINED" />
+</manifest>
