@@ -211,6 +211,12 @@ tested on the dev app first.
          AppAnalytics, so the same off switch and dev-app silence apply).
        - 5b-5f: the meals card (type a meal, usual foods, logged list, edit) moves to shared; it
          takes its data and actions as parameters instead of the Android ViewModel.
+       - 5b-5g: the iPhone shows Today's Food side after sign-in and restore: header, rings,
+         streak, nutrients, weigh-in and the meals card (type a meal, usual foods, See all,
+         edit, delete). A small shared TodayModel reads the shared LogRepository and builds
+         the state with TodayState.build; logging uses the shared NutritionParser. Steps,
+         sleep and other apps' workouts wait for Apple Health. Android is unchanged (only the
+         food history dialog moved to shared).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -435,3 +441,8 @@ person taps Change, as before. No new permissions.
 
 Step 5b-5f (reviewed 10 Nov): display code only; the same actions are wired to the same ViewModel calls.
 No data, storage, network or permission changes.
+
+Step 5b-5g (reviewed 10 Nov): from this step the iPhone writes too. Meals, edits, deletes and
+weigh-ins made on the iPhone are saved in its own database and backed up to users/{signed-in
+uid} only, exactly as Android does (CloudBackup checks the uid on every call). Meal text goes to
+Gemini through Firebase AI Logic with App Check, as on Android. No new permissions.
