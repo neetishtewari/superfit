@@ -2,12 +2,14 @@ package com.superfit.app.data
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 
+@OptIn(ExperimentalTime::class)
 class DayTotalsBuilderTest {
 
     private val zone = TimeZone.of("Asia/Kolkata")
