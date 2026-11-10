@@ -247,7 +247,10 @@ class HealthConnectManager(private val context: Context) {
         val range = TimeRangeFilter.between(startTime, endTime)
         val merged = client.aggregate(AggregateRequest(setOf(metric), range))
         val origins = merged.dataOrigins
-        if (origins.size <= 1) return merged[metric]
+        if (origins.size <= 1) {
+            android.util.Log.i("HealthConnectManager", "$label $startTime: ${merged[metric]} from ${origins.map { it.packageName }}")
+            return merged[metric]
+        }
         val perApp = origins.map { origin -> origin.packageName to readFrom(client, metric, range, origin) }
         android.util.Log.i("HealthConnectManager", "$label $startTime: merged=${merged[metric]} " + perApp.joinToString { "${it.first}=${it.second}" })
         return pickLargest(perApp.map { it.second }, compare) ?: merged[metric]
