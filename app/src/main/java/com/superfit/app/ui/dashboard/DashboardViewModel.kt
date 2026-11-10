@@ -182,7 +182,13 @@ class DashboardViewModel(
                 val tagger = com.superfit.app.domain.MealTagger()
                 untagged.chunked(20).forEach { batch ->
                     val tags = tagger.tag(batch)
-                    batch.forEach { entry -> tags[entry.id]?.let { repository.saveMealTags(entry, it.encode()) } }
+                    batch.forEach { entry ->
+                        tags[entry.id]?.let { t ->
+                            // Asked once: when the AI gives no food-by-food ratings, don't ask again every day.
+                            val saved = if (t.itemRatings == null && hasSeveralFoods(entry)) t.copy(itemRatings = emptyList()) else t
+                            repository.saveMealTags(entry, saved.encode())
+                        }
+                    }
                 }
                 sharedPrefs.edit().putString(BACKFILL_KEY, todayStr).apply()
             } catch (e: Exception) {
@@ -198,8 +204,16 @@ class DashboardViewModel(
     private fun needsTags(entry: NutritionEntryEntity, rerate: Boolean): Boolean {
         val tags = MealTags.decode(entry.qualityTags) ?: return true
         if (rerate && (tags.rating == null || tags.verdict == null || tags.adviceVersion != com.superfit.app.domain.PersonalNutrition.adviceVersion())) return true
+        // Meals of several foods rated before each food got its own rating, once.
+        if (tags.itemRatings == null && hasSeveralFoods(entry)) return true
         return !tags.hasAdvice && FoodQualityEngine.scoreFromTags(tags, isHighProtein = false) <= 5
     }
+
+    private fun hasSeveralFoods(entry: NutritionEntryEntity): Boolean =
+        com.superfit.app.domain.MealItems.decode(entry.items)?.items.orEmpty()
+            .filter { it.name.isNotBlank() }
+            .map { com.superfit.app.domain.MealTags.itemKey(it.name) }
+            .distinct().size >= 2
 
     fun loadFrequentMeals() {
         viewModelScope.launch {

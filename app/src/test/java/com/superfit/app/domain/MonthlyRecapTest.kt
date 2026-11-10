@@ -108,6 +108,23 @@ class MonthlyRecapTest {
     }
 
     @Test
+    fun choicesNameTheFoodWorthARethinkNotTheWholeMeal() {
+        val tags = MealTags(
+            2, fried = false, addedSugar = false, vegFruitServings = 0.0, fiberG = 0.0, treat = true, foodType = "eggs and beer",
+            rating = 4, itemRatings = listOf(ItemRating("eggs", 8), ItemRating("beer", 2))
+        )
+        fun item(name: String, kcal: Double) = MealItem(name, 1.0, "serving", kcal, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        val meal = meal(october.atDay(1), "eggs and beer", 4, "Eggs and beer").copy(
+            calories = 500.0,
+            qualityTags = tags.encode(),
+            items = MealItems(listOf(item("eggs", 200.0), item("beer", 300.0))).encode()
+        )
+        val card = MonthlyRecap.choices(listOf(meal))!!
+        assertEquals(listOf("Eggs"), card.good)
+        assertEquals(listOf("Beer"), card.rethink)
+    }
+
+    @Test
     fun choicesNameTheBestAndLowestRatedMeals() {
         val meals = listOf(
             meal(october.atDay(1), "dal", 9, "Dal, roti and salad"),

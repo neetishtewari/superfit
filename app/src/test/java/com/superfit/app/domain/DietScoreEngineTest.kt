@@ -208,4 +208,71 @@ class DietScoreEngineTest {
         assertEquals(2, back.vegKinds)
         assertEquals("ab12cd", back.adviceVersion)
     }
+
+    private fun item(name: String, kcal: Double, protein: Double = 0.0) =
+        MealItem(name, 1.0, "serving", kcal, protein, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    private val eggsAndBeerTags = MealTags(
+        2, fried = false, addedSugar = false, vegFruitServings = 0.0, fiberG = 0.0, treat = true, foodType = "eggs and beer",
+        rating = 4, verdict = "treat", treatItems = listOf("beer"),
+        itemRatings = listOf(ItemRating("eggs", 8, "Good protein"), ItemRating("beer", 3, "Empty calories"))
+    )
+
+    private fun eggsAndBeer(daysAgo: Int, tags: MealTags = eggsAndBeerTags) =
+        meal(daysAgo, 20, 400.0, 13.0, tags, text = "eggs and beer").copy(
+            items = MealItems(listOf(item("eggs", 160.0, 13.0), item("beer", 240.0))).encode()
+        )
+
+    @Test
+    fun `food choices name the lowest food, not the whole meal it came with`() {
+        val s = score((1..6).flatMap { goodDay(it) } + eggsAndBeer(1))!!
+        val food = s.part("food")
+        assertTrue(food.detail, food.detail.endsWith("lowest: beer"))
+        assertTrue(food.tip, food.tip.startsWith("Have beer less often"))
+    }
+
+    @Test
+    fun `meals rated before food-by-food ratings are judged as a whole`() {
+        val old = eggsAndBeerTags.copy(itemRatings = null)
+        val s = score((1..6).flatMap { goodDay(it) } + eggsAndBeer(1, old))!!
+        assertTrue(s.part("food").detail.endsWith("lowest: eggs and beer"))
+    }
+
+    @Test
+    fun `each food of a mixed meal gets its own rating and share of calories`() {
+        val foods = RatedFoods.of(eggsAndBeer(1))
+        assertEquals(listOf("eggs", "beer"), foods.map { it.label })
+        assertEquals(listOf(8, 3), foods.map { it.rating })
+        assertEquals(160.0, foods[0].kcal, 0.01)
+        assertEquals(13.0, foods[0].proteinG, 0.01)
+        assertEquals(FoodVerdict.GREAT, foods[0].verdict)
+        assertEquals(FoodVerdict.TREAT, foods[1].verdict)
+        assertEquals(null, foods[0].swap)
+    }
+
+    @Test
+    fun `a food marked fine for me in a mixed meal rates at least 7`() {
+        PersonalNutrition.approvedFoods = setOf("beer")
+        val beer = RatedFoods.of(eggsAndBeer(1)).single { it.label == "beer" }
+        assertEquals(7, beer.rating)
+        assertEquals(FoodVerdict.GOOD, beer.verdict)
+    }
+
+    @Test
+    fun `food-by-food ratings survive saving`() {
+        val back = MealTags.decode(eggsAndBeerTags.encode())!!
+        assertEquals(eggsAndBeerTags.itemRatings, back.itemRatings)
+        assertEquals(8, back.itemRating("Eggs")?.rating)
+        val asked = MealTags.decode(eggsAndBeerTags.copy(itemRatings = emptyList()).encode())!!
+        assertEquals(emptyList<ItemRating>(), asked.itemRatings)
+        assertNull(MealTags.decode(eggsAndBeerTags.copy(itemRatings = null).encode())!!.itemRatings)
+    }
+
+    @Test
+    fun `the insights food list shows each food of a mixed meal on its own row`() {
+        val entries = (1..6).flatMap { goodDay(it) } + eggsAndBeer(1)
+        val m = FoodQualityEngine.analyzeDietQuality(entries, today = today.toKotlinLocalDate(), zoneId = TimeZone.UTC)
+        val names = m.allRatedItems.map { it.foodText }
+        assertTrue(names.toString(), "Eggs" in names && "Beer" in names && names.none { it.contains("And Beer") })
+    }
 }

@@ -114,15 +114,17 @@ object DietScoreEngine {
     }
 
     private fun foodPart(tagged: List<Pair<NutritionEntryEntity, MealTags>>, max: Int): DietScorePart {
-        val kcal = tagged.sumOf { it.first.calories }
+        // Food by food, so the eggs in "eggs and beer" aren't marked down for the beer.
+        val foods = tagged.flatMap { (e, t) -> RatedFoods.of(e, t) }
+        val kcal = foods.sumOf { it.kcal }
         val avg = if (kcal > 0) {
-            tagged.sumOf { (e, t) -> mealRating(e, t) * e.calories } / kcal
+            foods.sumOf { (it.rating ?: 0) * it.kcal } / kcal
         } else {
-            tagged.map { (e, t) -> mealRating(e, t) }.average()
+            foods.map { it.rating ?: 0 }.average()
         }
-        val lowest = tagged.filter { (e, t) -> mealRating(e, t) <= 5 }
-            .groupBy { (e, t) -> t.foodType.ifBlank { e.foodText.lowercase().take(30) } }
-            .maxByOrNull { (_, list) -> list.sumOf { it.first.calories } }?.key
+        val lowest = foods.filter { (it.rating ?: 10) <= 5 }
+            .groupBy { it.key }
+            .maxByOrNull { (_, list) -> list.sumOf { it.kcal } }?.value?.first()?.label
         return DietScorePart(
             key = "food",
             label = "Food choices",
@@ -271,7 +273,11 @@ object DietScoreEngine {
         val extra = (treats - allowance).coerceAtLeast(0)
         // Foods to avoid until the goal is reached have no free allowance.
         val avoid = tagged.filter { (e, t) -> PersonalNutrition.countsAsAvoid(e, t) }
-        val avoidNames = avoid.map { (e, t) -> t.foodType.ifBlank { e.foodText.lowercase().take(30) } }.distinct()
+        // Name the food to avoid, not the whole meal it came with.
+        val avoidNames = avoid.flatMap { (e, t) ->
+            RatedFoods.of(e, t).filter { it.isItem && it.verdict == FoodVerdict.AVOID }.map { it.label }
+                .ifEmpty { listOf(t.foodType.ifBlank { e.foodText.lowercase().take(30) }) }
+        }.distinct()
         val lost = extra * 3 + avoid.size * 3
         val treatText = if (extra == 0) {
             "$treats treats, within the $allowance a week that fit any plan"
