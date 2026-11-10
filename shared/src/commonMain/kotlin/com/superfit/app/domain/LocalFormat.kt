@@ -20,8 +20,14 @@ expect object LocalFormat {
     /** "6:05 am" (h:mm a). */
     fun clock(time: LocalTime): String
 
+    /** The time the way the phone shows it, 12 or 24 hour ("6:05 am" or "06:05"). */
+    fun shortClock(time: LocalTime): String
+
     /** "8,432", grouped the way the phone groups numbers. */
     fun integer(n: Long): String
+
+    /** [x] with exactly [digits] decimals in the phone's style ("79.5", or "79,5" in Portuguese), not grouped. Same as String.format("%.1f"). */
+    fun decimal(x: Double, digits: Int): String
 
     fun uppercase(text: String): String
 

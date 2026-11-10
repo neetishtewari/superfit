@@ -17,7 +17,6 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,9 +34,7 @@ import com.superfit.app.theme.SuperfitTheme
 
 /** "AI coach style": how the daily tip and the chat talk to the user. One roomy row per style. */
 @Composable
-fun CoachStyleSettings(viewModel: DashboardViewModel) {
-    val style by viewModel.coachStyle.collectAsState()
-
+fun CoachStyleSettings(style: CoachStyle, onSelect: (CoachStyle) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = "AI coach style",
@@ -45,7 +42,7 @@ fun CoachStyleSettings(viewModel: DashboardViewModel) {
             color = SuperfitTheme.colors.textPrimary,
             fontSize = 14.sp
         )
-        CoachStyleOptions(selected = style, onSelect = viewModel::setCoachStyle)
+        CoachStyleOptions(selected = style, onSelect = onSelect)
     }
 }
 

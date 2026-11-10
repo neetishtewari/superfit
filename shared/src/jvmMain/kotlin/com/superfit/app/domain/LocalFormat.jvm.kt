@@ -2,6 +2,7 @@ package com.superfit.app.domain
 
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
@@ -20,7 +21,12 @@ actual object LocalFormat {
 
     actual fun clock(time: LocalTime): String = time.toJavaLocalTime().format(pattern("h:mm a"))
 
+    actual fun shortClock(time: LocalTime): String =
+        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).format(time.toJavaLocalTime())
+
     actual fun integer(n: Long): String = NumberFormat.getIntegerInstance().format(n)
+
+    actual fun decimal(x: Double, digits: Int): String = String.format(Locale.getDefault(), "%.${digits}f", x)
 
     actual fun uppercase(text: String): String = text.uppercase(Locale.getDefault())
 

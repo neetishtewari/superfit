@@ -16,15 +16,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.data.WeightEntryEntity
+import com.superfit.app.domain.Decimals
 import com.superfit.app.theme.ThemeCardBgTranslucent
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.temporal.ChronoUnit
-import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.todayIn
 
 /** A small Home row to log today's weight without going to the History tab. */
 @Composable
@@ -49,7 +52,7 @@ fun WeightQuickRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Weight  ${String.format(Locale.US, "%.1f", shownWeight)} kg",
+                text = "Weight  ${Decimals.one(shownWeight)} kg",
                 color = ThemeTextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
@@ -77,11 +80,13 @@ fun WeightQuickRow(
     }
 }
 
+@OptIn(ExperimentalTime::class)
 private fun lastLoggedText(timestamp: Long): String {
-    val day = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-    return when (val days = ChronoUnit.DAYS.between(day, LocalDate.now())) {
-        0L -> "Logged today"
-        1L -> "Logged yesterday"
+    val zone = TimeZone.currentSystemDefault()
+    val day = Instant.fromEpochMilliseconds(timestamp).toLocalDateTime(zone).date
+    return when (val days = day.daysUntil(Clock.System.todayIn(zone))) {
+        0 -> "Logged today"
+        1 -> "Logged yesterday"
         else -> "Logged $days days ago"
     }
 }

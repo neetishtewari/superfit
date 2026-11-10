@@ -186,6 +186,14 @@ tested on the dev app first.
          passes these through; it still owns Health Connect, the widget refresh (run after each
          meal change), imported workouts, coach chat files and clearing data. Tested on a real
          in-memory database (bundled SQLite) on the computer.
+     - 5b-5 starts bottom-up with the Today screen's parts, then its ViewModel, then the screen:
+       - 5b-5a: the self-contained Today cards and dialogs move to shared unchanged: streak header,
+         goal progress card with weigh-in and edit-goal dialogs, step-goal note/sheet/chooser,
+         Diet Quality card and detail sheet, coach style chooser, widget tip card, and the
+         dashboard colour tokens. Numbers with decimals use LocalFormat.decimal (the phone's own
+         style, as String.format did on Android); step counts keep "12,000".
+         Also the Home "Log weight" row and the "Is this you?" scale dialog, on kotlinx-datetime;
+         the dialog's time uses LocalFormat.shortClock (the phone's 12/24-hour style, as before).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -393,3 +401,5 @@ Step 5b-4b (reviewed 10 Nov): no change to what is stored or backed up, or where
 still goes only to users/{signed-in uid}; signed out, nothing is uploaded (CloudBackup checks
 the uid on every call). The new test library (bundled SQLite) is used by the computer tests only
 and is not in either app. No new permissions.
+
+Step 5b-5a (reviewed 10 Nov): display code only; no data, storage, network or permission changes.

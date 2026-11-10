@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.AreaOfConcern
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.WeightGoalMetrics
 import com.superfit.app.ui.components.SuperfitField
 
@@ -126,13 +127,13 @@ fun GoalProgressCard(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "${String.format("%.1f", metrics.currentWeightKg)} kg",
+                        text = "${LocalFormat.decimal(metrics.currentWeightKg, 1)} kg",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     val changePrefix = if (metrics.totalWeightChangeKg <= 0) "" else "+"
-                    val changeLabel = "${changePrefix}${String.format("%.1f", metrics.totalWeightChangeKg)} kg total"
+                    val changeLabel = "${changePrefix}${LocalFormat.decimal(metrics.totalWeightChangeKg, 1)} kg total"
                     Text(
                         text = "Last weight ($changeLabel)",
                         fontSize = 12.sp,
@@ -174,7 +175,7 @@ fun GoalProgressCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Start: ${String.format("%.1f", metrics.startingWeightKg)} kg",
+                    text = "Start: ${LocalFormat.decimal(metrics.startingWeightKg, 1)} kg",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -189,7 +190,7 @@ fun GoalProgressCard(
                     }
                 ) {
                     Text(
-                        text = "Goal: ${String.format("%.1f", metrics.targetWeightKg)} kg",
+                        text = "Goal: ${LocalFormat.decimal(metrics.targetWeightKg, 1)} kg",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -210,7 +211,7 @@ fun GoalProgressCard(
             val weeklyPaceKg = metrics.weeklyPaceKg
             if (weeklyPaceKg != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                val paceStr = String.format("%.2f", weeklyPaceKg)
+                val paceStr = LocalFormat.decimal(weeklyPaceKg, 2)
                 val paceLabel = if (weeklyPaceKg < 0) "$paceStr kg/week" else "+$paceStr kg/week"
                 Text(
                     text = "Current pace: $paceLabel",
@@ -259,7 +260,7 @@ fun GoalProgressCard(
                             text = when (concern) {
                                 is AreaOfConcern.StaleLog -> "It's been ${concern.daysAgo} days since your last weigh-in. Tap 'Weigh In' for a quick update!"
                                 is AreaOfConcern.Plateau -> "Plateau Alert: Weight has been steady over the past ${concern.daysCount} days."
-                                is AreaOfConcern.RapidLoss -> "Rapid Drop: Losing weight fast (${String.format("%.1f", concern.pacePerWeek)} kg/wk). Prioritize protein & hydration!"
+                                is AreaOfConcern.RapidLoss -> "Rapid Drop: Losing weight fast (${LocalFormat.decimal(concern.pacePerWeek, 1)} kg/wk). Prioritize protein & hydration!"
                                 else -> ""
                             },
                             fontSize = 12.sp,

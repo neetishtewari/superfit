@@ -517,7 +517,8 @@ fun SettingsScreen(
                     .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    CoachStyleSettings(viewModel)
+                    val coachStyle by viewModel.coachStyle.collectAsState()
+                    CoachStyleSettings(coachStyle, viewModel::setCoachStyle)
                     HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
                     CoachMemorySettings(viewModel)
                 }

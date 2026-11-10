@@ -9,10 +9,13 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
+import platform.Foundation.NSDateFormatterNoStyle
+import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.NSLocale
 import platform.Foundation.NSNumber
 import platform.Foundation.NSNumberFormatter
 import platform.Foundation.NSNumberFormatterDecimalStyle
+import platform.Foundation.NSNumberFormatterRoundHalfUp
 import platform.Foundation.currentLocale
 import platform.Foundation.dateWithTimeIntervalSince1970
 
@@ -38,11 +41,29 @@ actual object LocalFormat {
         return format(NSDate.dateWithTimeIntervalSince1970(instant.epochSeconds.toDouble()), "h:mm a")
     }
 
+    actual fun shortClock(time: LocalTime): String {
+        val instant = LocalDateTime(LocalDate(2000, 1, 1), time).toInstant(TimeZone.currentSystemDefault())
+        return NSDateFormatter().apply {
+            locale = NSLocale.currentLocale
+            dateStyle = NSDateFormatterNoStyle
+            timeStyle = NSDateFormatterShortStyle
+        }.stringFromDate(NSDate.dateWithTimeIntervalSince1970(instant.epochSeconds.toDouble()))
+    }
+
     actual fun integer(n: Long): String = NSNumberFormatter().apply {
         locale = NSLocale.currentLocale
         numberStyle = NSNumberFormatterDecimalStyle
         maximumFractionDigits = 0u
     }.stringFromNumber(NSNumber(longLong = n)) ?: n.toString()
+
+    actual fun decimal(x: Double, digits: Int): String = NSNumberFormatter().apply {
+        locale = NSLocale.currentLocale
+        numberStyle = NSNumberFormatterDecimalStyle
+        usesGroupingSeparator = false
+        roundingMode = NSNumberFormatterRoundHalfUp
+        minimumFractionDigits = digits.toULong()
+        maximumFractionDigits = digits.toULong()
+    }.stringFromNumber(NSNumber(double = x)) ?: Decimals.fixed(x, digits)
 
     // Kotlin's own case rules; the same as the phone's for every language except Turkish dotted i.
     actual fun uppercase(text: String): String = text.uppercase()

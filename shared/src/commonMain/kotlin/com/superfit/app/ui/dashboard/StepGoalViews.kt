@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalReason
 import com.superfit.app.domain.StepGoalResult
@@ -45,13 +46,12 @@ import com.superfit.app.theme.ThemeBrandSoft
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
 import com.superfit.app.ui.components.SuperfitField
-import java.util.Locale
 
-private fun steps(n: Int) = String.format(Locale.US, "%,d", n)
+private fun steps(n: Int) = Decimals.grouped(n.toLong())
 
 /** Shown on Home the day the step goal goes up, until dismissed. */
 @Composable
-internal fun StepGoalRaisedNote(goal: StepGoalResult, onDismiss: () -> Unit) {
+fun StepGoalRaisedNote(goal: StepGoalResult, onDismiss: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -79,7 +79,7 @@ internal fun StepGoalRaisedNote(goal: StepGoalResult, onDismiss: () -> Unit) {
 /** What today's step goal is and why, with the choice of setting your own. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun StepGoalSheet(goal: StepGoalResult, onSetOwn: (Int?) -> Unit, onDismiss: () -> Unit) {
+fun StepGoalSheet(goal: StepGoalResult, onSetOwn: (Int?) -> Unit, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -104,7 +104,7 @@ internal fun StepGoalSheet(goal: StepGoalResult, onSetOwn: (Int?) -> Unit, onDis
 }
 
 /** Plain lines explaining the goal, for the sheet. */
-internal fun stepGoalExplanation(goal: StepGoalResult): List<String> {
+fun stepGoalExplanation(goal: StepGoalResult): List<String> {
     val lines = mutableListOf<String>()
     when (goal.reason) {
         StepGoalReason.OWN -> lines += "You set this goal yourself."
@@ -125,7 +125,7 @@ internal fun stepGoalExplanation(goal: StepGoalResult): List<String> {
 
 /** Automatic goal or the person's own number. Used in the Home sheet and in Settings. */
 @Composable
-internal fun StepGoalChooser(goal: StepGoalResult, onSetOwn: (Int?) -> Unit) {
+fun StepGoalChooser(goal: StepGoalResult, onSetOwn: (Int?) -> Unit) {
     var mode by remember(goal.reason) { mutableStateOf(if (goal.reason == StepGoalReason.OWN) "OWN" else "AUTO") }
     var text by remember(goal.goal) { mutableStateOf(goal.goal.toString()) }
     SegmentedPills(
