@@ -427,7 +427,6 @@ stored or sent. No new permissions.
 
 Step 5b-5d (reviewed 10 Nov): display code only; no data, storage, network or permission changes.
 
-
 Step 5b-5e (reviewed 10 Nov): the same two anonymous events (meal_item_changed, meal_amount_changed)
 with the same "how" values; still nothing about the food. Voice words stay on the phone until the
 person taps Change, as before. No new permissions.
