@@ -514,7 +514,7 @@ class DashboardViewModel(
     }
 
     /** Today's steps and workouts next to the usual for this weekday. */
-    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?) =
+    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?, distance: TodayDistance? = todayDistance.value) =
         com.superfit.app.domain.TodayVsUsual.of(
             today = LocalDate.now().toKotlinLocalDate(),
             steps = state.activity.steps,
@@ -522,8 +522,14 @@ class DashboardViewModel(
                 com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
             },
             usual = usual,
-            distanceKm = state.activity.distanceMeters?.div(1000)
+            distanceKm = distance?.takeIf { it.date == LocalDate.now() }?.km
         )
+
+    /** Today's recorded distance, read live from Health Connect and kept only in memory (not stored). */
+    data class TodayDistance(val date: LocalDate, val km: Double)
+
+    private val _todayDistance = MutableStateFlow<TodayDistance?>(null)
+    val todayDistance: StateFlow<TodayDistance?> = _todayDistance
 
     private fun loadCachedCoachingInsight() {
         CoachInsightStore.loadForDay(sharedPrefs, LocalDate.now())?.let {
@@ -932,6 +938,8 @@ class DashboardViewModel(
     fun syncTelemetry() {
         viewModelScope.launch {
             repository.syncHealthConnectTelemetry(LocalDate.now())
+            val today = LocalDate.now()
+            _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()
             sharedPrefs.edit().putLong("last_telemetry_sync", now).apply()

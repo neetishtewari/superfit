@@ -304,6 +304,7 @@ fun DashboardScreen(
     val workoutImportEnabled by viewModel.workoutImportEnabled.collectAsState()
     val workoutCardDismissed by viewModel.workoutCardDismissed.collectAsState()
     val usualDay by viewModel.usualDay.collectAsState()
+    val todayDistance by viewModel.todayDistance.collectAsState()
     val workoutPermissionMissing by viewModel.workoutPermissionMissing.collectAsState()
     val workoutImportRunning by viewModel.workoutImportRunning.collectAsState()
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
@@ -645,7 +646,7 @@ fun DashboardScreen(
                             // 1. Activity & Performance Card
                             ActivityPerformanceCard(
                                 state = state,
-                                vsUsual = viewModel.todayVsUsual(state, usualDay),
+                                vsUsual = viewModel.todayVsUsual(state, usualDay, todayDistance),
                                 onDeleteWorkout = { viewModel.deleteWorkout(it) },
                                 onHideImportedWorkout = { viewModel.hideWorkout(it) },
                                 workoutImportEnabled = workoutImportEnabled,

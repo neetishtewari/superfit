@@ -56,9 +56,7 @@ data class HabitEntryEntity(
 data class ActivityTelemetryEntity(
     @PrimaryKey val date: String, // format YYYY-MM-DD
     val steps: Int,
-    val activeCalories: Double,
-    /** Distance walked/run that day as recorded by a watch or phone app; null when none records it. */
-    val distanceMeters: Double? = null
+    val activeCalories: Double
 )
 
 @Entity(tableName = "sleep_telemetry")

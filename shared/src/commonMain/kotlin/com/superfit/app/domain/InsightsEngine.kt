@@ -60,13 +60,8 @@ data class DayTotals(
     val steps: Int,
     val workouts: List<ActivityFact>,
     /** Average of the AI's 1-10 meal ratings that day; null when no meal was rated. */
-    val mealRating: Double? = null,
-    /** Distance recorded by a watch or phone app; null when none recorded it. */
-    val distanceKm: Double? = null
+    val mealRating: Double? = null
 ) {
-    /** Recorded distance, or an estimate from steps when no app recorded one. */
-    val distanceOrEstimateKm: Double get() = distanceKm ?: (steps * UsualDay.STEP_KM)
-
     val logged: Boolean get() = meals >= 2
     val net: Double get() = kcalEaten - kcalTarget
     val proteinHit: Boolean get() = logged && proteinTargetG > 0 && proteinG >= proteinTargetG * 0.9
@@ -384,7 +379,7 @@ data class UsualDay(val steps: Int, val distanceKm: Double, val moveMinutes: Lon
             if (same.size < 2) return null
             return UsualDay(
                 steps = same.map { it.steps }.average().roundToInt(),
-                distanceKm = same.map { it.distanceOrEstimateKm }.average(),
+                distanceKm = same.map { it.steps * STEP_KM }.average(),
                 moveMinutes = same.map { it.moveMinutes }.average().roundToLong(),
                 workoutKcal = same.map { it.workoutKcal }.average(),
                 samples = same.size

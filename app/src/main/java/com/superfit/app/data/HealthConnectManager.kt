@@ -136,14 +136,19 @@ class HealthConnectManager(private val context: Context) {
             return null
         }
         val activeCalories = readActiveCaloriesAggregate(client, startTime, endTime)
-        val distanceMeters = readDistanceTotal(client, startTime, endTime)
 
         return ActivityTelemetryEntity(
             date = localDate.toString(),
             steps = steps.toInt(),
-            activeCalories = activeCalories,
-            distanceMeters = distanceMeters
+            activeCalories = activeCalories
         )
+    }
+
+    /** The day's walked/run distance in meters as a watch or phone app recorded it, or null. Not stored. */
+    suspend fun readDistanceMeters(localDate: LocalDate): Double? {
+        val client = healthConnectClient ?: return null
+        val zoneId = ZoneId.systemDefault()
+        return readDistanceTotal(client, localDate.atStartOfDay(zoneId).toInstant(), localDate.plusDays(1).atStartOfDay(zoneId).toInstant())
     }
 
     suspend fun readSleepTelemetry(localDate: LocalDate): SleepTelemetryEntity? {

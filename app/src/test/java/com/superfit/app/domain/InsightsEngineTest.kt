@@ -168,12 +168,5 @@ class InsightsEngineTest {
         val estimated = TodayVsUsual.of(kToday, 10000, emptyList(), null)
         assertEquals(7.5, estimated.distanceKm, 0.001)
         assertTrue(estimated.distanceEstimated)
-
-        // The usual mixes days with recorded distance and days with only steps.
-        val u = UsualDay.forDay(
-            map(day(today.minusWeeks(1), steps = 8000).copy(distanceKm = 7.0), day(today.minusWeeks(2), steps = 8000)),
-            kToday
-        )
-        assertEquals((7.0 + 6.0) / 2, u!!.distanceKm, 0.001)
     }
 }

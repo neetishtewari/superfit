@@ -580,7 +580,7 @@ fun ActivityPerformanceCard(
             color = ThemeTextPrimary
         )
 
-        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(Now.today(), state.activity.steps, emptyList(), null, state.activity.distanceMeters?.div(1000))
+        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(Now.today(), state.activity.steps, emptyList(), null)
         val usual = today.usual
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

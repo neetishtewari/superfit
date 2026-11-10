@@ -24,7 +24,7 @@ import androidx.room.RoomDatabaseConstructor
         HabitEntryEntity::class,
         ImportedWorkoutEntity::class
     ],
-    version = 10,
+    version = 9,
     exportSchema = true
 )
 @ConstructedBy(SuperfitDatabaseConstructor::class)
