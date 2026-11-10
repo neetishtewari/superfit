@@ -73,6 +73,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.data.userPrefs
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.SpokenInput
 import com.superfit.app.theme.*
@@ -663,7 +664,7 @@ fun DashboardScreen(
         }
 
         // Once, for people who signed up before "Pick your coach" existed.
-        var askCoachStyle by remember { mutableStateOf(!com.superfit.app.data.CoachStyleStore.hasChosen(context)) }
+        var askCoachStyle by remember { mutableStateOf(!com.superfit.app.data.CoachStyleStore.hasChosen(userPrefs(context))) }
         if (askCoachStyle) {
             CoachStyleChooserDialog(
                 onChoose = { style ->

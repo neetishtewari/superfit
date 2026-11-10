@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
 import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.ReviewPrompt
+import com.superfit.app.data.userPrefs
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.CoachingEngine
@@ -129,7 +130,7 @@ class DashboardViewModel(
     val pendingScaleReading: StateFlow<com.superfit.app.domain.ScaleReading?> = _pendingScaleReading.asStateFlow()
 
     /** The nutritionist's weekly note at the top of Diet Quality; the last one shows until today's is written. */
-    private val _dietNote = MutableStateFlow(com.superfit.app.data.NutritionAdviceStore.lastNote(appContext))
+    private val _dietNote = MutableStateFlow(com.superfit.app.data.NutritionAdviceStore.lastNote(userPrefs(appContext)))
     val dietNote: StateFlow<com.superfit.app.domain.DietNote?> = _dietNote.asStateFlow()
     private var dietNoteRunning = false
 
@@ -151,8 +152,8 @@ class DashboardViewModel(
 
     init {
         com.superfit.app.data.BodyImporter.load(appContext)
-        com.superfit.app.data.NutritionAdviceStore.load(appContext)
-        com.superfit.app.data.CoachStyleStore.load(appContext)
+        com.superfit.app.data.NutritionAdviceStore.load(userPrefs(appContext))
+        com.superfit.app.data.CoachStyleStore.load(userPrefs(appContext))
         _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
         checkPermissions()
         loadCachedCoachingInsight()
@@ -372,7 +373,7 @@ class DashboardViewModel(
     /** Saves the AI coach style and rewrites today's tip in it, if there is one. */
     fun setCoachStyle(style: com.superfit.app.domain.CoachStyle) {
         // Saved even when unchanged, so the one-time chooser counts "Not now" as an answer.
-        com.superfit.app.data.CoachStyleStore.save(appContext, style)
+        com.superfit.app.data.CoachStyleStore.save(userPrefs(appContext), style)
         if (style == _coachStyle.value) return
         _coachStyle.value = style
         AppAnalytics.coachStyleChanged(style.name)
@@ -714,7 +715,7 @@ class DashboardViewModel(
             val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
             val workoutMins = (workouts.size * 25)
 
-            val todayStepGoal = StepGoalStore.ownGoal(appContext) ?: StepGoalStore.load(appContext)?.goal ?: StepGoal.starter(profile.age)
+            val todayStepGoal = StepGoalStore.ownGoal(userPrefs(appContext)) ?: StepGoalStore.load(userPrefs(appContext))?.goal ?: StepGoal.starter(profile.age)
 
             val habitEntry = (rawHabit ?: HabitEntryEntity(date = todayStr)).copy(
                 stepsCompleted = currentSteps >= todayStepGoal,
@@ -847,11 +848,11 @@ class DashboardViewModel(
     ) { profile, activity, _ ->
         if (profile == null) return@combine null
         val steps = activity.mapNotNull { row -> runCatching { kotlinx.datetime.LocalDate.parse(row.date) to row.steps }.getOrNull() }.toMap()
-        val saved = StepGoalStore.load(appContext)
-        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(appContext), LocalDate.now().toKotlinLocalDate())
+        val saved = StepGoalStore.load(userPrefs(appContext))
+        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(userPrefs(appContext)), LocalDate.now().toKotlinLocalDate())
         // An own number is kept apart, so switching back to automatic starts from the steps again.
         if (result.reason != StepGoalReason.OWN && result.saved != saved) {
-            StepGoalStore.save(appContext, result.saved)
+            StepGoalStore.save(userPrefs(appContext), result.saved)
             if (saved != null && result.goal != saved.goal) {
                 AppAnalytics.stepGoalChanged(if (result.goal > saved.goal) "up" else "down", "auto")
             }
@@ -863,20 +864,20 @@ class DashboardViewModel(
         initialValue = null
     )
 
-    private val _stepGoalNoteDismissedOn = MutableStateFlow(StepGoalStore.noteDismissedOn(appContext))
+    private val _stepGoalNoteDismissedOn = MutableStateFlow(StepGoalStore.noteDismissedOn(userPrefs(appContext)))
     val stepGoalNoteDismissedOn: StateFlow<String?> = _stepGoalNoteDismissedOn.asStateFlow()
 
     /** Hides today's "New step goal" note on Home. */
     fun dismissStepGoalNote() {
         val today = LocalDate.now().toKotlinLocalDate()
-        StepGoalStore.dismissNote(appContext, today)
+        StepGoalStore.dismissNote(userPrefs(appContext), today)
         _stepGoalNoteDismissedOn.value = today.toString()
     }
 
     /** Sets the person's own daily step goal, or null to go back to the automatic one. */
     fun setOwnStepGoal(steps: Int?) {
         val clamped = steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX)
-        StepGoalStore.setOwnGoal(appContext, clamped)
+        StepGoalStore.setOwnGoal(userPrefs(appContext), clamped)
         AppAnalytics.stepGoalChanged("set", if (clamped == null) "auto" else "own")
         stepGoalTrigger.value = System.currentTimeMillis()
     }
@@ -1309,7 +1310,7 @@ class DashboardViewModel(
     private fun writeDietNote(metrics: com.superfit.app.domain.DietQualityMetrics) {
         if (!metrics.hasEnoughData || dietNoteRunning) return
         val stamp = LocalDate.now().toString()
-        com.superfit.app.data.NutritionAdviceStore.note(appContext, stamp)?.let {
+        com.superfit.app.data.NutritionAdviceStore.note(userPrefs(appContext), stamp)?.let {
             _dietNote.value = it
             return
         }
@@ -1317,7 +1318,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             try {
                 com.superfit.app.domain.NutritionistNote.write(metrics)?.let { note ->
-                    com.superfit.app.data.NutritionAdviceStore.saveNote(appContext, stamp, note)
+                    com.superfit.app.data.NutritionAdviceStore.saveNote(userPrefs(appContext), stamp, note)
                     _dietNote.value = note
                 }
             } catch (e: Exception) {
@@ -1330,7 +1331,7 @@ class DashboardViewModel(
 
     /** "Fine for me": the food stops counting as a treat and stops getting swaps. */
     fun setFineForMe(key: String, fine: Boolean) {
-        com.superfit.app.data.NutritionAdviceStore.setFineForMe(appContext, key, fine)
+        com.superfit.app.data.NutritionAdviceStore.setFineForMe(userPrefs(appContext), key, fine)
     }
 
     /**
@@ -1338,7 +1339,7 @@ class DashboardViewModel(
      * targets the advice names, for the user to confirm, or null when it names none.
      */
     suspend fun saveNutritionistAdvice(text: String): com.superfit.app.domain.AdviceTargets? {
-        com.superfit.app.data.NutritionAdviceStore.saveAdvice(appContext, text)
+        com.superfit.app.data.NutritionAdviceStore.saveAdvice(userPrefs(appContext), text)
         sharedPrefs.edit().remove(BACKFILL_KEY).apply()
         tagOlderMeals()
         if (text.isBlank()) return null
@@ -1351,7 +1352,7 @@ class DashboardViewModel(
     }
 
     fun applyNutritionistTargets(targets: com.superfit.app.domain.AdviceTargets?) {
-        com.superfit.app.data.NutritionAdviceStore.applyTargets(appContext, targets)
+        com.superfit.app.data.NutritionAdviceStore.applyTargets(userPrefs(appContext), targets)
     }
 
     override fun onCleared() {

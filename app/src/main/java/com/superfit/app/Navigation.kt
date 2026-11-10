@@ -24,7 +24,7 @@ import com.superfit.app.data.GeminiKeyStore
 import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
-import com.superfit.app.ui.auth.LoginScreen
+import com.superfit.app.ui.auth.AndroidLoginScreen
 import com.superfit.app.ui.auth.LoginViewModel
 import com.superfit.app.ui.dashboard.CoachTab
 import com.superfit.app.ui.dashboard.DashboardScreen
@@ -106,7 +106,7 @@ fun MainNavigation(
                 val loginViewModel: LoginViewModel = viewModel {
                     LoginViewModel(repository)
                 }
-                LoginScreen(
+                AndroidLoginScreen(
                     viewModel = loginViewModel,
                     onLoginSuccess = {
                         coroutineScope.launch {
