@@ -197,6 +197,9 @@ tested on the dev app first.
        - 5b-5b: what the Today screen shows (DashboardUiState and its parts) moves to shared, so
          both apps describe Today the same way. The rings, macro bars, sleep pills, meal row and
          activity bar move too; the calories-left number uses LocalFormat.integer ("1,230").
+       - 5b-5c: the sums behind Today (targets, own macro targets, eaten totals, streak, step and
+         sleep ticks, Diet Quality, workout add-back) move to shared TodayState.build, tested on
+         the computer. Android reads the pieces and calls it; the screen is unchanged.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -409,3 +412,6 @@ Step 5b-5a (reviewed 10 Nov): display code only; no data, storage, network or pe
 
 Step 5b-5b (reviewed 10 Nov): display code and state types only; no data, storage, network or
 permission changes.
+
+Step 5b-5c (reviewed 10 Nov): the same sums on the same on-phone data, moved; nothing new is read,
+stored or sent. No new permissions.

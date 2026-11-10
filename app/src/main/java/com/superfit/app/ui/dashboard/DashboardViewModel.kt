@@ -676,105 +676,28 @@ class DashboardViewModel(
         if (profile == null) {
             DashboardUiState.NotInitialized
         } else {
-            val todayStr = LocalDate.now().toString()
-            // Live physiological calculations
-            val bmr = PhysiologyEngine.calculateBmr(profile)
-            val manualCal = workouts.sumOf { it.caloriesBurned }
-
-            // Workouts from other apps. Their calories are already inside Health Connect's
-            // "burned today", so they only move the target, never the burned number.
+            // Workouts from other apps, named the way this phone names their apps.
             val workoutPrefs = repository.workoutImportPrefs
             val importedWorkouts = if (workoutPrefs.enabled) {
-                ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
+                ImportedWorkouts.views(appContext, importedRows, workoutPrefs, PhysiologyEngine.calculateBmr(profile))
             } else {
                 emptyList()
             }
-            val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
-            // What the body burns today with all of today's workouts, for the coach's deficit sums.
-            val tdee = dailyTarget.maintenance
-            val readiness = sleep?.readinessScore ?: 50 // Default 50% if no sleep session found
-
-            // Macro targets from live TDEE and goal (or the user's own numbers)
-            val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-            val macroTargets = if (customMacroEnabled) {
-                val customProtein = sharedPrefs.getInt("custom_protein_g", 130).toDouble()
-                val customCarbs = sharedPrefs.getInt("custom_carbs_g", 200).toDouble()
-                val customFat = sharedPrefs.getInt("custom_fat_g", 70).toDouble()
-                val customCals = sharedPrefs.getInt("custom_calories", 2000).toDouble()
-                MacroTargets(
-                    calories = customCals,
-                    proteinG = customProtein,
-                    carbsG = customCarbs,
-                    fatG = customFat
-                )
-            } else {
-                dailyTarget.targets
-            }
-            val workoutTargetKcal = if (customMacroEnabled) 0.0 else dailyTarget.workoutKcal
-
-            // Aggregate nutrition eaten today
-            val caloriesEaten = nutrition.sumOf { it.calories }
-            val proteinEaten = nutrition.sumOf { it.proteinG }
-            val carbsEaten = nutrition.sumOf { it.carbsG }
-            val fatEaten = nutrition.sumOf { it.fatG }
-
-            val weightMetrics = com.superfit.app.domain.WeightTrendEngine.calculateMetrics(profile, weightEntries)
-
-            // Streak is derived from the full meal log (one missed day forgiven, two end it)
-            val streakState = com.superfit.app.domain.StreakEngine.fromMealTimestamps(
-                allNutritionHistory.map { it.timestamp }
-            )
-
-            val currentSteps = activity?.steps ?: 0
-            val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
-            val workoutMins = (workouts.size * 25)
-
-            val todayStepGoal = StepGoalStore.ownGoal(userPrefs(appContext)) ?: StepGoalStore.load(userPrefs(appContext))?.goal ?: StepGoal.starter(profile.age)
-
-            val habitEntry = (rawHabit ?: HabitEntryEntity(date = todayStr)).copy(
-                stepsCompleted = currentSteps >= todayStepGoal,
-                sleepCompleted = currentSleepSecs >= (7 * 3600),
-                workoutMins = workoutMins
-            )
-
-            // What the AI should weigh when it rates this person's meals
-            com.superfit.app.domain.PersonalNutrition.goal = profile.goal
-            com.superfit.app.domain.PersonalNutrition.calorieTarget = macroTargets.calories
-            com.superfit.app.domain.PersonalNutrition.proteinTargetG = macroTargets.proteinG
-
-            val dietQualityMetrics = com.superfit.app.domain.FoodQualityEngine.analyzeDietQuality(
-                nutritionHistory = allNutritionHistory,
-                userGoal = profile.goal,
-                proteinTargetG = macroTargets.proteinG,
-                calorieTarget = macroTargets.calories
-            )
-
-            DashboardUiState.Success(
+            TodayState.build(
+                today = LocalDate.now().toString(),
+                zone = kotlinx.datetime.TimeZone.currentSystemDefault(),
                 profile = profile,
-                activity = activity ?: ActivityTelemetryEntity(todayStr, 0, 0.0),
+                activity = activity,
                 sleep = sleep,
-                nutritionList = nutrition,
-                workoutList = workouts,
+                nutrition = nutrition,
+                workouts = workouts,
                 weightEntries = weightEntries,
-                weightMetrics = weightMetrics,
-                streakState = streakState,
-                mealDaysLogged = ReviewPrompt.daysWithMeals(allNutritionHistory.map { it.timestamp }),
-                habitEntry = habitEntry,
-                dietQualityMetrics = dietQualityMetrics,
-                bmr = bmr,
-                tdee = tdee,
-                readinessScore = readiness,
-                macroTargets = macroTargets,
-                caloriesEaten = caloriesEaten,
-                proteinEaten = proteinEaten,
-                carbsEaten = carbsEaten,
-                fatEaten = fatEaten,
-                manualWorkoutCalories = manualCal,
-                totalMealsLogged = allNutritionHistory.size,
+                habit = rawHabit,
+                allNutritionHistory = allNutritionHistory,
                 importedWorkouts = importedWorkouts,
-                importedWorkoutCount = if (workoutPrefs.enabled) importedCount else 0,
-                workoutTargetKcal = workoutTargetKcal,
-                workoutTargetSource = WorkoutDisplay.boostSource(importedWorkouts, workouts.size)
+                importedCount = importedCount,
+                workoutPrefs = workoutPrefs,
+                prefs = userPrefs(appContext)
             )
         }
     }.onEach { state ->
