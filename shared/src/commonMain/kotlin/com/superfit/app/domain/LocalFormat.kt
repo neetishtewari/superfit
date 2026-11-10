@@ -11,6 +11,12 @@ expect object LocalFormat {
     /** "Wed, 4 Nov" (EEE, d MMM). */
     fun dayLine(date: LocalDate): String
 
+    /** "Wednesday, 4 November" (EEEE, d MMMM). */
+    fun longDay(date: LocalDate): String
+
+    /** "Wed" (EEE). */
+    fun weekday(date: LocalDate): String
+
     /** "4 Nov" (d MMM). */
     fun dayMonth(date: LocalDate): String
 

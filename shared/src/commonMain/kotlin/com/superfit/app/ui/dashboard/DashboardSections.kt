@@ -1,19 +1,5 @@
 package com.superfit.app.ui.dashboard
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Bundle
-import android.provider.Settings
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import android.text.format.DateUtils
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -57,7 +43,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -67,29 +52,28 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.core.content.ContextCompat
-import androidx.health.connect.client.PermissionController
+import com.superfit.app.data.Now
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.CoachPatternEngine
+import com.superfit.app.domain.Decimals
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
-import java.time.LocalDate
-import kotlinx.datetime.toKotlinLocalDate
 
 @Composable
-internal fun DashboardHeader(
+fun DashboardHeader(
     grantedPermissions: Set<String>,
     hasHealthConnectPermissions: Boolean,
     onNavigateToSettings: () -> Unit
 ) {
-    val today = LocalDate.now()
+    val today = Now.today()
     val dateText = remember(today) {
-        today.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM", java.util.Locale.getDefault()))
+        LocalFormat.longDay(today)
     }
-    val greeting = when (java.time.LocalTime.now().hour) {
+    val greeting = when (Now.hour()) {
         in 4..11 -> "Good morning"
         in 12..16 -> "Good afternoon"
         else -> "Good evening"
@@ -160,7 +144,7 @@ private fun HeaderNavButton(icon: androidx.compose.ui.graphics.vector.ImageVecto
 }
 
 @Composable
-internal fun CalorieRingsCard(
+fun CalorieRingsCard(
     state: DashboardUiState.Success,
     stepGoal: com.superfit.app.domain.StepGoalResult? = null,
     onStepsClick: () -> Unit = {}
@@ -207,7 +191,7 @@ internal fun CalorieRingsCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                val fmt = java.text.NumberFormat.getIntegerInstance()
+                fun fmt(n: Int) = LocalFormat.integer(n.toLong())
                 // How workouts raised today's target, shown only when the person taps to ask why.
                 val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
                 var showKcalMath by remember { mutableStateOf(false) }
@@ -225,7 +209,7 @@ internal fun CalorieRingsCard(
                 ) {
                     RingLegendItem(
                         label = "Eaten, kcal",
-                        value = "${fmt.format(state.caloriesEaten.toInt())} of ${fmt.format(caloriesTarget.toInt())}",
+                        value = "${fmt(state.caloriesEaten.toInt())} of ${fmt(caloriesTarget.toInt())}",
                         color = NeonGreen
                     )
                     if (showKcalMath && kcalMath != null) {
@@ -239,7 +223,7 @@ internal fun CalorieRingsCard(
                 ) {
                     RingLegendItem(
                         label = "Steps",
-                        value = "${fmt.format(state.activity.steps)} of ${fmt.format(stepsTarget.toInt())}",
+                        value = "${fmt(state.activity.steps)} of ${fmt(stepsTarget.toInt())}",
                         color = ElectricCyan
                     )
                 }
@@ -249,7 +233,7 @@ internal fun CalorieRingsCard(
 }
 
 @Composable
-internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
+fun NutrientLedgerCard(state: DashboardUiState.Success) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -323,7 +307,7 @@ internal fun NutrientLedgerCard(state: DashboardUiState.Success) {
 }
 
 @Composable
-internal fun CoachInsightsCard(
+fun CoachInsightsCard(
     coachingState: CoachingInsightState,
     onRefresh: () -> Unit,
     onOpenChat: () -> Unit,
@@ -563,212 +547,7 @@ internal fun CoachInsightsCard(
 }
 
 @Composable
-internal fun TrackMealsCard(
-    state: DashboardUiState.Success,
-    viewModel: DashboardViewModel,
-    parsingState: ParsingState,
-    foodInputText: String,
-    onFoodInputChange: (String) -> Unit,
-    onViewAllFoods: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(ThemeCardBgTranslucent)
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        ThemeGlassBorder,
-                        ThemeGlassBorderGlow
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Today's meals",
-            style = MaterialTheme.typography.titleLarge,
-            color = ThemeTextPrimary
-        )
-
-        val submitMeal = {
-            if (foodInputText.isNotBlank()) {
-                viewModel.parseAndAddMeal(foodInputText)
-                onFoodInputChange("")
-            }
-        }
-        SuperfitField(
-            value = foodInputText,
-            onValueChange = onFoodInputChange,
-            placeholder = { Text("Type what you ate, e.g. 2 eggs and a banana") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { submitMeal() }),
-            trailingIcon = {
-                if (parsingState == ParsingState.Loading) {
-                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = NeonGreen, strokeWidth = 2.dp)
-                } else {
-                    com.superfit.app.ui.components.FieldActionButton(
-                        icon = Icons.Default.Check,
-                        contentDescription = "Log this meal",
-                        enabled = foodInputText.isNotBlank(),
-                        onClick = submitMeal,
-                        modifier = Modifier.padding(end = 6.dp)
-                    )
-                }
-            }
-        )
-
-        // Suggestions chips
-        val predictedFoods by viewModel.predictedFoods.collectAsState()
-        if (predictedFoods.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Your usual foods",
-                    fontSize = 12.sp,
-                    color = ThemeTextTertiary,
-                    fontWeight = FontWeight.Bold
-                )
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(predictedFoods.take(6)) { predicted ->
-                        SuggestionChip(
-                            onClick = { onFoodInputChange(predicted.foodText) },
-                            label = {
-                                Text(
-                                    text = predicted.foodText,
-                                    color = ThemeTextPrimary,
-                                    fontSize = 12.sp,
-                                    maxLines = 1
-                                )
-                            },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                enabled = true,
-                                borderColor = ThemeGlassBorder
-                            )
-                        )
-                    }
-                    item {
-                        SuggestionChip(
-                            onClick = onViewAllFoods,
-                            label = {
-                                Text(
-                                    text = "See all",
-                                    color = ThemeTextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = ThemeTextPrimary.copy(alpha = 0.05f)
-                            ),
-                            border = SuggestionChipDefaults.suggestionChipBorder(
-                                enabled = true,
-                                borderColor = ThemeGlassBorder
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // Display parsing state messages
-        AnimatedVisibility(visible = parsingState is ParsingState.Error) {
-            val errMsg = (parsingState as? ParsingState.Error)?.message ?: "Error"
-            Column(
-                modifier = Modifier.padding(horizontal = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = EnergeticCoral
-                    )
-                    Text(
-                        text = errMsg,
-                        color = EnergeticCoral,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                // Re-sends what the user last said or typed, so they don't have to say it again.
-                if (viewModel.canRetryLastMeal) {
-                    Button(
-                        onClick = { viewModel.retryLastMeal() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = EnergeticCoral.copy(alpha = 0.15f),
-                            contentColor = EnergeticCoral
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.heightIn(min = 32.dp)
-                    ) {
-                        Text(
-                            text = "Try again",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-
-        // Meals logged today list
-        Text(
-            text = "Logged so far",
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = ThemeTextPrimary
-        )
-
-        if (state.nutritionList.isEmpty()) {
-            Text(
-                text = "No meals logged today yet.",
-                fontSize = 13.sp,
-                color = ThemeTextSecondary
-            )
-        } else {
-            var editingMeal by remember { mutableStateOf<NutritionEntryEntity?>(null) }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.nutritionList.forEach { entry ->
-                    MealItemRow(
-                        entry = entry,
-                        onDelete = { viewModel.deleteMeal(entry) },
-                        onClick = { editingMeal = entry }
-                    )
-                }
-            }
-            editingMeal?.let { meal ->
-                MealEditSheet(
-                    entry = meal,
-                    onSave = {
-                        viewModel.updateMeal(it)
-                        editingMeal = null
-                    },
-                    onDismiss = { editingMeal = null }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ActivityPerformanceCard(
+fun ActivityPerformanceCard(
     state: DashboardUiState.Success,
     vsUsual: com.superfit.app.domain.TodayVsUsual? = null,
     onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
@@ -801,22 +580,22 @@ internal fun ActivityPerformanceCard(
             color = ThemeTextPrimary
         )
 
-        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(LocalDate.now().toKotlinLocalDate(), state.activity.steps, emptyList(), null)
+        val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(Now.today(), state.activity.steps, emptyList(), null)
         val usual = today.usual
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TodayTile(
                     label = "Steps",
-                    value = String.format(java.util.Locale.US, "%,d", today.steps),
-                    usual = usual?.let { String.format(java.util.Locale.US, "%,d", it.steps) },
+                    value = Decimals.grouped(today.steps.toLong()),
+                    usual = usual?.let { Decimals.grouped(it.steps.toLong()) },
                     ahead = usual != null && usual.steps > 0 && today.steps >= usual.steps,
                     color = ElectricCyan,
                     modifier = Modifier.weight(1f)
                 )
                 TodayTile(
                     label = "Distance (est.)",
-                    value = String.format(java.util.Locale.US, "%.1f km", today.distanceKm),
-                    usual = usual?.let { String.format(java.util.Locale.US, "%.1f km", it.distanceKm) },
+                    value = "${Decimals.one(today.distanceKm)} km",
+                    usual = usual?.let { "${Decimals.one(it.distanceKm)} km" },
                     ahead = usual != null && usual.distanceKm > 0 && today.distanceKm >= usual.distanceKm,
                     color = ElectricCyan,
                     modifier = Modifier.weight(1f)
@@ -840,7 +619,7 @@ internal fun ActivityPerformanceCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-            today.coachLine(java.time.LocalTime.now().hour)?.let { line ->
+            today.coachLine(Now.hour())?.let { line ->
                 Text(text = line, fontSize = 13.sp, color = ThemeTextPrimary, lineHeight = 18.sp)
             }
             if (usual == null) {
@@ -898,7 +677,7 @@ internal fun ActivityPerformanceCard(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() },
+                                text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ThemeTextPrimary
@@ -955,7 +734,7 @@ internal fun ActivityPerformanceCard(
 }
 
 @Composable
-internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
+fun SleepRecoveryCard(state: DashboardUiState.Success) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1068,7 +847,7 @@ internal fun SleepRecoveryCard(state: DashboardUiState.Success) {
 }
 
 /** Gemini marks key phrases as **bold**; show them bold instead of with raw asterisks. */
-internal fun boldMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+fun boldMarkdown(text: String): AnnotatedString = buildAnnotatedString {
     appendBold(text)
 }
 
@@ -1076,7 +855,7 @@ internal fun boldMarkdown(text: String): AnnotatedString = buildAnnotatedString 
  * Coach chat replies can also use markdown bullets ("* ", "- ") and headings ("## ");
  * show those as plain bullets and bold lines rather than raw symbols.
  */
-internal fun chatMarkdown(text: String): AnnotatedString = buildAnnotatedString {
+fun chatMarkdown(text: String): AnnotatedString = buildAnnotatedString {
     text.lines().forEachIndexed { i, rawLine ->
         if (i > 0) append("\n")
         val indent = rawLine.takeWhile { it == ' ' }
