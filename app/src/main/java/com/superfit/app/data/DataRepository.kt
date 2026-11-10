@@ -163,8 +163,8 @@ class DataRepository(
 
     /**
      * One-time clean-up after the single-app steps fix: re-reads the saved days from [fromDaysAgo]
-     * to [toDaysAgo] and keeps the new count only when it is lower but not zero, so a day can only
-     * be corrected down, never wiped (Health Connect may no longer have older days).
+     * to [toDaysAgo] and saves the watch app's count, up or down. A day Health Connect no longer
+     * has (or reads as zero) keeps its saved count, so nothing is wiped.
      */
     suspend fun correctPastSteps(fromDaysAgo: Long, toDaysAgo: Long) {
         if (!healthConnectManager.isAvailable()) return
@@ -180,7 +180,7 @@ class DataRepository(
             } catch (e: Exception) {
                 null
             } ?: continue
-            if (fresh.steps in 1 until saved.steps) log.saveActivity(saved.copy(steps = fresh.steps))
+            if (fresh.steps > 0 && fresh.steps != saved.steps) log.saveActivity(saved.copy(steps = fresh.steps))
         }
     }
 

@@ -1314,7 +1314,7 @@ class DashboardViewModel(
     }
 
     companion object {
-        private const val PAST_STEPS_CORRECTED = "past_steps_single_app_v1"
+        private const val PAST_STEPS_CORRECTED = "past_steps_watch_first_v2"
 
         /** First chat chip in Roast me style. */
         const val ROAST_MY_DAY = "Roast"

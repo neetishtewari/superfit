@@ -211,14 +211,15 @@ class HealthConnectManager(private val context: Context) {
         return null
     }
 
-    // The day's steps from the one app that counted the most. Health Connect's merged total can
-    // add apps together (for example Samsung Health, which already merges watch and phone, plus
-    // Google Fit counting the same walk on the phone), which showed ~30,600 for a 23,500-step day.
+    // The day's steps from one app, never several added together. Health Connect's merged total
+    // and Google Fit can both add a watch app's steps to the phone's own count (on one phone:
+    // Samsung Health 23,562 = the watch, Google Fit 11,391, phone 11,705, merged 31,727; on other
+    // days Google Fit alone showed watch + phone). So a watch app is trusted first (see pickSource).
     private suspend fun readStepsTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Long =
         largestSingleSource(client, StepsRecord.COUNT_TOTAL, startTime, endTime, "steps", compare = { it.toDouble() }) ?: 0L
 
     /**
-     * The day's distance in meters from the one app that recorded the most, or null when no app
+     * The day's distance in meters from one app (picked like steps), or null when no app
      * records distance or distance access is off (then the app estimates it from steps).
      */
     private suspend fun readDistanceTotal(client: HealthConnectClient, startTime: Instant, endTime: Instant): Double? {
@@ -235,7 +236,7 @@ class HealthConnectManager(private val context: Context) {
         }
     }
 
-    /** [metric] for the day per app that wrote it, keeping the largest. Throws if the first read fails. */
+    /** [metric] for the day from a single app, chosen by [pickSource]. Throws if the first read fails. */
     private suspend fun <T : Any> largestSingleSource(
         client: HealthConnectClient,
         metric: AggregateMetric<T>,
@@ -253,7 +254,7 @@ class HealthConnectManager(private val context: Context) {
         }
         val perApp = origins.map { origin -> origin.packageName to readFrom(client, metric, range, origin) }
         android.util.Log.i("HealthConnectManager", "$label $startTime: merged=${merged[metric]} " + perApp.joinToString { "${it.first}=${it.second}" })
-        return pickLargest(perApp.map { it.second }, compare) ?: merged[metric]
+        return pickSource(perApp, compare) ?: merged[metric]
     }
 
     private suspend fun <T : Any> readFrom(client: HealthConnectClient, metric: AggregateMetric<T>, range: TimeRangeFilter, origin: DataOrigin): T? =
@@ -316,7 +317,33 @@ class HealthConnectManager(private val context: Context) {
     }
 
     companion object {
-        /** The largest of the per-app values, skipping apps whose read failed. */
-        internal fun <T : Any> pickLargest(values: List<T?>, compare: (T) -> Double): T? = values.filterNotNull().maxByOrNull(compare)
+        /**
+         * Apps of watches and bands. Each already merges its own watch and phone steps without
+         * counting twice, so when one has data it beats Google Fit and the phone's own counter.
+         */
+        internal val WEARABLE_APPS = setOf(
+            "com.sec.android.app.shealth", // Samsung Health (Galaxy Watch)
+            "com.fitbit.FitbitMobile", // Fitbit and Pixel Watch
+            "com.garmin.android.apps.connectmobile",
+            "com.ouraring.oura",
+            "com.withings.wiscale2",
+            "com.huawei.health",
+            "com.mi.health",
+            "com.xiaomi.wearable",
+            "com.huami.watch.hmwatchmanager", // Zepp / Amazfit
+            "fi.polar.polarflow",
+            "com.coros.coros",
+            "com.whoop.android"
+        )
+
+        /**
+         * One app's value, skipping apps whose read failed or gave nothing: the largest watch app
+         * if any has data, otherwise the largest of the rest.
+         */
+        internal fun <T : Any> pickSource(perApp: List<Pair<String, T?>>, compare: (T) -> Double): T? {
+            val usable = perApp.mapNotNull { (app, value) -> value?.takeIf { compare(it) > 0 }?.let { app to it } }
+            val wearable = usable.filter { it.first in WEARABLE_APPS }
+            return (wearable.ifEmpty { usable }).maxByOrNull { compare(it.second) }?.second
+        }
     }
 }
