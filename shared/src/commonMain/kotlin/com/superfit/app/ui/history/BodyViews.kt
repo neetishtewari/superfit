@@ -34,6 +34,7 @@ import com.superfit.app.domain.BodyPeriod
 import com.superfit.app.domain.BodyReadings
 import com.superfit.app.domain.BodySeries
 import com.superfit.app.domain.BodySummary
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.MeasuredBody
 import com.superfit.app.theme.SolarAmber
 import com.superfit.app.theme.SuperfitTheme
@@ -42,12 +43,7 @@ import com.superfit.app.theme.ThemeFieldBg
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.abs
-import kotlinx.datetime.toJavaLocalDate
-
-private val bodyDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 
 @Composable
 private fun BodySection(content: @Composable () -> Unit) {
@@ -94,7 +90,7 @@ fun BodyNowCard(body: BodySummary?, weightKg: Double?, weightChange4w: Double?, 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Your body now", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextSecondary, modifier = Modifier.weight(1f))
             val from = if (body?.hasScaleData == true) {
-                listOfNotNull(body.source, body.measuredOn?.toJavaLocalDate()?.format(bodyDate)).joinToString(" · ")
+                listOfNotNull(body.source, body.measuredOn?.let { LocalFormat.dayMonth(it) }).joinToString(" · ")
             } else {
                 ""
             }
@@ -126,7 +122,7 @@ fun BodyNowCard(body: BodySummary?, weightKg: Double?, weightChange4w: Double?, 
             val extras = listOfNotNull(
                 body.bmi?.let { "BMI ${BodyReadings.fmt(it)}" },
                 body.boneKg?.let { "Bone ${BodyReadings.fmt(it)} kg" },
-                body.scaleBmr?.let { "Resting burn ${"%,d".format(it.toInt())} kcal" }
+                body.scaleBmr?.let { "Resting burn ${LocalFormat.integer(it.toLong())} kcal" }
             )
             if (extras.isNotEmpty()) Text(extras.joinToString(" · "), fontSize = 13.sp, color = ThemeTextSecondary)
             if (MeasuredBody.currentBodyFat() != null) {

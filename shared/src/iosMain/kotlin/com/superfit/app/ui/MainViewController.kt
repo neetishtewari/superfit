@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,7 @@ import com.superfit.app.ui.components.PrimaryButton
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
 import com.superfit.app.ui.history.HistoryModel
-import com.superfit.app.ui.history.ProgressHistoryPage
+import com.superfit.app.ui.history.ProgressTabs
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
@@ -132,7 +133,7 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when (tab) {
-                    MainTab.PROGRESS -> ProgressHistoryPage(history)
+                    MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value)
                     else -> TodayScreen(today) {
                         // What the iPhone still shows below Today until Settings moves over.
                         Text(

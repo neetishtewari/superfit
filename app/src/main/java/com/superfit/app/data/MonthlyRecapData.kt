@@ -22,7 +22,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import kotlin.math.abs
 import kotlinx.datetime.toJavaYearMonth
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
@@ -98,8 +97,7 @@ object MonthlyRecapData {
 
         // The goal as it stood at the end of the month (or today, for a month still going).
         val asOf = minOf(month.atEndOfMonth().plusDays(1), today)
-        val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
-        val goalSet = (GoalDatePref.isGoalSet(prefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
+        val goalSet = GoalDatePref.hasGoal(AndroidPrefs(prefs), profile)
         val journey = GoalForecast.compute(
             startKg = profile.startingWeightKg,
             targetKg = profile.targetWeightKg,
@@ -112,7 +110,7 @@ object MonthlyRecapData {
             weighIns = kWeighIns.filter { it.first <= asOf.toKotlinLocalDate() },
             days = days,
             calorieOffset = profile.calorieOffset,
-            targetDate = GoalDatePref.get(prefs)?.toKotlinLocalDate(),
+            targetDate = GoalDatePref.get(AndroidPrefs(prefs)),
             today = asOf.toKotlinLocalDate(),
             fallbackCurrentKg = profile.weightKg
         )

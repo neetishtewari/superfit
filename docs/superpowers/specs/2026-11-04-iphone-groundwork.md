@@ -246,6 +246,13 @@ tested on the dev app first.
          and "log a missed meal" as Android; HistoryModel does them on iPhone and
          HistoryLog.missedMeal times a late meal at midday for both apps. Share buttons are
          hidden on iPhone until share cards arrive.
+       - 5c-3: Insights and Journey move to shared (InsightsTab, JourneyTab, the body cards and
+         the goal dialog), with GoalDatePref now on shared Prefs and kotlinx dates. ProgressLog
+         (shared) works out the week report, the journey forecast, the body summary and trend
+         lines, the same sums Android's HistoryViewModel used; Android now calls it. The iPhone
+         Progress page gets the Insights | Journey | History switch, weigh-ins and goal edits.
+         Personal bests and the coach report wait for share cards and the iPhone PDF; scale
+         readings (body fat and more) wait for Apple Health.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -497,3 +504,9 @@ Step 5c-2 (reviewed 11 Nov): on iPhone, editing, deleting and logging a missed m
 use the same calls as Today (5b-5g): saved in the account's own database and backed up to
 users/{signed-in uid} only; the typed meal goes to Gemini through Firebase AI Logic with App
 Check, as on Android. No new permissions.
+
+Step 5c-3 (reviewed 11 Nov): the same sums on the same on-phone data, moved. On iPhone a weigh-in
+and a goal edit use the same calls as Android: saved in the account's own database and settings,
+and the weigh-in and profile backed up to users/{signed-in uid} only. "Fine for me" is kept in
+the account's own settings, as on Android. Nothing new is sent to the AI or anywhere else. No new
+permissions.
