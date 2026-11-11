@@ -313,6 +313,15 @@ tested on the dev app first.
          Settings. The mics in meal editing ("Say what it was") and "My nutritionist's advice"
          show on iPhone too, with a small Listening window, since iPhone has no voice-typing box.
          Results slide in at the top as on Android. Camera, barcode and label reading follow.
+       - 8: Camera and barcode. "Snap your plate" on Today's Food side offers Meal, Barcode or
+         Label, the three modes of Android's food camera. Apple's own camera takes the meal or
+         label photo (CameraBridge; the simulator picks a library photo instead), shrunk to
+         1280 px and sent to the AI once through shared FoodPhotoParser; Apple's live barcode
+         scanner (VisionKit) reads packets, looked up in Open Food Facts through shared
+         OpenFoodFacts (Android now uses its barcode forms too). Shared PhotoLog has Android's
+         words for working, not found ("Snap its nutrition label instead") and failures, and the
+         check sheets (CheckMealSheet, CheckPackSheet) move to shared, so nothing is saved until
+         Log meal, as on Android. Saved meals get quality tags the same way.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -606,3 +615,11 @@ and stops after a minute at most. Sound goes to Apple's speech recognition (as i
 on Android) and is never recorded, kept or sent to Superfit or Firebase; only the words go on, to
 Gemini through Firebase AI Logic with App Check, exactly as typed words do. Nothing new is stored
 or backed up. No new Android permissions; Android unchanged.
+
+Step 8 (reviewed 12 Nov): asks for the camera only when it first opens, with the reason in
+Apple's sheet (NSCameraUsageDescription). Photos are shrunk, sent once to Gemini through Firebase
+AI Logic with App Check, and never saved to the phone's photos, the database or the backup. Only
+the barcode number goes to Open Food Facts (over HTTPS, a plain app name as User-Agent, no
+account or device details). The simulator's photo picker needs no library permission. What is
+logged is saved and backed up like any meal. No new Android permissions; Android's camera is
+unchanged apart from the check sheets now coming from shared code.

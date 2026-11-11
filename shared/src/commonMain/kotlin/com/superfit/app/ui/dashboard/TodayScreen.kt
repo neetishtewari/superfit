@@ -34,6 +34,12 @@ import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
 import com.superfit.app.domain.LogKind
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.camera.PhotoCamera
+import com.superfit.app.ui.camera.PhotoKind
+import com.superfit.app.ui.camera.PhotoKindSheet
+import com.superfit.app.ui.camera.PhotoLog
+import com.superfit.app.ui.camera.PhotoLogOverlay
+import com.superfit.app.ui.camera.PhotoLogState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -49,6 +55,9 @@ fun TodayScreen(
     onOpenSettings: () -> Unit = {},
     /** Opens Superfit's page in the phone's own Settings, for turning the microphone back on. */
     onOpenPhoneSettings: () -> Unit = {},
+    /** The camera for "Snap your plate", with what happens to its pictures; null hides the button. */
+    camera: PhotoCamera? = null,
+    photoLog: PhotoLog? = null,
     footer: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
@@ -73,6 +82,19 @@ fun TodayScreen(
     val voiceNotice by (voice?.notice ?: noVoice.notice).collectAsState()
     val micOff by (voice?.micOff ?: noVoice.micOff).collectAsState()
     var banner by remember { mutableStateOf<LogBanner?>(null) }
+    val photoCamera = camera?.takeIf { photoLog != null && it.isAvailable() }
+    var showPhotoKinds by remember { mutableStateOf(false) }
+    val idlePhoto = remember { MutableStateFlow<PhotoLogState>(PhotoLogState.Idle) }
+    val photoState by (photoLog?.state ?: idlePhoto).collectAsState()
+    val openCamera: (PhotoKind) -> Unit = { kind ->
+        photoLog?.close()
+        photoCamera?.take(
+            kind,
+            onPhoto = { photoLog?.onPhoto(kind, it) },
+            onBarcode = { photoLog?.onBarcode(it) },
+            onError = { banner = LogBanner(it, isError = true) }
+        )
+    }
 
     // What was logged, or why it couldn't be, slides in at the top for a few seconds, as on Android.
     LaunchedEffect(parsing) {
@@ -139,7 +161,8 @@ fun TodayScreen(
                         liveText = if (mine) voiceUi.liveText else "",
                         isProcessing = parsing is ParsingState.Loading,
                         onMicClick = { voice.start(kind) },
-                        onStopClick = voice::stop
+                        onStopClick = voice::stop,
+                        onCameraClick = photoCamera?.let { { showPhotoKinds = true } }
                     )
                 }
                 if (side == "MEAL") {
@@ -187,7 +210,29 @@ fun TodayScreen(
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+        photoLog?.let { log ->
+            PhotoLogOverlay(
+                state = photoState,
+                kind = log.kind,
+                onLog = { entry, isPackaged ->
+                    log.close()
+                    model.addPhotoMeal(entry, isPackaged)
+                },
+                onRetake = openCamera,
+                onClose = log::close
+            )
+        }
         LogResultBanner(banner, modifier = Modifier.align(Alignment.TopCenter))
+    }
+
+    if (showPhotoKinds) {
+        PhotoKindSheet(
+            onPick = { kind ->
+                showPhotoKinds = false
+                openCamera(kind)
+            },
+            onDismiss = { showPhotoKinds = false }
+        )
     }
 
     if (micOff) {

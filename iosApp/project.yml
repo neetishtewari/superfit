@@ -66,6 +66,9 @@ targets:
         # only the words come back; nothing is recorded or kept.
         NSMicrophoneUsageDescription: "Superfit listens when you tap a mic button, so you can say what you ate or the workout you did. Nothing is recorded or kept."
         NSSpeechRecognitionUsageDescription: "Apple's speech recognition turns what you say into words, which Superfit uses to log your meal or workout. Nothing is recorded or kept."
+        # Shown the first time the camera opens (meal photo, barcode or label). Photos go to the AI
+        # once and are never saved.
+        NSCameraUsageDescription: "Superfit uses the camera when you snap your meal, scan a barcode or snap a nutrition label, to work out what you ate. Photos aren't saved."
         # Google's sign-in sheet returns to the app through this link (REVERSED_CLIENT_ID in
         # GoogleService-Info.plist). It identifies the app, it is not a secret.
         CFBundleURLTypes:

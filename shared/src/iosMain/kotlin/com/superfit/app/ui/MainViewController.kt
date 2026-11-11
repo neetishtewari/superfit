@@ -42,6 +42,7 @@ import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
+import com.superfit.app.ui.camera.PhotoLog
 import com.superfit.app.ui.dashboard.ProvideVoiceTyping
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
@@ -59,10 +60,11 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
+    val photoCamera = IosPhotoCamera(camera)
     return ComposeUIViewController {
         // Light, dark or Auto, kept for the whole app like Android's "theme_mode".
         val appPrefs = remember { IosPrefs(APP_PREFS) }
@@ -74,7 +76,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -101,6 +103,7 @@ private fun IosRoot(
     cloudStore: IosCloudStore,
     health: HealthSource,
     speech: VoiceRecognizer,
+    camera: IosPhotoCamera,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -181,6 +184,7 @@ private fun IosRoot(
             ) { _ -> today.syncHealth() }
             onDispose { NSNotificationCenter.defaultCenter.removeObserver(observer) }
         }
+        val photoLog = remember(uid) { PhotoLog(accountScope, camera::lookup) }
         val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope, scaleReadings = scale::mine) }
         var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
         var showSettings by remember(uid) { mutableStateOf(false) }
@@ -210,7 +214,13 @@ private fun IosRoot(
             Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when (tab) {
                     MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value)
-                    else -> TodayScreen(today, onOpenSettings = { showSettings = true }, onOpenPhoneSettings = ::openPhoneSettings) {
+                    else -> TodayScreen(
+                        today,
+                        onOpenSettings = { showSettings = true },
+                        onOpenPhoneSettings = ::openPhoneSettings,
+                        camera = camera,
+                        photoLog = photoLog
+                    ) {
                         if (restored?.failed == true) {
                             Text(
                                 text = "Couldn't reach your backup. Check your internet and open the app again.",

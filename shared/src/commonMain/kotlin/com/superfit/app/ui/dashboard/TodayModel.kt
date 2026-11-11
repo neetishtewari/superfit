@@ -474,6 +474,29 @@ class TodayModel(
         }
     }
 
+    /**
+     * Saves a meal from the camera once the person checked it, as Android does: packets (and
+     * meals whose food was changed) get their quality tags afterwards.
+     */
+    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean) {
+        scope.launch {
+            try {
+                val id = log.addNutritionEntry(entry)
+                loadPredictedFoods()
+                _parsing.value = ParsingState.Success(entry.foodText)
+                if (isPackaged || entry.qualityTags == null) {
+                    val saved = entry.copy(id = id)
+                    MealTagger().tagOne(saved)?.let { log.saveMealTags(saved, it.encode()) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Saving photo meal failed", e)
+                _parsing.value = ParsingState.Error("Couldn't save this meal. Please try again.")
+            }
+        }
+    }
+
     /** The result has been shown (in the banner), so the box goes back to its usual look. */
     fun resetParsing() {
         _parsing.value = ParsingState.Idle
