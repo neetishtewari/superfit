@@ -19,6 +19,7 @@ import kotlinx.datetime.toInstant
 class ProgressLogTest {
 
     private val zone = TimeZone.of("Asia/Kolkata")
+
     @OptIn(ExperimentalTime::class)
     private fun at(day: String, hour: Int) = LocalDateTime.parse("${day}T${hour.toString().padStart(2, '0')}:00").toInstant(zone).toEpochMilliseconds()
     private fun weight(kg: Double, day: String, hour: Int = 8) = WeightEntryEntity(weightKg = kg, timestamp = at(day, hour))
