@@ -259,6 +259,12 @@ tested on the dev app first.
          the gear on Today with the account, your plan, Appearance (Auto, Light, Dark, kept for
          the whole app as on Android) and Sign out. Health data, the AI coach, reminders, the
          widget, sharing, privacy and deleting the account follow with their iPhone parts.
+       - 5d-2: Settings, second part. "My nutritionist's advice" moves to shared (its mic shows
+         where the phone has voice typing) and the once-a-day re-rating of recent meals becomes
+         shared MealTagBackfill; Android calls both. The iPhone Settings page gets the advice box
+         and the AI coach style, and the iPhone now loads the person's coach style and advice
+         (with confirmed targets and "Fine for me" foods) at sign-in, as Android does at start.
+         "What my coach knows" joins with coach chat.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -522,3 +528,9 @@ Step 5d-1 (reviewed 11 Nov): the same settings under the same keys, kept in the 
 settings on the phone (theme in the app's settings); a goal change saves the profile, backed up to
 users/{signed-in uid} only, as on Android. Signing out on the iPhone is the same Firebase sign-out
 as before. Nothing new is read, stored or sent. No new permissions.
+
+Step 5d-2 (reviewed 11 Nov): the same settings under the same keys, kept on the phone. The advice
+text goes to Gemini through Firebase AI Logic with App Check only when the person saves it (to
+read targets) and inside the meal-rating prompt, exactly as on Android; re-rated tags are saved to
+the account's own database and backed up to users/{signed-in uid} only. Targets from the advice
+are used only after the person confirms them. No new permissions.

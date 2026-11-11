@@ -22,15 +22,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.data.NutritionAdviceStore
-import com.superfit.app.data.userPrefs
+import com.superfit.app.data.Prefs
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.LocalVoiceTyping
+import com.superfit.app.ui.components.MicButton
 import com.superfit.app.ui.components.SuperfitField
 import kotlinx.coroutines.launch
 
@@ -40,10 +41,15 @@ import kotlinx.coroutines.launch
  * confirms them.
  */
 @Composable
-fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
-    val context = LocalContext.current
+fun NutritionistAdviceSettings(
+    prefs: Prefs,
+    /** Saves the advice, has recent meals rated again, and returns any daily targets it names. */
+    onSave: suspend (String) -> AdviceTargets?,
+    /** Uses the confirmed targets in place of the app's own (null stops using them). */
+    onApplyTargets: (AdviceTargets?) -> Unit
+) {
     val scope = rememberCoroutineScope()
-    var saved by remember { mutableStateOf(NutritionAdviceStore.advice(userPrefs(context))) }
+    var saved by remember { mutableStateOf(NutritionAdviceStore.advice(prefs)) }
     var text by remember { mutableStateOf(saved) }
     var saving by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -63,13 +69,18 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
             fontSize = 12.sp,
             lineHeight = 15.sp
         )
-        val speakAdvice = com.superfit.app.ui.components.rememberVoiceTyping("Say what your nutritionist told you") { said ->
+        // Null where the phone can't do voice typing yet; the mic is then left out.
+        val speakAdvice = LocalVoiceTyping.current("Say what your nutritionist told you") { said ->
             text = (if (text.isBlank()) said else text.trimEnd() + " " + said).take(2000)
         }
         SuperfitField(
             value = text,
             onValueChange = { text = it.take(2000) },
-            trailingIcon = { com.superfit.app.ui.components.MicButton(onClick = speakAdvice, modifier = Modifier.padding(end = 6.dp)) },
+            trailingIcon = if (speakAdvice != null) {
+                { MicButton(onClick = speakAdvice, modifier = Modifier.padding(end = 6.dp)) }
+            } else {
+                null
+            },
             supportingText = {
                 Text("${text.length} / 2000", fontSize = 12.sp, color = SuperfitTheme.colors.textTertiary)
             },
@@ -105,7 +116,7 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
                     saving = true
                     status = "Saving…"
                     scope.launch {
-                        val targets = viewModel.saveNutritionistAdvice(text)
+                        val targets = onSave(text)
                         saved = text.trim()
                         saving = false
                         status = "Saved. Your recent meals will be rated again with it."
@@ -130,7 +141,7 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = {
-                    viewModel.applyNutritionistTargets(null)
+                    onApplyTargets(null)
                     applied = null
                 }) { Text("Stop using", fontSize = 12.sp) }
             }
@@ -149,7 +160,7 @@ fun NutritionistAdviceSettings(viewModel: DashboardViewModel) {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.applyNutritionistTargets(t)
+                    onApplyTargets(t)
                     applied = t
                     proposed = null
                 }) { Text("Use them") }

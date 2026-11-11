@@ -273,7 +273,13 @@ fun SettingsScreen(
                 onGoal = { goal -> viewModel.updateGoal(goal.key, goal.calorieOffset) },
                 onSetOwnStepGoal = { viewModel.setOwnStepGoal(it) },
                 onTargetsChanged = { saved -> if (saved) Toast.makeText(context, "Targets saved", Toast.LENGTH_SHORT).show() },
-                nutritionistAdvice = { NutritionistAdviceSettings(viewModel) }
+                nutritionistAdvice = {
+                    NutritionistAdviceSettings(
+                        prefs = remember { com.superfit.app.data.userPrefs(context) },
+                        onSave = viewModel::saveNutritionistAdvice,
+                        onApplyTargets = viewModel::applyNutritionistTargets
+                    )
+                }
             )
 
             SettingsGroupLabel("AI coach")

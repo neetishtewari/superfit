@@ -2,9 +2,11 @@ package com.superfit.app.ui.dashboard
 
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.CoachInsightStore
+import com.superfit.app.data.CoachStyleStore
 import com.superfit.app.data.HabitEntryEntity
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
+import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
@@ -14,13 +16,18 @@ import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
+import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachNote
+import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.FitnessGoal
 import com.superfit.app.domain.LogKind
+import com.superfit.app.domain.MealTagBackfill
+import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
+import com.superfit.app.domain.NutritionistNote
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
@@ -52,6 +59,15 @@ class TodayModel(
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() }
 ) {
     private val today = Now.today()
+
+    // The person's coach style and own nutritionist's advice, before anything is worked out with them.
+    init {
+        CoachStyleStore.load(prefs)
+        NutritionAdviceStore.load(prefs)
+    }
+
+    private val _coachStyle = MutableStateFlow(CoachStyle.current)
+    val coachStyle: StateFlow<CoachStyle> = _coachStyle.asStateFlow()
 
     private val _parsing = MutableStateFlow<ParsingState>(ParsingState.Idle)
     val parsing: StateFlow<ParsingState> = _parsing.asStateFlow()
@@ -190,6 +206,55 @@ class TodayModel(
 
     init {
         loadPredictedFoods()
+        tagOlderMeals()
+    }
+
+    /** Saves the AI coach style and rewrites today's tip in it, if there is one, as on Android. */
+    fun setCoachStyle(style: CoachStyle) {
+        // Saved even when unchanged, so a later one-time chooser counts it as an answer.
+        CoachStyleStore.save(prefs, style)
+        if (style == _coachStyle.value) return
+        _coachStyle.value = style
+        if (_coaching.value is CoachingInsightState.Success) refreshCoachingInsight()
+    }
+
+    /** Saves the nutritionist's advice, has recent meals rated again with it, and reads any daily targets in it. */
+    suspend fun saveNutritionistAdvice(text: String): AdviceTargets? {
+        NutritionAdviceStore.saveAdvice(prefs, text)
+        prefs.edit { remove(BACKFILL_KEY) }
+        tagOlderMeals()
+        refreshTargets()
+        if (text.isBlank()) return null
+        return try {
+            NutritionistNote.readTargets(text)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.w("TodayModel", "Couldn't read targets from the advice", e)
+            null
+        }
+    }
+
+    fun applyNutritionistTargets(targets: AdviceTargets?) {
+        NutritionAdviceStore.applyTargets(prefs, targets)
+        refreshTargets()
+    }
+
+    /** Once a day, recent meals are judged (again) the same way as on Android. */
+    private fun tagOlderMeals() {
+        val day = today.toString()
+        if (prefs.getString(BACKFILL_KEY, "") == day) return
+        scope.launch {
+            try {
+                val due = MealTagBackfill.due(log.getAllNutritionEntries(), Now.millis())
+                MealTagBackfill.tag(due, MealTagger()) { entry, tags -> log.saveMealTags(entry, tags) }
+                prefs.edit { putString(BACKFILL_KEY, day) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Tagging older meals failed; will retry next launch", e)
+            }
+        }
     }
 
     private fun loadPredictedFoods() {
@@ -292,5 +357,10 @@ class TodayModel(
 
     fun logWeight(weightKg: Double, note: String) {
         scope.launch { log.addWeightEntry(weightKg, note) }
+    }
+
+    private companion object {
+        // The same day stamp Android keeps, bumped with the nutritionist ratings.
+        const val BACKFILL_KEY = "meal_tag_backfill_date_v3"
     }
 }

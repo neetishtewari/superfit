@@ -28,11 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Prefs
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.dashboard.CoachStyleSettings
+import com.superfit.app.ui.dashboard.NutritionistAdviceSettings
 import com.superfit.app.ui.dashboard.TodayModel
 
 /**
- * Settings on the iPhone, from the same cards as Android: the account, your plan and the look.
- * Health data, the AI coach, reminders, sharing and privacy join with their iPhone parts.
+ * Settings on the iPhone, from the same cards as Android: the account, your plan (with your
+ * nutritionist's advice), the coach's style and the look. Health data, what the coach remembers,
+ * reminders, sharing and privacy join with their iPhone parts.
  */
 @Composable
 fun SettingsPage(
@@ -81,8 +84,22 @@ fun SettingsPage(
             onSetOwnStepGoal = model::setOwnStepGoal,
             // Today works its numbers out again with the new targets.
             onTargetsChanged = { model.refreshTargets() },
-            confirmInCard = true
+            confirmInCard = true,
+            nutritionistAdvice = {
+                NutritionistAdviceSettings(
+                    prefs = prefs,
+                    onSave = model::saveNutritionistAdvice,
+                    onApplyTargets = model::applyNutritionistTargets
+                )
+            }
         )
+
+        SettingsGroupLabel("AI coach")
+        // What the coach remembers joins with coach chat on the iPhone.
+        SettingsCard(spacing = 14) {
+            val coachStyle by model.coachStyle.collectAsState()
+            CoachStyleSettings(coachStyle, model::setCoachStyle)
+        }
 
         AppearanceCard(mode = themeMode, onSelect = onThemeMode)
 
