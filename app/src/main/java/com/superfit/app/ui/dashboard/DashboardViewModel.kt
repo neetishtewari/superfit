@@ -168,47 +168,14 @@ class DashboardViewModel(
         if (sharedPrefs.getString(BACKFILL_KEY, "") == todayStr) return
         viewModelScope.launch {
             try {
-                val cutoff = System.currentTimeMillis() - 28L * 24 * 3600 * 1000
-                val rerateFrom = System.currentTimeMillis() - RERATE_DAYS * 24 * 3600 * 1000
-                val untagged = repository.getAllNutritionEntries()
-                    .filter { it.timestamp >= cutoff && it.id != 0L && needsTags(it, rerate = it.timestamp >= rerateFrom) }
-                    .sortedByDescending { it.timestamp }
-                    .take(60)
-                val tagger = com.superfit.app.domain.MealTagger()
-                untagged.chunked(20).forEach { batch ->
-                    val tags = tagger.tag(batch)
-                    batch.forEach { entry ->
-                        tags[entry.id]?.let { t ->
-                            // Asked once: when the AI gives no food-by-food ratings, don't ask again every day.
-                            val saved = if (t.itemRatings == null && hasSeveralFoods(entry)) t.copy(itemRatings = emptyList()) else t
-                            repository.saveMealTags(entry, saved.encode())
-                        }
-                    }
-                }
+                val due = com.superfit.app.domain.MealTagBackfill.due(repository.getAllNutritionEntries(), System.currentTimeMillis())
+                com.superfit.app.domain.MealTagBackfill.tag(due, com.superfit.app.domain.MealTagger()) { entry, tags -> repository.saveMealTags(entry, tags) }
                 sharedPrefs.edit().putString(BACKFILL_KEY, todayStr).apply()
             } catch (e: Exception) {
                 android.util.Log.w("DashboardViewModel", "Tagging older meals failed; will retry next launch", e)
             }
         }
     }
-
-    /**
-     * Untagged meals always; recent meals also when they have no nutritionist rating yet, or were
-     * rated before the user's nutritionist's advice last changed.
-     */
-    private fun needsTags(entry: NutritionEntryEntity, rerate: Boolean): Boolean {
-        val tags = MealTags.decode(entry.qualityTags) ?: return true
-        if (rerate && (tags.rating == null || tags.verdict == null || tags.adviceVersion != com.superfit.app.domain.PersonalNutrition.adviceVersion())) return true
-        // Meals of several foods rated before each food got its own rating, once.
-        if (tags.itemRatings == null && hasSeveralFoods(entry)) return true
-        return !tags.hasAdvice && FoodQualityEngine.scoreFromTags(tags, isHighProtein = false) <= 5
-    }
-
-    private fun hasSeveralFoods(entry: NutritionEntryEntity): Boolean =
-        com.superfit.app.domain.MealItems.decode(entry.items)?.items.orEmpty()
-            .filter { it.name.isNotBlank() }
-            .map { com.superfit.app.domain.MealTags.itemKey(it.name) }
-            .distinct().size >= 2
 
     fun loadFrequentMeals() {
         viewModelScope.launch {
@@ -1225,7 +1192,6 @@ class DashboardViewModel(
 
         /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
         private const val BACKFILL_KEY = "meal_tag_backfill_date_v3"
-        private const val RERATE_DAYS = 14L
     }
 }
 
