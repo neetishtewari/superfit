@@ -18,6 +18,7 @@ import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.FitnessGoal
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.StepGoal
@@ -61,6 +62,9 @@ class TodayModel(
     private var lastMeal: String? = null
     val canRetryLastMeal: Boolean get() = !lastMeal.isNullOrBlank()
 
+    // Settings saved outside the database (own calorie targets) ask Today to work things out again.
+    private val settingsChanged = MutableStateFlow(0)
+
     @Suppress("UNCHECKED_CAST")
     val state: StateFlow<DashboardUiState> = combine(
         listOf<Flow<Any?>>(
@@ -71,7 +75,8 @@ class TodayModel(
             log.getWorkoutEntriesForDay(today),
             log.weightEntriesFlow,
             log.getHabitEntryFlow(today.toString()),
-            log.allNutritionEntriesFlow
+            log.allNutritionEntriesFlow,
+            settingsChanged
         )
     ) { values ->
         val profile = values[0] as? UserProfileEntity ?: return@combine DashboardUiState.NotInitialized
@@ -128,6 +133,18 @@ class TodayModel(
     fun dismissStepGoalNote() {
         StepGoalStore.dismissNote(prefs, today)
         _stepGoalNoteDismissedOn.value = today.toString()
+    }
+
+    /** After the person saves their own calorie and macro targets in Settings. */
+    fun refreshTargets() {
+        settingsChanged.value++
+    }
+
+    /** A new goal (lose, keep or gain) and its calorie change, as Settings on Android saves it. */
+    fun updateGoal(goal: FitnessGoal) {
+        scope.launch {
+            log.getProfile()?.let { log.saveProfile(it.copy(goal = goal.key, calorieOffset = goal.calorieOffset)) }
+        }
     }
 
     /** The person's own daily step goal, or null to go back to the automatic one. */
