@@ -2,13 +2,23 @@ package com.superfit.app.ui.history
 
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
+import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.domain.AiFailover
+import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.MealTagger
+import com.superfit.app.domain.NutritionParser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -26,12 +36,15 @@ data class HistoryPage(
 
 /**
  * History for the iPhone, worked out by the same [HistoryLog] as Android: a month calendar of
- * logged days and the picked day's meals. Workouts from other apps join with Apple Health.
+ * logged days and the picked day, where meals can be edited, deleted or logged late. Workouts
+ * from other apps join with Apple Health.
  */
 class HistoryModel(
     private val log: LogRepository,
     private val prefs: Prefs,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
+    private val parser: NutritionParser = NutritionParser(),
+    private val tagger: MealTagger = MealTagger(),
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() }
 ) {
     private val today = Now.today()
@@ -41,7 +54,16 @@ class HistoryModel(
     // Yesterday, like Android: today is on the Today tab.
     private val selected = MutableStateFlow(today.minus(DatePeriod(days = 1)))
 
-    val page: StateFlow<HistoryPage?> = combine(log.profileFlow, log.allNutritionEntriesFlow, month, selected) { profile, meals, monthStart, day ->
+    // Workouts aren't watched by the database here, so a change to them asks for a re-read.
+    private val reload = MutableStateFlow(0)
+
+    private val _parsing = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
+    val parsing: StateFlow<HistoryParsingState> = _parsing.asStateFlow()
+
+    private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
+    val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
+
+    val page: StateFlow<HistoryPage?> = combine(log.profileFlow, log.allNutritionEntriesFlow, month, selected, reload) { profile, meals, monthStart, day, _ ->
         if (profile == null) return@combine null
         val tz = zone()
         val nutrition = HistoryLog.byDay(meals, tz) { it.timestamp }
@@ -57,6 +79,10 @@ class HistoryModel(
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
+    init {
+        scope.launch { _predictedFoods.value = runCatching { log.getPredictedFoods(Now.hour()) }.getOrDefault(emptyList()) }
+    }
+
     fun select(date: LocalDate) {
         selected.value = date
     }
@@ -67,5 +93,51 @@ class HistoryModel(
 
     fun nextMonth() {
         if (month.value < thisMonth) month.value = month.value.plus(DatePeriod(months = 1))
+    }
+
+    /** Logs a meal that was missed on the picked day, at midday so it never slips into the next day. */
+    fun addMeal(text: String) {
+        if (text.isBlank()) return
+        val day = selected.value
+        scope.launch {
+            _parsing.value = HistoryParsingState.Loading
+            _parsing.value = try {
+                val result = parser.parseFoodInput(text, log.getAllNutritionEntries())
+                if (result.foodText == "invalid") {
+                    HistoryParsingState.Error("Could not recognize any food items. Please try typing something like 'one apple and greek yogurt'.")
+                } else {
+                    log.addNutritionEntry(HistoryLog.missedMeal(result, day, zone()))
+                    HistoryParsingState.Success(result.foodText)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("HistoryModel", "Missed meal failed", e)
+                HistoryParsingState.Error(AiFailover.sanitizeError(e))
+            }
+        }
+    }
+
+    fun resetParsing() {
+        _parsing.value = HistoryParsingState.Idle
+    }
+
+    /** Saves an edited meal; a changed food drops its old tags, so it is judged again, as on Android. */
+    fun updateMeal(entry: NutritionEntryEntity) {
+        scope.launch {
+            log.updateNutritionEntry(entry)
+            if (entry.qualityTags == null) tagger.tagOne(entry)?.let { log.saveMealTags(entry, it.encode()) }
+        }
+    }
+
+    fun deleteMeal(entry: NutritionEntryEntity) {
+        scope.launch { log.deleteNutritionEntry(entry) }
+    }
+
+    fun deleteWorkout(entry: WorkoutEntryEntity) {
+        scope.launch {
+            log.deleteWorkoutEntry(entry)
+            reload.value++
+        }
     }
 }

@@ -1,28 +1,19 @@
 package com.superfit.app.ui.history
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,54 +21,63 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.PredictedFood
+import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
+import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
-import com.superfit.app.ui.dashboard.DashboardUiState
-import com.superfit.app.ui.dashboard.DashboardViewModel
-import com.superfit.app.ui.dashboard.FoodQualityCard
-import com.superfit.app.ui.dashboard.FoodSwapCard
-import com.superfit.app.ui.dashboard.GoalProgressCard
 import com.superfit.app.ui.dashboard.MealEditSheet
-import com.superfit.app.ui.share.ShareCardSheet
-import java.time.LocalDate
-import java.time.format.TextStyle
-import java.util.Locale
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.minus
 
+/** Where a meal typed on History for a past day is: working it out, done, or why it failed. */
+sealed interface HistoryParsingState {
+    object Idle : HistoryParsingState
+    object Loading : HistoryParsingState
+    data class Success(val foodText: String) : HistoryParsingState
+    data class Error(val message: String) : HistoryParsingState
+}
+
+/**
+ * The picked day on History, the same on Android and iPhone: eaten against what was burned, its
+ * meals and workouts (tap a meal to edit it), and a box to log a meal that was missed. [onShare]
+ * is null where share cards aren't ready yet, which hides the share buttons.
+ */
 @Composable
 fun DayBalanceCard(
     summary: DaySummaryState,
-    selectedDate: LocalDate,
-    viewModel: HistoryViewModel,
-    modifier: Modifier = Modifier
+    parsingState: HistoryParsingState,
+    predictedFoods: List<PredictedFood>,
+    onAddMeal: (String) -> Unit,
+    onResetParsing: () -> Unit,
+    onUpdateMeal: (NutritionEntryEntity) -> Unit,
+    onDeleteMeal: (NutritionEntryEntity) -> Unit,
+    onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
+    onHideImported: (WorkoutView) -> Unit,
+    modifier: Modifier = Modifier,
+    onShare: ((ShareCard) -> Unit)? = null
 ) {
-    var shareCard by remember { mutableStateOf<ShareCard?>(null) }
-    shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
-
     val netColor = if (summary.netBalance < 0) NeonMint else SolarAmber
     val balanceLabel = if (summary.netBalance < 0) "Under what you burned" else "Over what you burned"
 
-    val today = LocalDate.now()
-    val yesterday = today.minusDays(1)
-    val dateLabel = when (selectedDate) {
+    val today = Now.today()
+    val dateLabel = when (summary.date) {
         today -> "Today"
-        yesterday -> "Yesterday"
-        else -> selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM", java.util.Locale.ENGLISH))
+        today.minus(DatePeriod(days = 1)) -> "Yesterday"
+        else -> LocalFormat.longDay(summary.date)
     }
+    fun count(x: Double) = LocalFormat.integer(x.toLong())
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -126,12 +126,12 @@ fun DayBalanceCard(
             // Stats: two rows of two, so numbers never wrap on narrow phones.
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    BalanceStat("Eaten", "${"%,d".format(summary.caloriesEaten.toInt())} kcal", ThemeTextPrimary, Modifier.weight(1f))
-                    BalanceStat("Burned in total", "${"%,d".format(summary.tdee.toInt())} kcal", ThemeTextPrimary, Modifier.weight(1f))
+                    BalanceStat("Eaten", "${count(summary.caloriesEaten)} kcal", ThemeTextPrimary, Modifier.weight(1f))
+                    BalanceStat("Burned in total", "${count(summary.tdee)} kcal", ThemeTextPrimary, Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    BalanceStat("Steps", "%,d".format(summary.steps), ThemeTextPrimary, Modifier.weight(1f))
-                    BalanceStat("From exercise", "${"%,d".format(summary.activeBurn.toInt())} kcal", com.superfit.app.theme.ElectricCyan, Modifier.weight(1f))
+                    BalanceStat("Steps", LocalFormat.integer(summary.steps.toLong()), ThemeTextPrimary, Modifier.weight(1f))
+                    BalanceStat("From exercise", "${count(summary.activeBurn)} kcal", ElectricCyan, Modifier.weight(1f))
                 }
             }
 
@@ -183,7 +183,7 @@ fun DayBalanceCard(
                     MealEditSheet(
                         entry = meal,
                         onSave = {
-                            viewModel.updateMeal(it)
+                            onUpdateMeal(it)
                             editingMeal = null
                         },
                         onDismiss = { editingMeal = null }
@@ -205,7 +205,7 @@ fun DayBalanceCard(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = entry.foodText.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                                    text = entry.foodText.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = ThemeTextPrimary
@@ -232,7 +232,7 @@ fun DayBalanceCard(
                                     color = NeonMint
                                 )
                                 IconButton(
-                                    onClick = { viewModel.deleteMeal(entry) },
+                                    onClick = { onDeleteMeal(entry) },
                                     modifier = Modifier.size(24.dp)
                                 ) {
                                     Icon(
@@ -264,8 +264,8 @@ fun DayBalanceCard(
                     summary.importedWorkouts.forEach { workout ->
                         com.superfit.app.ui.dashboard.ImportedWorkoutRow(
                             workout = workout,
-                            onHide = { viewModel.hideImportedWorkout(workout) },
-                            onShare = { shareCard = ShareCards.activity(workout) }
+                            onHide = { onHideImported(workout) },
+                            onShare = onShare?.let { share -> { share(ShareCards.activity(workout)) } }
                         )
                     }
                 }
@@ -297,7 +297,7 @@ fun DayBalanceCard(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                                    text = entry.description.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = ThemeTextPrimary
@@ -323,19 +323,21 @@ fun DayBalanceCard(
                                     fontWeight = FontWeight.Bold,
                                     color = SolarAmber
                                 )
-                                IconButton(
-                                    onClick = { shareCard = ShareCards.activity(entry) },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Share workout",
-                                        tint = ThemeTextSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                if (onShare != null) {
+                                    IconButton(
+                                        onClick = { onShare(ShareCards.activity(entry)) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = "Share workout",
+                                            tint = ThemeTextSecondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                                 IconButton(
-                                    onClick = { viewModel.deleteWorkout(entry) },
+                                    onClick = { onDeleteWorkout(entry) },
                                     modifier = Modifier.size(24.dp)
                                 ) {
                                     Icon(
@@ -358,7 +360,6 @@ fun DayBalanceCard(
 
             // Add missed meal text input row
             var foodText by remember { mutableStateOf("") }
-            val parsingState by viewModel.parsingState.collectAsState()
 
             var statusMessage by remember { mutableStateOf<String?>(null) }
             var isErrorState by remember { mutableStateOf(false) }
@@ -370,12 +371,12 @@ fun DayBalanceCard(
                         statusMessage = "Logged: ${state.foodText}"
                         isErrorState = false
                         foodText = ""
-                        viewModel.resetParsingState()
+                        onResetParsing()
                     }
                     is HistoryParsingState.Error -> {
                         statusMessage = state.message
                         isErrorState = true
-                        viewModel.resetParsingState()
+                        onResetParsing()
                     }
                     else -> {}
                 }
@@ -417,7 +418,7 @@ fun DayBalanceCard(
                     Button(
                         onClick = {
                             if (foodText.isNotBlank()) {
-                                viewModel.parseAndAddMeal(foodText)
+                                onAddMeal(foodText)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -445,7 +446,6 @@ fun DayBalanceCard(
                 }
 
                 // Suggestions chips
-                val predictedFoods = viewModel.predictedFoods
                 if (predictedFoods.isNotEmpty()) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -500,7 +500,7 @@ fun DayBalanceCard(
 }
 
 @Composable
-private fun BalanceStat(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+private fun BalanceStat(label: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(text = label, fontSize = 12.sp, color = ThemeTextSecondary, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Text(text = value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1)

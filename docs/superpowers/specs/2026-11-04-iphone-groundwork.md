@@ -242,6 +242,10 @@ tested on the dev app first.
          iPhone shows the chart, the calendar and a read-only view of the picked day; editing
          past days, Insights and Journey come next. The share offer, new-best and widget-tip
          cards on Today wait for Apple Health, share cards and the widget (5b-6).
+       - 5c-2: the picked day's card (DayBalanceCard) moves to shared, with the same edit, delete
+         and "log a missed meal" as Android; HistoryModel does them on iPhone and
+         HistoryLog.missedMeal times a late meal at midday for both apps. Share buttons are
+         hidden on iPhone until share cards arrive.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -488,3 +492,8 @@ and camera stay Android-only for now.
 Step 5c-1 (reviewed 11 Nov): the same sums on the same on-phone data, moved; the iPhone's History
 page only reads the account's own database. Nothing new is stored, backed up or sent. No new
 permissions.
+
+Step 5c-2 (reviewed 11 Nov): on iPhone, editing, deleting and logging a missed meal from History
+use the same calls as Today (5b-5g): saved in the account's own database and backed up to
+users/{signed-in uid} only; the typed meal goes to Gemini through Firebase AI Logic with App
+Check, as on Android. No new permissions.

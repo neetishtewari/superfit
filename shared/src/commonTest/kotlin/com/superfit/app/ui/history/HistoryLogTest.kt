@@ -3,9 +3,11 @@ package com.superfit.app.ui.history
 import com.superfit.app.data.MemoryPrefs
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.domain.ParsedNutritionResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 
 class HistoryLogTest {
 
@@ -69,5 +71,17 @@ class HistoryLogTest {
 
         assertEquals(LocalDate.parse("2026-11-04"), week.first().date)
         assertEquals(LocalDate.parse("2026-11-10"), week.last().date)
+    }
+
+    @Test
+    fun aMissedMealIsTimedAtMiddayOnItsOwnDay() {
+        val zone = TimeZone.of("Asia/Kolkata")
+        val day = LocalDate.parse("2026-11-09")
+
+        val entry = HistoryLog.missedMeal(ParsedNutritionResult("dal rice", 450.0, 15.0, 70.0, 10.0), day, zone)
+
+        assertEquals("dal rice", entry.foodText)
+        assertEquals(listOf(day), HistoryLog.byDay(listOf(entry), zone) { it.timestamp }.keys.toList())
+        assertEquals(listOf(day), HistoryLog.byDay(listOf(entry), TimeZone.UTC) { it.timestamp }.keys.toList())
     }
 }

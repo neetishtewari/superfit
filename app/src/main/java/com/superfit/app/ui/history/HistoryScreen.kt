@@ -57,7 +57,6 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
-import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -301,8 +300,15 @@ fun HistoryScreen(
                                 viewModel.selectedSummary?.let { summary ->
                                     DayBalanceCard(
                                         summary = summary,
-                                        selectedDate = viewModel.selectedDate.toJavaLocalDate(),
-                                        viewModel = viewModel
+                                        parsingState = viewModel.parsingState.collectAsState().value,
+                                        predictedFoods = viewModel.predictedFoods,
+                                        onAddMeal = viewModel::parseAndAddMeal,
+                                        onResetParsing = viewModel::resetParsingState,
+                                        onUpdateMeal = viewModel::updateMeal,
+                                        onDeleteMeal = viewModel::deleteMeal,
+                                        onDeleteWorkout = viewModel::deleteWorkout,
+                                        onHideImported = viewModel::hideImportedWorkout,
+                                        onShare = { shareCard = it }
                                     )
                                 }
                             }

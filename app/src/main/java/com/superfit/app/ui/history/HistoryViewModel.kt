@@ -24,13 +24,6 @@ import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
 
-sealed interface HistoryParsingState {
-    object Idle : HistoryParsingState
-    object Loading : HistoryParsingState
-    data class Success(val foodText: String) : HistoryParsingState
-    data class Error(val message: String) : HistoryParsingState
-}
-
 class HistoryViewModel(
     private val repository: DataRepository,
     context: Context
@@ -389,22 +382,7 @@ class HistoryViewModel(
                     return@launch
                 }
 
-                // Construct a timestamp at exactly 12:00 PM of the selected date to avoid timezone boundaries
-                val targetTimestamp = selectedDate.toJavaLocalDate().atTime(12, 0)
-                    .atZone(ZoneId.systemDefault())
-                    .toInstant()
-                    .toEpochMilli()
-
-                val entry = NutritionEntryEntity(
-                    foodText = result.foodText,
-                    calories = result.calories,
-                    proteinG = result.proteinG,
-                    carbsG = result.carbsG,
-                    fatG = result.fatG,
-                    timestamp = targetTimestamp,
-                    qualityTags = result.tags?.encode(),
-                    items = result.items?.encode()
-                )
+                val entry = HistoryLog.missedMeal(result, selectedDate, TimeZone.currentSystemDefault())
                 repository.addNutritionEntry(entry)
                 com.superfit.app.data.AppAnalytics.mealLogged("typed")
                 loadData()
