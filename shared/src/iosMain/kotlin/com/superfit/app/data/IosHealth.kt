@@ -1,6 +1,8 @@
 package com.superfit.app.data
 
 import com.superfit.app.domain.AppleWorkoutTypes
+import com.superfit.app.domain.BodyValue
+import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.SleepNight
 import com.superfit.app.domain.SleepSpan
 import kotlin.coroutines.resume
@@ -34,7 +36,13 @@ interface IosHealth {
 
     /** Workouts that started between two times, from every app and watch, newest first. */
     fun workouts(startMs: Long, endMs: Long, done: (List<IosWorkout>?, String?) -> Unit)
+
+    /** [kind] is "weightKg", "bodyFatPct" (0 to 100) or "leanKg": every sample since [sinceMs]. */
+    fun bodySamples(kind: String, sinceMs: Long, done: (List<IosBodySample>?, String?) -> Unit)
 }
+
+/** One weigh-in or body measurement as Apple Health holds it, with the name of the app or scale that saved it. */
+class IosBodySample(val id: String, val timeMs: Long, val value: Double, val sourceName: String)
 
 /**
  * One Apple Health workout as Swift reads it. [appleType] is HKWorkoutActivityType's raw value;
@@ -98,6 +106,24 @@ class IosHealthSource(private val ios: IosHealth, private val zone: () -> TimeZo
             }
         } ?: return null
         return workouts.map { HealthWorkout(AppleWorkouts.row(it, bmr), it.sourceName) }
+    }
+
+    override suspend fun readBody(sinceMs: Long): BodySamples? {
+        val weights = samples("weightKg", sinceMs) ?: return null
+        // Body fat and lean mass only add detail; a refused read leaves them out.
+        val fat = runCatching { samples("bodyFatPct", sinceMs) }.getOrNull().orEmpty()
+        val lean = runCatching { samples("leanKg", sinceMs) }.getOrNull().orEmpty()
+        return BodySamples(
+            weights = weights.map { ScaleReading(id = it.id, timeMs = it.timeMs, weightKg = it.value, source = it.sourceName) },
+            bodyFat = fat.map { BodyValue(it.timeMs, it.sourceName, it.value) },
+            lean = lean.map { BodyValue(it.timeMs, it.sourceName, it.value) }
+        )
+    }
+
+    private suspend fun samples(kind: String, sinceMs: Long): List<IosBodySample>? = suspendCancellableCoroutine { c ->
+        ios.bodySamples(kind, sinceMs) { list, error ->
+            if (error != null) c.resumeWithException(IosHealthException(error)) else c.resume(list)
+        }
     }
 
     private suspend fun sum(kind: String, start: Long, end: Long): Double? = suspendCancellableCoroutine { c ->

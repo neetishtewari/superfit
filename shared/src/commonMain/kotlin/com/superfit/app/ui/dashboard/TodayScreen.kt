@@ -49,6 +49,7 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
     val distanceKm by model.distanceKm.collectAsState()
     val workoutImportEnabled by model.workoutImportEnabled.collectAsState()
     val workoutImportRunning by model.workoutImportRunning.collectAsState()
+    val pendingScaleReading by model.pendingScaleReading.collectAsState()
     var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
@@ -134,6 +135,15 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
         stepGoal?.let { goal ->
             StepGoalSheet(goal = goal, onSetOwn = model::setOwnStepGoal, onDismiss = { showStepGoalSheet = false })
         }
+    }
+
+    pendingScaleReading?.let { reading ->
+        ScaleReadingDialog(
+            reading = reading,
+            onMe = { model.answerScaleReading(isMe = true) },
+            onNotMe = { model.answerScaleReading(isMe = false) },
+            onLater = model::postponeScaleReading
+        )
     }
 
     if (showAllFoods) {

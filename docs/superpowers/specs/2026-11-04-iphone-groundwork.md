@@ -295,6 +295,13 @@ tested on the dev app first.
          the card once more for the new part, and their steps and sleep keep coming in meanwhile.
          Hiding a workout works as on Android; the import's settings page (main app, add-back)
          joins with the rest of Settings.
+       - 6c: Apple Health, weight and body. Weigh-ins with body fat and lean mass from a smart
+         scale (or typed into the Health app) come in through shared ScaleImport, the same rules
+         as Android's BodyImporter: a reading close to the person's own weight goes into the
+         weight log ("from Withings"), one far from it (or the first with body fat) waits for
+         "Is this you?" on Today, and "Not me" sets a partner's readings aside from then on. Body
+         fat sets the calorie target as on Android and feeds the Journey Body card. Apple Health
+         has no bone mass or scale BMR, so those stay Android-only.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -574,3 +581,9 @@ swimming distance and heart rate; heart rate is read only as each workout's aver
 in the account's own database on the phone and are not backed up, exactly as Android keeps Health
 Connect workouts; the app and watch names are kept in the account's own settings on the phone.
 Nothing new goes to the AI or anywhere else. No new Android permissions; Android unchanged.
+
+Step 6c (reviewed 12 Nov): still read only; adds weight, body fat and lean mass. Accepted weigh-ins
+go into the weight log and are backed up to users/{signed-in uid} only, as Android does with Health
+Connect weigh-ins; the scale lists (mine, not me, waiting) and the last body fat stay in the
+account's own settings on the phone. Readings that may be someone else's are never added without
+the person's answer. Nothing new goes to the AI or anywhere else. Android unchanged.

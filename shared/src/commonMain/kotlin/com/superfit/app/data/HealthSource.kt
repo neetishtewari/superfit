@@ -32,6 +32,9 @@ interface HealthSource {
      * [bmr] fills in the resting part of total calories when only active calories were recorded.
      */
     suspend fun readWorkouts(fromMs: Long, toMs: Long, bmr: Double): List<HealthWorkout>?
+
+    /** Weigh-ins, body fat and lean mass saved since [sinceMs] by any app or scale, or null when they couldn't be read. */
+    suspend fun readBody(sinceMs: Long): BodySamples?
 }
 
 /** Where [HealthSync] keeps what it read: the account's database, backed up like Android's. */
@@ -51,12 +54,12 @@ interface HealthStore {
 object HealthSync {
     /**
      * Set once the person has answered the phone's access sheet. The number goes up when Superfit
-     * reads something new (v2: workouts), so the sheet is offered again for just the new part.
+     * reads something new (v2: workouts, v3: weight and body measurements), so the sheet is offered again for just the new part.
      */
-    const val KEY_ASKED = "health_access_asked_v2"
+    const val KEY_ASKED = "health_access_asked_v3"
 
-    /** Asked before workouts were read: steps and sleep keep coming in until the new sheet is answered. */
-    const val KEY_ASKED_V1 = "health_access_asked"
+    /** Asked before something new was read: what was allowed keeps coming in until the new sheet is answered. */
+    val EARLIER_KEYS = listOf("health_access_asked", "health_access_asked_v2")
 
     suspend fun sync(source: HealthSource, store: HealthStore, today: LocalDate) {
         for (date in listOf(today, today.minus(DatePeriod(days = 1)))) {

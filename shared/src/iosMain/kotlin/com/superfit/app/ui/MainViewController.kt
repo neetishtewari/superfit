@@ -33,6 +33,7 @@ import com.superfit.app.data.IosHealth
 import com.superfit.app.data.IosHealthSource
 import com.superfit.app.data.IosPrefs
 import com.superfit.app.data.LogRepository
+import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.HealthApp
@@ -138,14 +139,16 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore, health: HealthSour
         }
         // Lives while this account is signed in; signing out stops Today's updates.
         val accountScope = rememberCoroutineScope()
-        val log = remember(uid) { LogRepository(database = { database }, backup = backup) }
+        val log = remember(uid) { LogRepository(database = { database }, backup = backup, isImportedWeight = ScaleImport::isImported) }
+        val scale = remember(uid) { ScaleImport(IosPrefs.forUser(uid), log) }
         val today = remember(uid) {
             TodayModel(
                 log = log,
                 prefs = IosPrefs.forUser(uid),
                 scope = accountScope,
                 coachNotes = local::loadNotes,
-                health = health
+                health = health,
+                scale = scale
             )
         }
         // Steps and sleep are read again each time the app comes back to the front.
@@ -157,7 +160,7 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore, health: HealthSour
             ) { _ -> today.syncHealth() }
             onDispose { NSNotificationCenter.defaultCenter.removeObserver(observer) }
         }
-        val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope) }
+        val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope, scaleReadings = scale::mine) }
         var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
         var showSettings by remember(uid) { mutableStateOf(false) }
         val signOut = {

@@ -35,6 +35,7 @@ class WorkoutSyncTest {
             askedFrom = fromMs
             return workouts
         }
+        override suspend fun readBody(sinceMs: Long): BodySamples? = null
     }
 
     private fun run(id: String, daysAgo: Long, source: String = "com.apple.health.watch", name: String = "Apple Watch") = HealthWorkout(

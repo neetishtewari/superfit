@@ -23,7 +23,7 @@ import com.superfit.app.ui.components.IconBadge
 import com.superfit.app.ui.components.SuperfitCard
 
 /** What Superfit reads from the phone's health app, said the same way before and after connecting. */
-fun healthReadsLine(): String = "Superfit reads your steps, active calories, walking distance, sleep and workouts from " +
+fun healthReadsLine(): String = "Superfit reads your steps, active calories, walking distance, sleep, workouts and weigh-ins from " +
     "${HealthApp.name}. It never changes anything there."
 
 /**
@@ -37,7 +37,7 @@ fun ConnectHealthCard(onConnect: () -> Unit, modifier: Modifier = Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IconBadge(Icons.Rounded.MonitorHeart, background = colors.brandSoft, tint = colors.primaryAccent, size = 40)
             Text(
-                "Bring in your steps, sleep and workouts",
+                "Bring in your steps, sleep, workouts and weight",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.textPrimary

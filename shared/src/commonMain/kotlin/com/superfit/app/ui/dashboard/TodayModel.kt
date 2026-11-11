@@ -15,6 +15,7 @@ import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.StepGoalStore
 import com.superfit.app.data.UserProfileEntity
@@ -35,6 +36,7 @@ import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.NutritionistNote
 import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
@@ -66,7 +68,8 @@ class TodayModel(
     private val coachNotes: () -> List<CoachNote> = { emptyList() },
     private val coach: CoachingEngine = CoachingEngine(),
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
-    private val health: HealthSource? = null
+    private val health: HealthSource? = null,
+    private val scale: ScaleImport? = null
 ) {
     private val today = Now.today()
 
@@ -74,6 +77,8 @@ class TodayModel(
     init {
         CoachStyleStore.load(prefs)
         NutritionAdviceStore.load(prefs)
+        // The last body fat from a smart scale, for the calorie target.
+        scale?.load()
     }
 
     private val _coachStyle = MutableStateFlow(CoachStyle.current)
@@ -195,7 +200,7 @@ class TodayModel(
 
     /** Reads today's and yesterday's steps and sleep again; the app calls this whenever it comes to the front. */
     fun syncHealth() {
-        val askedBefore = prefs.getBoolean(HealthSync.KEY_ASKED_V1, false)
+        val askedBefore = HealthSync.EARLIER_KEYS.any { prefs.getBoolean(it, false) }
         val source = health?.takeIf { healthAvailable && (_healthAsked.value || askedBefore) } ?: return
         scope.launch { readHealth(source) }
     }
@@ -207,6 +212,26 @@ class TodayModel(
 
     private val _workoutImportRunning = MutableStateFlow(false)
     val workoutImportRunning: StateFlow<Boolean> = _workoutImportRunning.asStateFlow()
+
+    private val _pendingScaleReading = MutableStateFlow(scale?.nextPending())
+
+    /** A smart-scale reading far from the person's own, waiting for "Is this you?". */
+    val pendingScaleReading: StateFlow<ScaleReading?> = _pendingScaleReading.asStateFlow()
+
+    fun answerScaleReading(isMe: Boolean) {
+        val reading = _pendingScaleReading.value ?: return
+        val importer = scale ?: return
+        scope.launch {
+            importer.answer(reading.id, isMe)
+            _pendingScaleReading.value = importer.nextPending()
+            settingsChanged.value++
+        }
+    }
+
+    /** "Not now": asked again next time the app opens. */
+    fun postponeScaleReading() {
+        _pendingScaleReading.value = null
+    }
 
     /** Hides a workout from another app (every app's copy of it), as on Android. */
     fun hideImportedWorkout(view: WorkoutView) {
@@ -223,6 +248,12 @@ class TodayModel(
             } finally {
                 _workoutImportRunning.value = false
             }
+        }
+        scale?.let { importer ->
+            importer.importNew(source, Now.millis())
+            _pendingScaleReading.value = importer.nextPending()
+            // Body fat may have changed the calorie target.
+            settingsChanged.value++
         }
         _distanceKm.value = try {
             source.readDistanceMeters(Now.today())?.takeIf { it > 0 }?.div(1000)

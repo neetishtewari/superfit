@@ -18,6 +18,10 @@ final class HealthKitBridge: NSObject, IosHealth {
         HKQuantityType(.distanceCycling),
         HKQuantityType(.distanceSwimming),
         HKQuantityType(.heartRate),
+        // Weigh-ins and body measurements from smart scales.
+        HKQuantityType(.bodyMass),
+        HKQuantityType(.bodyFatPercentage),
+        HKQuantityType(.leanBodyMass),
     ]
 
     // A workout's distance is kept under the kind that fits it; the first one it has is used.
@@ -102,6 +106,43 @@ final class HealthKitBridge: NSObject, IosHealth {
                 }
                 let workouts = (samples as? [HKWorkout]) ?? []
                 done(workouts.map { Self.describe($0, distanceTypes: distanceTypes) }, nil)
+            }
+        }
+        store.execute(query)
+    }
+
+    func bodySamples(kind: String, sinceMs: Int64, done: @escaping ([IosBodySample]?, String?) -> Void) {
+        let (type, unit, scale): (HKQuantityType, HKUnit, Double)
+        switch kind {
+        case "weightKg": (type, unit, scale) = (HKQuantityType(.bodyMass), .gramUnit(with: .kilo), 1)
+        case "bodyFatPct": (type, unit, scale) = (HKQuantityType(.bodyFatPercentage), .percent(), 100)
+        case "leanKg": (type, unit, scale) = (HKQuantityType(.leanBodyMass), .gramUnit(with: .kilo), 1)
+        default:
+            done(nil, "Unknown body value \(kind)")
+            return
+        }
+        let query = HKSampleQuery(
+            sampleType: type,
+            predicate: HKQuery.predicateForSamples(
+                withStart: Date(timeIntervalSince1970: Double(sinceMs) / 1000), end: nil, options: .strictStartDate
+            ),
+            limit: 2000,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        ) { _, samples, error in
+            DispatchQueue.main.async {
+                if let error, (error as? HKError)?.code != .errorNoData {
+                    done(nil, error.localizedDescription)
+                    return
+                }
+                let list = ((samples as? [HKQuantitySample]) ?? []).map { sample in
+                    IosBodySample(
+                        id: sample.uuid.uuidString,
+                        timeMs: Int64(sample.startDate.timeIntervalSince1970 * 1000),
+                        value: sample.quantity.doubleValue(for: unit) * scale,
+                        sourceName: sample.sourceRevision.source.name
+                    )
+                }
+                done(list, nil)
             }
         }
         store.execute(query)

@@ -19,6 +19,7 @@ import com.superfit.app.domain.BodyPeriod
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.WorkoutView
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -63,7 +64,8 @@ class HistoryModel(
     private val scope: CoroutineScope,
     private val parser: NutritionParser = NutritionParser(),
     private val tagger: MealTagger = MealTagger(),
-    private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() }
+    private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val scaleReadings: () -> List<ScaleReading> = { emptyList() }
 ) {
     private val today = Now.today()
     private val thisMonth = LocalDate(today.year, today.month, 1)
@@ -109,7 +111,7 @@ class HistoryModel(
 
     private val period = MutableStateFlow(BodyPeriod.fromLabel(prefs.getString(ProgressLog.KEY_BODY_PERIOD, null)))
 
-    /** Insights and Journey. Scale readings (body fat and more) come with Apple Health. */
+    /** Insights and Journey, with the person's own smart-scale readings (body fat and more) from the health app. */
     val progress: StateFlow<ProgressPage?> = combine(log.profileFlow, log.allNutritionEntriesFlow, log.weightEntriesFlow, period, reload) { profile, meals, weights, bodyPeriod, _ ->
         if (profile == null) return@combine null
         val tz = zone()
@@ -122,7 +124,7 @@ class HistoryModel(
         val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, imported[date].orEmpty(), workouts[date].orEmpty()) }
         val totals = DayTotalsBuilder.days(meals, workoutList, activityList, imported, target, PhysiologyEngine.proteinTargetG(profile), tz)
         ProgressPage(
-            progress = ProgressLog.build(profile, prefs, meals, weights, totals, emptyList(), bodyPeriod, day, tz),
+            progress = ProgressLog.build(profile, prefs, meals, weights, totals, scaleReadings(), bodyPeriod, day, tz),
             consistency = HistoryLog.consistency(day, nutrition, workouts, imported, target),
             trends = HistoryLog.weeklyTrends(
                 day,
