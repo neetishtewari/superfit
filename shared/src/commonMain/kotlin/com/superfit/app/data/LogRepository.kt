@@ -74,6 +74,12 @@ class LogRepository(
         override suspend fun saveSleep(sleep: SleepTelemetryEntity) = this@LogRepository.saveSleep(sleep)
     }
 
+    // --- Workouts from other apps (the phone's health app; kept on the phone, not backed up) ---
+
+    val importedWorkouts: ImportedWorkoutDao get() = db.importedWorkoutDao()
+
+    val allImportedWorkoutsFlow: Flow<List<ImportedWorkoutEntity>> get() = db.importedWorkoutDao().getAllFlow()
+
     // --- Meals ---
 
     fun getNutritionEntriesForDay(date: LocalDate): Flow<List<NutritionEntryEntity>> {

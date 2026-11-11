@@ -48,7 +48,7 @@ targets:
         com.apple.developer.devicecheck.appattest-environment: production
         # Sign in with Apple (Continue with Apple on the sign-in screen).
         com.apple.developer.applesignin: [Default]
-        # Apple Health, read only (steps, active energy, walking distance, sleep).
+        # Apple Health, read only (steps, energy, distances, sleep, workouts, workout heart rate).
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
     info:
@@ -60,7 +60,7 @@ targets:
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true
         # Shown in Apple's Health access sheet. Superfit only reads; it never writes to Apple Health.
-        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, walking distance and sleep to show your day, set your step goal and guide your coach. It never changes anything in Apple Health."
+        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, distances, sleep, workouts and heart rate during workouts to show your day, set your step goal and guide your coach. It never changes anything in Apple Health."
         # Google's sign-in sheet returns to the app through this link (REVERSED_CLIENT_ID in
         # GoogleService-Info.plist). It identifies the app, it is not a secret.
         CFBundleURLTypes:

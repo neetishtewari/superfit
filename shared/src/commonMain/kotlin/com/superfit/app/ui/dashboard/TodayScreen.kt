@@ -47,6 +47,8 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
     val coaching by model.coaching.collectAsState()
     val healthAsked by model.healthAsked.collectAsState()
     val distanceKm by model.distanceKm.collectAsState()
+    val workoutImportEnabled by model.workoutImportEnabled.collectAsState()
+    val workoutImportRunning by model.workoutImportRunning.collectAsState()
     var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
@@ -110,12 +112,15 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                         onViewAllFoods = { showAllFoods = true }
                     )
                 } else {
-                    // Sharing a workout card joins with share cards; workouts from other apps with their own step.
+                    // Sharing a workout card joins with share cards.
                     if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
                     ActivityPerformanceCard(
                         state = s,
                         vsUsual = model.vsUsual(s, usualDay, distanceKm),
-                        onDeleteWorkout = model::deleteWorkout
+                        onDeleteWorkout = model::deleteWorkout,
+                        onHideImportedWorkout = model::hideImportedWorkout,
+                        workoutImportEnabled = workoutImportEnabled,
+                        workoutImportRunning = workoutImportRunning
                     )
                     SleepRecoveryCard(state = s)
                 }

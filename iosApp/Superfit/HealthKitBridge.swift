@@ -13,6 +13,18 @@ final class HealthKitBridge: NSObject, IosHealth {
         HKQuantityType(.activeEnergyBurned),
         HKQuantityType(.distanceWalkingRunning),
         HKCategoryType(.sleepAnalysis),
+        // Workouts from the watch and other apps, with their distance and heart rate.
+        HKObjectType.workoutType(),
+        HKQuantityType(.distanceCycling),
+        HKQuantityType(.distanceSwimming),
+        HKQuantityType(.heartRate),
+    ]
+
+    // A workout's distance is kept under the kind that fits it; the first one it has is used.
+    private let distanceTypes: [HKQuantityType] = [
+        HKQuantityType(.distanceWalkingRunning),
+        HKQuantityType(.distanceCycling),
+        HKQuantityType(.distanceSwimming),
     ]
 
     func isAvailable() -> Bool {
@@ -74,6 +86,50 @@ final class HealthKitBridge: NSObject, IosHealth {
             }
         }
         store.execute(query)
+    }
+
+    func workouts(startMs: Int64, endMs: Int64, done: @escaping ([IosWorkout]?, String?) -> Void) {
+        let query = HKSampleQuery(
+            sampleType: HKObjectType.workoutType(),
+            predicate: Self.range(startMs, endMs),
+            limit: 2000,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]
+        ) { [distanceTypes] _, samples, error in
+            DispatchQueue.main.async {
+                if let error, (error as? HKError)?.code != .errorNoData {
+                    done(nil, error.localizedDescription)
+                    return
+                }
+                let workouts = (samples as? [HKWorkout]) ?? []
+                done(workouts.map { Self.describe($0, distanceTypes: distanceTypes) }, nil)
+            }
+        }
+        store.execute(query)
+    }
+
+    private static func describe(_ workout: HKWorkout, distanceTypes: [HKQuantityType]) -> IosWorkout {
+        let source = workout.sourceRevision.source
+        let distance = distanceTypes.lazy
+            .compactMap { workout.statistics(for: $0)?.sumQuantity()?.doubleValue(for: .meter()) }
+            .first { $0 > 0 } ?? 0
+        let active = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? 0
+        let heartRate = workout.statistics(for: HKQuantityType(.heartRate))?.averageQuantity()?
+            .doubleValue(for: HKUnit.count().unitDivided(by: .minute())) ?? 0
+        let indoorFlag = (workout.metadata?[HKMetadataKeyIndoorWorkout] as? NSNumber)?.boolValue ?? false
+        let pool = (workout.metadata?[HKMetadataKeySwimmingLocationType] as? NSNumber)?.intValue
+            == HKWorkoutSwimmingLocationType.pool.rawValue
+        return IosWorkout(
+            id: workout.uuid.uuidString,
+            sourceId: source.bundleIdentifier,
+            sourceName: source.name,
+            appleType: Int64(workout.workoutActivityType.rawValue),
+            indoor: indoorFlag || pool,
+            startMs: Int64(workout.startDate.timeIntervalSince1970 * 1000),
+            endMs: Int64(workout.endDate.timeIntervalSince1970 * 1000),
+            distanceMeters: distance,
+            activeKcal: active,
+            avgHeartRate: heartRate
+        )
     }
 
     private static func range(_ startMs: Int64, _ endMs: Int64) -> NSPredicate {

@@ -285,6 +285,16 @@ tested on the dev app first.
          an Apple Health section. Read again at every app open and return to the front (no
          background reads yet). On-screen "Health Connect" becomes the phone's own health app
          name. Workouts from other apps (6b) and smart-scale body data (6c) follow.
+       - 6b: Apple Health, workouts. Workouts the watch, Strava or any app saved to Apple
+         Health come into imported_workouts through shared WorkoutSync (90 days the first time,
+         then the last week; deleted there, gone here), with distance, active calories and
+         average heart rate, named after the app or watch that recorded them. Apple's workout
+         kinds map onto the same numbers Android uses (AppleWorkoutTypes), so titles, paces,
+         doubles across apps, "vs your usual", History, Insights and the calorie add-back work as
+         on Android. Connecting Apple Health turns the import on; people who connected before see
+         the card once more for the new part, and their steps and sleep keep coming in meanwhile.
+         Hiding a workout works as on Android; the import's settings page (main app, add-back)
+         joins with the rest of Settings.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -558,3 +568,9 @@ ads (App Store rule 5.1.3). An empty or refused read never overwrites a saved da
 phone on the same account can't wipe steps. The entitlement is HealthKit only (no clinical
 records). No new Android permissions; Android unchanged apart from the shared text naming its
 health app.
+
+Step 6b (reviewed 11 Nov): still read only. Superfit now also asks to read workouts, cycling and
+swimming distance and heart rate; heart rate is read only as each workout's average. Workouts stay
+in the account's own database on the phone and are not backed up, exactly as Android keeps Health
+Connect workouts; the app and watch names are kept in the account's own settings on the phone.
+Nothing new goes to the AI or anywhere else. No new Android permissions; Android unchanged.

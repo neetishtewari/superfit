@@ -26,6 +26,12 @@ interface HealthSource {
     suspend fun readDistanceMeters(date: LocalDate): Double?
 
     suspend fun readSleep(date: LocalDate): SleepTelemetryEntity?
+
+    /**
+     * Workouts any app or watch saved between two times, or null when they couldn't be read.
+     * [bmr] fills in the resting part of total calories when only active calories were recorded.
+     */
+    suspend fun readWorkouts(fromMs: Long, toMs: Long, bmr: Double): List<HealthWorkout>?
 }
 
 /** Where [HealthSync] keeps what it read: the account's database, backed up like Android's. */
@@ -43,8 +49,14 @@ interface HealthStore {
  * steps another phone on the same account already backed up.
  */
 object HealthSync {
-    /** Set once the person has answered the phone's access sheet. */
-    const val KEY_ASKED = "health_access_asked"
+    /**
+     * Set once the person has answered the phone's access sheet. The number goes up when Superfit
+     * reads something new (v2: workouts), so the sheet is offered again for just the new part.
+     */
+    const val KEY_ASKED = "health_access_asked_v2"
+
+    /** Asked before workouts were read: steps and sleep keep coming in until the new sheet is answered. */
+    const val KEY_ASKED_V1 = "health_access_asked"
 
     suspend fun sync(source: HealthSource, store: HealthStore, today: LocalDate) {
         for (date in listOf(today, today.minus(DatePeriod(days = 1)))) {
