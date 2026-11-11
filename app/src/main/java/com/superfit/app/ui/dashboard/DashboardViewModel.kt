@@ -515,15 +515,7 @@ class DashboardViewModel(
 
     /** Today's steps and workouts next to the usual for this weekday. */
     fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?, distance: TodayDistance? = todayDistance.value) =
-        com.superfit.app.domain.TodayVsUsual.of(
-            today = LocalDate.now().toKotlinLocalDate(),
-            steps = state.activity.steps,
-            workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
-                com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
-            },
-            usual = usual,
-            distanceKm = distance?.takeIf { it.date == LocalDate.now() }?.km
-        )
+        TodayState.vsUsual(state, usual, LocalDate.now().toKotlinLocalDate(), distance?.takeIf { it.date == LocalDate.now() }?.km)
 
     /** Today's recorded distance, read live from Health Connect and kept only in memory (not stored). */
     data class TodayDistance(val date: LocalDate, val km: Double)
@@ -728,16 +720,13 @@ class DashboardViewModel(
         repository.getActivityFlow(LocalDate.now().toString())
     ) { profile, _, _ ->
         if (profile == null) return@combine null
-        val imported = com.superfit.app.data.ImportedWorkouts.byDate(repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)))
-        val days = InsightsData.days(
-            nutrition = emptyList(),
+        TodayState.usualDay(
             voiceWorkouts = repository.getAllWorkoutEntries(),
             activity = repository.getAllActivityTelemetry(),
-            imported = imported,
-            kcalTarget = { 0.0 },
-            proteinTargetG = 0.0
+            imported = repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)),
+            today = LocalDate.now().toKotlinLocalDate(),
+            zone = kotlinx.datetime.TimeZone.currentSystemDefault()
         )
-        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now().toKotlinLocalDate())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

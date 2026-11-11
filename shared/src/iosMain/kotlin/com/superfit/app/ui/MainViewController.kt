@@ -2,11 +2,8 @@ package com.superfit.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,8 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeUIViewController
 import com.superfit.app.data.CloudBackup
 import com.superfit.app.data.IosAuth
@@ -25,8 +22,9 @@ import com.superfit.app.data.IosAuthClient
 import com.superfit.app.data.IosBackupLocal
 import com.superfit.app.data.IosCloudStore
 import com.superfit.app.data.IosCloudStoreAdapter
+import com.superfit.app.data.IosPrefs
+import com.superfit.app.data.LogRepository
 import com.superfit.app.data.openIosDatabase
-import com.superfit.app.domain.Ai
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.IosAi
 import com.superfit.app.domain.installIosAi
@@ -34,8 +32,8 @@ import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.components.PrimaryButton
-import com.superfit.app.ui.components.SuperfitBrandHeader
-import kotlinx.coroutines.launch
+import com.superfit.app.ui.dashboard.TodayModel
+import com.superfit.app.ui.dashboard.TodayScreen
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
@@ -74,11 +72,13 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
     } else {
         val uid = auth.currentUid() ?: return
         var restored by remember(uid) { mutableStateOf<Restored?>(null) }
+        val database = remember(uid) { openIosDatabase(uid) }
+        val backup = remember(uid) {
+            CloudBackup(IosCloudStoreAdapter(cloudStore), { auth.currentUid() }, { database }, IosBackupLocal(uid))
+        }
         // Same as Android after sign-in: bring the backup down into this account's database
         // (merge only), then count what arrived.
         LaunchedEffect(uid) {
-            val database = openIosDatabase(uid)
-            val backup = CloudBackup(IosCloudStoreAdapter(cloudStore), { auth.currentUid() }, { database }, IosBackupLocal(uid))
             val failed = try {
                 backup.syncAllDown()
                 false
@@ -93,56 +93,32 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
                 failed = failed
             )
         }
-        // Placeholder until the real screens move over (step 5b-5).
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SuperfitTheme.colors.bgStart)
-                .systemBarsPadding()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            SuperfitBrandHeader()
-            Text(
-                text = "Signed in as ${email ?: "your Apple account"}",
-                style = MaterialTheme.typography.titleMedium,
-                color = SuperfitTheme.colors.textPrimary
-            )
+        if (restored == null) {
+            // Today waits for the backup, so it never says "no profile" before it arrives.
+            Box(Modifier.fillMaxSize().background(SuperfitTheme.colors.bgStart), contentAlignment = Alignment.Center) {
+                Text(
+                    "Bringing back your meals and progress…",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = SuperfitTheme.colors.textPrimary
+                )
+            }
+            return
+        }
+        // Lives while this account is signed in; signing out stops Today's updates.
+        val accountScope = rememberCoroutineScope()
+        val today = remember(uid) {
+            TodayModel(LogRepository(database = { database }, backup = backup), IosPrefs.forUser(uid), accountScope)
+        }
+        TodayScreen(today) {
+            // What the iPhone still shows below Today until Settings moves over.
             Text(
                 text = when {
-                    restored == null -> "Bringing back your meals and progress…"
                     restored?.failed == true -> "Couldn't reach your backup. Check your internet and open the app again."
-                    else -> restored?.let { "On this iPhone: ${it.meals} meals, ${it.workouts} workouts, ${it.weighIns} weigh-ins." }.orEmpty()
+                    else -> restored?.let { "Signed in as ${email ?: "your Apple account"}. On this iPhone: ${it.meals} meals, ${it.workouts} workouts, ${it.weighIns} weigh-ins." }.orEmpty()
                 },
-                style = MaterialTheme.typography.bodyLarge,
-                color = SuperfitTheme.colors.textPrimary
-            )
-            Text(
-                text = "The rest of the app comes next.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = SuperfitTheme.colors.textSecondary
             )
-            // A one-off check that the AI answers on this iPhone (placeholder until the coach moves over).
-            var aiReply by remember { mutableStateOf<String?>(null) }
-            var aiBusy by remember { mutableStateOf(false) }
-            PrimaryButton(
-                text = "Test the AI coach",
-                loading = aiBusy,
-                onClick = {
-                    aiBusy = true
-                    scope.launch {
-                        aiReply = try {
-                            Ai.generate("Greet a Superfit user in one short, friendly sentence.", isJson = false).trim()
-                        } catch (e: Exception) {
-                            Ai.friendlyError(e)
-                        }
-                        aiBusy = false
-                    }
-                }
-            )
-            aiReply?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyLarge, color = SuperfitTheme.colors.textPrimary)
-            }
             PrimaryButton(
                 text = "Sign out",
                 onClick = {

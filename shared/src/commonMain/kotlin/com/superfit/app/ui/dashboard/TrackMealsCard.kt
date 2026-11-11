@@ -1,19 +1,5 @@
 package com.superfit.app.ui.dashboard
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Bundle
-import android.provider.Settings
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
-import android.text.format.DateUtils
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -57,7 +43,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -67,8 +52,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.core.content.ContextCompat
-import androidx.health.connect.client.PermissionController
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.WorkoutEntryEntity
@@ -76,13 +59,16 @@ import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
-import java.time.LocalDate
-import kotlinx.datetime.toKotlinLocalDate
 
 @Composable
-internal fun TrackMealsCard(
+fun TrackMealsCard(
     state: DashboardUiState.Success,
-    viewModel: DashboardViewModel,
+    predictedFoods: List<PredictedFood>,
+    canRetryLastMeal: Boolean,
+    onLogMeal: (String) -> Unit,
+    onRetryLastMeal: () -> Unit,
+    onDeleteMeal: (NutritionEntryEntity) -> Unit,
+    onUpdateMeal: (NutritionEntryEntity) -> Unit,
     parsingState: ParsingState,
     foodInputText: String,
     onFoodInputChange: (String) -> Unit,
@@ -114,7 +100,7 @@ internal fun TrackMealsCard(
 
         val submitMeal = {
             if (foodInputText.isNotBlank()) {
-                viewModel.parseAndAddMeal(foodInputText)
+                onLogMeal(foodInputText)
                 onFoodInputChange("")
             }
         }
@@ -141,7 +127,6 @@ internal fun TrackMealsCard(
         )
 
         // Suggestions chips
-        val predictedFoods by viewModel.predictedFoods.collectAsState()
         if (predictedFoods.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -225,9 +210,9 @@ internal fun TrackMealsCard(
                     )
                 }
                 // Re-sends what the user last said or typed, so they don't have to say it again.
-                if (viewModel.canRetryLastMeal) {
+                if (canRetryLastMeal) {
                     Button(
-                        onClick = { viewModel.retryLastMeal() },
+                        onClick = onRetryLastMeal,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EnergeticCoral.copy(alpha = 0.15f),
                             contentColor = EnergeticCoral
@@ -265,7 +250,7 @@ internal fun TrackMealsCard(
                 state.nutritionList.forEach { entry ->
                     MealItemRow(
                         entry = entry,
-                        onDelete = { viewModel.deleteMeal(entry) },
+                        onDelete = { onDeleteMeal(entry) },
                         onClick = { editingMeal = entry }
                     )
                 }
@@ -274,7 +259,7 @@ internal fun TrackMealsCard(
                 MealEditSheet(
                     entry = meal,
                     onSave = {
-                        viewModel.updateMeal(it)
+                        onUpdateMeal(it)
                         editingMeal = null
                     },
                     onDismiss = { editingMeal = null }
