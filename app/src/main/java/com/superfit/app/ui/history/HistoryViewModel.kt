@@ -8,18 +8,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
 import com.superfit.app.domain.PhysiologyEngine
-import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate as KDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
@@ -30,6 +27,7 @@ class HistoryViewModel(
 ) : ViewModel() {
 
     private val sharedPrefs = getUserSharedPrefs(context)
+    private val prefs = AndroidPrefs(sharedPrefs)
     private val appContext = context.applicationContext
 
     private val _parsingState = MutableStateFlow<HistoryParsingState>(HistoryParsingState.Idle)
@@ -78,7 +76,7 @@ class HistoryViewModel(
     var journey by mutableStateOf<com.superfit.app.domain.JourneyForecast?>(null)
         private set
 
-    var goalTargetDate by mutableStateOf<LocalDate?>(null)
+    var goalTargetDate by mutableStateOf<KDate?>(null)
         private set
 
     /** The Body card in Journey: what the user's smart scale measures, plus BMI. */
@@ -200,56 +198,24 @@ class HistoryViewModel(
                 inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
             }
             allMeals = allNutrition
-            val loseGoal = profile.targetWeightKg < profile.startingWeightKg
             val scaleReadings = com.superfit.app.data.BodyImporter.mine(appContext)
-            weekReport = com.superfit.app.domain.InsightsEngine.weekReport(
-                dayTotals,
-                today.toKotlinLocalDate(),
-                loseGoal,
-                allNutrition,
-                body = com.superfit.app.domain.BodyTrend.fourWeeks(scaleReadings, today.toKotlinLocalDate())
-            )
-            goalTargetDate = GoalDatePref.get(sharedPrefs)
-            val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
-            goalSet = (GoalDatePref.isGoalSet(sharedPrefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
-            val journeyWeighIns = InsightsData.weighIns(repository.getAllWeightEntries())
-            val kJourneyWeighIns = journeyWeighIns.map { it.first.toKotlinLocalDate() to it.second }
-            val journeyStart = com.superfit.app.domain.GoalForecast.startDate(
-                profileStart = profile.startDateTimestamp.takeIf { it > 0 }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() },
-                weighIns = kJourneyWeighIns,
-                firstLogged = allNutrition.minOfOrNull { it.timestamp }?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() },
-                today = today.toKotlinLocalDate()
-            )
-            journey = com.superfit.app.domain.GoalForecast.compute(
-                startKg = profile.startingWeightKg,
-                targetKg = profile.targetWeightKg,
-                startDate = journeyStart,
-                weighIns = kJourneyWeighIns,
-                days = dayTotals,
-                calorieOffset = profile.calorieOffset,
-                targetDate = goalTargetDate?.toKotlinLocalDate(),
-                today = today.toKotlinLocalDate(),
-                fallbackCurrentKg = profile.weightKg
-            )
-
-            body = com.superfit.app.domain.BodyReadings.summary(
-                mine = scaleReadings,
-                latestWeightKg = repository.getAllWeightEntries().maxByOrNull { it.timestamp }?.weightKg ?: profile.weightKg,
-                heightCm = profile.heightCm,
-                today = today.toKotlinLocalDate()
-            )
-            latestWeightKg = kJourneyWeighIns.lastOrNull()?.second ?: profile.weightKg
-            weightChange4w = kJourneyWeighIns.lastOrNull()?.let { (lastDay, lastKg) ->
-                kJourneyWeighIns.lastOrNull { it.first <= lastDay.minus(28, kotlinx.datetime.DateTimeUnit.DAY) }
-                    ?.let { lastKg - it.second }
-            }
-            goalKgChange = if (goalSet) profile.targetWeightKg - profile.startingWeightKg else 0.0
+            val weights = repository.getAllWeightEntries()
+            val progress = ProgressLog.build(profile, prefs, allNutrition, weights, dayTotals, scaleReadings, bodyPeriod, todayK, zone)
+            weekReport = progress.report
+            journey = progress.journey
+            goalSet = progress.goalSet
+            goalTargetDate = progress.goalDate
+            body = progress.body
+            latestWeightKg = progress.latestWeightKg
+            weightChange4w = progress.weightChange4w
+            goalKgChange = progress.goalKgChange
+            val weighIns = ProgressLog.weighIns(weights, zone)
             val goalChange = goalKgChange
             bodyInputs = {
-                com.superfit.app.domain.BodyHistory.series(kJourneyWeighIns, scaleReadings, profile.heightCm, goalChange, bodyPeriod, todayK)
+                com.superfit.app.domain.BodyHistory.series(weighIns, scaleReadings, profile.heightCm, goalChange, bodyPeriod, todayK, zone)
             }
-            bodySeries = bodyInputs!!()
-            bodyHasHistory = kJourneyWeighIns.size >= 2
+            bodySeries = progress.bodySeries
+            bodyHasHistory = progress.bodyHasHistory
             val hc = repository.healthConnectManager
             canAskBodyAccess = hc.isAvailable() && !hc.hasBodyPermissions()
 
@@ -315,13 +281,13 @@ class HistoryViewModel(
     }
 
     /** Start weight, goal weight and the optional date to reach it by. */
-    fun updateGoal(startingWeightKg: Double, targetWeightKg: Double, targetDate: LocalDate?) {
+    fun updateGoal(startingWeightKg: Double, targetWeightKg: Double, targetDate: KDate?) {
         viewModelScope.launch {
             repository.getProfile()?.let {
                 repository.saveProfile(it.copy(startingWeightKg = startingWeightKg, targetWeightKg = targetWeightKg))
             }
-            GoalDatePref.set(sharedPrefs, targetDate)
-            GoalDatePref.markGoalSet(sharedPrefs)
+            GoalDatePref.set(prefs, targetDate)
+            GoalDatePref.markGoalSet(prefs)
             com.superfit.app.data.AppAnalytics.goalSet(withDate = targetDate != null)
             loadData()
         }
@@ -395,6 +361,6 @@ class HistoryViewModel(
     }
 
     private companion object {
-        const val KEY_BODY_PERIOD = "body_trend_period"
+        const val KEY_BODY_PERIOD = ProgressLog.KEY_BODY_PERIOD
     }
 }

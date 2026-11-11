@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
 import com.superfit.app.domain.CalorieFood
 import com.superfit.app.domain.CalorieSources
 import com.superfit.app.domain.CalorieSourcesEngine
@@ -63,6 +64,7 @@ import com.superfit.app.domain.GoalForecast
 import com.superfit.app.domain.Insight
 import com.superfit.app.domain.InsightsEngine
 import com.superfit.app.domain.JourneyForecast
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.WeekReport
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
@@ -72,19 +74,16 @@ import com.superfit.app.theme.ThemeCardBgTranslucent
 import com.superfit.app.theme.ThemeGlassBorder
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.plus
 
-private val shortDate = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
-
-/** Journey's dates come from the shared code as kotlinx dates; the screen formats them the Java way. */
-private fun kotlinx.datetime.LocalDate.format(formatter: DateTimeFormatter): String = toJavaLocalDate().format(formatter)
+/** "4 Nov", in the phone's language. */
+private fun LocalDate.short(): String = LocalFormat.dayMonth(this)
 private val Orange = SolarAmber
 
 @Composable
@@ -128,9 +127,11 @@ private fun InsightRow(item: Insight, dot: Color) {
 fun InsightsTab(
     report: WeekReport,
     onOpenJourney: () -> Unit,
-    onShareWithCoach: (weeks: Int) -> Unit,
+    /** Null hides the report row (the iPhone gets it with its own PDF). */
+    onShareWithCoach: ((weeks: Int) -> Unit)?,
     foodQuality: @Composable () -> Unit,
-    bests: @Composable () -> Unit,
+    /** Null hides personal bests (the iPhone gets them with share cards). */
+    bests: (@Composable () -> Unit)?,
     trends: @Composable () -> Unit,
     /** "Your body now": the latest weight and scale readings, first thing on Progress. */
     bodyNow: @Composable () -> Unit = {}
@@ -138,7 +139,7 @@ fun InsightsTab(
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         bodyNow()
         SectionCard {
-            SectionLabel("Your week · ${report.from.toJavaLocalDate().format(shortDate)} to ${report.to.toJavaLocalDate().format(shortDate)}", NeonMint)
+            SectionLabel("Your week · ${report.from.short()} to ${report.to.short()}", NeonMint)
             Text(report.verdict, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = ThemeTextPrimary, lineHeight = 24.sp)
             val s = report.thisWeek
             val l = report.lastWeek
@@ -209,9 +210,9 @@ fun InsightsTab(
                 .border(1.dp, ThemeGlassBorder, RoundedCornerShape(20.dp))
         ) {
             ExpandRow("Food Quality and swaps", content = foodQuality)
-            ExpandRow("Personal bests", content = bests)
+            bests?.let { ExpandRow("Personal bests", content = it) }
             ExpandRow("All trends", "steps, sleep, protein, streaks", content = trends)
-            ShareWithCoachRow(onShareWithCoach)
+            onShareWithCoach?.let { ShareWithCoachRow(it) }
         }
     }
 }
@@ -227,7 +228,7 @@ private fun CalorieSourcesCard(c: CalorieSources, days: Int) {
             c.biggestTreat != null -> {
                 val b = c.biggestTreat!!
                 val share = if (c.totalKcal > 0) (c.treatKcal * 100.0 / c.totalKcal).roundToInt() else 0
-                "Treat foods: ${InsightsEngine.kcal(c.treatKcal.toDouble())} kcal this week ($share%). Biggest: ${b.name.lowercase(Locale.getDefault())}, ${b.times} ${if (b.times == 1) "time" else "times"}."
+                "Treat foods: ${InsightsEngine.kcal(c.treatKcal.toDouble())} kcal this week ($share%). Biggest: ${b.name.lowercase()}, ${b.times} ${if (b.times == 1) "time" else "times"}."
             }
             c.surelyNoTreats -> "No treat foods this week."
             else -> null
@@ -374,7 +375,7 @@ private fun LegendDot(color: Color, label: String) {
 }
 
 @Composable
-private fun NetBars(days: List<Pair<kotlinx.datetime.LocalDate, Double?>>) {
+private fun NetBars(days: List<Pair<LocalDate, Double?>>) {
     val maxAbs = max(300.0, days.mapNotNull { it.second?.let(::abs) }.maxOrNull() ?: 0.0)
     val missing = ThemeGlassBorder
     val axis = ThemeTextSecondary.copy(alpha = 0.4f)
@@ -499,7 +500,7 @@ fun JourneyTab(
                 Text("Goal ${GoalForecast.fmt(j.targetKg)}", fontSize = 12.sp, color = ThemeTextSecondary)
             }
             TextButton(onClick = onEditGoal, modifier = Modifier.heightIn(min = 44.dp)) {
-                Text(j.targetDate?.let { "Edit goal · target ${it.format(shortDate)}" } ?: "Edit goal or add a target date", color = NeonMint, fontWeight = FontWeight.Bold)
+                Text(j.targetDate?.let { "Edit goal · target ${it.short()}" } ?: "Edit goal or add a target date", color = NeonMint, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -539,14 +540,14 @@ fun JourneyTab(
                         Text(fix.label, fontSize = 15.sp, color = ThemeTextPrimary, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            fix.weeksSooner?.let { if (it == 1) "1 week sooner" else "$it weeks sooner" } ?: "goal by ${fix.newDate?.format(shortDate)}",
+                            fix.weeksSooner?.let { if (it == 1) "1 week sooner" else "$it weeks sooner" } ?: "goal by ${fix.newDate?.short()}",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = NeonMint
                         )
                     }
                 }
-                j.allFixesDate?.let { Text("Both together: goal by ${it.format(shortDate)}.", fontSize = 13.sp, color = ThemeTextSecondary) }
+                j.allFixesDate?.let { Text("Both together: goal by ${it.short()}.", fontSize = 13.sp, color = ThemeTextSecondary) }
             }
         }
 
@@ -557,7 +558,7 @@ fun JourneyTab(
                     Row(Modifier.fillMaxWidth()) {
                         Text(m.label, fontSize = 15.sp, color = ThemeTextPrimary, modifier = Modifier.weight(1f))
                         Text(
-                            m.reachedOn?.let { "${it.format(shortDate)} ✓" } ?: "${GoalForecast.fmt(m.kgToGo)} kg to go",
+                            m.reachedOn?.let { "${it.short()} ✓" } ?: "${GoalForecast.fmt(m.kgToGo)} kg to go",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (m.reachedOn != null) NeonMint else ThemeTextSecondary
@@ -603,13 +604,13 @@ private fun WeighInCard(j: JourneyForecast, onWeighIn: () -> Unit) {
 /** Weigh-ins so far, the goal line, and a dashed line from today to the forecast date. */
 @Composable
 private fun JourneyChart(j: JourneyForecast, forecastColor: Color) {
-    val points = j.weighIns.takeLast(30).map { it.first.toJavaLocalDate() to it.second }
-    val forecastDate = j.forecastDate?.toJavaLocalDate()
-    val targetDate = j.targetDate?.toJavaLocalDate()
+    val points = j.weighIns.takeLast(30)
+    val forecastDate = j.forecastDate
+    val targetDate = j.targetDate
     val first = points.first().first
-    val today = LocalDate.now()
-    val end = listOfNotNull(forecastDate, targetDate, today).maxOrNull()!!.coerceAtMost(today.plusDays(365))
-    val span = max(1L, ChronoUnit.DAYS.between(first, end)).toFloat()
+    val today = Now.today()
+    val end = listOfNotNull(forecastDate, targetDate, today).maxOrNull()!!.coerceAtMost(today.plus(DatePeriod(days = 365)))
+    val span = max(1, first.daysUntil(end)).toFloat()
     val weights = points.map { it.second } + j.targetKg + j.currentKg
     val lo = weights.min() - 0.5
     val hi = weights.max() + 0.5
@@ -620,35 +621,41 @@ private fun JourneyChart(j: JourneyForecast, forecastColor: Color) {
             .height(150.dp)
             .semantics { contentDescription = "Weight from ${GoalForecast.fmt(points.first().second)} to ${GoalForecast.fmt(j.currentKg)} kg, goal ${GoalForecast.fmt(j.targetKg)} kg" }
     ) {
-        fun x(d: LocalDate) = ChronoUnit.DAYS.between(first, d).toFloat() / span * size.width
+        fun x(d: LocalDate) = first.daysUntil(d).toFloat() / span * size.width
         fun y(kg: Double) = ((hi - kg) / (hi - lo) * size.height).toFloat()
         val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))
         drawLine(SolarAmber, Offset(0f, y(j.targetKg)), Offset(size.width, y(j.targetKg)), strokeWidth = 1.5.dp.toPx(), pathEffect = dash)
         targetDate?.let { td ->
-            if (!td.isAfter(end)) drawLine(grid, Offset(x(td), 0f), Offset(x(td), size.height), strokeWidth = 1.dp.toPx(), pathEffect = dash)
+            if (td <= end) drawLine(grid, Offset(x(td), 0f), Offset(x(td), size.height), strokeWidth = 1.dp.toPx(), pathEffect = dash)
         }
         val path = Path()
         points.forEachIndexed { i, (d, kg) -> if (i == 0) path.moveTo(x(d), y(kg)) else path.lineTo(x(d), y(kg)) }
         drawPath(path, NeonMint, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
         points.forEach { (d, kg) -> drawCircle(NeonMint, 3.dp.toPx(), Offset(x(d), y(kg))) }
         forecastDate?.let { fd ->
-            if (!fd.isAfter(end)) {
+            if (fd <= end) {
                 drawLine(forecastColor, Offset(x(today), y(j.currentKg)), Offset(x(fd), y(j.targetKg)), strokeWidth = 2.dp.toPx(), pathEffect = dash)
                 drawCircle(forecastColor, 5.dp.toPx(), Offset(x(fd), y(j.targetKg)))
             }
         }
     }
     Row(Modifier.fillMaxWidth()) {
-        Text(first.format(shortDate), fontSize = 12.sp, color = ThemeTextSecondary)
+        Text(first.short(), fontSize = 12.sp, color = ThemeTextSecondary)
         Spacer(Modifier.weight(1f))
         Text("Today", fontSize = 12.sp, color = ThemeTextSecondary)
         Spacer(Modifier.weight(1f))
-        Text(end.format(shortDate), fontSize = 12.sp, color = ThemeTextSecondary)
+        Text(end.short(), fontSize = 12.sp, color = ThemeTextSecondary)
     }
 }
 
-private fun hours(minutes: Long): String = if (minutes >= 60) String.format(Locale.US, "%.1f h", minutes / 60.0) else "$minutes min"
-private fun km(v: Double): String = String.format(Locale.US, if (v >= 10) "%.0f" else "%.1f", v)
+private fun hours(minutes: Long): String = if (minutes >= 60) "${oneDecimal(minutes / 60.0)} h" else "$minutes min"
+private fun km(v: Double): String = if (v >= 10) kotlin.math.round(v).toLong().toString() else oneDecimal(v)
+
+/** Like "%.1f" with a dot, whatever the phone's language ("1.5"). */
+private fun oneDecimal(v: Double): String {
+    val tenths = kotlin.math.round(v * 10).toLong()
+    return "${tenths / 10}.${abs(tenths % 10)}"
+}
 private fun signedKcal(v: Double): String = (
     if (v > 0) {
         "+"

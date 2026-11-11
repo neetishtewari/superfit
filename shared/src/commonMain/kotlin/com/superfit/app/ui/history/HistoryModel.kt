@@ -1,15 +1,20 @@
 package com.superfit.app.ui.history
 
+import com.superfit.app.data.DayTotalsBuilder
+import com.superfit.app.data.GoalDatePref
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
+import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.BodyPeriod
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
+import com.superfit.app.domain.PhysiologyEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +37,14 @@ data class HistoryPage(
     val selected: LocalDate,
     val summary: DaySummaryState,
     val canGoNext: Boolean
+)
+
+/** What Insights and Journey show, with the last 30 days' consistency and the week's averages. */
+data class ProgressPage(
+    val progress: ProgressState,
+    val consistency: LogConsistency,
+    val trends: WeeklyTrendsState,
+    val period: BodyPeriod
 )
 
 /**
@@ -78,6 +91,59 @@ class HistoryModel(
             canGoNext = monthStart < thisMonth
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    private val period = MutableStateFlow(BodyPeriod.fromLabel(prefs.getString(ProgressLog.KEY_BODY_PERIOD, null)))
+
+    /** Insights and Journey. Scale readings (body fat and more) come with Apple Health. */
+    val progress: StateFlow<ProgressPage?> = combine(log.profileFlow, log.allNutritionEntriesFlow, log.weightEntriesFlow, period, reload) { profile, meals, weights, bodyPeriod, _ ->
+        if (profile == null) return@combine null
+        val tz = zone()
+        val day = Now.today()
+        val workoutList = log.getAllWorkoutEntries()
+        val activityList = log.getAllActivityTelemetry()
+        val nutrition = HistoryLog.byDay(meals, tz) { it.timestamp }
+        val workouts = HistoryLog.byDay(workoutList, tz) { it.timestamp }
+        val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, emptyList(), workouts[date].orEmpty()) }
+        val totals = DayTotalsBuilder.days(meals, workoutList, activityList, emptyMap(), target, PhysiologyEngine.proteinTargetG(profile), tz)
+        ProgressPage(
+            progress = ProgressLog.build(profile, prefs, meals, weights, totals, emptyList(), bodyPeriod, day, tz),
+            consistency = HistoryLog.consistency(day, nutrition, workouts, emptyMap(), target),
+            trends = HistoryLog.weeklyTrends(
+                day,
+                nutrition,
+                workouts,
+                emptyMap(),
+                HistoryLog.activityByDay(activityList),
+                HistoryLog.sleepByDay(log.getAllSleepTelemetry()),
+                target
+            ),
+            period = bodyPeriod
+        )
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    fun choosePeriod(p: BodyPeriod) {
+        prefs.edit { putString(ProgressLog.KEY_BODY_PERIOD, p.label) }
+        period.value = p
+    }
+
+    /** "Fine for me" on a food, kept with the person's settings so ratings leave it be. */
+    fun setFineForMe(key: String, fine: Boolean) {
+        NutritionAdviceStore.setFineForMe(prefs, key, fine)
+    }
+
+    fun logWeight(kg: Double) {
+        scope.launch { log.addWeightEntry(kg) }
+    }
+
+    /** Start weight, goal weight and the optional date to reach it by, as on Android. */
+    fun updateGoal(startKg: Double, targetKg: Double, date: LocalDate?) {
+        scope.launch {
+            log.getProfile()?.let { log.saveProfile(it.copy(startingWeightKg = startKg, targetWeightKg = targetKg)) }
+            GoalDatePref.set(prefs, date)
+            GoalDatePref.markGoalSet(prefs)
+            reload.value++
+        }
+    }
 
     init {
         scope.launch { _predictedFoods.value = runCatching { log.getPredictedFoods(Now.hour()) }.getOrDefault(emptyList()) }

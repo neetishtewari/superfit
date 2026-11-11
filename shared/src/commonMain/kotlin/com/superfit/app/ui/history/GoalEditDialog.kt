@@ -26,12 +26,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.ui.components.SuperfitField
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 
 /** Start weight, goal weight and an optional "reach it by" date for the Journey forecast. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,7 +85,7 @@ fun GoalEditDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { picking = true }) {
-                        Text(date?.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())) ?: "Pick a date")
+                        Text(date?.let { "${LocalFormat.dayMonth(it)} ${it.year}" } ?: "Pick a date")
                     }
                     if (date != null) TextButton(onClick = { date = null }) { Text("No date") }
                 }
@@ -105,9 +105,9 @@ fun GoalEditDialog(
     )
 
     if (picking) {
-        val tomorrowUtc = LocalDate.now().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        val tomorrowUtc = Now.today().plus(1, DateTimeUnit.DAY).toEpochDays() * DAY_MS
         val state = rememberDatePickerState(
-            initialSelectedDateMillis = date?.atStartOfDay()?.toInstant(ZoneOffset.UTC)?.toEpochMilli(),
+            initialSelectedDateMillis = date?.let { it.toEpochDays() * DAY_MS },
             selectableDates = object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= tomorrowUtc
             }
@@ -116,7 +116,7 @@ fun GoalEditDialog(
             onDismissRequest = { picking = false },
             confirmButton = {
                 TextButton(onClick = {
-                    state.selectedDateMillis?.let { date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+                    state.selectedDateMillis?.let { date = LocalDate.fromEpochDays(it / DAY_MS) }
                     picking = false
                 }) { Text("OK") }
             },
@@ -126,3 +126,6 @@ fun GoalEditDialog(
         }
     }
 }
+
+// The date picker counts in UTC midnights.
+private const val DAY_MS = 86_400_000L

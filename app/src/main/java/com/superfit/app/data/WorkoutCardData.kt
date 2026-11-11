@@ -146,8 +146,7 @@ object WorkoutCardData {
     /** "Day 34 of my journey", with goal progress only when the user allows weight on cards. Null without a goal. */
     private suspend fun journey(context: Context, repository: DataRepository, profile: UserProfileEntity, zone: ZoneId): String? {
         val prefs = getUserSharedPrefs(context)
-        val oldDefault = profile.startingWeightKg == 75.0 && profile.targetWeightKg == 70.0
-        val goalSet = (GoalDatePref.isGoalSet(prefs) || !oldDefault) && abs(profile.startingWeightKg - profile.targetWeightKg) >= 0.5
+        val goalSet = GoalDatePref.hasGoal(AndroidPrefs(prefs), profile)
         if (!goalSet) return null
         val today = LocalDate.now(zone)
         val weighIns = InsightsData.weighIns(repository.getAllWeightEntries(), zone)

@@ -496,8 +496,8 @@ class DashboardViewModel(
             todayMeals = nutrition,
             report = report,
             workouts = coachWorkouts,
-            targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(sharedPrefs) },
-            goalDate = GoalDatePref.get(sharedPrefs)?.toKotlinLocalDate(),
+            targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(AndroidPrefs(sharedPrefs)) },
+            goalDate = GoalDatePref.get(AndroidPrefs(sharedPrefs)),
             commonFoods = CoachingEngine.commonFoods(allNutrition, today.toKotlinLocalDate()),
             notes = _coachNotes.value,
             todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(userPrefs(appContext), today.toKotlinLocalDate()),
@@ -891,7 +891,7 @@ class DashboardViewModel(
                     )
                 )
             }
-            GoalDatePref.markGoalSet(sharedPrefs)
+            GoalDatePref.markGoalSet(AndroidPrefs(sharedPrefs))
             AppAnalytics.goalSet(withDate = false)
         }
     }
