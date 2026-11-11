@@ -41,15 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.theme.*
-import com.superfit.app.ui.dashboard.DashboardUiState
-import com.superfit.app.ui.dashboard.DashboardViewModel
-import com.superfit.app.ui.dashboard.FoodQualityCard
-import com.superfit.app.ui.dashboard.FoodSwapCard
-import com.superfit.app.ui.dashboard.GoalProgressCard
-import java.time.LocalDate
-import java.time.format.TextStyle
-import java.util.Locale
+import kotlinx.datetime.number
 
 @Composable
 fun ConsistencyScoreGauge(
@@ -222,7 +216,7 @@ fun WeeklyTrendsCard(
 
     val sleepHours = trends.avgSleepDurationSeconds / 3600.0
     // No sleep tracker: say so instead of showing 0.0h and a made-up readiness.
-    val sleepText = if (trends.avgSleepDurationSeconds > 0) String.format("%.1fh (${trends.avgSleepReadiness}%%)", sleepHours) else "Not tracked"
+    val sleepText = if (trends.avgSleepDurationSeconds > 0) "${LocalFormat.decimal(sleepHours, 1)}h (${trends.avgSleepReadiness}%)" else "Not tracked"
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -261,7 +255,7 @@ fun WeeklyTrendsCard(
                     )
                     TrendItem(
                         label = "Daily steps",
-                        value = String.format("%,.0f", trends.avgSteps),
+                        value = LocalFormat.integer(kotlin.math.round(trends.avgSteps).toLong()),
                         valueColor = ElectricCyan,
                         modifier = Modifier.weight(1f)
                     )
@@ -515,7 +509,7 @@ fun CalorieTrendChart(
                 val showMonth = days.size <= 7
                 days.forEach { day ->
                     Text(
-                        text = if (showMonth) "${day.date.dayOfMonth}/${day.date.monthValue}" else "${day.date.dayOfMonth}",
+                        text = if (showMonth) "${day.date.day}/${day.date.month.number}" else "${day.date.day}",
                         fontSize = 11.sp,
                         color = ThemeTextTertiary,
                         fontWeight = FontWeight.Bold,

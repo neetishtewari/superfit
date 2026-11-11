@@ -234,6 +234,14 @@ tested on the dev app first.
          messages) is what Android's mic logging now calls; TodayModel.smartLog uses it too. The
          Snap your plate / Say what you ate / Say your workout buttons move to shared
          (QuickLogCard.kt); the iPhone shows them once its voice and camera arrive (5b-6).
+       - 5c-1: Progress starts on iPhone with its History page, and a bottom menu (Today,
+         Progress; Coach joins with coach chat). HistoryLog (shared) works out the month
+         calendar, the 30-day consistency, the 7-day trends and the picked day, the same sums
+         Android's History used; Android's HistoryViewModel now calls it. The calendar, the
+         "eaten vs what you burn" chart, the trend cards and the bottom menu move to shared. The
+         iPhone shows the chart, the calendar and a read-only view of the picked day; editing
+         past days, Insights and Journey come next. The share offer, new-best and widget-tip
+         cards on Today wait for Apple Health, share cards and the widget (5b-6).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -476,3 +484,7 @@ new permissions.
 Step 5b-5j (reviewed 11 Nov): the same logging logic, moved; the same text goes to the same AI
 calls (Firebase AI Logic with App Check) and is saved the same way. No new permissions; the mic
 and camera stay Android-only for now.
+
+Step 5c-1 (reviewed 11 Nov): the same sums on the same on-phone data, moved; the iPhone's History
+page only reads the account's own database. Nothing new is stored, backed up or sent. No new
+permissions.

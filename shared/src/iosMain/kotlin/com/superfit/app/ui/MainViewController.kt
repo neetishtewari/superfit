@@ -3,8 +3,12 @@ package com.superfit.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,6 +38,8 @@ import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.components.PrimaryButton
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
+import com.superfit.app.ui.history.HistoryModel
+import com.superfit.app.ui.history.ProgressHistoryPage
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
@@ -107,32 +113,47 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
         }
         // Lives while this account is signed in; signing out stops Today's updates.
         val accountScope = rememberCoroutineScope()
+        val log = remember(uid) { LogRepository(database = { database }, backup = backup) }
         val today = remember(uid) {
             TodayModel(
-                log = LogRepository(database = { database }, backup = backup),
+                log = log,
                 prefs = IosPrefs.forUser(uid),
                 scope = accountScope,
                 coachNotes = local::loadNotes
             )
         }
-        TodayScreen(today) {
-            // What the iPhone still shows below Today until Settings moves over.
-            Text(
-                text = when {
-                    restored?.failed == true -> "Couldn't reach your backup. Check your internet and open the app again."
-                    else -> restored?.let { "Signed in as ${email ?: "your Apple account"}. On this iPhone: ${it.meals} meals, ${it.workouts} workouts, ${it.weighIns} weigh-ins." }.orEmpty()
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = SuperfitTheme.colors.textSecondary
-            )
-            PrimaryButton(
-                text = "Sign out",
-                onClick = {
-                    auth.signOut()
-                    signedIn = false
-                    email = null
+        val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope) }
+        var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
+        Scaffold(
+            containerColor = SuperfitTheme.colors.bgStart,
+            // Each screen handles the top of the phone itself; the menu handles the bottom.
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            bottomBar = { MainMenuBar(tab, onSelect = { tab = it }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS)) }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                when (tab) {
+                    MainTab.PROGRESS -> ProgressHistoryPage(history)
+                    else -> TodayScreen(today) {
+                        // What the iPhone still shows below Today until Settings moves over.
+                        Text(
+                            text = when {
+                                restored?.failed == true -> "Couldn't reach your backup. Check your internet and open the app again."
+                                else -> restored?.let { "Signed in as ${email ?: "your Apple account"}. On this iPhone: ${it.meals} meals, ${it.workouts} workouts, ${it.weighIns} weigh-ins." }.orEmpty()
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = SuperfitTheme.colors.textSecondary
+                        )
+                        PrimaryButton(
+                            text = "Sign out",
+                            onClick = {
+                                auth.signOut()
+                                signedIn = false
+                                email = null
+                            }
+                        )
+                    }
                 }
-            )
+            }
         }
     }
 }
