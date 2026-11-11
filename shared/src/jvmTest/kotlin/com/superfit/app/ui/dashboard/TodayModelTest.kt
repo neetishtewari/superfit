@@ -16,6 +16,7 @@ import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.ChatEntry
 import com.superfit.app.domain.CoachNote
+import com.superfit.app.domain.LogKind
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -91,5 +92,18 @@ class TodayModelTest {
 
         model.deleteWorkout(shown.workoutList.single())
         model.state.first { it is DashboardUiState.Success && it.workoutList.isEmpty() }
+    }
+
+    @Test
+    fun saidAgainAnExactRepeatOfAPastMealIsLoggedWithoutTheAi() = runTest {
+        val model = TodayModel(log, MemoryPrefs(), backgroundScope)
+        log.saveProfile(UserProfileEntity(age = 35, heightCm = 175.0, weightKg = 80.0, isMale = true))
+        log.addNutritionEntry(NutritionEntryEntity(foodText = "2 roti and dal", calories = 420.0, proteinG = 15.0, carbsG = 60.0, fatG = 10.0, timestamp = Now.millis() - 86_400_000L))
+
+        model.smartLog("2 roti and dal", kind = LogKind.MEAL)
+
+        assertIs<ParsingState.Success>(model.parsing.first { it is ParsingState.Success || it is ParsingState.Error })
+        val today = model.state.first { it is DashboardUiState.Success && it.nutritionList.isNotEmpty() } as DashboardUiState.Success
+        assertEquals(420.0, today.caloriesEaten)
     }
 }

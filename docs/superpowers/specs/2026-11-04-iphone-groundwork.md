@@ -229,6 +229,11 @@ tested on the dev app first.
          step-goal work; Android's Today and evening reminder call them. The iPhone shows the
          coach card ("Get today's tip"; chat comes with coach chat), the step goal on the rings
          with its sheet, and the "new step goal" note.
+       - 5b-5j: the "log anything" logic and buttons move to shared, ready for iPhone voice and
+         camera. SmartLogger (repeat meals, food/exercise split, both parsers, partial success
+         messages) is what Android's mic logging now calls; TodayModel.smartLog uses it too. The
+         Snap your plate / Say what you ate / Say your workout buttons move to shared
+         (QuickLogCard.kt); the iPhone shows them once its voice and camera arrive (5b-6).
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -467,3 +472,7 @@ Step 5b-5i (reviewed 11 Nov): the same tip request as Android, through Firebase 
 Check; it carries the same history summary Android already sends. The tip and step goal are saved
 in the account's own settings on the phone (same keys as Android), nothing new is backed up. No
 new permissions.
+
+Step 5b-5j (reviewed 11 Nov): the same logging logic, moved; the same text goes to the same AI
+calls (Firebase AI Logic with App Check) and is saved the same way. No new permissions; the mic
+and camera stay Android-only for now.
