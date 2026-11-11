@@ -69,7 +69,8 @@ final class CameraBridge: NSObject, IosCamera {
 
     private func snapPhoto() {
         guard let top = Self.topViewController() else { return answer(nil, nil, nil) }
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+        // The simulator says it has a camera but its capture fails, so it picks a library photo.
+        if UIImagePickerController.isSourceTypeAvailable(.camera), !Self.isSimulator {
             let picker = UIImagePickerController()
             picker.sourceType = .camera
             picker.cameraCaptureMode = .photo
