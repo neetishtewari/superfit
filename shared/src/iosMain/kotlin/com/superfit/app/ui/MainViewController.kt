@@ -73,8 +73,9 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
         val uid = auth.currentUid() ?: return
         var restored by remember(uid) { mutableStateOf<Restored?>(null) }
         val database = remember(uid) { openIosDatabase(uid) }
+        val local = remember(uid) { IosBackupLocal(uid) }
         val backup = remember(uid) {
-            CloudBackup(IosCloudStoreAdapter(cloudStore), { auth.currentUid() }, { database }, IosBackupLocal(uid))
+            CloudBackup(IosCloudStoreAdapter(cloudStore), { auth.currentUid() }, { database }, local)
         }
         // Same as Android after sign-in: bring the backup down into this account's database
         // (merge only), then count what arrived.
@@ -107,7 +108,12 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
         // Lives while this account is signed in; signing out stops Today's updates.
         val accountScope = rememberCoroutineScope()
         val today = remember(uid) {
-            TodayModel(LogRepository(database = { database }, backup = backup), IosPrefs.forUser(uid), accountScope)
+            TodayModel(
+                log = LogRepository(database = { database }, backup = backup),
+                prefs = IosPrefs.forUser(uid),
+                scope = accountScope,
+                coachNotes = local::loadNotes
+            )
         }
         TodayScreen(today) {
             // What the iPhone still shows below Today until Settings moves over.

@@ -25,7 +25,6 @@ import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RepeatMealCache
 import com.superfit.app.domain.SpokenInput
 import com.superfit.app.domain.StepGoal
-import com.superfit.app.domain.StepGoalReason
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
@@ -505,7 +504,7 @@ class DashboardViewModel(
             goalDate = GoalDatePref.get(sharedPrefs)?.toKotlinLocalDate(),
             commonFoods = CoachingEngine.commonFoods(allNutrition, today.toKotlinLocalDate()),
             notes = _coachNotes.value,
-            todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(sharedPrefs, today),
+            todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(userPrefs(appContext), today.toKotlinLocalDate()),
             earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
         )
 
@@ -524,7 +523,7 @@ class DashboardViewModel(
     val todayDistance: StateFlow<TodayDistance?> = _todayDistance
 
     private fun loadCachedCoachingInsight() {
-        CoachInsightStore.loadForDay(sharedPrefs, LocalDate.now())?.let {
+        CoachInsightStore.loadForDay(userPrefs(appContext), LocalDate.now().toKotlinLocalDate())?.let {
             _coachingState.value = CoachingInsightState.Success(it)
         }
     }
@@ -780,17 +779,9 @@ class DashboardViewModel(
         stepGoalTrigger
     ) { profile, activity, _ ->
         if (profile == null) return@combine null
-        val steps = activity.mapNotNull { row -> runCatching { kotlinx.datetime.LocalDate.parse(row.date) to row.steps }.getOrNull() }.toMap()
-        val saved = StepGoalStore.load(userPrefs(appContext))
-        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(userPrefs(appContext)), LocalDate.now().toKotlinLocalDate())
-        // An own number is kept apart, so switching back to automatic starts from the steps again.
-        if (result.reason != StepGoalReason.OWN && result.saved != saved) {
-            StepGoalStore.save(userPrefs(appContext), result.saved)
-            if (saved != null && result.goal != saved.goal) {
-                AppAnalytics.stepGoalChanged(if (result.goal > saved.goal) "up" else "down", "auto")
-            }
+        TodayCoach.stepGoal(profile, activity, userPrefs(appContext), LocalDate.now().toKotlinLocalDate()) { up ->
+            AppAnalytics.stepGoalChanged(if (up) "up" else "down", "auto")
         }
-        result
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -1222,22 +1213,18 @@ class DashboardViewModel(
         viewModelScope.launch {
             _coachingState.value = CoachingInsightState.Loading
             try {
-                val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-                val insight = CoachingEngine().generateDailyInsight(
-                    profile = currentState.profile,
-                    macroTargets = currentState.macroTargets,
-                    maintenanceCalories = if (customMacroEnabled) null else currentState.tdee,
-                    historyNutrition = repository.getAllNutritionEntries(),
-                    historyWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr),
-                    historyActivity = repository.getAllActivityTelemetry(),
-                    historySleep = repository.getAllSleepTelemetry(),
-                    historyWeights = repository.getAllWeightEntries(),
+                val insight = TodayCoach.dailyTip(
+                    state = currentState,
+                    prefs = userPrefs(appContext),
+                    nutrition = repository.getAllNutritionEntries(),
+                    workouts = repository.getAllWorkoutsForCoach(currentState.bmr),
+                    activity = repository.getAllActivityTelemetry(),
+                    sleep = repository.getAllSleepTelemetry(),
+                    weights = repository.getAllWeightEntries(),
                     stepGoal = stepGoal.value?.goal,
-                    memory = CoachInsightStore.memory(sharedPrefs),
-                    notes = _coachNotes.value
+                    notes = _coachNotes.value,
+                    today = LocalDate.now().toKotlinLocalDate()
                 )
-
-                CoachInsightStore.save(sharedPrefs, LocalDate.now(), insight)
 
                 _coachingState.value = CoachingInsightState.Success(insight)
             } catch (e: Exception) {

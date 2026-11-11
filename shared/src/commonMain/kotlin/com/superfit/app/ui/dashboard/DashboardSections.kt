@@ -310,7 +310,7 @@ fun NutrientLedgerCard(state: DashboardUiState.Success) {
 fun CoachInsightsCard(
     coachingState: CoachingInsightState,
     onRefresh: () -> Unit,
-    onOpenChat: () -> Unit,
+    onOpenChat: (() -> Unit)?,
     onRoast: (() -> Unit)? = null
 ) {
     Column(
@@ -519,16 +519,19 @@ fun CoachInsightsCard(
         // Chat is always one tap away, whatever state the tip is in. In Roast me style, so is the roast.
         // Wraps the roast button onto its own line when both don't fit, instead of cutting it off.
         @OptIn(ExperimentalLayoutApi::class)
+        // Null while a phone has no coach chat yet (the iPhone, until chat moves over).
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onOpenChat,
-                colors = ButtonDefaults.buttonColors(containerColor = HyperViolet, contentColor = Color.White),
-                shape = RoundedCornerShape(50),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Chat with coach", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            if (onOpenChat != null) {
+                Button(
+                    onClick = onOpenChat,
+                    colors = ButtonDefaults.buttonColors(containerColor = HyperViolet, contentColor = Color.White),
+                    shape = RoundedCornerShape(50),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Chat with coach", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                }
             }
             if (onRoast != null) {
                 Button(
