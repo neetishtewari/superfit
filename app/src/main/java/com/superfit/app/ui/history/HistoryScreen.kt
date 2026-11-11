@@ -57,6 +57,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -283,15 +284,7 @@ fun HistoryScreen(
                                 val daysInMonth = viewModel.daysInMonth
                                 if (daysInMonth.isNotEmpty()) {
                                     val selectedDate = viewModel.selectedDate
-                                    val chartDays = remember(daysInMonth, selectedDate) {
-                                        val selectedIndex = daysInMonth.indexOfFirst { it.date == selectedDate }
-                                        if (selectedIndex != -1) {
-                                            val start = (selectedIndex - 6).coerceAtLeast(0)
-                                            daysInMonth.subList(start, selectedIndex + 1)
-                                        } else {
-                                            daysInMonth.takeLast(7)
-                                        }
-                                    }
+                                    val chartDays = remember(daysInMonth, selectedDate) { HistoryLog.chartWeek(daysInMonth, selectedDate) }
                                     CalorieTrendChart(days = chartDays)
                                 }
 
@@ -308,7 +301,7 @@ fun HistoryScreen(
                                 viewModel.selectedSummary?.let { summary ->
                                     DayBalanceCard(
                                         summary = summary,
-                                        selectedDate = viewModel.selectedDate,
+                                        selectedDate = viewModel.selectedDate.toJavaLocalDate(),
                                         viewModel = viewModel
                                     )
                                 }

@@ -17,48 +17,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate as KDate
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toKotlinTimeZone
-
-enum class DayStatus {
-    Deficit,
-    Surplus,
-    Insufficient
-}
-
-data class HistoryDayState(
-    val date: LocalDate,
-    val caloriesEaten: Double,
-    val tdee: Double,
-    val mealsLogged: Int,
-    val status: DayStatus
-)
-
-data class DaySummaryState(
-    val date: LocalDate,
-    val caloriesEaten: Double,
-    val tdee: Double,
-    val activeBurn: Double,
-    val steps: Int,
-    val netBalance: Double,
-    val meals: List<NutritionEntryEntity>,
-    val workouts: List<WorkoutEntryEntity>,
-    // Workouts from other apps, without doubles or hidden ones.
-    val importedWorkouts: List<com.superfit.app.domain.WorkoutView> = emptyList()
-)
-
-data class WeeklyTrendsState(
-    val avgNetCalories: Double,
-    val avgSteps: Double,
-    val avgSleepDurationSeconds: Long,
-    val avgSleepReadiness: Int,
-    val avgProteinG: Double,
-    val trackedDaysCount: Int,
-    val totalWorkouts: Int,
-    val totalStrengthSets: Int
-)
 
 sealed interface HistoryParsingState {
     object Idle : HistoryParsingState
@@ -96,7 +60,7 @@ class HistoryViewModel(
     var loggedDaysCount by mutableStateOf(0)
         private set
 
-    var selectedDate by mutableStateOf<LocalDate>(LocalDate.now().minusDays(1))
+    var selectedDate by mutableStateOf(LocalDate.now().minusDays(1).toKotlinLocalDate())
         private set
 
     var selectedSummary by mutableStateOf<DaySummaryState?>(null)
@@ -162,29 +126,19 @@ class HistoryViewModel(
     var goalSet by mutableStateOf(true)
         private set
 
-    private var nutritionByDate: Map<LocalDate, List<NutritionEntryEntity>> = emptyMap()
-    private var workoutsByDate: Map<LocalDate, List<WorkoutEntryEntity>> = emptyMap()
-    private var activityByDate: Map<LocalDate, ActivityTelemetryEntity> = emptyMap()
-    private var importedByDate: Map<LocalDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
+    private var nutritionByDate: Map<KDate, List<NutritionEntryEntity>> = emptyMap()
+    private var workoutsByDate: Map<KDate, List<WorkoutEntryEntity>> = emptyMap()
+    private var activityByDate: Map<KDate, ActivityTelemetryEntity> = emptyMap()
+    private var importedByDate: Map<KDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
     private var profile: UserProfileEntity? = null
     private var dayTotals: Map<kotlinx.datetime.LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
     private var allMeals: List<NutritionEntryEntity> = emptyList()
 
     /** The day's calorie target, including that day's workouts for people who connected them. */
-    private fun calculateTargetCalories(date: LocalDate): Double {
-        val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-        val profile = profile
-        return if (customMacroEnabled || profile == null) {
-            sharedPrefs.getInt("custom_calories", 2000).toDouble()
-        } else {
-            ImportedWorkouts.target(
-                profile,
-                repository.workoutImportPrefs,
-                importedByDate[date].orEmpty(),
-                workoutsByDate[date].orEmpty()
-            ).targets.calories
-        }
-    }
+    private fun calculateTargetCalories(date: LocalDate): Double = targetOn(date.toKotlinLocalDate())
+
+    private fun targetOn(date: KDate): Double =
+        HistoryLog.calorieTarget(profile, userPrefs(appContext), importedByDate[date].orEmpty(), workoutsByDate[date].orEmpty())
 
     init {
         loadData()
@@ -204,38 +158,21 @@ class HistoryViewModel(
         loadData()
     }
 
-    fun selectDate(date: LocalDate) {
+    fun selectDate(date: KDate) {
         selectedDate = date
         updateSelectedSummary()
     }
 
     private fun updateSelectedSummary() {
-        val meals = nutritionByDate[selectedDate] ?: emptyList()
-        val workouts = workoutsByDate[selectedDate] ?: emptyList()
-        val activity = activityByDate[selectedDate]
-        val manualCal = workouts.sumOf { it.caloriesBurned }
-        val activeCal = (activity?.activeCalories ?: 0.0) + manualCal
-        val tdee = calculateTargetCalories(selectedDate)
-        val eaten = meals.sumOf { it.calories }
-
-        selectedSummary = DaySummaryState(
-            date = selectedDate,
-            caloriesEaten = eaten,
-            tdee = tdee,
-            activeBurn = activeCal,
-            steps = activity?.steps ?: 0,
-            netBalance = eaten - tdee,
-            meals = meals,
-            workouts = workouts,
-            importedWorkouts = importedByDate[selectedDate].orEmpty()
-        )
+        selectedSummary = HistoryLog.daySummary(selectedDate, nutritionByDate, workoutsByDate, activityByDate, importedByDate, ::targetOn)
     }
 
     fun loadData() {
         viewModelScope.launch {
             val profile = repository.getProfile() ?: return@launch
             this@HistoryViewModel.profile = profile
-            importedByDate = ImportedWorkouts.byDate(repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)))
+            val zone = TimeZone.currentSystemDefault()
+            importedByDate = DayTotalsBuilder.byDate(repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)), zone)
 
             // Get all local entries to compute month grid and consistency
             val allNutrition = repository.getAllNutritionEntries()
@@ -243,155 +180,27 @@ class HistoryViewModel(
             val allActivity = repository.getAllActivityTelemetry()
             val allSleep = repository.getAllSleepTelemetry()
 
-            nutritionByDate = allNutrition.groupBy {
-                Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-            }
-            workoutsByDate = allWorkouts.groupBy {
-                Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-            }
-            activityByDate = allActivity.associateBy {
-                try {
-                    LocalDate.parse(it.date)
-                } catch (e: Exception) {
-                    LocalDate.now()
-                }
-            }
-            val sleepByDate = allSleep.associateBy {
-                try {
-                    LocalDate.parse(it.date)
-                } catch (e: Exception) {
-                    LocalDate.now()
-                }
-            }
+            nutritionByDate = HistoryLog.byDay(allNutrition, zone) { it.timestamp }
+            workoutsByDate = HistoryLog.byDay(allWorkouts, zone) { it.timestamp }
+            activityByDate = HistoryLog.activityByDay(allActivity)
+            val sleepByDate = HistoryLog.sleepByDay(allSleep)
 
-            // Calculate current month days
-            val firstDayOfMonth = currentMonth.atDay(1)
-            val lastDayOfMonth = currentMonth.atEndOfMonth()
-            val daysList = mutableListOf<HistoryDayState>()
+            daysInMonth = HistoryLog.monthDays(currentMonth.atDay(1).toKotlinLocalDate(), nutritionByDate, ::targetOn)
 
-            var tempDate = firstDayOfMonth
-            while (!tempDate.isAfter(lastDayOfMonth)) {
-                val meals = nutritionByDate[tempDate] ?: emptyList()
-                val mealsCount = meals.size
-                val caloriesEaten = meals.sumOf { it.calories }
-
-                val tdee = calculateTargetCalories(tempDate)
-
-                val status = when {
-                    mealsCount < 2 -> DayStatus.Insufficient
-                    caloriesEaten < tdee -> DayStatus.Deficit
-                    else -> DayStatus.Surplus
-                }
-
-                daysList.add(
-                    HistoryDayState(
-                        date = tempDate,
-                        caloriesEaten = caloriesEaten,
-                        tdee = tdee,
-                        mealsLogged = mealsCount,
-                        status = status
-                    )
-                )
-                tempDate = tempDate.plusDays(1)
-            }
-            daysInMonth = daysList
-
-            // Calculate rolling 30-day consistency score (from today backwards)
             val today = LocalDate.now()
-            var rollingDeficitCount = 0
-            var rollingLoggedCount = 0
+            val todayK = today.toKotlinLocalDate()
+            val consistency = HistoryLog.consistency(todayK, nutritionByDate, workoutsByDate, importedByDate, ::targetOn)
+            deficitDaysCount = consistency.deficitDays
+            loggedDaysCount = consistency.loggedDays
+            consistencyScore = consistency.score
+            workoutConsistencyScore = consistency.trainingScore
 
-            for (i in 0 until 30) {
-                val checkDate = today.minusDays(i.toLong())
-                val meals = nutritionByDate[checkDate] ?: emptyList()
-                val mealsCount = meals.size
-                if (mealsCount >= 2) {
-                    rollingLoggedCount++
-                    val caloriesEaten = meals.sumOf { it.calories }
-                    val tdee = calculateTargetCalories(checkDate)
-                    if (caloriesEaten < tdee) {
-                        rollingDeficitCount++
-                    }
-                }
-            }
-
-            deficitDaysCount = rollingDeficitCount
-            loggedDaysCount = rollingLoggedCount
-            consistencyScore = if (rollingLoggedCount > 0) {
-                ((rollingDeficitCount.toDouble() / rollingLoggedCount) * 100).toInt()
-            } else {
-                0
-            }
-
-            // Calculate rolling 30-day training consistency score (from today backwards)
-            var rollingWorkoutDaysCount = 0
-            for (i in 0 until 30) {
-                val checkDate = today.minusDays(i.toLong())
-                val workouts = workoutsByDate[checkDate] ?: emptyList()
-                if (workouts.isNotEmpty() || !importedByDate[checkDate].isNullOrEmpty()) {
-                    rollingWorkoutDaysCount++
-                }
-            }
-            workoutConsistencyScore = ((rollingWorkoutDaysCount.toDouble() / 30) * 100).toInt()
-
-            // Calculate rolling 7-day weekly trends (from today backwards)
-            var totalNetCalories = 0.0
-            var totalSteps = 0.0
-            var totalSleepDurationSeconds = 0L
-            var totalSleepReadiness = 0
-            var sleepDaysCount = 0
-            var totalProteinG = 0.0
-            var trackedDaysCount = 0
-            var activeDaysCount = 0
-            var totalWorkouts = 0
-            var totalStrengthSets = 0
-
-            for (i in 0 until 7) {
-                val checkDate = today.minusDays(i.toLong())
-                val meals = nutritionByDate[checkDate] ?: emptyList()
-                val mealsCount = meals.size
-
-                val workouts = workoutsByDate[checkDate] ?: emptyList()
-                totalWorkouts += workouts.size + importedByDate[checkDate].orEmpty().size
-                totalStrengthSets += workouts.filter { it.workoutType == "Strength" }.sumOf { it.setsCount }
-
-                if (mealsCount >= 2) {
-                    val eatenCalories = meals.sumOf { it.calories }
-                    val tdee = calculateTargetCalories(checkDate)
-                    totalNetCalories += (eatenCalories - tdee)
-                    totalProteinG += meals.sumOf { it.proteinG }
-                    trackedDaysCount++
-                }
-
-                val activity = activityByDate[checkDate]
-                if (activity != null) {
-                    totalSteps += activity.steps
-                    activeDaysCount++
-                }
-
-                val sleep = sleepByDate[checkDate]
-                if (sleep != null) {
-                    totalSleepDurationSeconds += sleep.sleepDurationSeconds
-                    totalSleepReadiness += sleep.readinessScore
-                    sleepDaysCount++
-                }
-            }
-
-            weeklyTrends = WeeklyTrendsState(
-                avgNetCalories = if (trackedDaysCount > 0) totalNetCalories / trackedDaysCount else 0.0,
-                avgSteps = totalSteps / 7.0,
-                avgSleepDurationSeconds = if (sleepDaysCount > 0) totalSleepDurationSeconds / sleepDaysCount else 0L,
-                avgSleepReadiness = if (sleepDaysCount > 0) totalSleepReadiness / sleepDaysCount else 0,
-                avgProteinG = if (trackedDaysCount > 0) totalProteinG / trackedDaysCount else 0.0,
-                trackedDaysCount = trackedDaysCount,
-                totalWorkouts = totalWorkouts,
-                totalStrengthSets = totalStrengthSets
-            )
+            weeklyTrends = HistoryLog.weeklyTrends(todayK, nutritionByDate, workoutsByDate, importedByDate, activityByDate, sleepByDate, ::targetOn)
 
             predictedFoods = repository.getPredictedFoods()
 
             val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
-            val dayTotals = InsightsData.days(allNutrition, allWorkouts, allActivity, importedByDate, ::calculateTargetCalories, proteinTarget)
+            val dayTotals = DayTotalsBuilder.days(allNutrition, allWorkouts, allActivity, importedByDate, ::targetOn, proteinTarget, zone)
             this@HistoryViewModel.dayTotals = dayTotals
             recapMonths = (1..12).map { YearMonth.from(today).minusMonths(it.toLong()) }.filter { m ->
                 val inMonth = dayTotals.values.filter { YearMonth.from(it.date.toJavaLocalDate()) == m }
@@ -442,7 +251,6 @@ class HistoryViewModel(
                     ?.let { lastKg - it.second }
             }
             goalKgChange = if (goalSet) profile.targetWeightKg - profile.startingWeightKg else 0.0
-            val todayK = today.toKotlinLocalDate()
             val goalChange = goalKgChange
             bodyInputs = {
                 com.superfit.app.domain.BodyHistory.series(kJourneyWeighIns, scaleReadings, profile.heightCm, goalChange, bodyPeriod, todayK)
@@ -582,7 +390,7 @@ class HistoryViewModel(
                 }
 
                 // Construct a timestamp at exactly 12:00 PM of the selected date to avoid timezone boundaries
-                val targetTimestamp = selectedDate.atTime(12, 0)
+                val targetTimestamp = selectedDate.toJavaLocalDate().atTime(12, 0)
                     .atZone(ZoneId.systemDefault())
                     .toInstant()
                     .toEpochMilli()

@@ -8,19 +8,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Insights
-import androidx.compose.material.icons.rounded.Today
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,21 +19,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.superfit.app.data.AppAnalytics
-import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.theme.ThemeBgStart
-import com.superfit.app.theme.ThemeCardBg
-import com.superfit.app.theme.ThemeTextSecondary
-
-/** The three places in the bottom menu. */
-enum class MainTab(val label: String, val selectedIcon: ImageVector, val icon: ImageVector) {
-    TODAY("Today", Icons.Rounded.Today, Icons.Outlined.Today),
-    PROGRESS("Progress", Icons.Rounded.Insights, Icons.Outlined.Insights),
-    COACH("Coach", Icons.Rounded.AutoAwesome, Icons.Outlined.AutoAwesome)
-}
+import com.superfit.app.ui.MainMenuBar
+import com.superfit.app.ui.MainTab
 
 /**
  * The bottom menu and the tab it shows. The app always opens on Today; the phone's back button on
@@ -94,7 +71,7 @@ fun MainTabs(
         // Each screen handles the top of the phone itself; the menu handles the bottom.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            if (!keyboardOpen) MenuBar(tab, onSelect = { select(it, "menu") })
+            if (!keyboardOpen) MainMenuBar(tab, onSelect = { select(it, "menu") })
         }
     ) { padding ->
         Box(
@@ -110,40 +87,6 @@ fun MainTabs(
                     MainTab.COACH -> coach()
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MenuBar(selected: MainTab, onSelect: (MainTab) -> Unit) {
-    val colors = SuperfitTheme.colors
-    NavigationBar(containerColor = ThemeCardBg, tonalElevation = 0.dp) {
-        MainTab.entries.forEach { item ->
-            val isOn = item == selected
-            // Coach is purple, the coach's colour; the others use the calm green.
-            val onColor = if (item == MainTab.COACH) colors.tertiaryAccent else colors.selectedFg
-            val pill = if (item == MainTab.COACH) colors.coachSoft else colors.selectedBg
-            NavigationBarItem(
-                selected = isOn,
-                onClick = { onSelect(item) },
-                icon = { Icon(if (isOn) item.selectedIcon else item.icon, contentDescription = null) },
-                label = { Text(item.label, fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium) },
-                alwaysShowLabel = true,
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = onColor,
-                    // Under the pill: dark green on light, bright green on dark, so the label stays easy to read.
-                    selectedTextColor = if (item == MainTab.COACH) {
-                        onColor
-                    } else if (colors.isDark) {
-                        colors.primaryAccent
-                    } else {
-                        colors.selectedFg
-                    },
-                    indicatorColor = pill,
-                    unselectedIconColor = ThemeTextSecondary,
-                    unselectedTextColor = ThemeTextSecondary
-                )
-            )
         }
     }
 }

@@ -41,15 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
 import com.superfit.app.theme.*
-import com.superfit.app.ui.dashboard.DashboardUiState
-import com.superfit.app.ui.dashboard.DashboardViewModel
-import com.superfit.app.ui.dashboard.FoodQualityCard
-import com.superfit.app.ui.dashboard.FoodSwapCard
-import com.superfit.app.ui.dashboard.GoalProgressCard
-import java.time.LocalDate
-import java.time.format.TextStyle
-import java.util.Locale
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.isoDayNumber
 
 @Composable
 fun CalendarCard(
@@ -131,7 +126,7 @@ fun CalendarCard(
             if (daysInMonth.isNotEmpty()) {
                 val firstDay = daysInMonth.first().date
                 // Monday is 1, Sunday is 7. Convert to Sunday = 0 offset
-                val offset = firstDay.dayOfWeek.value % 7
+                val offset = firstDay.dayOfWeek.isoDayNumber % 7
                 val totalCells = offset + daysInMonth.size
                 val rows = (totalCells + 6) / 7
 
@@ -187,7 +182,7 @@ fun CalendarDayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isToday = dayState.date == LocalDate.now()
+    val isToday = dayState.date == Now.today()
     val dotColor = when (dayState.status) {
         DayStatus.Deficit -> NeonMint
         DayStatus.Surplus -> SolarAmber
@@ -205,7 +200,7 @@ fun CalendarDayCell(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                text = dayState.date.dayOfMonth.toString(),
+                text = dayState.date.day.toString(),
                 fontSize = 14.sp,
                 fontWeight = if (isToday || isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                 color = when {
