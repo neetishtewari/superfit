@@ -20,6 +20,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
+import com.superfit.app.domain.LogKind
 import com.superfit.app.theme.SuperfitTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Today on the iPhone, with the same Food / Activity switch and shared cards Android shows.
@@ -39,7 +44,13 @@ import com.superfit.app.theme.SuperfitTheme
  * adds for now.
  */
 @Composable
-fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Composable () -> Unit = {}) {
+fun TodayScreen(
+    model: TodayModel,
+    onOpenSettings: () -> Unit = {},
+    /** Opens Superfit's page in the phone's own Settings, for turning the microphone back on. */
+    onOpenPhoneSettings: () -> Unit = {},
+    footer: @Composable () -> Unit = {}
+) {
     val state by model.state.collectAsState()
     val usualDay by model.usualDay.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
@@ -56,6 +67,36 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
     val predictedFoods by model.predictedFoods.collectAsState()
     var foodInput by remember { mutableStateOf("") }
     var showAllFoods by remember { mutableStateOf(false) }
+    val voice = model.voiceLog?.takeIf { it.available }
+    val noVoice = remember { VoiceIdle() }
+    val voiceUi by (voice?.ui ?: noVoice.ui).collectAsState()
+    val voiceNotice by (voice?.notice ?: noVoice.notice).collectAsState()
+    val micOff by (voice?.micOff ?: noVoice.micOff).collectAsState()
+    var banner by remember { mutableStateOf<LogBanner?>(null) }
+
+    // What was logged, or why it couldn't be, slides in at the top for a few seconds, as on Android.
+    LaunchedEffect(parsing) {
+        when (val p = parsing) {
+            is ParsingState.Success -> banner = LogBanner(p.message ?: "Logged: ${p.foodText}", isError = false)
+            is ParsingState.Error -> banner = LogBanner(p.message, isError = true)
+            else -> return@LaunchedEffect
+        }
+        model.resetParsing()
+    }
+    LaunchedEffect(voiceNotice) {
+        voiceNotice?.let {
+            banner = LogBanner(it, isError = true)
+            voice?.dismissNotice()
+        }
+    }
+    LaunchedEffect(banner) {
+        if (banner != null) {
+            delay(4000)
+            banner = null
+        }
+    }
+    // Leaving Today stops the mic without logging half a sentence.
+    DisposableEffect(voice) { onDispose { voice?.cancel() } }
 
     Box(
         modifier = Modifier
@@ -83,7 +124,24 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 DashboardHeader(grantedPermissions = emptySet(), hasHealthConnectPermissions = true, onNavigateToSettings = onOpenSettings)
-                FoodActivitySwitch(side = side, onSelect = { side = it })
+                FoodActivitySwitch(side = side, onSelect = {
+                    voice?.cancel()
+                    side = it
+                })
+                if (voice != null) {
+                    val kind = if (side == "MEAL") LogKind.MEAL else LogKind.WORKOUT
+                    // Only the mic that's listening shows it; the other side's waits.
+                    val mine = voiceUi.listening && voiceUi.kind == kind
+                    VoiceQuickLogCard(
+                        logType = if (side == "MEAL") "MEAL" else "WORKOUT",
+                        isListening = mine,
+                        isChecking = mine && voiceUi.checking,
+                        liveText = if (mine) voiceUi.liveText else "",
+                        isProcessing = parsing is ParsingState.Loading,
+                        onMicClick = { voice.start(kind) },
+                        onStopClick = voice::stop
+                    )
+                }
                 if (side == "MEAL") {
                     CalorieRingsCard(state = s, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
                     val day = Now.today()
@@ -129,6 +187,17 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+        LogResultBanner(banner, modifier = Modifier.align(Alignment.TopCenter))
+    }
+
+    if (micOff) {
+        MicOffDialog(
+            onOpenSettings = {
+                voice?.dismissMicOff()
+                onOpenPhoneSettings()
+            },
+            onDismiss = { voice?.dismissMicOff() }
+        )
     }
 
     if (showStepGoalSheet) {

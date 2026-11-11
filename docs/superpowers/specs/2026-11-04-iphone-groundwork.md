@@ -302,6 +302,17 @@ tested on the dev app first.
          "Is this you?" on Today, and "Not me" sets a partner's readings aside from then on. Body
          fat sets the calorie target as on Android and feeds the Journey Body card. Apple Health
          has no bone mass or scale BMR, so those stay Android-only.
+       - 7: Voice. Today's "Say what you ate" (Food) and "Say your workout" (Activity) mics,
+         the same buttons as Android, through shared VoiceLog on top of a small VoiceRecognizer
+         that Swift provides with Apple's Speech framework (SpeechBridge). The same behaviour as
+         Android's: listens through pauses with live words, finishes 2 s after the last word or
+         after a minute, "Checking what you said…" waits up to 1.5 s for the corrected words, and
+         up to 5 of Apple's guesses go to the AI (SpokenInput) so it can pick the one that makes
+         sense as food. The phone's language and region are used (Indian English on an Indian
+         English phone). A refused mic shows the same "Microphone is off" note with Open
+         Settings. The mics in meal editing ("Say what it was") and "My nutritionist's advice"
+         show on iPhone too, with a small Listening window, since iPhone has no voice-typing box.
+         Results slide in at the top as on Android. Camera, barcode and label reading follow.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -587,3 +598,11 @@ go into the weight log and are backed up to users/{signed-in uid} only, as Andro
 Connect weigh-ins; the scale lists (mine, not me, waiting) and the last body fat stay in the
 account's own settings on the phone. Readings that may be someone else's are never added without
 the person's answer. Nothing new goes to the AI or anywhere else. Android unchanged.
+
+Step 7 (reviewed 12 Nov): asks for the microphone and speech recognition only when a mic button is
+first tapped, with the reasons in Apple's sheets (NSMicrophoneUsageDescription,
+NSSpeechRecognitionUsageDescription). The microphone is on only while the button shows Listening,
+and stops after a minute at most. Sound goes to Apple's speech recognition (as it goes to Google's
+on Android) and is never recorded, kept or sent to Superfit or Firebase; only the words go on, to
+Gemini through Firebase AI Logic with App Check, exactly as typed words do. Nothing new is stored
+or backed up. No new Android permissions; Android unchanged.

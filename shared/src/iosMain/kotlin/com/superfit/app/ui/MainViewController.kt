@@ -42,19 +42,24 @@ import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
+import com.superfit.app.ui.dashboard.ProvideVoiceTyping
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
+import com.superfit.app.ui.dashboard.VoiceRecognizer
 import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
 import com.superfit.app.ui.settings.SettingsPage
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
+import platform.Foundation.NSURL
+import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
+import platform.UIKit.UIApplicationOpenSettingsURLString
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
@@ -68,9 +73,11 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
             else -> isSystemInDarkTheme()
         }
         SuperfitTheme(darkTheme = dark) {
-            IosRoot(auth, cloudStore, healthSource, themeMode) { mode ->
-                appPrefs.edit { putString(KEY_THEME_MODE, mode) }
-                themeMode = mode
+            ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
+                IosRoot(auth, cloudStore, healthSource, speech, themeMode) { mode ->
+                    appPrefs.edit { putString(KEY_THEME_MODE, mode) }
+                    themeMode = mode
+                }
             }
         }
     }
@@ -79,11 +86,24 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
 /** What the placeholder shows after the backup comes down: how many of each the iPhone now has. */
 private data class Restored(val meals: Int, val workouts: Int, val weighIns: Int, val failed: Boolean)
 
+/** Superfit's own page in the iPhone's Settings app (microphone, speech recognition, notifications). */
+private fun openPhoneSettings() {
+    val url = NSURL.URLWithString(UIApplicationOpenSettingsURLString) ?: return
+    UIApplication.sharedApplication.openURL(url, options = emptyMap<Any?, Any>(), completionHandler = null)
+}
+
 private const val APP_PREFS = "superfit_prefs"
 private const val KEY_THEME_MODE = "theme_mode"
 
 @Composable
-private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore, health: HealthSource, themeMode: String, onThemeMode: (String) -> Unit) {
+private fun IosRoot(
+    auth: IosAuth,
+    cloudStore: IosCloudStore,
+    health: HealthSource,
+    speech: VoiceRecognizer,
+    themeMode: String,
+    onThemeMode: (String) -> Unit
+) {
     var email by remember { mutableStateOf(auth.currentEmail()) }
     var signedIn by remember { mutableStateOf(auth.currentUid() != null) }
     val scope = rememberCoroutineScope()
@@ -148,7 +168,8 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore, health: HealthSour
                 scope = accountScope,
                 coachNotes = local::loadNotes,
                 health = health,
-                scale = scale
+                scale = scale,
+                voice = speech
             )
         }
         // Steps and sleep are read again each time the app comes back to the front.
@@ -189,7 +210,7 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore, health: HealthSour
             Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when (tab) {
                     MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value)
-                    else -> TodayScreen(today, onOpenSettings = { showSettings = true }) {
+                    else -> TodayScreen(today, onOpenSettings = { showSettings = true }, onOpenPhoneSettings = ::openPhoneSettings) {
                         if (restored?.failed == true) {
                             Text(
                                 text = "Couldn't reach your backup. Check your internet and open the app again.",

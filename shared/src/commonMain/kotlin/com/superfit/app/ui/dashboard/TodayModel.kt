@@ -69,7 +69,8 @@ class TodayModel(
     private val coach: CoachingEngine = CoachingEngine(),
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val health: HealthSource? = null,
-    private val scale: ScaleImport? = null
+    private val scale: ScaleImport? = null,
+    voice: VoiceRecognizer? = null
 ) {
     private val today = Now.today()
 
@@ -91,6 +92,11 @@ class TodayModel(
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
 
     private var lastMeal: String? = null
+
+    /** Today's mic buttons, or null where the app doesn't provide speech recognition yet. */
+    val voiceLog: VoiceLog? = voice?.let { recognizer ->
+        VoiceLog(recognizer) { heard, kind -> smartLog(heard.text, heard.otherVersions, kind) }
+    }
     val canRetryLastMeal: Boolean get() = !lastMeal.isNullOrBlank()
 
     // Settings saved outside the database (own calorie targets) ask Today to work things out again.
@@ -466,6 +472,11 @@ class TodayModel(
             _parsing.value = ParsingState.Loading
             _parsing.value = smartLogger.log(input, otherVersions, kind)
         }
+    }
+
+    /** The result has been shown (in the banner), so the box goes back to its usual look. */
+    fun resetParsing() {
+        _parsing.value = ParsingState.Idle
     }
 
     fun retryLastMeal() {

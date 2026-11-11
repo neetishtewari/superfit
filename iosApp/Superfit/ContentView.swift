@@ -6,7 +6,8 @@ import UIKit
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         MainViewControllerKt.MainViewController(
-            auth: FirebaseAuthBridge(), cloudStore: FirestoreCloudStore(), ai: FirebaseAiBridge(), health: HealthKitBridge()
+            auth: FirebaseAuthBridge(), cloudStore: FirestoreCloudStore(), ai: FirebaseAiBridge(), health: HealthKitBridge(),
+            speech: SpeechBridge()
         )
     }
 
