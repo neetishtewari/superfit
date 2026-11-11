@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.superfit.app.data.Now
 import com.superfit.app.theme.SuperfitTheme
 
 /**
@@ -40,6 +41,10 @@ import com.superfit.app.theme.SuperfitTheme
 fun TodayScreen(model: TodayModel, footer: @Composable () -> Unit = {}) {
     val state by model.state.collectAsState()
     val usualDay by model.usualDay.collectAsState()
+    val stepGoal by model.stepGoal.collectAsState()
+    val stepGoalNoteDismissedOn by model.stepGoalNoteDismissedOn.collectAsState()
+    val coaching by model.coaching.collectAsState()
+    var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
@@ -74,7 +79,11 @@ fun TodayScreen(model: TodayModel, footer: @Composable () -> Unit = {}) {
                 DashboardHeader(grantedPermissions = emptySet(), hasHealthConnectPermissions = true, onNavigateToSettings = {})
                 FoodActivitySwitch(side = side, onSelect = { side = it })
                 if (side == "MEAL") {
-                    CalorieRingsCard(state = s)
+                    CalorieRingsCard(state = s, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
+                    val day = Now.today()
+                    stepGoal?.takeIf { it.raisedOn(day) && stepGoalNoteDismissedOn != day.toString() }?.let { goal ->
+                        StepGoalRaisedNote(goal = goal, onDismiss = model::dismissStepGoalNote)
+                    }
                     StreakHeaderCard(streakState = s.streakState)
                     NutrientLedgerCard(state = s)
                     WeightQuickRow(
@@ -82,6 +91,8 @@ fun TodayScreen(model: TodayModel, footer: @Composable () -> Unit = {}) {
                         weightEntries = s.weightEntries,
                         onLogWeight = model::logWeight
                     )
+                    // Coach chat joins in a later step, so the card offers today's tip only for now.
+                    CoachInsightsCard(coachingState = coaching, onRefresh = model::refreshCoachingInsight, onOpenChat = null)
                     TrackMealsCard(
                         state = s,
                         predictedFoods = predictedFoods,
@@ -107,6 +118,12 @@ fun TodayScreen(model: TodayModel, footer: @Composable () -> Unit = {}) {
                 footer()
                 Spacer(modifier = Modifier.height(48.dp))
             }
+        }
+    }
+
+    if (showStepGoalSheet) {
+        stepGoal?.let { goal ->
+            StepGoalSheet(goal = goal, onSetOwn = model::setOwnStepGoal, onDismiss = { showStepGoalSheet = false })
         }
     }
 

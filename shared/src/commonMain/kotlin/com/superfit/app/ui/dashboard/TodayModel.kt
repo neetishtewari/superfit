@@ -1,6 +1,7 @@
 package com.superfit.app.ui.dashboard
 
 import com.superfit.app.data.ActivityTelemetryEntity
+import com.superfit.app.data.CoachInsightStore
 import com.superfit.app.data.HabitEntryEntity
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
@@ -8,13 +9,18 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
 import com.superfit.app.data.SleepTelemetryEntity
+import com.superfit.app.data.StepGoalStore
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.CoachNote
+import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.NutritionParser
+import com.superfit.app.domain.StepGoal
+import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
 import com.superfit.app.domain.UsualDay
 import kotlinx.coroutines.CancellationException
@@ -39,6 +45,8 @@ class TodayModel(
     private val prefs: Prefs,
     private val scope: CoroutineScope,
     private val parser: NutritionParser = NutritionParser(),
+    private val coachNotes: () -> List<CoachNote> = { emptyList() },
+    private val coach: CoachingEngine = CoachingEngine(),
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() }
 ) {
     private val today = Now.today()
@@ -105,6 +113,62 @@ class TodayModel(
 
     /** Today's activity next to [usualDay]; the distance is estimated from steps until Apple Health joins. */
     fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?): TodayVsUsual = TodayState.vsUsual(state, usual, today)
+
+    private val stepGoalTrigger = MutableStateFlow(0)
+
+    /** Today's step goal, worked out from the step history (or the person's own number). */
+    val stepGoal: StateFlow<StepGoalResult?> = combine(log.profileFlow, log.allActivityTelemetryFlow, stepGoalTrigger) { profile, activity, _ ->
+        profile?.let { TodayCoach.stepGoal(it, activity, prefs, today) }
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    private val _stepGoalNoteDismissedOn = MutableStateFlow(StepGoalStore.noteDismissedOn(prefs))
+    val stepGoalNoteDismissedOn: StateFlow<String?> = _stepGoalNoteDismissedOn.asStateFlow()
+
+    fun dismissStepGoalNote() {
+        StepGoalStore.dismissNote(prefs, today)
+        _stepGoalNoteDismissedOn.value = today.toString()
+    }
+
+    /** The person's own daily step goal, or null to go back to the automatic one. */
+    fun setOwnStepGoal(steps: Int?) {
+        StepGoalStore.setOwnGoal(prefs, steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX))
+        stepGoalTrigger.value++
+    }
+
+    private val _coaching = MutableStateFlow<CoachingInsightState>(
+        CoachInsightStore.loadForDay(prefs, today)?.let { CoachingInsightState.Success(it) } ?: CoachingInsightState.Idle
+    )
+    val coaching: StateFlow<CoachingInsightState> = _coaching.asStateFlow()
+
+    /** Asks the AI coach for today's tip, the same way as Android, and keeps it for the day. */
+    fun refreshCoachingInsight() {
+        val current = state.value as? DashboardUiState.Success ?: return
+        scope.launch {
+            _coaching.value = CoachingInsightState.Loading
+            _coaching.value = try {
+                CoachingInsightState.Success(
+                    TodayCoach.dailyTip(
+                        state = current,
+                        prefs = prefs,
+                        nutrition = log.getAllNutritionEntries(),
+                        workouts = log.getAllWorkoutEntries(),
+                        activity = log.getAllActivityTelemetry(),
+                        sleep = log.getAllSleepTelemetry(),
+                        weights = log.getAllWeightEntries(),
+                        stepGoal = stepGoal.value?.goal,
+                        notes = coachNotes(),
+                        today = today,
+                        engine = coach
+                    )
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Coach tip failed", e)
+                CoachingInsightState.Error(AiFailover.sanitizeError(e))
+            }
+        }
+    }
 
     init {
         loadPredictedFoods()

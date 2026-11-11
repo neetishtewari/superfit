@@ -1,14 +1,15 @@
 package com.superfit.app.data
 
-import android.content.SharedPreferences
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.CoachMemory
 import com.superfit.app.domain.CoachMemoryEntry
 import com.superfit.app.domain.FindingKind
-import java.time.LocalDate
-import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.LocalDate
 
-/** Keeps today's coach message for the home screen, plus a short memory of past messages. */
+/**
+ * Keeps today's coach message for the home screen, plus a short memory of past messages, in the
+ * account's settings on the phone. The same on Android and iPhone.
+ */
 object CoachInsightStore {
     private const val KEY_DATE = "coaching_insight_date"
     private const val KEY_TEXT = "coaching_insight_text"
@@ -20,7 +21,7 @@ object CoachInsightStore {
     private const val KEY_NOTE = "coaching_insight_note"
     private const val KEY_MEMORY = "coach_memory"
 
-    fun loadForDay(prefs: SharedPreferences, date: LocalDate): CoachInsight? {
+    fun loadForDay(prefs: Prefs, date: LocalDate): CoachInsight? {
         if (prefs.getString(KEY_DATE, "") != date.toString()) return null
         val headline = prefs.getString(KEY_HEADLINE, null)
         if (headline.isNullOrBlank()) {
@@ -40,24 +41,24 @@ object CoachInsightStore {
         )
     }
 
-    fun memory(prefs: SharedPreferences): List<CoachMemoryEntry> =
+    fun memory(prefs: Prefs): List<CoachMemoryEntry> =
         CoachMemory.decode(prefs.getString(KEY_MEMORY, null))
 
-    fun save(prefs: SharedPreferences, date: LocalDate, insight: CoachInsight) {
+    fun save(prefs: Prefs, date: LocalDate, insight: CoachInsight) {
         val memory = CoachMemory.remember(
             memory(prefs),
-            CoachMemoryEntry(date.toKotlinLocalDate(), insight.focusId, insight.focusKind, insight.headline)
+            CoachMemoryEntry(date, insight.focusId, insight.focusKind, insight.headline)
         )
-        prefs.edit()
-            .putString(KEY_DATE, date.toString())
-            .putString(KEY_TEXT, insight.asText())
-            .putString(KEY_HEADLINE, insight.headline)
-            .putString(KEY_ACTION, insight.action)
-            .putString(KEY_WHY, insight.why.joinToString("\n"))
-            .putString(KEY_FOCUS, insight.focusId)
-            .putString(KEY_KIND, insight.focusKind.name)
-            .putString(KEY_NOTE, insight.note)
-            .putString(KEY_MEMORY, CoachMemory.encode(memory))
-            .apply()
+        prefs.edit {
+            putString(KEY_DATE, date.toString())
+            putString(KEY_TEXT, insight.asText())
+            putString(KEY_HEADLINE, insight.headline)
+            putString(KEY_ACTION, insight.action)
+            putString(KEY_WHY, insight.why.joinToString("\n"))
+            putString(KEY_FOCUS, insight.focusId)
+            putString(KEY_KIND, insight.focusKind.name)
+            putString(KEY_NOTE, insight.note)
+            putString(KEY_MEMORY, CoachMemory.encode(memory))
+        }
     }
 }

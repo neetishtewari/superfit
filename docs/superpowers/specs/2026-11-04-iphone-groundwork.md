@@ -224,6 +224,11 @@ tested on the dev app first.
          (delete works) and sleep, from data already on the phone or restored from backup.
          Sharing a workout card waits for share cards; steps, sleep and other apps' workouts
          keep coming from Android's backup until Apple Health. Android shows the same as before.
+       - 5b-5i: today's coach tip and step goal on iPhone. CoachInsightStore moves to shared (the
+         account's settings, same keys), and TodayCoach.dailyTip/stepGoal share the tip and
+         step-goal work; Android's Today and evening reminder call them. The iPhone shows the
+         coach card ("Get today's tip"; chat comes with coach chat), the step goal on the rings
+         with its sheet, and the "new step goal" note.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -457,3 +462,8 @@ Gemini through Firebase AI Logic with App Check, as on Android. No new permissio
 Step 5b-5h (reviewed 11 Nov): the same sums on the same on-phone data, moved; the iPhone adds
 deleting a voice-logged workout, which removes it from users/{signed-in uid} only, the same call
 Android makes. Nothing new is read, stored or sent. No new permissions.
+
+Step 5b-5i (reviewed 11 Nov): the same tip request as Android, through Firebase AI Logic with App
+Check; it carries the same history summary Android already sends. The tip and step goal are saved
+in the account's own settings on the phone (same keys as Android), nothing new is backed up. No
+new permissions.
