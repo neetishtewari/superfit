@@ -20,6 +20,7 @@ final class SpeechBridge: NSObject, VoiceRecognizer {
     private static let versions = 5
 
     private let audio = AVAudioEngine()
+    private let audioQueue = DispatchQueue(label: "com.superfit.speech.audio")
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var timers: [Timer] = []
@@ -102,27 +103,55 @@ final class SpeechBridge: NSObject, VoiceRecognizer {
         request.taskHint = .dictation
         request.addsPunctuation = false
         self.request = request
+        // Audio set-up can block for seconds (and Core Audio aborts a stuck main thread), so it
+        // runs on its own queue and the answer comes back to the main thread.
+        audioQueue.async { [audio] in
+            let failure = Self.startAudio(audio, feeding: request)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard id == self.session, self.active else {
+                    // Stopped or cancelled while the microphone was starting.
+                    self.audioQueue.async { Self.stopAudio(audio) }
+                    return
+                }
+                if let failure {
+                    self.end { $0.onError(failure) }
+                    return
+                }
+                self.task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                    DispatchQueue.main.async { self?.handle(id, result, error) }
+                }
+                self.timers.append(Timer.scheduledTimer(withTimeInterval: Self.longest, repeats: false) { [weak self] _ in
+                    guard let self, id == self.session else { return }
+                    self.finish()
+                })
+            }
+        }
+    }
+
+    /// Turns the microphone on and feeds it to [request]; nil when it worked, otherwise what to say.
+    private static func startAudio(_ audio: AVAudioEngine, feeding request: SFSpeechAudioBufferRecognitionRequest) -> String? {
+        let noMic = "Couldn't use the microphone. Check that nothing else is using it, or type your meal instead."
         do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            guard session.isInputAvailable else { return noMic }
             let input = audio.inputNode
-            input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
+            let format = input.outputFormat(forBus: 0)
+            // No usable microphone (some simulators, or another app holds it): don't start.
+            guard format.sampleRate > 0, format.channelCount > 0 else { return noMic }
+            input.removeTap(onBus: 0)
+            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 request.append(buffer)
             }
             audio.prepare()
             try audio.start()
+            return nil
         } catch {
-            end { $0.onError(error.localizedDescription) }
-            return
+            stopAudio(audio)
+            return noMic
         }
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            DispatchQueue.main.async { self?.handle(id, result, error) }
-        }
-        timers.append(Timer.scheduledTimer(withTimeInterval: Self.longest, repeats: false) { [weak self] _ in
-            guard let self, id == self.session else { return }
-            self.finish()
-        })
     }
 
     private func handle(_ id: Int, _ result: SFSpeechRecognitionResult?, _ error: Error?) {
@@ -165,7 +194,7 @@ final class SpeechBridge: NSObject, VoiceRecognizer {
         guard active, !finishing else { return }
         finishing = true
         onChecking()
-        stopAudio()
+        audioQueue.async { [audio] in Self.stopAudio(audio) }
         request?.endAudio()
         let id = session
         timers.append(Timer.scheduledTimer(withTimeInterval: Self.waitForFinal, repeats: false) { [weak self] _ in
@@ -191,9 +220,10 @@ final class SpeechBridge: NSObject, VoiceRecognizer {
         answer(self)
     }
 
-    private func stopAudio() {
+    private static func stopAudio(_ audio: AVAudioEngine) {
         if audio.isRunning { audio.stop() }
         audio.inputNode.removeTap(onBus: 0)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func tearDown() {
@@ -201,9 +231,8 @@ final class SpeechBridge: NSObject, VoiceRecognizer {
         silence = nil
         timers.forEach { $0.invalidate() }
         timers = []
-        stopAudio()
+        audioQueue.async { [audio] in Self.stopAudio(audio) }
         request?.endAudio()
         request = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 }
