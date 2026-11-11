@@ -10,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -18,6 +19,7 @@ import kotlinx.datetime.toInstant
 class ProgressLogTest {
 
     private val zone = TimeZone.of("Asia/Kolkata")
+    @OptIn(ExperimentalTime::class)
     private fun at(day: String, hour: Int) = LocalDateTime.parse("${day}T${hour.toString().padStart(2, '0')}:00").toInstant(zone).toEpochMilliseconds()
     private fun weight(kg: Double, day: String, hour: Int = 8) = WeightEntryEntity(weightKg = kg, timestamp = at(day, hour))
     private fun profile(start: Double, target: Double) = UserProfileEntity(age = 35, heightCm = 175.0, weightKg = start, isMale = true, startingWeightKg = start, targetWeightKg = target, startDateTimestamp = at("2026-10-01", 9))
