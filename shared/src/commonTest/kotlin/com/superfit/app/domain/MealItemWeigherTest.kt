@@ -30,7 +30,7 @@ class MealItemWeigherTest {
     }
 
     @Test
-    fun `weights from the answer make the switch work, per unit`() {
+    fun `weights from the answer make the switch work per unit`() {
         val out = MealItemWeigher.withWeights(
             """{"weights":[{"n":1,"grams":300,"liquid":false},{"n":2,"grams":150,"liquid":true}]}""",
             listOf(dal, chai, rice)
