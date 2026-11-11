@@ -27,14 +27,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Prefs
+import com.superfit.app.domain.HealthApp
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.dashboard.CoachStyleSettings
+import com.superfit.app.ui.dashboard.HealthSettingsSection
 import com.superfit.app.ui.dashboard.NutritionistAdviceSettings
 import com.superfit.app.ui.dashboard.TodayModel
 
 /**
  * Settings on the iPhone, from the same cards as Android: the account, your plan (with your
- * nutritionist's advice), the coach's style and the look. Health data, what the coach remembers,
+ * nutritionist's advice), Apple Health, the coach's style and the look. What the coach remembers,
  * reminders, sharing and privacy join with their iPhone parts.
  */
 @Composable
@@ -93,6 +95,14 @@ fun SettingsPage(
                 )
             }
         )
+
+        if (model.healthAvailable) {
+            SettingsGroupLabel(HealthApp.name)
+            SettingsCard {
+                val healthAsked by model.healthAsked.collectAsState()
+                HealthSettingsSection(asked = healthAsked, onConnect = model::connectHealth)
+            }
+        }
 
         SettingsGroupLabel("AI coach")
         // What the coach remembers joins with coach chat on the iPhone.

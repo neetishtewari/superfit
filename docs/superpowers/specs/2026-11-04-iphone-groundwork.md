@@ -273,6 +273,18 @@ tested on the dev app first.
        notifications and daily reminders, background refresh, home-screen widget (WidgetKit,
        SwiftUI), share sheet, PDF report, recap video with music, in-app review, analytics and
        crash reports.
+       Order (Neetish, 11 Nov): Apple Health, voice, camera and barcode, then the widget,
+       reminders and the PDF report, before the remaining screens.
+       - 6a: Apple Health, first part. Steps, active calories, walking distance and sleep are
+         read from Apple Health (HealthKit, read only) by Swift (HealthKitBridge) through a small
+         shared HealthSource; shared HealthSync saves today and yesterday the way Android's sync
+         does, and never saves an empty or failed read over a saved day. Shared SleepNight joins
+         Apple Health's many sleep pieces (watch and sleep app overlapping) into the night that
+         ended that day, deep sleep estimated at a fifth as on Android. Today's Activity side
+         asks to connect first with a short explanation, then Apple's own sheet; Settings has
+         an Apple Health section. Read again at every app open and return to the front (no
+         background reads yet). On-screen "Health Connect" becomes the phone's own health app
+         name. Workouts from other apps (6b) and smart-scale body data (6c) follow.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -534,3 +546,15 @@ text goes to Gemini through Firebase AI Logic with App Check only when the perso
 read targets) and inside the meal-rating prompt, exactly as on Android; re-rated tags are saved to
 the account's own database and backed up to users/{signed-in uid} only. Targets from the advice
 are used only after the person confirms them. No new permissions.
+
+Step 6a (reviewed 11 Nov): Apple Health is read only: Superfit asks to read steps, active energy,
+walking distance and sleep, and asks to write nothing. Access is asked only after the person taps
+Connect, with the reason shown first and in Apple's sheet (NSHealthShareUsageDescription). What is
+read stays in the account's own database on the phone; day totals (steps, active calories) and the
+night's sleep length are backed up to users/{signed-in uid} only, exactly what Android already
+backs up from Health Connect. Distance is shown, not stored. Nothing from Apple Health goes to the
+AI beyond the same day summaries Android's coach already uses, and nothing is shared or used for
+ads (App Store rule 5.1.3). An empty or refused read never overwrites a saved day, so a second
+phone on the same account can't wipe steps. The entitlement is HealthKit only (no clinical
+records). No new Android permissions; Android unchanged apart from the shared text naming its
+health app.

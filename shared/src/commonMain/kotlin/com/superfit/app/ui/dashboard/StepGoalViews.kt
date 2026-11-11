@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.Decimals
+import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalReason
 import com.superfit.app.domain.StepGoalResult
@@ -108,7 +109,7 @@ fun stepGoalExplanation(goal: StepGoalResult): List<String> {
     val lines = mutableListOf<String>()
     when (goal.reason) {
         StepGoalReason.OWN -> lines += "You set this goal yourself."
-        StepGoalReason.STARTER -> lines += "A starting goal for your age. Once there are about 5 days of steps from Health Connect, it changes to fit how much you usually walk."
+        StepGoalReason.STARTER -> lines += "A starting goal for your age. Once there are about 5 days of steps from ${HealthApp.name}, it changes to fit how much you usually walk."
         else -> {
             goal.usual?.let { lines += "You usually walk about ${steps(it)} steps a day." }
             if (goal.reason == StepGoalReason.DOWN) lines += "It was reset lower to fit a quieter stretch. It will build back up."

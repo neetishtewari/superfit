@@ -58,6 +58,7 @@ import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.Decimals
+import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
@@ -638,7 +639,7 @@ fun ActivityPerformanceCard(
             Text(
                 text = when {
                     workoutImportRunning -> "Bringing in your workouts from other apps…"
-                    state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once Samsung Health, Strava or your watch shares them with Health Connect."
+                    state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once ${HealthApp.workoutApps} shares them with ${HealthApp.name}."
                     else -> "Workouts from other apps appear here on their own. Older ones are in History."
                 },
                 fontSize = 12.sp,
@@ -839,7 +840,7 @@ fun SleepRecoveryCard(state: DashboardUiState.Success) {
             }
         } else {
             Text(
-                text = "Your sleep shows here if you track it with a watch, ring or sleep app that saves to Health Connect. " +
+                text = "Your sleep shows here if you track it with a watch, ring or sleep app that saves to ${HealthApp.name}. " +
                     "Once it does, Superfit uses it to tell you when to push and when to take it easy.",
                 fontSize = 13.sp,
                 color = ThemeTextSecondary,

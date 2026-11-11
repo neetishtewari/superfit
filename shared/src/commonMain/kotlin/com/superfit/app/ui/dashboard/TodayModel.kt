@@ -4,6 +4,8 @@ import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.CoachInsightStore
 import com.superfit.app.data.CoachStyleStore
 import com.superfit.app.data.HabitEntryEntity
+import com.superfit.app.data.HealthSource
+import com.superfit.app.data.HealthSync
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
 import com.superfit.app.data.NutritionAdviceStore
@@ -46,8 +48,9 @@ import kotlinx.datetime.TimeZone
 
 /**
  * Today for the iPhone, built from the same shared pieces as Android: today's meals, targets,
- * streak, weigh-ins and voice-logged workouts from [log], worked out by [TodayState.build]. Health
- * data (steps, sleep, workouts from other apps) joins when the iPhone reads Apple Health.
+ * streak, weigh-ins and voice-logged workouts from [log], worked out by [TodayState.build]. Steps,
+ * active calories, distance and sleep come from the phone's health app ([health], Apple Health)
+ * once the person connects it; workouts from other apps join in a later step.
  */
 class TodayModel(
     private val log: LogRepository,
@@ -56,7 +59,8 @@ class TodayModel(
     private val parser: NutritionParser = NutritionParser(),
     private val coachNotes: () -> List<CoachNote> = { emptyList() },
     private val coach: CoachingEngine = CoachingEngine(),
-    private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() }
+    private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val health: HealthSource? = null
 ) {
     private val today = Now.today()
 
@@ -133,8 +137,58 @@ class TodayModel(
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
-    /** Today's activity next to [usualDay]; the distance is estimated from steps until Apple Health joins. */
-    fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?): TodayVsUsual = TodayState.vsUsual(state, usual, today)
+    /** Today's activity next to [usualDay], with the health app's distance when it has one (else estimated from steps). */
+    fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?, distanceKm: Double? = null): TodayVsUsual =
+        TodayState.vsUsual(state, usual, today, distanceKm)
+
+    /** Whether this phone has a health app Superfit can read (false on iPads and without one). */
+    val healthAvailable: Boolean = health?.isAvailable() == true
+
+    private val _healthAsked = MutableStateFlow(healthAvailable && prefs.getBoolean(HealthSync.KEY_ASKED, false))
+
+    /** True once the person answered the health app's access sheet; then Today reads it on every open. */
+    val healthAsked: StateFlow<Boolean> = _healthAsked.asStateFlow()
+
+    private val _distanceKm = MutableStateFlow<Double?>(null)
+
+    /** Today's walked and run distance from the health app, or null to estimate it from steps. */
+    val distanceKm: StateFlow<Double?> = _distanceKm.asStateFlow()
+
+    /** Shows the phone's own access sheet, then reads today's steps and sleep straight away. */
+    fun connectHealth() {
+        val source = health?.takeIf { healthAvailable } ?: return
+        scope.launch {
+            val answered = try {
+                source.requestAccess()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Asking for health access failed", e)
+                false
+            }
+            if (!answered) return@launch
+            prefs.edit { putBoolean(HealthSync.KEY_ASKED, true) }
+            _healthAsked.value = true
+            readHealth(source)
+        }
+    }
+
+    /** Reads today's and yesterday's steps and sleep again; the app calls this whenever it comes to the front. */
+    fun syncHealth() {
+        val source = health?.takeIf { _healthAsked.value } ?: return
+        scope.launch { readHealth(source) }
+    }
+
+    private suspend fun readHealth(source: HealthSource) {
+        HealthSync.sync(source, log.healthStore, Now.today())
+        _distanceKm.value = try {
+            source.readDistanceMeters(Now.today())?.takeIf { it > 0 }?.div(1000)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private val stepGoalTrigger = MutableStateFlow(0)
 
@@ -207,6 +261,7 @@ class TodayModel(
     init {
         loadPredictedFoods()
         tagOlderMeals()
+        syncHealth()
     }
 
     /** Saves the AI coach style and rewrites today's tip in it, if there is one, as on Android. */
