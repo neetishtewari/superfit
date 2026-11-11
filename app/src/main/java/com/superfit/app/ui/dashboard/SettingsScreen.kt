@@ -13,7 +13,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -26,7 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -34,10 +32,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.superfit.app.data.ReminderNotifications
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.theme.*
-import com.superfit.app.ui.components.GoalPicker
-import com.superfit.app.ui.components.SuperfitField
+import com.superfit.app.ui.settings.SettingsGroupLabel
 import com.superfit.app.widget.WidgetPin
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,39 +54,6 @@ fun SettingsScreen(
     val hasHealthConnectPermissions by viewModel.hasHealthConnectPermissions.collectAsState()
     val lastSyncTime by viewModel.lastSyncTime.collectAsState()
     val scrollState = rememberScrollState()
-    var showDeleteAccountDialog by remember { mutableStateOf(false) }
-
-    if (showDeleteAccountDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteAccountDialog = false },
-            title = { Text("Delete your account?") },
-            text = {
-                Text(
-                    "This permanently deletes your Superfit account and everything in it: meals, workouts, " +
-                        "weight, sleep and settings, on this phone and in the cloud backup. It can't be undone."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteAccountDialog = false
-                    onDeleteAccount()
-                }) {
-                    Text("Delete account", color = DeleteRed, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
-
-    // Custom Targets Overrides State
-    var customMacroEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("custom_macro_enabled", false)) }
-    var customProtein by remember { mutableStateOf(sharedPrefs.getInt("custom_protein_g", 130).toString()) }
-    var customCarbs by remember { mutableStateOf(sharedPrefs.getInt("custom_carbs_g", 200).toString()) }
-    var customFat by remember { mutableStateOf(sharedPrefs.getInt("custom_fat_g", 70).toString()) }
-    var customCalories by remember { mutableStateOf(sharedPrefs.getInt("custom_calories", 2000).toString()) }
-
     var reminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("reminder_enabled", true)) }
     var reminderHour by remember { mutableStateOf(sharedPrefs.getInt("reminder_hour", 21)) }
     var reminderMinute by remember { mutableStateOf(sharedPrefs.getInt("reminder_minute", 0)) }
@@ -169,47 +132,13 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SettingsGroupLabel("Account")
-            // SECTION 1: Which account is signed in, so people with two accounts can tell them apart.
             val account = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
             if (account != null) {
-                val viaGoogle = account.providerData.any { it.providerId == "google.com" }
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = "Signed in as",
-                            fontSize = 12.sp,
-                            color = SuperfitTheme.colors.textSecondary
-                        )
-                        account.displayName?.takeIf { it.isNotBlank() }?.let {
-                            Text(
-                                text = it,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = SuperfitTheme.colors.textPrimary
-                            )
-                        }
-                        Text(
-                            text = account.email ?: "Account without an email",
-                            fontWeight = if (account.displayName.isNullOrBlank()) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 14.sp,
-                            color = SuperfitTheme.colors.textPrimary
-                        )
-                        Text(
-                            text = if (viaGoogle) "Google sign-in" else "Email and password",
-                            fontSize = 12.sp,
-                            color = SuperfitTheme.colors.textSecondary
-                        )
-                    }
-                }
+                com.superfit.app.ui.settings.AccountCard(
+                    name = account.displayName,
+                    email = account.email,
+                    signInMethod = if (account.providerData.any { it.providerId == "google.com" }) "Google sign-in" else "Email and password"
+                )
             }
 
             SettingsGroupLabel("Health data")
@@ -337,175 +266,15 @@ fun SettingsScreen(
             }
 
             SettingsGroupLabel("Your plan")
-            // SECTION 3: Fitness Goals and Targets Overrides
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        text = "Goal",
-                        fontWeight = FontWeight.Bold,
-                        color = SuperfitTheme.colors.textPrimary,
-                        fontSize = 14.sp
-                    )
-
-                    if (dashboardState is DashboardUiState.Success) {
-                        val state = dashboardState as DashboardUiState.Success
-                        val targets = state.macroTargets
-                        GoalPicker(
-                            selected = state.profile.goal,
-                            onSelect = { goal -> viewModel.updateGoal(goal.key, goal.calorieOffset) },
-                            selectedDetail = "Today's target: ${"%,d".format(targets.calories.roundToInt())} kcal · ${targets.proteinG.roundToInt()} g protein"
-                        )
-                    }
-
-                    stepGoal?.let { goal ->
-                        HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "Daily step goal",
-                                fontWeight = FontWeight.Bold,
-                                color = SuperfitTheme.colors.textPrimary,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "Today's goal: ${"%,d".format(goal.goal)} steps",
-                                color = SuperfitTheme.colors.textSecondary,
-                                fontSize = 12.sp
-                            )
-                            StepGoalChooser(goal = goal, onSetOwn = { viewModel.setOwnStepGoal(it) })
-                        }
-                    }
-
-                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
-
-                    NutritionistAdviceSettings(viewModel)
-
-                    HorizontalDivider(color = SuperfitTheme.colors.glassBorder)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                            Text(
-                                text = "Daily targets",
-                                fontWeight = FontWeight.Bold,
-                                color = SuperfitTheme.colors.textPrimary,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "Set your own calories and macros instead of ours",
-                                color = SuperfitTheme.colors.textSecondary,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Switch(
-                            checked = customMacroEnabled,
-                            onCheckedChange = { on ->
-                                customMacroEnabled = on
-                                if (on) {
-                                    // Just opens the boxes; nothing changes until "Save targets".
-                                    // First time, start from the person's current plan, not generic numbers.
-                                    val plan = (dashboardState as? DashboardUiState.Success)?.macroTargets
-                                    if (plan != null && !sharedPrefs.contains("custom_calories")) {
-                                        customCalories = plan.calories.roundToInt().toString()
-                                        customProtein = plan.proteinG.roundToInt().toString()
-                                        customCarbs = plan.carbsG.roundToInt().toString()
-                                        customFat = plan.fatG.roundToInt().toString()
-                                    }
-                                } else {
-                                    sharedPrefs.edit().putBoolean("custom_macro_enabled", false).apply()
-                                }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = NeonMint,
-                                checkedTrackColor = NeonMint.copy(alpha = 0.3f),
-                                uncheckedThumbColor = SuperfitTheme.colors.textTertiary,
-                                uncheckedTrackColor = SuperfitTheme.colors.glassBorder
-                            )
-                        )
-                    }
-
-                    if (customMacroEnabled) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                SuperfitField(
-                                    value = customCalories,
-                                    onValueChange = { customCalories = it },
-                                    label = { Text("Calories (kcal)", color = SuperfitTheme.colors.textSecondary) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                SuperfitField(
-                                    value = customProtein,
-                                    onValueChange = { customProtein = it },
-                                    label = { Text("Protein (g)", color = SuperfitTheme.colors.textSecondary) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                SuperfitField(
-                                    value = customCarbs,
-                                    onValueChange = { customCarbs = it },
-                                    label = { Text("Carbs (g)", color = SuperfitTheme.colors.textSecondary) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                SuperfitField(
-                                    value = customFat,
-                                    onValueChange = { customFat = it },
-                                    label = { Text("Fat (g)", color = SuperfitTheme.colors.textSecondary) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    val calVal = customCalories.toIntOrNull() ?: 2000
-                                    val protVal = customProtein.toIntOrNull() ?: 130
-                                    val carbVal = customCarbs.toIntOrNull() ?: 200
-                                    val fatVal = customFat.toIntOrNull() ?: 70
-
-                                    sharedPrefs.edit()
-                                        .putInt("custom_calories", calVal)
-                                        .putInt("custom_protein_g", protVal)
-                                        .putInt("custom_carbs_g", carbVal)
-                                        .putInt("custom_fat_g", fatVal)
-                                        .putBoolean("custom_macro_enabled", true)
-                                        .apply()
-
-                                    Toast.makeText(context, "Targets saved", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonMint),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Save targets", color = Color.White, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
+            com.superfit.app.ui.settings.PlanSettingsCard(
+                state = dashboardState,
+                stepGoal = stepGoal,
+                prefs = remember { com.superfit.app.data.AndroidPrefs(sharedPrefs) },
+                onGoal = { goal -> viewModel.updateGoal(goal.key, goal.calorieOffset) },
+                onSetOwnStepGoal = { viewModel.setOwnStepGoal(it) },
+                onTargetsChanged = { saved -> if (saved) Toast.makeText(context, "Targets saved", Toast.LENGTH_SHORT).show() },
+                nutritionistAdvice = { NutritionistAdviceSettings(viewModel) }
+            )
 
             SettingsGroupLabel("AI coach")
             // AI coach: kept apart from "My nutritionist's advice", which comes from a real person.
@@ -524,43 +293,8 @@ fun SettingsScreen(
                 }
             }
 
-            // SECTION 4: App Appearance Theme Selector
             val themeMode by ThemeConfig.mode.collectAsState()
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Appearance",
-                        fontWeight = FontWeight.Bold,
-                        color = SuperfitTheme.colors.textPrimary,
-                        fontSize = 14.sp
-                    )
-
-                    Text(
-                        text = "Auto follows your phone's light or dark setting.",
-                        fontSize = 12.sp,
-                        color = SuperfitTheme.colors.textSecondary
-                    )
-
-                    SegmentedPills(
-                        options = listOf(
-                            ThemeConfig.MODE_SYSTEM to "Auto",
-                            ThemeConfig.MODE_LIGHT to "Light",
-                            ThemeConfig.MODE_DARK to "Dark"
-                        ),
-                        selected = themeMode,
-                        onSelect = { ThemeConfig.setMode(context, it) }
-                    )
-                }
-            }
+            com.superfit.app.ui.settings.AppearanceCard(mode = themeMode, onSelect = { ThemeConfig.setMode(context, it) })
 
             // SECTION 4.5: Daily Reminder Notifications Settings
             Card(
@@ -894,70 +628,7 @@ fun SettingsScreen(
                 }
             }
 
-            // SECTION 6: Account Actions
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = onSignOut,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SuperfitTheme.colors.textPrimary.copy(alpha = 0.08f),
-                            contentColor = SuperfitTheme.colors.textPrimary
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "Sign out",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Button(
-                        onClick = { showDeleteAccountDialog = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = DeleteRed.copy(alpha = 0.15f),
-                            contentColor = DeleteRed
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "Delete account",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
+            com.superfit.app.ui.settings.AccountActionsCard(onSignOut = onSignOut, onDeleteAccount = onDeleteAccount)
         }
     }
-}
-
-/** Small heading above each group of settings. */
-@Composable
-private fun SettingsGroupLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = SuperfitTheme.colors.textSecondary,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-    )
 }

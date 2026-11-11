@@ -36,11 +36,11 @@ import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
-import com.superfit.app.ui.components.PrimaryButton
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
 import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
+import com.superfit.app.ui.settings.SettingsPage
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
@@ -48,8 +48,19 @@ import platform.UIKit.UIViewController
 fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi): UIViewController {
     installIosAi(ai)
     return ComposeUIViewController {
-        SuperfitTheme(darkTheme = isSystemInDarkTheme()) {
-            IosRoot(auth, cloudStore)
+        // Light, dark or Auto, kept for the whole app like Android's "theme_mode".
+        val appPrefs = remember { IosPrefs(APP_PREFS) }
+        var themeMode by remember { mutableStateOf(appPrefs.getString(KEY_THEME_MODE, "system") ?: "system") }
+        val dark = when (themeMode) {
+            "dark" -> true
+            "light" -> false
+            else -> isSystemInDarkTheme()
+        }
+        SuperfitTheme(darkTheme = dark) {
+            IosRoot(auth, cloudStore, themeMode) { mode ->
+                appPrefs.edit { putString(KEY_THEME_MODE, mode) }
+                themeMode = mode
+            }
         }
     }
 }
@@ -57,8 +68,11 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi): UIV
 /** What the placeholder shows after the backup comes down: how many of each the iPhone now has. */
 private data class Restored(val meals: Int, val workouts: Int, val weighIns: Int, val failed: Boolean)
 
+private const val APP_PREFS = "superfit_prefs"
+private const val KEY_THEME_MODE = "theme_mode"
+
 @Composable
-private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
+private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore, themeMode: String, onThemeMode: (String) -> Unit) {
     var email by remember { mutableStateOf(auth.currentEmail()) }
     var signedIn by remember { mutableStateOf(auth.currentUid() != null) }
     val scope = rememberCoroutineScope()
@@ -125,6 +139,24 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
         }
         val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope) }
         var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
+        var showSettings by remember(uid) { mutableStateOf(false) }
+        val signOut = {
+            auth.signOut()
+            signedIn = false
+            email = null
+        }
+        if (showSettings) {
+            SettingsPage(
+                model = today,
+                prefs = IosPrefs.forUser(uid),
+                email = email,
+                themeMode = themeMode,
+                onThemeMode = onThemeMode,
+                onBack = { showSettings = false },
+                onSignOut = signOut
+            )
+            return
+        }
         Scaffold(
             containerColor = SuperfitTheme.colors.bgStart,
             // Each screen handles the top of the phone itself; the menu handles the bottom.
@@ -134,24 +166,14 @@ private fun IosRoot(auth: IosAuth, cloudStore: IosCloudStore) {
             Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when (tab) {
                     MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value)
-                    else -> TodayScreen(today) {
-                        // What the iPhone still shows below Today until Settings moves over.
-                        Text(
-                            text = when {
-                                restored?.failed == true -> "Couldn't reach your backup. Check your internet and open the app again."
-                                else -> restored?.let { "Signed in as ${email ?: "your Apple account"}. On this iPhone: ${it.meals} meals, ${it.workouts} workouts, ${it.weighIns} weigh-ins." }.orEmpty()
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SuperfitTheme.colors.textSecondary
-                        )
-                        PrimaryButton(
-                            text = "Sign out",
-                            onClick = {
-                                auth.signOut()
-                                signedIn = false
-                                email = null
-                            }
-                        )
+                    else -> TodayScreen(today, onOpenSettings = { showSettings = true }) {
+                        if (restored?.failed == true) {
+                            Text(
+                                text = "Couldn't reach your backup. Check your internet and open the app again.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SuperfitTheme.colors.textSecondary
+                            )
+                        }
                     }
                 }
             }

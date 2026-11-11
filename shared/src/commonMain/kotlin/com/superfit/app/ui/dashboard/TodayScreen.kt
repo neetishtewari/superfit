@@ -38,7 +38,7 @@ import com.superfit.app.theme.SuperfitTheme
  * the usual, then sleep. [footer] holds what the iPhone still adds for now (sign out).
  */
 @Composable
-fun TodayScreen(model: TodayModel, footer: @Composable () -> Unit = {}) {
+fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Composable () -> Unit = {}) {
     val state by model.state.collectAsState()
     val usualDay by model.usualDay.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
@@ -76,7 +76,7 @@ fun TodayScreen(model: TodayModel, footer: @Composable () -> Unit = {}) {
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                DashboardHeader(grantedPermissions = emptySet(), hasHealthConnectPermissions = true, onNavigateToSettings = {})
+                DashboardHeader(grantedPermissions = emptySet(), hasHealthConnectPermissions = true, onNavigateToSettings = onOpenSettings)
                 FoodActivitySwitch(side = side, onSelect = { side = it })
                 if (side == "MEAL") {
                     CalorieRingsCard(state = s, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })

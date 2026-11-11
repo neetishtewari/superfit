@@ -253,6 +253,12 @@ tested on the dev app first.
          Progress page gets the Insights | Journey | History switch, weigh-ins and goal edits.
          Personal bests and the coach report wait for share cards and the iPhone PDF; scale
          readings (body fat and more) wait for Apple Health.
+       - 5d-1: Settings, first part. The account card, "Your plan" (goal, step goal, own
+         calorie and macro targets), Appearance and Sign out / Delete account move to shared
+         cards (ui/settings); Android's Settings uses them. The iPhone gets a Settings page from
+         the gear on Today with the account, your plan, Appearance (Auto, Light, Dark, kept for
+         the whole app as on Android) and Sign out. Health data, the AI coach, reminders, the
+         widget, sharing, privacy and deleting the account follow with their iPhone parts.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -510,3 +516,9 @@ and a goal edit use the same calls as Android: saved in the account's own databa
 and the weigh-in and profile backed up to users/{signed-in uid} only. "Fine for me" is kept in
 the account's own settings, as on Android. Nothing new is sent to the AI or anywhere else. No new
 permissions.
+
+
+Step 5d-1 (reviewed 11 Nov): the same settings under the same keys, kept in the account's own
+settings on the phone (theme in the app's settings); a goal change saves the profile, backed up to
+users/{signed-in uid} only, as on Android. Signing out on the iPhone is the same Firebase sign-out
+as before. Nothing new is read, stored or sent. No new permissions.
