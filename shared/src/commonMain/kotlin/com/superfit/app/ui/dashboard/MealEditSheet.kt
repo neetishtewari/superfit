@@ -37,6 +37,7 @@ import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.Level
 import com.superfit.app.domain.MealItem
 import com.superfit.app.domain.MealItemReplacer
+import com.superfit.app.domain.MealItemWeigher
 import com.superfit.app.domain.MealItems
 import com.superfit.app.domain.NumberInput
 import com.superfit.app.domain.withItems
@@ -117,7 +118,8 @@ fun MealEditSheet(
 fun MealItemsEditor(
     meal: MealItems,
     onChange: (MealItems) -> Unit,
-    replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> List<MealItem> = MealItemReplacer()::replace
+    replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> List<MealItem> = MealItemReplacer()::replace,
+    weighItems: suspend (List<MealItem>) -> List<MealItem> = MealItemWeigher()::weigh
 ) {
     val totals = meal.totals()
     val scope = rememberCoroutineScope()
@@ -126,6 +128,9 @@ fun MealItemsEditor(
     var busy by remember { mutableStateOf(false) }
     // Why the last change failed, in words the user can act on; null when it didn't.
     var failed by remember { mutableStateOf<String?>(null) }
+    // The item whose weight the AI is working out for the g or ml switch, and why it last failed.
+    var weighing by remember { mutableStateOf<Int?>(null) }
+    var weighFailed by remember { mutableStateOf<Int?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         meal.items.forEachIndexed { index, item ->
@@ -168,12 +173,40 @@ fun MealItemsEditor(
                     askToCheck = !meal.checked,
                     canRemove = meal.items.size > 1,
                     canChange = !busy,
+                    weighing = weighing == index,
+                    weighFailed = weighFailed == index,
                     onQtyChange = { qty ->
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
                     },
                     onSwitchUnit = {
-                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.switchUnit() }))
-                        UsageEvents.mealAmountChanged(how = "switch")
+                        if (item.canSwitchUnit) {
+                            onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.switchUnit() }))
+                            UsageEvents.mealAmountChanged(how = "switch")
+                        } else if (item.needsWeight && weighing == null) {
+                            // Never weighed (older or repeated meals): ask the AI once for every item's weight.
+                            weighing = index
+                            weighFailed = null
+                            scope.launch {
+                                try {
+                                    val weighed = weighItems(meal.items).toMutableList()
+                                    val switched = weighed[index].takeIf { it.canSwitchUnit }?.switchUnit()
+                                    if (switched == null) {
+                                        weighFailed = index
+                                    } else {
+                                        weighed[index] = switched
+                                        UsageEvents.mealAmountChanged(how = "weigh")
+                                    }
+                                    onChange(meal.copy(items = weighed))
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    AppLog.w("MealItemsEditor", "Weighing items failed", e)
+                                    weighFailed = index
+                                } finally {
+                                    weighing = null
+                                }
+                            }
+                        }
                     },
                     onTypeAmount = { qty ->
                         onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
@@ -230,6 +263,8 @@ private fun MealItemEditRow(
     askToCheck: Boolean,
     canRemove: Boolean,
     canChange: Boolean,
+    weighing: Boolean,
+    weighFailed: Boolean,
     onQtyChange: (Double) -> Unit,
     onSwitchUnit: () -> Unit,
     onTypeAmount: (Double) -> Unit,
@@ -318,10 +353,14 @@ private fun MealItemEditRow(
                 }
             }
         }
-        if (item.canSwitchUnit) {
+        if (item.canSwitchUnit || item.needsWeight) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = item.weightText().orEmpty(),
+                    text = when {
+                        weighing -> "Weighing…"
+                        weighFailed -> "Couldn't work out the weight. Try again."
+                        else -> item.weightText().orEmpty()
+                    },
                     color = ThemeTextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier.weight(1f)
@@ -363,7 +402,8 @@ private fun MealItemEditRow(
 @Composable
 private fun UnitSwitch(item: MealItem, onSwitch: () -> Unit) {
     val household = if (item.isMetric) item.home?.unit else item.unit
-    val metric = if (item.isMetric) item.unit else item.metric
+    // Not weighed yet: show g; tapping it asks the AI for the weight first.
+    val metric = if (item.isMetric) item.unit else item.metric ?: "g"
     if (household == null || metric == null) return
     Row(
         modifier = Modifier
@@ -408,8 +448,8 @@ private fun AmountDialog(item: MealItem, onDismiss: () -> Unit, onDone: (Double)
                     keyboardActions = KeyboardActions(onDone = { value?.let(onDone) }),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (!item.isMetric && item.canSwitchUnit) {
-                    Text("Want grams? Use the ${item.metric} switch under the amount.", color = ThemeTextSecondary, fontSize = 12.sp)
+                if (!item.isMetric) {
+                    Text("Want grams? Use the ${item.metric ?: "g"} switch under the amount.", color = ThemeTextSecondary, fontSize = 12.sp)
                 }
             }
         },
