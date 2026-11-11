@@ -66,6 +66,14 @@ class LogRepository(
         backup.uploadSleep(sleep)
     }
 
+    /** Steps and sleep from the phone's health app, for [HealthSync]. */
+    val healthStore: HealthStore = object : HealthStore {
+        override suspend fun activity(date: String) = db.telemetryDao().getActivity(date)
+        override suspend fun saveActivity(activity: ActivityTelemetryEntity) = this@LogRepository.saveActivity(activity)
+        override suspend fun sleep(date: String) = db.telemetryDao().getSleep(date)
+        override suspend fun saveSleep(sleep: SleepTelemetryEntity) = this@LogRepository.saveSleep(sleep)
+    }
+
     // --- Meals ---
 
     fun getNutritionEntriesForDay(date: LocalDate): Flow<List<NutritionEntryEntity>> {

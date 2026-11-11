@@ -35,7 +35,8 @@ import com.superfit.app.theme.SuperfitTheme
 /**
  * Today on the iPhone, with the same Food / Activity switch and shared cards Android shows.
  * Food: calorie rings, streak, nutrients, weigh-in and meals. Activity: steps and workouts next to
- * the usual, then sleep. [footer] holds what the iPhone still adds for now (sign out).
+ * the usual, then sleep, from Apple Health once it's connected. [footer] holds what the iPhone still
+ * adds for now.
  */
 @Composable
 fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Composable () -> Unit = {}) {
@@ -44,6 +45,8 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
     val stepGoal by model.stepGoal.collectAsState()
     val stepGoalNoteDismissedOn by model.stepGoalNoteDismissedOn.collectAsState()
     val coaching by model.coaching.collectAsState()
+    val healthAsked by model.healthAsked.collectAsState()
+    val distanceKm by model.distanceKm.collectAsState()
     var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
@@ -107,10 +110,11 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                         onViewAllFoods = { showAllFoods = true }
                     )
                 } else {
-                    // Sharing a workout card joins with share cards; Apple Health brings steps, sleep and workouts.
+                    // Sharing a workout card joins with share cards; workouts from other apps with their own step.
+                    if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
                     ActivityPerformanceCard(
                         state = s,
-                        vsUsual = model.vsUsual(s, usualDay),
+                        vsUsual = model.vsUsual(s, usualDay, distanceKm),
                         onDeleteWorkout = model::deleteWorkout
                     )
                     SleepRecoveryCard(state = s)
