@@ -18,6 +18,7 @@ import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
@@ -212,6 +213,47 @@ class TodayModel(
                 AppLog.w("TodayModel", "Meal parsing failed", e)
                 ParsingState.Error(AiFailover.sanitizeError(e))
             }
+        }
+    }
+
+    /** Logs a spoken meal, workout or both, the same way as Android's mic (for iPhone voice, step 5b-6). */
+    private val smartLogger = SmartLogger(
+        history = { log.getAllNutritionEntries() },
+        saveMeal = { result ->
+            log.addNutritionEntry(
+                NutritionEntryEntity(
+                    foodText = result.foodText,
+                    calories = result.calories,
+                    proteinG = result.proteinG,
+                    carbsG = result.carbsG,
+                    fatG = result.fatG,
+                    timestamp = Now.millis(),
+                    qualityTags = result.tags?.encode(),
+                    items = result.items?.encode()
+                )
+            )
+            loadPredictedFoods()
+        },
+        saveWorkout = { result ->
+            log.addWorkoutEntry(
+                WorkoutEntryEntity(
+                    description = result.workoutText,
+                    caloriesBurned = result.caloriesBurned,
+                    workoutType = result.workoutType,
+                    setsCount = result.setsCount,
+                    repsCount = result.repsCount,
+                    timestamp = Now.millis(),
+                    difficultyRating = "JUST_RIGHT"
+                )
+            )
+        }
+    )
+
+    fun smartLog(input: String, otherVersions: List<String> = emptyList(), kind: LogKind = LogKind.ANY) {
+        if (input.isBlank()) return
+        scope.launch {
+            _parsing.value = ParsingState.Loading
+            _parsing.value = smartLogger.log(input, otherVersions, kind)
         }
     }
 
