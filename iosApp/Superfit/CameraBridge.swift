@@ -29,7 +29,8 @@ final class CameraBridge: NSObject, IosCamera {
                 self.answer(nil, nil, "The camera is off for Superfit. Turn it on in Settings › Superfit, or type your meal instead.")
                 return
             }
-            if kind == "barcode" { self.scanBarcode() } else { self.snapPhoto() }
+            // Answers always arrive on the main thread (see askCamera).
+            if kind == "barcode" { MainActor.assumeIsolated { self.scanBarcode() } } else { self.snapPhoto() }
         }
     }
 
@@ -106,6 +107,7 @@ final class CameraBridge: NSObject, IosCamera {
 
     // MARK: - Barcode
 
+    @MainActor
     private func scanBarcode() {
         guard DataScannerViewController.isSupported, DataScannerViewController.isAvailable else {
             return answer(nil, nil, "Barcode scanning isn't available on this phone. Snap the nutrition label instead.")
@@ -136,6 +138,7 @@ final class CameraBridge: NSObject, IosCamera {
         }
     }
 
+    @MainActor
     fileprivate func scanned(_ code: String, from scanner: DataScannerViewController) {
         // The scanner reports the same code many times a second; only the first one counts.
         guard !scannedOnce else { return }
@@ -199,7 +202,7 @@ extension CameraBridge: DataScannerViewControllerDelegate {
     func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
         for item in addedItems {
             if case let .barcode(barcode) = item, let code = barcode.payloadStringValue {
-                scanned(code, from: dataScanner)
+                MainActor.assumeIsolated { scanned(code, from: dataScanner) }
                 return
             }
         }
@@ -207,7 +210,7 @@ extension CameraBridge: DataScannerViewControllerDelegate {
 
     func dataScanner(_ dataScanner: DataScannerViewController, didTapOn item: RecognizedItem) {
         if case let .barcode(barcode) = item, let code = barcode.payloadStringValue {
-            scanned(code, from: dataScanner)
+            MainActor.assumeIsolated { scanned(code, from: dataScanner) }
         }
     }
 }
