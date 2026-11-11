@@ -7,15 +7,19 @@ import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
+import com.superfit.app.domain.ParsedNutritionResult
 import com.superfit.app.domain.WorkoutView
 import com.superfit.app.ui.dashboard.TodayState
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
 enum class DayStatus {
@@ -232,4 +236,17 @@ object HistoryLog {
         val index = days.indexOfFirst { it.date == selected }
         return if (index != -1) days.subList((index - 6).coerceAtLeast(0), index + 1) else days.takeLast(7)
     }
+
+    /** A meal logged late for [day], timed at midday there so time zones never move it to another day. */
+    @OptIn(ExperimentalTime::class)
+    fun missedMeal(result: ParsedNutritionResult, day: LocalDate, zone: TimeZone): NutritionEntryEntity = NutritionEntryEntity(
+        foodText = result.foodText,
+        calories = result.calories,
+        proteinG = result.proteinG,
+        carbsG = result.carbsG,
+        fatG = result.fatG,
+        timestamp = LocalDateTime(day, LocalTime(12, 0)).toInstant(zone).toEpochMilliseconds(),
+        qualityTags = result.tags?.encode(),
+        items = result.items?.encode()
+    )
 }
