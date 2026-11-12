@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
+import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.LogKind
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.camera.PhotoCamera
@@ -61,10 +62,13 @@ fun TodayScreen(
     /** The widget's mic or camera, done once Today is showing; [onLaunchHandled] clears it. */
     launch: TodayLaunch? = null,
     onLaunchHandled: () -> Unit = {},
+    /** Opens the coach chat (with a roast asked for, in Roast me style); null hides "Chat with coach". */
+    onOpenCoach: ((roast: Boolean) -> Unit)? = null,
     footer: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
     val usualDay by model.usualDay.collectAsState()
+    val coachStyle by model.coachStyle.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
     val stepGoalNoteDismissedOn by model.stepGoalNoteDismissedOn.collectAsState()
     val coaching by model.coaching.collectAsState()
@@ -202,7 +206,12 @@ fun TodayScreen(
                         onLogWeight = model::logWeight
                     )
                     // Coach chat joins in a later step, so the card offers today's tip only for now.
-                    CoachInsightsCard(coachingState = coaching, onRefresh = model::refreshCoachingInsight, onOpenChat = null)
+                    CoachInsightsCard(
+                        coachingState = coaching,
+                        onRefresh = model::refreshCoachingInsight,
+                        onOpenChat = onOpenCoach?.let { open -> { open(false) } },
+                        onRoast = onOpenCoach?.takeIf { coachStyle == CoachStyle.ROAST }?.let { open -> { open(true) } }
+                    )
                     TrackMealsCard(
                         state = s,
                         predictedFoods = predictedFoods,

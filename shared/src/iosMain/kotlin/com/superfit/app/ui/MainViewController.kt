@@ -36,6 +36,7 @@ import com.superfit.app.data.LogRepository
 import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.IosAi
 import com.superfit.app.domain.LogKind
@@ -300,7 +301,11 @@ private fun IosRoot(
                         camera = camera,
                         photoLog = photoLog,
                         launch = launch,
-                        onLaunchHandled = IosLaunch::handled
+                        onLaunchHandled = IosLaunch::handled,
+                        onOpenCoach = { roast ->
+                            if (roast) coachChat.send(CoachChat.ROAST_MY_DAY, how = "chip")
+                            tab = MainTab.COACH
+                        }
                     ) {
                         if (restored?.failed == true) {
                             Text(
