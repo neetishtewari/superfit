@@ -159,7 +159,15 @@ fun BirthMonthInput(
                 modifier = Modifier.weight(1f)
             )
         }
-        if (error != null) ErrorLine(error)
+        if (error != null) {
+            ErrorLine(error)
+        } else {
+            Text(
+                "Your age changes how many calories your body needs. We ask only the month and year, so your age stays right without you updating it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = SuperfitTheme.colors.textSecondary
+            )
+        }
     }
 }
 
