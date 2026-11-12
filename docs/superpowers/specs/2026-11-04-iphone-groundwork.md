@@ -392,6 +392,16 @@ tested on the dev app first.
          Superfit is revoked too. Today now offers a "New personal best" card and Progress lists
          every personal best with Share, from shared TodayModel.personalBests. The usage and crash
          reports switch comes with analytics.
+       - 17: Usage and crash reports. The events move into shared UsageEvents (Android's
+         AppAnalytics now only switches Firebase on/off and sends them), so both phones count the
+         same things: meals logged by voice/typed/photo/barcode/label, edits, weigh-ins, goals,
+         coach messages and notes, share cards and offers, report shared, step goal, coach style
+         and which tab or screen was opened. The iPhone sends them with Firebase Analytics and
+         Crashlytics (UsageReportsBridge.swift); a crash in the shared Kotlin code is noted with
+         its Kotlin stack before the app closes. Settings › Privacy has the same "Share anonymous
+         usage and crash reports" switch on both phones (shared UsageReportsCard). Release builds
+         upload their symbol file to Crashlytics. Not on iPhone: "widget added" (iOS doesn't say
+         when a widget is added) and the speech-service key (Apple has one).
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -751,3 +761,16 @@ then the Firebase account, then the phone's copy (database file, chat file, acco
 Sign in with Apple, Apple's sheet confirms the person and the app revokes its Apple token with the
 one-time code (Apple's rule for account deletion); the code is used once and never stored. Workout
 choices go to the same users/{uid} backup document as Android's. No new permissions on either phone.
+
+Step 17 (reviewed 12 Nov): usage counts carry only how something was done or which screen opened,
+never food, numbers, health data, photos, names or email (UsageEvents is the one list for both
+phones). Both phones keep the person's switch (on unless turned off) and never report from the dev
+app (Android: .debug package; iPhone: Debug builds). On iPhone, Analytics and Crashlytics start
+switched off in Info.plist and are only turned on once the switch has been checked, so nothing is
+sent before that; no advertising ID is collected (no AdSupport, no tracking prompt,
+GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED off) and ad personalisation signals are off. Crash
+reports and handled errors include the error message and stack, as on Android. The symbol upload
+uses the Firebase config already in the app, no new key. No new permissions on either phone. App
+Store privacy labels (before the first App Store submission, Neetish): Usage data (product
+interaction) and Diagnostics (crash data), plus Device ID (Firebase's install ID), not linked to
+identity, not used for tracking; this matches Android's Data safety entry.

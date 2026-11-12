@@ -9,6 +9,7 @@ import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
@@ -199,11 +200,13 @@ class HistoryModel(
     }
 
     fun logWeight(kg: Double) {
+        UsageEvents.weighIn()
         scope.launch { log.addWeightEntry(kg) }
     }
 
     /** Start weight, goal weight and the optional date to reach it by, as on Android. */
     fun updateGoal(startKg: Double, targetKg: Double, date: LocalDate?) {
+        UsageEvents.goalSet(withDate = date != null)
         scope.launch {
             log.getProfile()?.let { log.saveProfile(it.copy(startingWeightKg = startKg, targetWeightKg = targetKg)) }
             GoalDatePref.set(prefs, date)
@@ -248,6 +251,7 @@ class HistoryModel(
                 } else {
                     log.addNutritionEntry(HistoryLog.missedMeal(result, day, zone()))
                     loadSuggestions()
+                    UsageEvents.mealLogged("typed")
                     HistoryParsingState.Success(result.foodText)
                 }
             } catch (e: CancellationException) {
@@ -265,6 +269,7 @@ class HistoryModel(
 
     /** Saves an edited meal; a changed food drops its old tags, so it is judged again, as on Android. */
     fun updateMeal(entry: NutritionEntryEntity) {
+        UsageEvents.mealEdited()
         scope.launch {
             log.updateNutritionEntry(entry)
             if (entry.qualityTags == null) tagger.tagOne(entry)?.let { log.saveMealTags(entry, it.encode()) }

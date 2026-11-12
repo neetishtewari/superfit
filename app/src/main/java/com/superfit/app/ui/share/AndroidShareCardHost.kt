@@ -20,8 +20,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import com.superfit.app.data.AndroidWorkoutCards
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.ShareCardPrefs
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.WorkoutCardData
 import com.superfit.app.data.of
 import java.io.File
@@ -58,7 +58,7 @@ class AndroidShareCardHost(private val context: Context) : ShareCardHost {
     }
 
     override fun shared(event: CardShared) {
-        AppAnalytics.cardShared(
+        UsageEvents.cardShared(
             type = event.type,
             photo = event.photo,
             adjusted = event.adjusted,

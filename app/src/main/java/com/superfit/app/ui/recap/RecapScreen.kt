@@ -75,9 +75,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.MonthlyRecapData
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.domain.MonthRecap
 import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
@@ -120,7 +120,7 @@ class RecapViewModel(private val repository: DataRepository, private val appCont
                 return@launch
             }
             if (month.isBefore(YearMonth.now())) MonthlyRecapData.markOpened(appContext, month)
-            AppAnalytics.screenOpened("recap")
+            UsageEvents.screenOpened("recap")
             _state.value = RecapState.Ready(recap, MonthlyRecapData.words(appContext, recap))
         }
     }
@@ -243,7 +243,7 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
             scope.launch { pager.animateScrollToPage(page + 1) }
         } else if (!finished) {
             finished = true
-            AppAnalytics.recapWatched(stories)
+            UsageEvents.recapWatched(stories)
         }
     }
 
@@ -341,10 +341,10 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, music: RecapMu
                                 videoReveal = 1f
                                 pager.scrollToPage(back)
                             }
-                            AppAnalytics.cardShared("recap_video")
+                            UsageEvents.cardShared("recap_video")
                             RecapVideo.share(context, file)
                         } catch (e: Exception) {
-                            AppAnalytics.recordError(e)
+                            UsageEvents.recordError(e)
                             Toast.makeText(context, "Couldn't make the video on this phone. You can still share each card.", Toast.LENGTH_LONG).show()
                         } finally {
                             making = null
@@ -404,7 +404,7 @@ private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth, onSh
                     scope.launch {
                         try {
                             shareImage(context, layer.toImageBitmap().asAndroidBitmap())
-                            AppAnalytics.cardShared("recap_${card.id}")
+                            UsageEvents.cardShared("recap_${card.id}")
                         } catch (e: Exception) {
                             Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
                         } finally {

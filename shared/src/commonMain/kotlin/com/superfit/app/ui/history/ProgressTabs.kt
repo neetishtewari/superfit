@@ -24,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.ShareCard
@@ -72,6 +74,7 @@ fun ProgressTabs(
     val progress by model.progress.collectAsState()
     // Each page keeps its own scroll place, as on Android.
     val scrolls = listOf(rememberScrollState(), rememberScrollState(), rememberScrollState())
+    LaunchedEffect(tab) { UsageEvents.screenOpened(listOf("insights", "journey", "log")[tab]) }
     Box(Modifier.fillMaxSize().background(SuperfitTheme.colors.bgStart)) {
         Column(Modifier.statusBarsPadding()) {
             Text(

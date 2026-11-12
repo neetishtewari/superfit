@@ -65,7 +65,10 @@ fun SettingsPage(
     /** How to add the home-screen widget on this phone; null hides it. */
     widgetHelp: String? = null,
     /** Settings › Delete account; null hides it. */
-    onDeleteAccount: (() -> Unit)? = null
+    onDeleteAccount: (() -> Unit)? = null,
+    /** Settings › Privacy: whether usage and crash reports are on, and how to change it; null hides it. */
+    usageReports: Boolean? = null,
+    onUsageReports: (Boolean) -> Unit = {}
 ) {
     val state by model.state.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
@@ -148,6 +151,11 @@ fun SettingsPage(
         SettingsGroupLabel("Sharing")
         // Today checks for a run or walk to offer again when it shows.
         SharingSettingsCard()
+
+        usageReports?.let { on ->
+            SettingsGroupLabel("Privacy")
+            UsageReportsCard(enabled = on, onChange = onUsageReports)
+        }
 
         AccountActionsCard(onSignOut = onSignOut, onDeleteAccount = onDeleteAccount)
         Spacer(Modifier.fillMaxWidth().height(24.dp))

@@ -8,8 +8,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.superfit.app.data.ShareCardPrefs
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.WorkoutCardData
 import com.superfit.app.domain.AppLog
+import com.superfit.app.ui.share.CardShared
 import com.superfit.app.ui.share.MAX_PHOTO_EDGE
 import com.superfit.app.ui.share.SHARE_TEXT
 import com.superfit.app.ui.share.ShareCardHost
@@ -76,6 +78,15 @@ class IosShareCardHost(
     }
 
     override fun notice(message: String) = ios.notice(message)
+
+    override fun shared(event: CardShared) = UsageEvents.cardShared(
+        type = event.type,
+        photo = event.photo,
+        adjusted = event.adjusted,
+        chips = event.chips,
+        statsPlace = event.statsPlace,
+        heartLine = event.heartLine
+    )
 
     private fun decode(bytes: ByteArray): ImageBitmap? = try {
         Image.makeFromEncoded(bytes).toComposeImageBitmap()

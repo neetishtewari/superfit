@@ -32,11 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
+import com.superfit.app.domain.ShareOffer
 import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.camera.PhotoCamera
@@ -211,6 +213,7 @@ fun TodayScreen(
                 }
                 // The ready-to-share card waits while a new best is offered, as on Android.
                 shareOffer?.takeIf { bests.toOffer == null }?.let { workout ->
+                    LaunchedEffect(workout.merged.primary.id) { UsageEvents.shareOffer("shown", offerType(workout)) }
                     ShareOfferCard(
                         workout = workout,
                         onShare = {
@@ -218,6 +221,7 @@ fun TodayScreen(
                             shareCard = ShareCards.activity(workout)
                         },
                         onDismiss = {
+                            UsageEvents.shareOffer("dismissed", offerType(workout))
                             shareHost.prefs.markOfferHandled(workout.merged.primary.id)
                             shareOfferCheck++
                         }
@@ -289,8 +293,9 @@ fun TodayScreen(
                 state = photoState,
                 kind = log.kind,
                 onLog = { entry, isPackaged ->
+                    val method = if (log.kind == PhotoKind.MEAL) "photo" else log.kind.name.lowercase()
                     log.close()
-                    model.addPhotoMeal(entry, isPackaged)
+                    model.addPhotoMeal(entry, isPackaged, method)
                 },
                 onRetake = { kind ->
                     // Closes the check sheet first; the camera opens once it has gone.
@@ -314,6 +319,7 @@ fun TodayScreen(
             onShared = {
                 shareBest?.let(model::acknowledgeBest)
                 shareOfferWorkout?.let {
+                    UsageEvents.shareOffer("shared", offerType(it))
                     shareHost.prefs.markOfferHandled(it.merged.primary.id)
                     shareOfferCheck++
                 }
@@ -386,3 +392,5 @@ fun FoodActivitySwitch(side: String, onSelect: (String) -> Unit, unseenActivity:
         unseen = if (unseenActivity) setOf("WORKOUT") else emptySet()
     )
 }
+
+private fun offerType(workout: WorkoutView) = if (ShareOffer.isRun(workout)) "run" else "walk"

@@ -37,11 +37,14 @@ import com.superfit.app.data.IosHealth
 import com.superfit.app.data.IosHealthSource
 import com.superfit.app.data.IosOnboardingHealth
 import com.superfit.app.data.IosPrefs
+import com.superfit.app.data.IosUsageReports
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.ShareCardPrefs
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.WorkoutCardData
 import com.superfit.app.data.WorkoutImportPrefs
+import com.superfit.app.data.installUsageReports
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachChat
@@ -88,8 +91,9 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport, shareCards: IosShareCards): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport, shareCards: IosShareCards, usage: IosUsageReports): UIViewController {
     installIosAi(ai)
+    installUsageReports(usage)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
     val photoCamera = IosPhotoCamera(camera)
@@ -104,7 +108,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, shareCards, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, shareCards, usage, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -136,6 +140,7 @@ private fun IosRoot(
     reminders: IosReminders,
     report: IosReport,
     shareCards: IosShareCards,
+    usage: IosUsageReports,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -300,7 +305,17 @@ private fun IosRoot(
         val photoLog = remember(uid) { PhotoLog(accountScope, camera::lookup) }
         val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope, scaleReadings = scale::mine) }
         var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
+        // How the tab was reached, for usage reports: start, menu or card (the coach card on Today).
+        var tabHow by remember(uid) { mutableStateOf("start") }
+        LaunchedEffect(tab) {
+            when (tab) {
+                MainTab.TODAY -> UsageEvents.screenOpened("home")
+                MainTab.PROGRESS -> UsageEvents.screenOpened("progress", tabHow)
+                MainTab.COACH -> UsageEvents.screenOpened("coach", tabHow)
+            }
+        }
         var showSettings by remember(uid) { mutableStateOf(false) }
+        LaunchedEffect(showSettings) { if (showSettings) UsageEvents.screenOpened("settings") }
         // The widget's mic or camera brings Today forward first.
         LaunchedEffect(launch) {
             if (launch != null) {
@@ -374,6 +389,8 @@ private fun IosRoot(
                                 onClearChat = coachChat::clearHistory
                             )
                         },
+                        usageReports = usage.isEnabled(),
+                        onUsageReports = usage::setEnabled,
                         widgetHelp = "Calories left, plus mic and camera buttons to log in seconds. To add it, touch and hold your home screen, tap Edit, then Add Widget, and find Superfit.",
                         onDeleteAccount = deleteAccount
                     )
@@ -391,7 +408,12 @@ private fun IosRoot(
                 containerColor = SuperfitTheme.colors.bgStart,
                 // Each screen handles the top of the phone itself; the menu handles the bottom.
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                bottomBar = { MainMenuBar(tab, onSelect = { tab = it }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH)) }
+                bottomBar = {
+                    MainMenuBar(tab, onSelect = {
+                        tabHow = "menu"
+                        tab = it
+                    }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH))
+                }
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                     when (tab) {
@@ -400,7 +422,12 @@ private fun IosRoot(
                             model = history,
                             today = today.state.collectAsState().value,
                             onShareReport = { weeks ->
-                                accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
+                                accountScope.launch {
+                                    history.buildReport(weeks, name = auth.currentName())?.let {
+                                        UsageEvents.reportShared(weeks)
+                                        report.share(it)
+                                    }
+                                }
                             },
                             bests = today.personalBests.collectAsState().value.all
                         )
@@ -414,6 +441,7 @@ private fun IosRoot(
                             onLaunchHandled = IosLaunch::handled,
                             onOpenCoach = { roast ->
                                 if (roast) coachChat.send(CoachChat.ROAST_MY_DAY, how = "chip")
+                                tabHow = "card"
                                 tab = MainTab.COACH
                             }
                         ) {

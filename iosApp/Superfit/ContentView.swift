@@ -8,7 +8,7 @@ struct ComposeView: UIViewControllerRepresentable {
         MainViewControllerKt.MainViewController(
             auth: FirebaseAuthBridge(), cloudStore: FirestoreCloudStore(), ai: FirebaseAiBridge(), health: HealthKitBridge(),
             speech: SpeechBridge(), camera: CameraBridge(), widget: WidgetBridge.shared, reminders: ReminderBridge.shared, report: ReportBridge(),
-            shareCards: ShareBridge()
+            shareCards: ShareBridge(), usage: UsageReportsBridge.shared
         )
     }
 

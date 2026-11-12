@@ -3,6 +3,7 @@ package com.superfit.app.ui.coach
 import com.superfit.app.data.CloudBackup
 import com.superfit.app.data.CloudBackupLocal
 import com.superfit.app.data.Now
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.domain.Ai
 import com.superfit.app.domain.AiChatTurn
 import com.superfit.app.domain.AiFailover
@@ -81,6 +82,7 @@ class CoachChatModel(
         val before = _messages.value.filterNot { it.isError }
         _messages.value = _messages.value + ChatEntry(id = newId(), fromUser = true, text = question, time = clock(), spoken = how == "voice")
         persist()
+        UsageEvents.coachMessageSent(how)
         _loading.value = true
         scope.launch {
             try {
@@ -128,6 +130,7 @@ class CoachChatModel(
                 if (noteUpdate.isEmpty) return@launch
                 val current = _notes.value
                 saveNotes(CoachNotes.apply(current, noteUpdate))
+                noteUpdate.add.forEach { _ -> UsageEvents.coachNoteSaved(byUser = false) }
                 update(reply.id) {
                     it.copy(rememberedIds = noteUpdate.add.map { n -> n.id }, forgotten = current.filter { n -> n.id in noteUpdate.outdatedIds })
                 }
@@ -149,6 +152,7 @@ class CoachChatModel(
     fun undoNotes(entryId: Long) {
         val entry = _messages.value.firstOrNull { it.id == entryId } ?: return
         val current = _notes.value
+        UsageEvents.coachNoteRemoved("undo")
         saveNotes(current.filterNot { it.id in entry.rememberedIds } + entry.forgotten.filter { old -> current.none { it.id == old.id } })
         update(entryId) { it.copy(rememberedIds = emptyList(), forgotten = emptyList()) }
     }
@@ -158,16 +162,21 @@ class CoachChatModel(
         val entry = _messages.value.firstOrNull { it.id == entryId } ?: return
         val meal = entry.mealToLog ?: return
         if (entry.mealLogged) return
-        today.logMeal(meal)
+        today.logMeal(meal, countAs = null)
+        UsageEvents.coachMealLogged()
         update(entryId) { it.copy(mealLogged = true) }
     }
 
-    fun deleteNote(id: String) = saveNotes(_notes.value.filterNot { it.id == id })
+    fun deleteNote(id: String) {
+        UsageEvents.coachNoteRemoved("settings")
+        saveNotes(_notes.value.filterNot { it.id == id })
+    }
 
     /** Adds what the person typed or pasted in Settings; each line becomes its own note. */
     fun addNote(text: String) {
         val added = CoachNotes.fromUserText(text, Now.today(), clock())
         if (added.isEmpty()) return
+        added.forEach { _ -> UsageEvents.coachNoteSaved(byUser = true) }
         saveNotes(CoachNotes.apply(_notes.value, NoteUpdate(added, emptyList())))
     }
 

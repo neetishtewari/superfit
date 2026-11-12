@@ -382,7 +382,7 @@ fun DashboardScreen(
                 FoodCameraScreen(
                     controller = foodCameraController,
                     onLogged = { entry, isPackaged ->
-                        com.superfit.app.data.AppAnalytics.mealLogged(
+                        com.superfit.app.data.UsageEvents.mealLogged(
                             when (foodCameraController.mode) {
                                 com.superfit.app.ui.camera.CameraMode.BARCODE -> "barcode"
                                 com.superfit.app.ui.camera.CameraMode.LABEL -> "label"
@@ -541,7 +541,7 @@ fun DashboardScreen(
                         // The ready-to-share card waits while the recap or a new best is offered.
                         shareOffer?.takeIf { recapOffer == null && personalBests.toOffer == null }?.let { workout ->
                             LaunchedEffect(workout.merged.primary.id) {
-                                com.superfit.app.data.AppAnalytics.shareOffer("shown", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+                                com.superfit.app.data.UsageEvents.shareOffer("shown", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
                             }
                             ShareOfferCard(
                                 workout = workout,

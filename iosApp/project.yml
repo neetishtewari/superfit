@@ -45,6 +45,11 @@ targets:
         product: FirebaseAuth
       - package: Firebase
         product: FirebaseAI
+      # Anonymous usage counts and crash reports (Settings › Privacy switch, off in Debug builds).
+      - package: Firebase
+        product: FirebaseAnalytics
+      - package: Firebase
+        product: FirebaseCrashlytics
       - package: GoogleSignIn
         product: GoogleSignIn
     entitlements:
@@ -69,6 +74,13 @@ targets:
         # Manrope for drawing the report PDF (copied in from the shared fonts above).
         UIAppFonts: [manrope_regular.ttf, manrope_medium.ttf, manrope_bold.ttf, manrope_extrabold.ttf]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Usage counts and crash reports start off; UsageReportsBridge turns them on only when the
+        # person's Settings › Privacy switch is on, and never in Debug builds. No advertising ID,
+        # no ad personalisation.
+        FIREBASE_ANALYTICS_COLLECTION_ENABLED: false
+        FirebaseCrashlyticsCollectionEnabled: false
+        GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED: false
+        GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS: false
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true
         # Shown in Apple's Health access sheet. Superfit only reads; it never writes to Apple Health.
@@ -110,6 +122,21 @@ targets:
         script: |
           cd "$SRCROOT/.."
           ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+    postBuildScripts:
+      # Sends the Release build's symbol file to Crashlytics so crash reports show code lines.
+      # Debug builds don't report, so they skip it.
+      - name: Upload symbols for crash reports
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
+        script: |
+          if [ "$CONFIGURATION" = "Release" ]; then
+            "${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run"
+          fi
   # Home-screen and lock-screen widget: today's calories left, with mic and camera buttons.
   SuperfitWidget:
     type: app-extension

@@ -20,6 +20,7 @@ import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.StepGoalStore
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
@@ -309,6 +310,7 @@ class TodayModel(
         workoutPrefs.enabled = on
         _workoutImportEnabled.value = on
         workoutSettingsChanged()
+        if (on) UsageEvents.workoutsConnected()
         if (on) health?.takeIf { healthAvailable }?.let { source -> scope.launch { readHealth(source) } }
     }
 
@@ -401,10 +403,12 @@ class TodayModel(
         scope.launch {
             log.getProfile()?.let { log.saveProfile(it.copy(goal = goal.key, calorieOffset = goal.calorieOffset)) }
         }
+        UsageEvents.goalSet(withDate = false)
     }
 
     /** Sex, birth month, height and activity level from Settings > About you. */
     fun saveAboutYou(updated: UserProfileEntity) {
+        UsageEvents.profileEdited()
         scope.launch {
             // Only the About you fields: a weigh-in or goal saved meanwhile is kept.
             log.getProfile()?.let {
@@ -424,6 +428,7 @@ class TodayModel(
     /** The person's own daily step goal, or null to go back to the automatic one. */
     fun setOwnStepGoal(steps: Int?) {
         StepGoalStore.setOwnGoal(prefs, steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX))
+        UsageEvents.stepGoalChanged("set", if (steps == null) "auto" else "own")
         stepGoalTrigger.value++
     }
 
@@ -539,6 +544,7 @@ class TodayModel(
         CoachStyleStore.save(prefs, style)
         if (style == _coachStyle.value) return
         _coachStyle.value = style
+        UsageEvents.coachStyleChanged(style.name)
         if (_coaching.value is CoachingInsightState.Success) refreshCoachingInsight()
     }
 
@@ -588,8 +594,11 @@ class TodayModel(
         }
     }
 
-    /** Works out a typed meal with the AI and logs it, the same way as Android. */
-    fun logMeal(text: String) {
+    /**
+     * Works out a typed meal with the AI and logs it, the same way as Android. [countAs] is how it
+     * shows in usage reports (null when the caller counts it itself, like the coach's "Log this").
+     */
+    fun logMeal(text: String, countAs: String? = "typed") {
         if (text.isBlank()) return
         lastMeal = text
         scope.launch {
@@ -612,6 +621,7 @@ class TodayModel(
                         )
                     )
                     loadPredictedFoods()
+                    countAs?.let(UsageEvents::mealLogged)
                     ParsingState.Success(result.foodText)
                 }
             } catch (e: CancellationException) {
@@ -640,6 +650,7 @@ class TodayModel(
                 )
             )
             loadPredictedFoods()
+            UsageEvents.mealLogged("voice")
         },
         saveWorkout = { result ->
             log.addWorkoutEntry(
@@ -653,6 +664,7 @@ class TodayModel(
                     difficultyRating = "JUST_RIGHT"
                 )
             )
+            UsageEvents.workoutLogged()
         }
     )
 
@@ -668,7 +680,8 @@ class TodayModel(
      * Saves a meal from the camera once the person checked it, as Android does: packets (and
      * meals whose food was changed) get their quality tags afterwards.
      */
-    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean) {
+    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean, method: String = "photo") {
+        UsageEvents.mealLogged(method)
         scope.launch {
             try {
                 val id = log.addNutritionEntry(entry)
@@ -697,6 +710,7 @@ class TodayModel(
     }
 
     fun updateMeal(entry: NutritionEntryEntity) {
+        UsageEvents.mealEdited()
         scope.launch { log.updateNutritionEntry(entry) }
     }
 
@@ -709,6 +723,7 @@ class TodayModel(
     }
 
     fun logWeight(weightKg: Double, note: String) {
+        UsageEvents.weighIn()
         scope.launch { log.addWeightEntry(weightKg, note) }
     }
 

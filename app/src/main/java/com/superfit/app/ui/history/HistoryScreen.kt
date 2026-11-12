@@ -87,7 +87,7 @@ fun HistoryScreen(
     }
     var unseen by remember { mutableStateOf(com.superfit.app.data.SeenTabs.unseen(context, listOf("progress_1", "progress_2"))) }
     LaunchedEffect(selectedTab) {
-        com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab])
+        com.superfit.app.data.UsageEvents.screenOpened(listOf("insights", "journey", "log")[selectedTab])
         if ("progress_$selectedTab" in unseen) {
             com.superfit.app.data.SeenTabs.markSeen(context, "progress_$selectedTab")
             unseen = unseen - "progress_$selectedTab"

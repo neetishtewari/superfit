@@ -273,14 +273,14 @@ class HistoryViewModel(
                 body = body
             )
             com.superfit.app.ui.share.CoachExportPdf.share(context, report)
-            com.superfit.app.data.AppAnalytics.reportShared(weeks)
+            com.superfit.app.data.UsageEvents.reportShared(weeks)
         }
     }
 
     fun logWeight(weightKg: Double) {
         viewModelScope.launch {
             repository.addWeightEntry(weightKg)
-            com.superfit.app.data.AppAnalytics.weighIn()
+            com.superfit.app.data.UsageEvents.weighIn()
             loadData()
         }
     }
@@ -293,7 +293,7 @@ class HistoryViewModel(
             }
             GoalDatePref.set(prefs, targetDate)
             GoalDatePref.markGoalSet(prefs)
-            com.superfit.app.data.AppAnalytics.goalSet(withDate = targetDate != null)
+            com.superfit.app.data.UsageEvents.goalSet(withDate = targetDate != null)
             loadData()
         }
     }
@@ -306,7 +306,7 @@ class HistoryViewModel(
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
-            com.superfit.app.data.AppAnalytics.mealEdited()
+            com.superfit.app.data.UsageEvents.mealEdited()
             loadData()
             // A changed food drops the old tags (see withItems), so the meal is judged again.
             if (entry.qualityTags == null) {
@@ -355,7 +355,7 @@ class HistoryViewModel(
 
                 val entry = HistoryLog.missedMeal(result, selectedDate, TimeZone.currentSystemDefault())
                 repository.addNutritionEntry(entry)
-                com.superfit.app.data.AppAnalytics.mealLogged("typed")
+                com.superfit.app.data.UsageEvents.mealLogged("typed")
                 loadData()
                 _parsingState.value = HistoryParsingState.Success(result.foodText)
             } catch (e: Exception) {
