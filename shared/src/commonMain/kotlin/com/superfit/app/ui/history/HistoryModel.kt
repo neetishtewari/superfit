@@ -87,6 +87,8 @@ class HistoryModel(
 
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
+    private val _mealSuggester = MutableStateFlow(com.superfit.app.domain.MealSuggester.EMPTY)
+    val mealSuggester: StateFlow<com.superfit.app.domain.MealSuggester> = _mealSuggester.asStateFlow()
 
     private val workoutPrefs = WorkoutImportPrefs(prefs)
 
@@ -211,7 +213,14 @@ class HistoryModel(
     }
 
     init {
-        scope.launch { _predictedFoods.value = runCatching { log.getPredictedFoods(Now.hour()) }.getOrDefault(emptyList()) }
+        loadSuggestions()
+    }
+
+    private fun loadSuggestions() {
+        scope.launch {
+            _predictedFoods.value = runCatching { log.getPredictedFoods(Now.hour()) }.getOrDefault(emptyList())
+            runCatching { log.getMealSuggester(Now.hour()) }.onSuccess { _mealSuggester.value = it }
+        }
     }
 
     fun select(date: LocalDate) {
@@ -238,6 +247,7 @@ class HistoryModel(
                     HistoryParsingState.Error("Could not recognize any food items. Please try typing something like 'one apple and greek yogurt'.")
                 } else {
                     log.addNutritionEntry(HistoryLog.missedMeal(result, day, zone()))
+                    loadSuggestions()
                     HistoryParsingState.Success(result.foodText)
                 }
             } catch (e: CancellationException) {

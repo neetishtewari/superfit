@@ -308,7 +308,8 @@ fun HistoryScreen(
                                         onDeleteMeal = viewModel::deleteMeal,
                                         onDeleteWorkout = viewModel::deleteWorkout,
                                         onHideImported = viewModel::hideImportedWorkout,
-                                        onShare = { shareCard = it }
+                                        onShare = { shareCard = it },
+                                        mealSuggester = viewModel.mealSuggester
                                     )
                                 }
                             }

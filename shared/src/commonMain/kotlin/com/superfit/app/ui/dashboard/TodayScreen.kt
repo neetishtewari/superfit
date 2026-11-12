@@ -81,6 +81,7 @@ fun TodayScreen(
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
+    val mealSuggester by model.mealSuggester.collectAsState()
     var foodInput by remember { mutableStateOf("") }
     var showAllFoods by remember { mutableStateOf(false) }
     val voice = model.voiceLog?.takeIf { it.available }
@@ -223,7 +224,8 @@ fun TodayScreen(
                         parsingState = parsing,
                         foodInputText = foodInput,
                         onFoodInputChange = { foodInput = it },
-                        onViewAllFoods = { showAllFoods = true }
+                        onViewAllFoods = { showAllFoods = true },
+                        mealSuggester = mealSuggester
                     )
                 } else {
                     // Sharing a workout card joins with share cards.

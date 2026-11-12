@@ -203,6 +203,7 @@ private fun HistoryPageContent(model: HistoryModel) {
     val page by model.page.collectAsState()
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
+    val mealSuggester by model.mealSuggester.collectAsState()
     val p = page
     if (p == null) {
         CircularProgressIndicator(color = NeonMint)
@@ -228,6 +229,7 @@ private fun HistoryPageContent(model: HistoryModel) {
         onDeleteMeal = model::deleteMeal,
         onDeleteWorkout = model::deleteWorkout,
         // Hiding comes with Apple Health workouts; sharing with share cards.
-        onHideImported = {}
+        onHideImported = {},
+        mealSuggester = mealSuggester
     )
 }
