@@ -8,6 +8,7 @@ import com.superfit.app.ui.dashboard.CoachingInsightState
 import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.TodayModel
 import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +32,7 @@ interface IosReminders {
  * Keeps the iPhone's evening reminders in step with Today: written ahead from today's numbers and
  * tip (ReminderPlan), and written again whenever they or the reminder settings change.
  */
+@OptIn(ExperimentalTime::class)
 class ReminderSync(private val ios: IosReminders, private val prefs: Prefs, private val today: TodayModel) {
     private val settingsChanged = MutableStateFlow(0)
 

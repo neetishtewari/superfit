@@ -1,6 +1,7 @@
 package com.superfit.app.domain
 
 import com.superfit.app.data.Prefs
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
@@ -20,6 +21,7 @@ data class ReminderNote(val id: String, val atEpochSeconds: Long, val title: Str
  * a full day gets today's coach tip (or the short "Daily log complete" line). The coming days are
  * written as reminders too, so they still come if the app isn't opened.
  */
+@OptIn(ExperimentalTime::class)
 object ReminderPlan {
     // The same settings as Android's Settings › Daily reminder.
     const val KEY_ENABLED = "reminder_enabled"

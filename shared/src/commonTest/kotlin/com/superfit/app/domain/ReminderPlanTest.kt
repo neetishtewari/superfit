@@ -3,11 +3,13 @@ package com.superfit.app.domain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 
+@OptIn(ExperimentalTime::class)
 class ReminderPlanTest {
     private val zone = TimeZone.UTC
     private val today = LocalDate(2026, 11, 12)
