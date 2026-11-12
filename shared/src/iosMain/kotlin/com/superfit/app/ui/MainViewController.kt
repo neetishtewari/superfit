@@ -53,6 +53,7 @@ import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
 import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
+import kotlinx.coroutines.launch
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSURL
@@ -63,7 +64,7 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
@@ -79,7 +80,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -109,6 +110,7 @@ private fun IosRoot(
     camera: IosPhotoCamera,
     widget: IosWidget,
     reminders: IosReminders,
+    report: IosReport,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -267,7 +269,9 @@ private fun IosRoot(
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when (tab) {
-                    MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value)
+                    MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value) { weeks ->
+                        accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
+                    }
                     else -> TodayScreen(
                         today,
                         onOpenSettings = { showSettings = true },

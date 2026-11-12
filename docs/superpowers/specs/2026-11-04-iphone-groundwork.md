@@ -345,6 +345,13 @@ tested on the dev app first.
          notifications once, after sign-in; if they're off, Settings says so and opens the
          phone's settings. Signing out removes them. The monthly recap's notification comes with
          the recap.
+       - 12: Share my report. Progress › Insights › "Share my report" (2 or 4 weeks), the same
+         PDF as Android. Its layout moved to shared code (CoachReportPdf on a small PdfSurface),
+         so both apps draw the same pages; Android's PdfDocument drawing is now that surface,
+         and the iPhone's is Apple's PDF renderer (ReportBridge) in the bundled Manrope with the
+         app icon, then Apple's share sheet. The report's numbers come from shared
+         CoachExportBuilder via HistoryModel.buildReport, as on Android. The footer links to
+         Google Play until Superfit is on the App Store (then StoreLink gets the App Store link).
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -664,3 +671,9 @@ anywhere, no server push and no new data. They contain only today's calories and
 already on Home, and they are removed on sign out. Apple's notification prompt is the only new
 permission, and it can be refused: the reminder just doesn't show. A reminder tap can only start
 listening on Today (Apple's mic indicator shows), as the widget's mic does. Android unchanged.
+
+Step 12 (reviewed 12 Nov): the PDF is made on the phone from the person's own data, saved in the
+app's temporary folder with file protection (replaced each time), and leaves the phone only
+through the share sheet, where the person picks where it goes. Nothing is uploaded and there are no
+new permissions. The name at the top comes from the signed-in account, as on Android. Android's
+PDF is drawn by the same shared layout, with the same fonts, colours, positions and Play Store link.

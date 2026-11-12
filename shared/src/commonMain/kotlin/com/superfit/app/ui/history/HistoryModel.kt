@@ -16,11 +16,16 @@ import com.superfit.app.data.WorkoutSync
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.BodyPeriod
+import com.superfit.app.domain.CoachExport
+import com.superfit.app.domain.CoachExportBuilder
+import com.superfit.app.domain.CoachExportHeader
+import com.superfit.app.domain.DietScoreEngine
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.WorkoutView
+import com.superfit.app.domain.currentAge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +143,48 @@ class HistoryModel(
             period = bodyPeriod
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /**
+     * "Share my report": the last [weeks] full weeks for a coach, a friend or an accountability
+     * partner, built exactly as Android's (CoachExportBuilder); null before a profile exists.
+     */
+    suspend fun buildReport(weeks: Int, name: String?): CoachExport? {
+        val profile = log.getProfile() ?: return null
+        val tz = zone()
+        val day = Now.today()
+        val meals = log.getAllNutritionEntries()
+        val workoutList = log.getAllWorkoutEntries()
+        val workouts = HistoryLog.byDay(workoutList, tz) { it.timestamp }
+        val imported = importedByDay(profile, tz)
+        val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, imported[date].orEmpty(), workouts[date].orEmpty()) }
+        val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
+        val totals = DayTotalsBuilder.days(meals, workoutList, log.getAllActivityTelemetry(), imported, target, proteinTarget, tz)
+        val yesterday = day.minus(DatePeriod(days = 1))
+        val weights = log.getAllWeightEntries()
+        return CoachExportBuilder.build(
+            header = CoachExportHeader(
+                name = name?.takeIf { it.isNotBlank() },
+                goal = profile.goal,
+                age = profile.currentAge(day),
+                heightCm = profile.heightCm,
+                isMale = profile.isMale,
+                startKg = profile.startingWeightKg,
+                targetKg = profile.targetWeightKg
+            ),
+            weeks = weeks,
+            today = day,
+            days = totals,
+            meals = meals,
+            weighIns = ProgressLog.weighIns(weights, tz),
+            proteinTargetG = proteinTarget,
+            // Same as Android: each week's Diet Quality, against yesterday's calorie target.
+            dietScores = (weeks - 1 downTo 0).map { weeksAgo ->
+                DietScoreEngine.score(meals, yesterday, proteinTarget, target(yesterday), tz, weeksAgo)?.score
+            },
+            zone = tz,
+            body = ProgressLog.build(profile, prefs, meals, weights, totals, scaleReadings(), period.value, day, tz).body
+        )
+    }
 
     fun choosePeriod(p: BodyPeriod) {
         prefs.edit { putString(ProgressLog.KEY_BODY_PERIOD, p.label) }
