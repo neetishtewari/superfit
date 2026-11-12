@@ -1,7 +1,10 @@
 package com.superfit.app.data
 
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.execSQL
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -27,11 +30,22 @@ internal fun iosAppFolder(): String {
 }
 
 /**
+ * Birth month and year (version 10), for iPhone test installs made at version 9. Same change as
+ * Android's MIGRATION_9_10.
+ */
+private val IOS_MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `user_profile` ADD COLUMN `birthYearMonth` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/**
  * Opens the database of the person signed in now, one file per account like on Android. The
- * iPhone starts at the current version, so it needs none of Android's upgrade steps.
+ * iPhone started at version 9, so it needs none of Android's older upgrade steps.
  */
 fun openIosDatabase(uid: String): SuperfitDatabase =
     Room.databaseBuilder<SuperfitDatabase>(name = "${iosAppFolder()}/superfit_database_$uid.db")
         .setDriver(BundledSQLiteDriver())
+        .addMigrations(IOS_MIGRATION_9_10)
         .setQueryCoroutineContext(Dispatchers.IO)
         .build()

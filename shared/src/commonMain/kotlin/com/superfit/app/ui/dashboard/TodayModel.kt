@@ -297,6 +297,24 @@ class TodayModel(
         }
     }
 
+    /** Sex, birth month, height and activity level from Settings > About you. */
+    fun saveAboutYou(updated: UserProfileEntity) {
+        scope.launch {
+            // Only the About you fields: a weigh-in or goal saved meanwhile is kept.
+            log.getProfile()?.let {
+                log.saveProfile(
+                    it.copy(
+                        isMale = updated.isMale,
+                        age = updated.age,
+                        birthYearMonth = updated.birthYearMonth,
+                        heightCm = updated.heightCm,
+                        activityMultiplier = updated.activityMultiplier
+                    )
+                )
+            }
+        }
+    }
+
     /** The person's own daily step goal, or null to go back to the automatic one. */
     fun setOwnStepGoal(steps: Int?) {
         StepGoalStore.setOwnGoal(prefs, steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX))

@@ -28,6 +28,7 @@ import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutParser
 import com.superfit.app.domain.WorkoutView
+import com.superfit.app.domain.currentAge
 import com.superfit.app.widget.SuperfitWidget
 import com.superfit.app.widget.WidgetSnapshot
 import com.superfit.app.widget.WidgetSnapshotStore
@@ -438,7 +439,7 @@ class DashboardViewModel(
             sleep = repository.getAllSleepTelemetry(),
             weights = repository.getAllWeightEntries(),
             targetWeightKg = profile.targetWeightKg,
-            age = profile.age,
+            age = profile.currentAge(),
             stepGoal = stepGoal.value?.goal
         )
 
@@ -446,7 +447,7 @@ class DashboardViewModel(
             You are Superfit AI Coach, a friendly, knowledgeable personal trainer and nutrition coach who knows this user well.
             Answer the user's questions about their fitness, food, sleep and progress.
             Their numbers today:
-            - Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
+            - Profile: Age ${profile.currentAge()}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
             - Body (smart scale): $bodyText
             - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
             - Their own nutritionist's advice (follow it, never contradict it): ${com.superfit.app.domain.PersonalNutrition.advice ?: "none given"}
@@ -1087,6 +1088,24 @@ class DashboardViewModel(
             val currentProfile = repository.getProfile() ?: return@launch
             val updated = currentProfile.copy(goal = goal, calorieOffset = offset)
             repository.saveProfile(updated)
+        }
+    }
+
+    /** Sex, birth month, height and activity level from Settings > About you. */
+    fun saveAboutYou(updated: UserProfileEntity) {
+        viewModelScope.launch {
+            val current = repository.getProfile() ?: return@launch
+            // Only the About you fields: a weigh-in or goal saved meanwhile is kept.
+            repository.saveProfile(
+                current.copy(
+                    isMale = updated.isMale,
+                    age = updated.age,
+                    birthYearMonth = updated.birthYearMonth,
+                    heightCm = updated.heightCm,
+                    activityMultiplier = updated.activityMultiplier
+                )
+            )
+            AppAnalytics.profileEdited()
         }
     }
 

@@ -11,7 +11,7 @@ class CloudMapsTest {
         val p = UserProfileEntity(
             age = 34, heightCm = 172.5, weightKg = 81.2, isMale = false, activityMultiplier = 1.55,
             goal = "BUILD_MUSCLE", calorieOffset = 250, startingWeightKg = 84.0, targetWeightKg = 78.0,
-            startDateTimestamp = 1_700_000_000_000L, fitnessLevel = "BEGINNER"
+            startDateTimestamp = 1_700_000_000_000L, fitnessLevel = "BEGINNER", birthYearMonth = 199103
         )
         assertEquals(p, p.toMap().toUserProfileEntity())
     }
@@ -55,6 +55,8 @@ class CloudMapsTest {
     fun missingFieldsFallBackToDefaults() {
         val empty = emptyMap<String, Any>()
         assertEquals("LOSE_WEIGHT", empty.toUserProfileEntity().goal)
+        // Backups saved before birth months existed: no birth month, so the typed age is used.
+        assertEquals(0, empty.toUserProfileEntity().birthYearMonth)
         assertEquals("Cardio", empty.toWorkoutEntry("x").workoutType)
         assertEquals(1, empty.toStreakState().graceDaysRemaining)
     }

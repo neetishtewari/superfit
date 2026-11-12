@@ -26,6 +26,7 @@ import com.superfit.app.domain.WeekMark
 import com.superfit.app.domain.WorkoutHeart
 import com.superfit.app.domain.WorkoutMoments
 import com.superfit.app.domain.WorkoutView
+import com.superfit.app.domain.currentAge
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -68,7 +69,7 @@ object WorkoutCardData {
         if (workout != null) {
             val primary = workout.merged.primary
             val samples = readHeartRate(repository.healthConnectManager.healthConnectClient, primary.sourcePackage, primary.startTime, primary.endTime)
-            val heart = samples?.let { WorkoutHeart.line(it, primary.startTime, primary.endTime, profile?.age) }
+            val heart = samples?.let { WorkoutHeart.line(it, primary.startTime, primary.endTime, profile?.currentAge()) }
             val moment = safe("moments") {
                 val sleep = repository.getAllSleepTelemetry()
                     .mapNotNull { s -> runCatching { kotlinx.datetime.LocalDate.parse(s.date) }.getOrNull()?.let { it to s.sleepDurationSeconds / 3600.0 } }

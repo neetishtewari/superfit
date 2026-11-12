@@ -61,6 +61,7 @@ import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.MealTags
+import com.superfit.app.domain.currentAge
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
 
@@ -174,7 +175,7 @@ fun CalorieRingsCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // The person's own step goal (see StepGoal); the age starter until it's worked out.
-            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.age)).toDouble()
+            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.currentAge())).toDouble()
             val caloriesTarget = state.macroTargets.calories
 
             val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)

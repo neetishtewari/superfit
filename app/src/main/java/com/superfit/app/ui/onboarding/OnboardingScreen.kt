@@ -253,7 +253,7 @@ fun OnboardingScreen(
                             errors = aboutYouErrors,
                             onNext = {
                                 val errors = AboutYouErrors(
-                                    age = (uiState.age.toIntOrNull() ?: 0) <= 0,
+                                    birth = uiState.birthProblem(),
                                     height = (uiState.height.toDoubleOrNull() ?: 0.0) <= 0.0,
                                     weight = (uiState.weight.toDoubleOrNull() ?: 0.0) <= 0.0
                                 )

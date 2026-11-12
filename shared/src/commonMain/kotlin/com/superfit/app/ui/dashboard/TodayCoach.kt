@@ -15,6 +15,7 @@ import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalReason
 import com.superfit.app.domain.StepGoalResult
+import com.superfit.app.domain.currentAge
 import kotlinx.datetime.LocalDate
 
 /**
@@ -70,7 +71,7 @@ object TodayCoach {
     ): StepGoalResult {
         val steps = activity.mapNotNull { row -> runCatching { LocalDate.parse(row.date) to row.steps }.getOrNull() }.toMap()
         val saved = StepGoalStore.load(prefs)
-        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(prefs), today)
+        val result = StepGoal.update(steps, profile.currentAge(), saved, StepGoalStore.ownGoal(prefs), today)
         if (result.reason != StepGoalReason.OWN && result.saved != saved) {
             StepGoalStore.save(prefs, result.saved)
             if (saved != null && result.goal != saved.goal) onAutoChange(result.goal > saved.goal)

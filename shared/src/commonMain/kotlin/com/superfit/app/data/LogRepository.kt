@@ -1,6 +1,7 @@
 package com.superfit.app.data
 
 import com.superfit.app.domain.FoodPredictor
+import com.superfit.app.domain.withCurrentAge
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
@@ -36,8 +37,10 @@ class LogRepository(
     suspend fun getProfile(): UserProfileEntity? = db.profileDao().getProfile()
 
     suspend fun saveProfile(profile: UserProfileEntity) {
-        db.profileDao().insertProfile(profile)
-        backup.uploadProfile(profile)
+        // The saved age follows the birth month, for older app versions that read only "age".
+        val current = profile.withCurrentAge()
+        db.profileDao().insertProfile(current)
+        backup.uploadProfile(current)
     }
 
     // --- Steps and sleep already read from the health app ---

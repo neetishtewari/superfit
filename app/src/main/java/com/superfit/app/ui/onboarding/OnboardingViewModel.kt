@@ -3,6 +3,7 @@ package com.superfit.app.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
+import com.superfit.app.domain.BirthMonth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,8 @@ class OnboardingViewModel(
             val existing = repository.getProfile()
             if (existing != null) {
                 _uiState.value = _uiState.value.copy(
-                    age = existing.age.toString(),
+                    birthMonth = existing.birthYearMonth.takeIf { it > 0 }?.let(BirthMonth::month),
+                    birthYear = existing.birthYearMonth.takeIf { it > 0 }?.let { BirthMonth.year(it).toString() } ?: "",
                     height = com.superfit.app.domain.BodyReadings.fmt(existing.heightCm),
                     weight = com.superfit.app.domain.BodyReadings.fmt(existing.weightKg),
                     isMale = existing.isMale,
@@ -50,8 +52,12 @@ class OnboardingViewModel(
         }
     }
 
-    fun onAgeChanged(age: String) {
-        _uiState.value = _uiState.value.copy(age = age, error = null)
+    fun onBirthMonthChanged(month: Int) {
+        _uiState.value = _uiState.value.copy(birthMonth = month, error = null)
+    }
+
+    fun onBirthYearChanged(year: String) {
+        _uiState.value = _uiState.value.copy(birthYear = year, error = null)
     }
 
     fun onHeightChanged(height: String) {
@@ -96,14 +102,15 @@ class OnboardingViewModel(
 
     fun saveProfile(onSuccess: () -> Unit) {
         val state = _uiState.value
-        val ageInt = state.age.toIntOrNull()
+        val birthProblem = state.birthProblem()
         val heightDouble = state.height.toDoubleOrNull()
         val weightDouble = state.weight.toDoubleOrNull()
 
-        if (ageInt == null || ageInt <= 0) {
-            _uiState.value = _uiState.value.copy(error = "Go back and enter your age.")
+        if (birthProblem != null) {
+            _uiState.value = _uiState.value.copy(error = "Go back and check when you were born.")
             return
         }
+        val birthYearMonth = BirthMonth.encode(state.birthYear.toInt(), state.birthMonth!!)
         if (heightDouble == null || heightDouble <= 0) {
             _uiState.value = _uiState.value.copy(error = "Go back and enter your height.")
             return
@@ -120,7 +127,8 @@ class OnboardingViewModel(
                 val existing = repository.getProfile()
                 val profile = UserProfileEntity(
                     id = 0,
-                    age = ageInt,
+                    age = BirthMonth.ageOn(birthYearMonth, Now.today()),
+                    birthYearMonth = birthYearMonth,
                     heightCm = heightDouble,
                     weightKg = weightDouble,
                     isMale = state.isMale,
@@ -141,7 +149,8 @@ class OnboardingViewModel(
 }
 
 data class OnboardingUiState(
-    val age: String = "",
+    val birthMonth: Int? = null,
+    val birthYear: String = "",
     val height: String = "",
     val weight: String = "",
     val isMale: Boolean = true,
@@ -154,4 +163,11 @@ data class OnboardingUiState(
     // True once Health Connect filled in height or weight, so "About you" can say where they came from.
     val filledFromHealthConnect: Boolean = false,
     val error: String? = null
-)
+) {
+    /** What's wrong with the birth month and year, in plain words, or null when they're fine. */
+    fun birthProblem(): String? = BirthMonth.problem(birthYear.toIntOrNull(), birthMonth, Now.today())
+
+    /** The age from the birth month and year, or null until they're filled in properly. */
+    fun ageOrNull(): Int? =
+        if (birthProblem() == null) BirthMonth.ageOn(BirthMonth.encode(birthYear.toInt(), birthMonth!!), Now.today()) else null
+}

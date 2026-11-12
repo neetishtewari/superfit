@@ -24,6 +24,7 @@ import com.superfit.app.domain.UsualDay
 import com.superfit.app.domain.WeightTrendEngine
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutView
+import com.superfit.app.domain.currentAge
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -115,7 +116,7 @@ object TodayState {
 
         val currentSteps = activity?.steps ?: 0
         val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
-        val todayStepGoal = StepGoalStore.ownGoal(prefs) ?: StepGoalStore.load(prefs)?.goal ?: StepGoal.starter(profile.age)
+        val todayStepGoal = StepGoalStore.ownGoal(prefs) ?: StepGoalStore.load(prefs)?.goal ?: StepGoal.starter(profile.currentAge())
 
         val habitEntry = (habit ?: HabitEntryEntity(date = today)).copy(
             stepsCompleted = currentSteps >= todayStepGoal,

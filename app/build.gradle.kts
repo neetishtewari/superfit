@@ -24,8 +24,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 61
-        versionName = "1.0.57"
+        versionCode = 62
+        versionName = "1.0.58"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
