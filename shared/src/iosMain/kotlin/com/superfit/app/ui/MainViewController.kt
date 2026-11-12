@@ -39,6 +39,7 @@ import com.superfit.app.data.IosOnboardingHealth
 import com.superfit.app.data.IosPrefs
 import com.superfit.app.data.IosUsageReports
 import com.superfit.app.data.LogRepository
+import com.superfit.app.data.Prefs
 import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.UsageEvents
@@ -51,6 +52,7 @@ import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.IosAi
 import com.superfit.app.domain.LogKind
+import com.superfit.app.domain.RecapSetup
 import com.superfit.app.domain.ReminderPlan
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
@@ -74,24 +76,31 @@ import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
 import com.superfit.app.ui.onboarding.OnboardingModel
 import com.superfit.app.ui.onboarding.OnboardingScreen
+import com.superfit.app.ui.recap.RecapModel
+import com.superfit.app.ui.recap.RecapReadyCard
+import com.superfit.app.ui.recap.RecapStoryScreen
 import com.superfit.app.ui.settings.CoachMemoryCard
 import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
 import com.superfit.app.ui.share.LocalShareCardHost
 import com.superfit.app.ui.share.ShareCardSheet
+import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.datetime.YearMonth
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import platform.UIKit.UIApplicationOpenSettingsURLString
+import platform.UIKit.UIApplicationWillResignActiveNotification
 import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport, shareCards: IosShareCards, usage: IosUsageReports): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport, shareCards: IosShareCards, usage: IosUsageReports, recap: IosRecapMedia): UIViewController {
     installIosAi(ai)
     installUsageReports(usage)
     HealthApp.useAppleHealth()
@@ -108,7 +117,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, shareCards, usage, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, shareCards, usage, recap, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -141,6 +150,7 @@ private fun IosRoot(
     report: IosReport,
     shareCards: IosShareCards,
     usage: IosUsageReports,
+    recap: IosRecapMedia,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -316,11 +326,19 @@ private fun IosRoot(
         }
         var showSettings by remember(uid) { mutableStateOf(false) }
         LaunchedEffect(showSettings) { if (showSettings) UsageEvents.screenOpened("settings") }
+        // The monthly recap: offered on Today from the 1st, and kept under Progress › Insights.
+        var recapMonth by remember(uid) { mutableStateOf<YearMonth?>(null) }
+        var recapOffer by remember(uid) { mutableStateOf<YearMonth?>(null) }
+        val recapSetup: suspend () -> RecapSetup = remember(uid) { { iosRecapSetup(recap, health, IosPrefs.forUser(uid)) } }
+        LaunchedEffect(uid, recapMonth) {
+            if (recapMonth == null) recapOffer = runCatching { RecapModel.homeOffer(log, IosPrefs.forUser(uid), recapSetup(), scale.mine()) }.getOrNull()
+        }
         // The widget's mic or camera brings Today forward first.
         LaunchedEffect(launch) {
             if (launch != null) {
                 tab = MainTab.TODAY
                 showSettings = false
+                recapMonth = null
             }
         }
         val signOut = {
@@ -345,6 +363,38 @@ private fun IosRoot(
                     }
                 }
             }
+        }
+        recapMonth?.let { month ->
+            val recapModel = remember(month) { RecapModel(log, IosPrefs.forUser(uid), accountScope, month, recapSetup, scale::mine) }
+            val host = remember(month) {
+                IosRecapHost(
+                    media = recap,
+                    prefs = IosPrefs.forUser(uid),
+                    month = month,
+                    onOpenSettings = {
+                        recapMonth = null
+                        showSettings = true
+                    },
+                    notice = shareCards::notice
+                )
+            }
+            DisposableEffect(host) { onDispose { host.release() } }
+            // The story pauses (and its music stops) while the app is in the background.
+            var inBackground by remember { mutableStateOf(false) }
+            DisposableEffect(Unit) {
+                val center = NSNotificationCenter.defaultCenter
+                val away = center.addObserverForName(UIApplicationWillResignActiveNotification, null, NSOperationQueue.mainQueue) { _ -> inBackground = true }
+                val back = center.addObserverForName(UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue) { _ -> inBackground = false }
+                onDispose {
+                    center.removeObserver(away)
+                    center.removeObserver(back)
+                }
+            }
+            val state by recapModel.state.collectAsState()
+            CompositionLocalProvider(LocalShareCardHost provides shareHost) {
+                RecapStoryScreen(month, state, host, inBackground, onBack = { recapMonth = null }, onReload = recapModel::reload)
+            }
+            return
         }
         if (showSettings) {
             Box(Modifier.fillMaxSize()) {
@@ -429,7 +479,8 @@ private fun IosRoot(
                                     }
                                 }
                             },
-                            bests = today.personalBests.collectAsState().value.all
+                            bests = today.personalBests.collectAsState().value.all,
+                            onOpenRecap = { recapMonth = it }
                         )
                         else -> TodayScreen(
                             today,
@@ -443,7 +494,8 @@ private fun IosRoot(
                                 if (roast) coachChat.send(CoachChat.ROAST_MY_DAY, how = "chip")
                                 tabHow = "card"
                                 tab = MainTab.COACH
-                            }
+                            },
+                            recapCard = recapOffer?.let { month -> { RecapReadyCard(month, onOpen = { recapMonth = month }) } }
                         ) {
                             if (restored?.failed == true) {
                                 Text(
@@ -509,4 +561,14 @@ private fun CoachTab(chat: CoachChatModel, today: TodayModel) {
         }
     )
     shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
+}
+
+/** What the recap's "Get more from Superfit" card checks on iPhone: Apple Health, the mic and the widget. */
+private suspend fun iosRecapSetup(media: IosRecapMedia, health: IosHealthSource, prefs: Prefs): RecapSetup {
+    val widgetPlaced = suspendCancellableCoroutine { cont -> media.widgetPlaced { cont.resume(it) } }
+    return RecapSetup(
+        healthConnect = !health.isAvailable() || prefs.getBoolean(HealthSync.KEY_ASKED, false),
+        mic = media.micAllowed(),
+        widget = widgetPlaced
+    )
 }

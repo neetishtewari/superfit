@@ -406,6 +406,17 @@ tested on the dev app first.
          Store instead of Google Play (shared ThisAppStore, linking to apps.apple.com/app/id6834018727,
          the app's App Store Connect id); Apple's
          privacy manifests (PrivacyInfo.xcprivacy for the app and the widget); version 1.0.0.
+       - 18: Monthly recap. The month's data (RecapData, same settings keys as Android's
+         MonthlyRecapData), the story cards and the story screen (RecapStoryScreen) are shared;
+         each phone plugs in its music, video maker and setup fixes through RecapHost. iPhone:
+         the same 12 original tracks as m4a (made from Android's ogg files with ffmpeg, 80 kbps
+         AAC), played with the "ambient" audio setting so the silent switch keeps them quiet and
+         someone's own music isn't stopped; the video is the same 720x1280 24 fps story (count-up,
+         swipe, looped music faded in and out) made with Apple's encoder (RecapBridge.swift).
+         Entry points as Android: Today's card from the 1st until just after opening (latest the
+         10th), Progress › Insights top for the first week, "Past months" below. "Get more from
+         Superfit" checks Apple Health, mic + speech recognition and the widget. Not yet: the
+         reminder on the 1st (iPhone needs it scheduled ahead) and the dev-app preview button.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -782,3 +793,11 @@ The privacy manifest declares the same data as the App Store labels (name, email
 fitness and the person's own logs for the app to work, linked to the account; usage, crash data
 and the Firebase install ID for analytics, not linked; nothing for tracking) and why the app uses
 settings storage (its own and the widget's shared group), file dates and the phone's uptime.
+Step 18 (recap): no new permissions or data. The recap reads only the person's own logs on the
+phone; its words come from the same one AI call per month as Android (no new data sent). The
+video is made on the phone, written to the app's own temporary folder with complete file
+protection (the frames-only file is deleted once the music is added, and the folder is cleared
+each time) and leaves only through the share sheet. The music is bundled, original, nothing
+downloaded. The setup card only reads whether mic and speech are allowed and whether a widget is
+placed; asking for the mic uses Apple's own prompts (or opens Settings once refused).
+

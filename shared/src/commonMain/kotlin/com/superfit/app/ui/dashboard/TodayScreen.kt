@@ -72,6 +72,8 @@ fun TodayScreen(
     onLaunchHandled: () -> Unit = {},
     /** Opens the coach chat (with a roast asked for, in Roast me style); null hides "Chat with coach". */
     onOpenCoach: ((roast: Boolean) -> Unit)? = null,
+    /** Last month's recap card while Home offers it (from the 1st); null when there's none. */
+    recapCard: (@Composable () -> Unit)? = null,
     footer: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
@@ -211,8 +213,9 @@ fun TodayScreen(
                         onCameraClick = photoCamera?.let { { showPhotoKinds = true } }
                     )
                 }
-                // The ready-to-share card waits while a new best is offered, as on Android.
-                shareOffer?.takeIf { bests.toOffer == null }?.let { workout ->
+                recapCard?.invoke()
+                // The ready-to-share card waits while the recap or a new best is offered, as on Android.
+                shareOffer?.takeIf { bests.toOffer == null && recapCard == null }?.let { workout ->
                     LaunchedEffect(workout.merged.primary.id) { UsageEvents.shareOffer("shown", offerType(workout)) }
                     ShareOfferCard(
                         workout = workout,

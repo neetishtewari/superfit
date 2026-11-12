@@ -3,6 +3,7 @@ package com.superfit.app.data
 import com.superfit.app.domain.Ai
 import com.superfit.app.domain.BodyTrend
 import com.superfit.app.domain.CoachStyle
+import com.superfit.app.domain.DayTotals
 import com.superfit.app.domain.GoalForecast
 import com.superfit.app.domain.MonthRecap
 import com.superfit.app.domain.MonthlyRecap
@@ -46,6 +47,15 @@ object RecapData {
         if (today.day > LAST_HOME_DAY) return false
         val opened = openedOn(prefs, offeredMonth(today)) ?: return true
         return today <= opened.plus(DatePeriod(days = DAYS_AFTER_OPENING))
+    }
+
+    /** The past 12 months with enough logged (or active) days for a recap, newest first. */
+    fun months(days: Map<LocalDate, DayTotals>, today: LocalDate): List<YearMonth> {
+        val byMonth = days.values.groupBy { it.date.yearMonth }
+        return (1..12).map { today.minus(DatePeriod(months = it)).yearMonth }.filter { m ->
+            val inMonth = byMonth[m].orEmpty()
+            inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
+        }
     }
 
     /** Progress keeps the new recap at the top for the first week of the month. */

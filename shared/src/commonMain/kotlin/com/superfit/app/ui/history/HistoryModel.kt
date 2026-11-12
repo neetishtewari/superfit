@@ -56,7 +56,9 @@ data class ProgressPage(
     val progress: ProgressState,
     val consistency: LogConsistency,
     val trends: WeeklyTrendsState,
-    val period: BodyPeriod
+    val period: BodyPeriod,
+    /** Past months with enough logged for a recap, newest first. */
+    val recapMonths: List<kotlinx.datetime.YearMonth> = emptyList()
 )
 
 /**
@@ -143,7 +145,8 @@ class HistoryModel(
                 HistoryLog.sleepByDay(log.getAllSleepTelemetry()),
                 target
             ),
-            period = bodyPeriod
+            period = bodyPeriod,
+            recapMonths = com.superfit.app.data.RecapData.months(totals, day)
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
 

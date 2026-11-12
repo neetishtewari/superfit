@@ -64,7 +64,9 @@ fun ProgressTabs(
     /** "Share my report" for the last 2 or 4 weeks; null hides it. */
     onShareReport: ((weeks: Int) -> Unit)? = null,
     /** Every personal best (from Today's model); null hides them. */
-    bests: List<PersonalBest>? = null
+    bests: List<PersonalBest>? = null,
+    /** Opens a month's recap; null hides the recap cards. */
+    onOpenRecap: ((kotlinx.datetime.YearMonth) -> Unit)? = null
 ) {
     var bestCard by remember { mutableStateOf<ShareCard?>(null) }
     bestCard?.let { card -> ShareCardSheet(card = card, onDismiss = { bestCard = null }) }
@@ -108,36 +110,49 @@ fun ProgressTabs(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 when {
-                    tab == 0 && p != null -> InsightsTab(
-                        report = p.progress.report,
-                        onOpenJourney = { tab = 1 },
-                        bodyNow = {
-                            BodyNowCard(
-                                body = p.progress.body,
-                                weightKg = p.progress.latestWeightKg,
-                                weightChange4w = p.progress.weightChange4w,
-                                goalKgChange = p.progress.goalKgChange
-                            )
-                        },
-                        onShareWithCoach = onShareReport,
-                        bests = bests?.let { list ->
-                            {
-                                PersonalBestsList(bests = list, onShare = { best ->
-                                    bestCard = ShareCards.best(best, isNew = false, today = Now.today())
-                                })
-                            }
-                        },
-                        foodQuality = {
-                            if (today is DashboardUiState.Success) {
-                                FoodQualityCard(
-                                    metrics = today.dietQualityMetrics,
-                                    onFineForMe = { item, fine -> model.setFineForMe(item.approvalKey, fine) }
+                    tab == 0 && p != null -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // The new monthly recap sits at the top of Progress for the first week of the month.
+                        val todayDate = Now.today()
+                        val newRecap = com.superfit.app.data.RecapData.offeredMonth(todayDate).takeIf {
+                            onOpenRecap != null && com.superfit.app.data.RecapData.showAtTopOfProgress(todayDate) && it in p.recapMonths
+                        }
+                        if (newRecap != null && onOpenRecap != null) {
+                            com.superfit.app.ui.recap.RecapReadyCard(newRecap, onOpen = { onOpenRecap(newRecap) })
+                        }
+                        InsightsTab(
+                            report = p.progress.report,
+                            onOpenJourney = { tab = 1 },
+                            bodyNow = {
+                                BodyNowCard(
+                                    body = p.progress.body,
+                                    weightKg = p.progress.latestWeightKg,
+                                    weightChange4w = p.progress.weightChange4w,
+                                    goalKgChange = p.progress.goalKgChange
                                 )
-                                today.dietQualityMetrics.swapSuggestions.forEach { FoodSwapCard(swap = it) }
-                            }
-                        },
-                        trends = { Trends(p, today) }
-                    )
+                            },
+                            onShareWithCoach = onShareReport,
+                            bests = bests?.let { list ->
+                                {
+                                    PersonalBestsList(bests = list, onShare = { best ->
+                                        bestCard = ShareCards.best(best, isNew = false, today = Now.today())
+                                    })
+                                }
+                            },
+                            foodQuality = {
+                                if (today is DashboardUiState.Success) {
+                                    FoodQualityCard(
+                                        metrics = today.dietQualityMetrics,
+                                        onFineForMe = { item, fine -> model.setFineForMe(item.approvalKey, fine) }
+                                    )
+                                    today.dietQualityMetrics.swapSuggestions.forEach { FoodSwapCard(swap = it) }
+                                }
+                            },
+                            trends = { Trends(p, today) }
+                        )
+                        if (onOpenRecap != null) {
+                            com.superfit.app.ui.recap.PastMonthsList(p.recapMonths - setOfNotNull(newRecap), onOpenRecap)
+                        }
+                    }
                     tab == 1 && p != null -> JourneyTab(
                         j = p.progress.journey,
                         goalSet = p.progress.goalSet,
