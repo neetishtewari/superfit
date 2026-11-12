@@ -36,23 +36,32 @@ import com.superfit.app.data.LogRepository
 import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.IosAi
+import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.ReminderPlan
 import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.camera.PhotoLog
+import com.superfit.app.ui.coach.ChatMic
+import com.superfit.app.ui.coach.CoachChatModel
+import com.superfit.app.ui.coach.CoachChatView
 import com.superfit.app.ui.dashboard.DashboardUiState
+import com.superfit.app.ui.dashboard.MicOffDialog
 import com.superfit.app.ui.dashboard.ProvideVoiceTyping
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
+import com.superfit.app.ui.dashboard.VoiceLog
 import com.superfit.app.ui.dashboard.VoiceRecognizer
 import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
+import com.superfit.app.ui.settings.CoachMemoryCard
 import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
+import kotlinx.coroutines.launch
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSURL
@@ -63,7 +72,7 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
@@ -79,7 +88,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -109,6 +118,7 @@ private fun IosRoot(
     camera: IosPhotoCamera,
     widget: IosWidget,
     reminders: IosReminders,
+    report: IosReport,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -185,6 +195,10 @@ private fun IosRoot(
                 voice = speech
             )
         }
+        // The coach chat, kept on the phone and backed up like Android's.
+        val coachChat = remember(uid) {
+            CoachChatModel(local = local, clearLocalChat = local::clearChat, backup = backup, today = today, scope = accountScope, voice = speech)
+        }
         // The evening reminder, written ahead from Today's numbers (the iPhone can't run code at 9 PM).
         val reminderSync = remember(uid) { ReminderSync(reminders, IosPrefs.forUser(uid), today) }
         LaunchedEffect(reminderSync) { reminderSync.run() }
@@ -255,6 +269,15 @@ private fun IosRoot(
                         },
                         onOpenPhoneSettings = ::openPhoneSettings
                     )
+                },
+                coachMemory = {
+                    val notes by coachChat.notes.collectAsState()
+                    CoachMemoryCard(
+                        notes = notes,
+                        onRemove = coachChat::deleteNote,
+                        onAdd = coachChat::addNote,
+                        onClearChat = coachChat::clearHistory
+                    )
                 }
             )
             return
@@ -263,11 +286,14 @@ private fun IosRoot(
             containerColor = SuperfitTheme.colors.bgStart,
             // Each screen handles the top of the phone itself; the menu handles the bottom.
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = { MainMenuBar(tab, onSelect = { tab = it }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS)) }
+            bottomBar = { MainMenuBar(tab, onSelect = { tab = it }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH)) }
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                 when (tab) {
-                    MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value)
+                    MainTab.COACH -> CoachTab(coachChat)
+                    MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value) { weeks ->
+                        accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
+                    }
                     else -> TodayScreen(
                         today,
                         onOpenSettings = { showSettings = true },
@@ -275,7 +301,11 @@ private fun IosRoot(
                         camera = camera,
                         photoLog = photoLog,
                         launch = launch,
-                        onLaunchHandled = IosLaunch::handled
+                        onLaunchHandled = IosLaunch::handled,
+                        onOpenCoach = { roast ->
+                            if (roast) coachChat.send(CoachChat.ROAST_MY_DAY, how = "chip")
+                            tab = MainTab.COACH
+                        }
                     ) {
                         if (restored?.failed == true) {
                             Text(
@@ -289,4 +319,47 @@ private fun IosRoot(
             }
         }
     }
+}
+
+/** The Coach tab: the shared chat, with the iPhone's speech recognition on its mic. */
+@Composable
+private fun CoachTab(chat: CoachChatModel) {
+    val messages by chat.messages.collectAsState()
+    val loading by chat.loading.collectAsState()
+    val notes by chat.notes.collectAsState()
+    val style by chat.style.collectAsState()
+    val voice = chat.voiceLog
+    val voiceUi = voice?.ui?.collectAsState()?.value
+    val notice = voice?.notice?.collectAsState()?.value
+    val micOff = voice?.micOff?.collectAsState()?.value == true
+    // Leaving the tab stops listening without sending anything.
+    DisposableEffect(voice) { onDispose { voice?.cancel() } }
+    if (micOff) {
+        MicOffDialog(
+            onOpenSettings = {
+                voice?.dismissMicOff()
+                openPhoneSettings()
+            },
+            onDismiss = { voice?.dismissMicOff() }
+        )
+    }
+    CoachChatView(
+        messages = messages,
+        loading = loading,
+        notes = notes,
+        style = style,
+        questions = chat::questions,
+        mic = ChatMic(
+            available = voice?.available == true,
+            listening = voiceUi?.listening == true,
+            liveText = voiceUi?.liveText.orEmpty(),
+            problem = notice?.let { if (it == VoiceLog.NOTHING_HEARD_LINE) "I didn't catch that. Tap the mic and try again." else it },
+            onStart = { voice?.start(LogKind.ANY) },
+            onStop = { voice?.stop() },
+            onProblemShown = { voice?.dismissNotice() }
+        ),
+        onSend = chat::send,
+        onUndo = chat::undoNotes,
+        onLogMeal = chat::logSuggestedMeal
+    )
 }

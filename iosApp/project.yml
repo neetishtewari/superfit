@@ -29,6 +29,9 @@ targets:
       - Superfit
       # Names shared with the widget (app group, link key).
       - SuperfitWidget/WidgetKeys.swift
+      # Manrope, the app's font, for the report PDF (the same files the shared screens use).
+      - path: ../shared/src/commonMain/composeResources/font
+        buildPhase: resources
     dependencies:
       # The home-screen widget, built and embedded with the app.
       - target: SuperfitWidget
@@ -63,6 +66,8 @@ targets:
       properties:
         CFBundleDisplayName: Superfit
         UILaunchScreen: {}
+        # Manrope for drawing the report PDF (copied in from the shared fonts above).
+        UIAppFonts: [manrope_regular.ttf, manrope_medium.ttf, manrope_bold.ttf, manrope_extrabold.ttf]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true

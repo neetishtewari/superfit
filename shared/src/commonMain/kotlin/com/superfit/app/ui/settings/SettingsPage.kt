@@ -50,7 +50,9 @@ fun SettingsPage(
     onBack: () -> Unit,
     onSignOut: () -> Unit,
     /** Settings › Daily reminder, where the app has reminders. */
-    reminders: @Composable () -> Unit = {}
+    reminders: @Composable () -> Unit = {},
+    /** Settings › AI coach › What my AI coach knows, where the app has the coach chat. */
+    coachMemory: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
@@ -115,10 +117,10 @@ fun SettingsPage(
         }
 
         SettingsGroupLabel("AI coach")
-        // What the coach remembers joins with coach chat on the iPhone.
         SettingsCard(spacing = 14) {
             val coachStyle by model.coachStyle.collectAsState()
             CoachStyleSettings(coachStyle, model::setCoachStyle)
+            coachMemory()
         }
 
         AppearanceCard(mode = themeMode, onSelect = onThemeMode)

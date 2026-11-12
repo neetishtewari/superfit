@@ -6,6 +6,7 @@ import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachNotes
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Foundation.NSFileManager
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.stringWithContentsOfFile
@@ -25,6 +26,11 @@ class IosBackupLocal(private val uid: String) : CloudBackupLocal {
     override fun loadChat(): List<ChatEntry> = CoachChat.decode(read(chatFile))
 
     override fun saveChat(entries: List<ChatEntry>) = write(chatFile, CoachChat.encode(entries))
+
+    /** Clear chat history: the conversation file goes; the coach's notes stay. */
+    fun clearChat() {
+        NSFileManager.defaultManager.removeItemAtPath(chatFile, error = null)
+    }
 
     override fun hasNotes(): Boolean = prefs.contains(KEY_NOTES)
 
