@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
 import com.superfit.app.data.CloudBackup
 import com.superfit.app.data.HealthSync
+import com.superfit.app.data.IosAccountDeletion
 import com.superfit.app.data.IosAuth
 import com.superfit.app.data.IosAuthClient
 import com.superfit.app.data.IosBackupLocal
@@ -138,6 +141,15 @@ private fun IosRoot(
 ) {
     var email by remember { mutableStateOf(auth.currentEmail()) }
     var signedIn by remember { mutableStateOf(auth.currentUid() != null) }
+    // What deleting the account did, shown once it's over (even after signing out).
+    var accountNotice by remember { mutableStateOf<String?>(null) }
+    accountNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = { accountNotice = null },
+            text = { Text(notice) },
+            confirmButton = { TextButton(onClick = { accountNotice = null }) { Text("OK") } }
+        )
+    }
     val scope = rememberCoroutineScope()
     val client = remember { IosAuthClient(auth) }
     val onSignedIn = {
@@ -303,46 +315,75 @@ private fun IosRoot(
             signedIn = false
             email = null
         }
+        var deleting by remember(uid) { mutableStateOf(false) }
+        val deleteAccount = {
+            if (!deleting) {
+                deleting = true
+                accountScope.launch {
+                    val done = IosAccountDeletion(auth, backup, database, local, uid).delete()
+                    deleting = false
+                    if (done == null) {
+                        accountNotice = IosAccountDeletion.NOT_DELETED
+                    } else {
+                        accountNotice = done
+                        signOut()
+                    }
+                }
+            }
+        }
         if (showSettings) {
-            SettingsPage(
-                model = today,
-                prefs = IosPrefs.forUser(uid),
-                email = email,
-                themeMode = themeMode,
-                onThemeMode = onThemeMode,
-                onBack = { showSettings = false },
-                onSignOut = signOut,
-                reminders = {
-                    val prefs = IosPrefs.forUser(uid)
-                    var enabled by remember { mutableStateOf(ReminderPlan.enabled(prefs)) }
-                    var time by remember { mutableStateOf(ReminderPlan.hour(prefs) to ReminderPlan.minute(prefs)) }
-                    val allowed by reminderSync.allowed.collectAsState()
-                    ReminderSettingsCard(
-                        enabled = enabled,
-                        hour = time.first,
-                        minute = time.second,
-                        allowed = allowed,
-                        onEnabled = {
-                            enabled = it
-                            reminderSync.setEnabled(it)
+            Box(Modifier.fillMaxSize()) {
+                CompositionLocalProvider(LocalShareCardHost provides shareHost) {
+                    SettingsPage(
+                        model = today,
+                        prefs = IosPrefs.forUser(uid),
+                        email = email,
+                        name = auth.currentName(),
+                        signInMethod = auth.signInMethod(),
+                        themeMode = themeMode,
+                        onThemeMode = onThemeMode,
+                        onBack = { showSettings = false },
+                        onSignOut = signOut,
+                        reminders = {
+                            val prefs = IosPrefs.forUser(uid)
+                            var enabled by remember { mutableStateOf(ReminderPlan.enabled(prefs)) }
+                            var time by remember { mutableStateOf(ReminderPlan.hour(prefs) to ReminderPlan.minute(prefs)) }
+                            val allowed by reminderSync.allowed.collectAsState()
+                            ReminderSettingsCard(
+                                enabled = enabled,
+                                hour = time.first,
+                                minute = time.second,
+                                allowed = allowed,
+                                onEnabled = {
+                                    enabled = it
+                                    reminderSync.setEnabled(it)
+                                },
+                                onTime = { h, m ->
+                                    time = h to m
+                                    reminderSync.setTime(h, m)
+                                },
+                                onOpenPhoneSettings = ::openPhoneSettings
+                            )
                         },
-                        onTime = { h, m ->
-                            time = h to m
-                            reminderSync.setTime(h, m)
+                        coachMemory = {
+                            val notes by coachChat.notes.collectAsState()
+                            CoachMemoryCard(
+                                notes = notes,
+                                onRemove = coachChat::deleteNote,
+                                onAdd = coachChat::addNote,
+                                onClearChat = coachChat::clearHistory
+                            )
                         },
-                        onOpenPhoneSettings = ::openPhoneSettings
-                    )
-                },
-                coachMemory = {
-                    val notes by coachChat.notes.collectAsState()
-                    CoachMemoryCard(
-                        notes = notes,
-                        onRemove = coachChat::deleteNote,
-                        onAdd = coachChat::addNote,
-                        onClearChat = coachChat::clearHistory
+                        widgetHelp = "Calories left, plus mic and camera buttons to log in seconds. To add it, touch and hold your home screen, tap Edit, then Add Widget, and find Superfit.",
+                        onDeleteAccount = deleteAccount
                     )
                 }
-            )
+                if (deleting) {
+                    Box(Modifier.fillMaxSize().background(SuperfitTheme.colors.bgStart.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
+                        Text("Deleting your account…", style = MaterialTheme.typography.bodyLarge, color = SuperfitTheme.colors.textPrimary)
+                    }
+                }
+            }
             return
         }
         CompositionLocalProvider(LocalShareCardHost provides shareHost) {
@@ -355,9 +396,14 @@ private fun IosRoot(
                 Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
                     when (tab) {
                         MainTab.COACH -> CoachTab(coachChat, today)
-                        MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value) { weeks ->
-                            accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
-                        }
+                        MainTab.PROGRESS -> ProgressTabs(
+                            model = history,
+                            today = today.state.collectAsState().value,
+                            onShareReport = { weeks ->
+                                accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
+                            },
+                            bests = today.personalBests.collectAsState().value.all
+                        )
                         else -> TodayScreen(
                             today,
                             onOpenSettings = { showSettings = true },

@@ -33,8 +33,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.superfit.app.data.Now
 import com.superfit.app.domain.LocalFormat
+import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.ShareCard
+import com.superfit.app.domain.ShareCards
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
@@ -43,6 +46,7 @@ import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.FoodQualityCard
 import com.superfit.app.ui.dashboard.FoodSwapCard
+import com.superfit.app.ui.dashboard.PersonalBestsList
 import com.superfit.app.ui.dashboard.SegmentedPills
 import com.superfit.app.ui.dashboard.WeighInDialog
 import com.superfit.app.ui.share.ShareCardSheet
@@ -56,8 +60,12 @@ fun ProgressTabs(
     model: HistoryModel,
     today: DashboardUiState,
     /** "Share my report" for the last 2 or 4 weeks; null hides it. */
-    onShareReport: ((weeks: Int) -> Unit)? = null
+    onShareReport: ((weeks: Int) -> Unit)? = null,
+    /** Every personal best (from Today's model); null hides them. */
+    bests: List<PersonalBest>? = null
 ) {
+    var bestCard by remember { mutableStateOf<ShareCard?>(null) }
+    bestCard?.let { card -> ShareCardSheet(card = card, onDismiss = { bestCard = null }) }
     var tab by rememberSaveable { mutableStateOf(0) }
     var showWeighIn by remember { mutableStateOf(false) }
     var showGoalEdit by remember { mutableStateOf(false) }
@@ -108,9 +116,14 @@ fun ProgressTabs(
                                 goalKgChange = p.progress.goalKgChange
                             )
                         },
-                        // Personal bests come with share cards.
                         onShareWithCoach = onShareReport,
-                        bests = null,
+                        bests = bests?.let { list ->
+                            {
+                                PersonalBestsList(bests = list, onShare = { best ->
+                                    bestCard = ShareCards.best(best, isNew = false, today = Now.today())
+                                })
+                            }
+                        },
                         foodQuality = {
                             if (today is DashboardUiState.Success) {
                                 FoodQualityCard(

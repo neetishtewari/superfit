@@ -34,12 +34,15 @@ import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachQuestions
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FitnessGoal
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.MealTagBackfill
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.NutritionistNote
+import com.superfit.app.domain.PersonalBest
+import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.ShareOffer
@@ -47,6 +50,7 @@ import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
 import com.superfit.app.domain.UsualDay
+import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutView
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -60,6 +64,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -254,7 +259,94 @@ class TodayModel(
     /** Hides a workout from another app (every app's copy of it), as on Android. */
     fun hideImportedWorkout(view: WorkoutView) {
         workoutPrefs.hide(view.merged.memberIds)
+        workoutSettingsChanged()
+    }
+
+    /**
+     * Personal bests from every workout from other apps and daily steps, plus the one new best to
+     * offer on Today, as on Android. Workout bests wait for the first import to finish, so it sets
+     * the starting points quietly.
+     */
+    val personalBests: StateFlow<BestsUiState> = combine(
+        log.profileFlow,
+        log.allImportedWorkoutsFlow,
+        log.allActivityTelemetryFlow,
+        settingsChanged
+    ) { profile, rows, activity, _ ->
+        if (profile == null) return@combine BestsUiState()
+        val views = if (workoutPrefs.enabled && workoutPrefs.lastImportMillis > 0) workoutViews(rows, profile) else emptyList()
+        val steps = activity.mapNotNull { row -> runCatching { DaySteps(LocalDate.parse(row.date), row.steps) }.getOrNull() }
+        val bests = PersonalBests.compute(views, steps, Now.today())
+        val baseline = workoutPrefs.bestBaseline
+        val seen = workoutPrefs.bestPodiumSeen
+        val check = PersonalBests.check(bests, baseline, seen, Now.millis())
+        if (check.baseline != baseline || check.podiumSeen != seen) {
+            workoutPrefs.bestBaseline = check.baseline
+            workoutPrefs.bestPodiumSeen = check.podiumSeen
+            backUpWorkoutSettings()
+        }
+        BestsUiState(all = bests, toOffer = check.announce.firstOrNull())
+    }.stateIn(scope, SharingStarted.WhileSubscribed(5000), BestsUiState())
+
+    /** A new best was shared or dismissed: it's offered only once. */
+    fun acknowledgeBest(best: PersonalBest) {
+        workoutPrefs.bestBaseline = PersonalBests.acknowledge(best, workoutPrefs.bestBaseline)
+        workoutPrefs.bestPodiumSeen = PersonalBests.acknowledgePodium(best, workoutPrefs.bestPodiumSeen)
+        workoutSettingsChanged()
+    }
+
+    /** Settings › workouts from other apps: what's chosen now. */
+    val workoutImportPrefs: WorkoutImportPrefs get() = workoutPrefs
+
+    /** Turning the import on asks for health access first when it hasn't been asked yet. */
+    fun setWorkoutImportEnabled(on: Boolean) {
+        if (on && !_healthAsked.value) {
+            connectHealth()
+            return
+        }
+        workoutPrefs.enabled = on
+        _workoutImportEnabled.value = on
+        workoutSettingsChanged()
+        if (on) health?.takeIf { healthAvailable }?.let { source -> scope.launch { readHealth(source) } }
+    }
+
+    fun setMainWorkoutApp(sourceId: String?) {
+        workoutPrefs.mainApp = sourceId
+        workoutSettingsChanged()
+    }
+
+    fun setWorkoutAddBack(addBack: WorkoutAddBack) {
+        workoutPrefs.addBack = addBack
+        workoutSettingsChanged()
+    }
+
+    fun unhideAllWorkouts() {
+        workoutPrefs.unhideAll()
+        workoutSettingsChanged()
+    }
+
+    /** Apps that have shared workouts, as (id, name), for the "Main workout app" choice. */
+    suspend fun workoutSourceApps(): List<Pair<String, String>> =
+        log.importedWorkouts.getAll().map { it.sourcePackage }.distinct()
+            .map { it to sourceNames.label(it) }
+            .sortedBy { it.second }
+
+    /** Today works its numbers out again, and the choices go to the backup. */
+    private fun workoutSettingsChanged() {
         settingsChanged.value++
+        backUpWorkoutSettings()
+    }
+
+    private fun backUpWorkoutSettings() {
+        scope.launch {
+            try {
+                log.backUpWorkoutImportSettings(workoutPrefs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Backing up workout settings failed", e)
+            }
+        }
     }
 
     private suspend fun readHealth(source: HealthSource) {

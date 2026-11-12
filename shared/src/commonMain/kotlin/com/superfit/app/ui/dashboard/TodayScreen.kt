@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.LogKind
+import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
 import com.superfit.app.domain.WorkoutView
@@ -86,6 +87,8 @@ fun TodayScreen(
     val shareHost = LocalShareCardHost.current
     var shareCard by remember { mutableStateOf<ShareCard?>(null) }
     var shareOfferWorkout by remember { mutableStateOf<WorkoutView?>(null) }
+    var shareBest by remember { mutableStateOf<PersonalBest?>(null) }
+    val bests by model.personalBests.collectAsState()
     var shareOffer by remember { mutableStateOf<WorkoutView?>(null) }
     var shareOfferCheck by remember { mutableStateOf(0) }
     val importedToday = (state as? DashboardUiState.Success)?.importedWorkouts
@@ -205,7 +208,8 @@ fun TodayScreen(
                         onCameraClick = photoCamera?.let { { showPhotoKinds = true } }
                     )
                 }
-                shareOffer?.let { workout ->
+                // The ready-to-share card waits while a new best is offered, as on Android.
+                shareOffer?.takeIf { bests.toOffer == null }?.let { workout ->
                     ShareOfferCard(
                         workout = workout,
                         onShare = {
@@ -216,6 +220,16 @@ fun TodayScreen(
                             shareHost.prefs.markOfferHandled(workout.merged.primary.id)
                             shareOfferCheck++
                         }
+                    )
+                }
+                bests.toOffer?.let { best ->
+                    NewBestCard(
+                        best = best,
+                        onShare = {
+                            shareBest = best
+                            shareCard = ShareCards.best(best, isNew = true, today = Now.today())
+                        },
+                        onDismiss = { model.acknowledgeBest(best) }
                     )
                 }
                 if (side == "MEAL") {
@@ -293,8 +307,10 @@ fun TodayScreen(
             onDismiss = {
                 shareCard = null
                 shareOfferWorkout = null
+                shareBest = null
             },
             onShared = {
+                shareBest?.let(model::acknowledgeBest)
                 shareOfferWorkout?.let {
                     shareHost.prefs.markOfferHandled(it.merged.primary.id)
                     shareOfferCheck++

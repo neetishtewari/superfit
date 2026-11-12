@@ -381,6 +381,17 @@ tested on the dev app first.
          shows its own access sheet; "About you" fills height and weight from it (the iPhone now
          also reads height). Android keeps "Read aloud" (its text to speech); the iPhone hides
          the speaker for now. Back on the first step signs out on iPhone, for a wrong account.
+       - 16: Rest of Settings. Settings › Account shows the name and how the account signs in
+         (Google, Apple or email). Apple Health gets the workouts-from-other-apps choices (shared
+         WorkoutImportCard: on/off, main workout app, add workout calories Off/Half/All, show
+         hidden workouts), backed up like Android's. Settings › Sharing (shared
+         SharingSettingsCard). A home-screen widget card says how to add it on iPhone. Delete
+         account (the App Store requires it): the cloud backup first, then the account, then
+         everything this account kept on the phone (its database, chat and settings), as on
+         Android; a Sign in with Apple account confirms with Apple once more so Apple's link to
+         Superfit is revoked too. Today now offers a "New personal best" card and Progress lists
+         every personal best with Share, from shared TodayModel.personalBests. The usage and crash
+         reports switch comes with analytics.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -733,3 +744,10 @@ Step 15 (reviewed 12 Nov): sign-up saves the profile on the phone and in the per
 users/{uid} backup, as on Android. Height and weight are read once from the health app, only after
 the person allows it, and only fill the boxes. The iPhone asks Apple Health for one more read-only
 type (height), named in the access sheet's description. No new Android permissions.
+
+Step 16 (reviewed 12 Nov): Delete account removes the person's users/{uid} data in the cloud before
+the account (it can't be reached afterwards; offline, nothing is deleted and they stay signed in),
+then the Firebase account, then the phone's copy (database file, chat file, account settings). For
+Sign in with Apple, Apple's sheet confirms the person and the app revokes its Apple token with the
+one-time code (Apple's rule for account deletion); the code is used once and never stored. Workout
+choices go to the same users/{uid} backup document as Android's. No new permissions on either phone.

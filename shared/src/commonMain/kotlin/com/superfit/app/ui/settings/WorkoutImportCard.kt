@@ -1,0 +1,169 @@
+package com.superfit.app.ui.settings
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.superfit.app.domain.WorkoutAddBack
+import com.superfit.app.theme.NeonMint
+import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.dashboard.SegmentedPills
+
+/**
+ * Settings for workouts from other apps, the same on Android and iPhone: the import switch, the
+ * main app, calorie add-back and hidden workouts. [sources] names the apps people use on this phone.
+ */
+@Composable
+fun WorkoutImportCard(
+    enabled: Boolean,
+    sources: String,
+    mainApp: String?,
+    /** Apps that have shared workouts, as (id, name). */
+    apps: List<Pair<String, String>>,
+    addBack: WorkoutAddBack,
+    hiddenCount: Int,
+    onEnabled: (Boolean) -> Unit,
+    onMainApp: (String?) -> Unit,
+    onAddBack: (WorkoutAddBack) -> Unit,
+    onShowHidden: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                Text(
+                    text = "Import workouts from other apps",
+                    fontWeight = FontWeight.Bold,
+                    color = SuperfitTheme.colors.textPrimary,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = sources,
+                    color = SuperfitTheme.colors.textSecondary,
+                    fontSize = 12.sp
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onEnabled,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = NeonMint,
+                    checkedTrackColor = NeonMint.copy(alpha = 0.3f),
+                    uncheckedThumbColor = SuperfitTheme.colors.textTertiary,
+                    uncheckedTrackColor = SuperfitTheme.colors.glassBorder
+                )
+            )
+        }
+
+        if (enabled) {
+            MainAppPicker(
+                mainApp = mainApp,
+                apps = sourceApps,
+                onPick = onMainApp
+            )
+
+            Text(
+                text = "Add workout calories to my target",
+                fontWeight = FontWeight.Bold,
+                color = SuperfitTheme.colors.textPrimary,
+                fontSize = 13.sp
+            )
+            SegmentedPills(
+                options = WorkoutAddBack.entries.map { it.name to it.label },
+                selected = addBack.name,
+                onSelect = { key -> onAddBack(WorkoutAddBack.valueOf(key)) }
+            )
+            Text(
+                text = when (addBack) {
+                    WorkoutAddBack.OFF -> "Your target stays the same every day, from the activity level you chose."
+                    WorkoutAddBack.HALF -> "Your target covers everyday life, plus half of each workout's calories that day."
+                    WorkoutAddBack.ALL -> "Your target covers everyday life, plus all of each workout's calories that day."
+                },
+                color = SuperfitTheme.colors.textSecondary,
+                fontSize = 12.sp
+            )
+
+            if (hiddenCount > 0) {
+                TextButton(onClick = onShowHidden) {
+                    Text("Show hidden workouts ($hiddenCount)", color = NeonMint, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainAppPicker(mainApp: String?, apps: List<Pair<String, String>>, onPick: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val current = apps.firstOrNull { it.first == mainApp }?.second ?: "Automatic"
+    // Full-width text with the picker below it, so the explanation isn't squeezed into a narrow column.
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "Main workout app",
+            fontWeight = FontWeight.Bold,
+            color = SuperfitTheme.colors.textPrimary,
+            fontSize = 13.sp
+        )
+        Text(
+            text = "When two apps record the same workout, this one's copy is kept. Automatic keeps the most detailed one.",
+            color = SuperfitTheme.colors.textSecondary,
+            fontSize = 12.sp
+        )
+        Box {
+            OutlinedButton(
+                onClick = { open = true },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.heightIn(min = 44.dp)
+            ) {
+                Text(current, color = NeonMint, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NeonMint)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(text = { Text("Automatic") }, onClick = {
+                    open = false
+                    onPick(null)
+                })
+                apps.forEach { (pkg, name) ->
+                    DropdownMenuItem(text = { Text(name) }, onClick = {
+                        open = false
+                        onPick(pkg)
+                    })
+                }
+            }
+        }
+    }
+}
+
+private val WorkoutAddBack.label: String
+    get() = when (this) {
+        WorkoutAddBack.OFF -> "Off"
+        WorkoutAddBack.HALF -> "Half"
+        WorkoutAddBack.ALL -> "All"
+    }
