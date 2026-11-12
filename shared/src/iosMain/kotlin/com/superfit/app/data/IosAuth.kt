@@ -18,6 +18,9 @@ class IosAuthError(val code: String?, val message: String?, val isNetwork: Boole
 interface IosAuth {
     fun currentUid(): String?
     fun currentEmail(): String?
+
+    /** The account's name (from Google or Apple sign-in), for the top of Share my report. */
+    fun currentName(): String?
     fun signIn(email: String, password: String, done: (IosAuthError?) -> Unit)
     fun createAccount(email: String, password: String, done: (IosAuthError?) -> Unit)
     fun sendPasswordReset(email: String, done: (IosAuthError?) -> Unit)

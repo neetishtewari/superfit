@@ -64,6 +64,16 @@ object WorkoutSync {
                 WorkoutDisplay.view(it, names.label(it.primary.sourcePackage), bmr)
             }
         }
+
+    /** A workout from another app in the shape the coach already understands; calories are the exercise part only. */
+    fun coachEntry(view: WorkoutView): WorkoutEntryEntity = WorkoutEntryEntity(
+        description = "${view.title}, ${view.detailLine} (from ${view.sourceName})",
+        caloriesBurned = view.exerciseKcal ?: 0.0,
+        workoutType = if (view.title == "Strength workout") "Strength" else "Cardio",
+        setsCount = 0,
+        repsCount = 0,
+        timestamp = view.startTime
+    )
 }
 
 /**

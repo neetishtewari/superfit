@@ -16,6 +16,8 @@ final class FirebaseAuthBridge: NSObject, IosAuth {
 
     func currentEmail() -> String? { Auth.auth().currentUser?.email }
 
+    func currentName() -> String? { Auth.auth().currentUser?.displayName }
+
     func signIn(email: String, password: String, done: @escaping (IosAuthError?) -> Void) {
         Auth.auth().signIn(withEmail: email, password: password) { _, error in done(Self.authError(error)) }
     }

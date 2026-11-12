@@ -50,7 +50,12 @@ import com.superfit.app.ui.dashboard.WeighInDialog
  * [today] supplies the streak and food quality that Today already works out.
  */
 @Composable
-fun ProgressTabs(model: HistoryModel, today: DashboardUiState) {
+fun ProgressTabs(
+    model: HistoryModel,
+    today: DashboardUiState,
+    /** "Share my report" for the last 2 or 4 weeks; null hides it. */
+    onShareReport: ((weeks: Int) -> Unit)? = null
+) {
     var tab by rememberSaveable { mutableStateOf(0) }
     var showWeighIn by remember { mutableStateOf(false) }
     var showGoalEdit by remember { mutableStateOf(false) }
@@ -101,8 +106,8 @@ fun ProgressTabs(model: HistoryModel, today: DashboardUiState) {
                                 goalKgChange = p.progress.goalKgChange
                             )
                         },
-                        // The coach report comes with the iPhone's own PDF; personal bests with share cards.
-                        onShareWithCoach = null,
+                        // Personal bests come with share cards.
+                        onShareWithCoach = onShareReport,
                         bests = null,
                         foodQuality = {
                             if (today is DashboardUiState.Success) {
@@ -198,6 +203,7 @@ private fun HistoryPageContent(model: HistoryModel) {
     val page by model.page.collectAsState()
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
+    val mealSuggester by model.mealSuggester.collectAsState()
     val p = page
     if (p == null) {
         CircularProgressIndicator(color = NeonMint)
@@ -223,6 +229,7 @@ private fun HistoryPageContent(model: HistoryModel) {
         onDeleteMeal = model::deleteMeal,
         onDeleteWorkout = model::deleteWorkout,
         // Hiding comes with Apple Health workouts; sharing with share cards.
-        onHideImported = {}
+        onHideImported = {},
+        mealSuggester = mealSuggester
     )
 }

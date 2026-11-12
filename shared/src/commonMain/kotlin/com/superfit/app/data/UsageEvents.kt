@@ -13,4 +13,7 @@ object UsageEvents {
 
     /** A meal item's amount typed in, or switched between household units and g/ml ([how]: typed, switch). */
     fun mealAmountChanged(how: String) = report("meal_amount_changed", mapOf("how" to how))
+
+    /** A suggestion under the meal box picked while typing ([kind]: meal, food). */
+    fun mealSuggestionUsed(kind: String) = report("meal_suggestion_used", mapOf("kind" to kind))
 }

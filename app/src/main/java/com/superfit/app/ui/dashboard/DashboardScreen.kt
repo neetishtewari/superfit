@@ -629,7 +629,8 @@ fun DashboardScreen(
                                 parsingState = parsingState,
                                 foodInputText = foodInputText,
                                 onFoodInputChange = { foodInputText = it },
-                                onViewAllFoods = { showFavoritesDialog = true }
+                                onViewAllFoods = { showFavoritesDialog = true },
+                                mealSuggester = viewModel.mealSuggester.collectAsState().value
                             )
                         } else {
                             // WORKOUT VIEW: Activity & Performance, Sleep & Recovery

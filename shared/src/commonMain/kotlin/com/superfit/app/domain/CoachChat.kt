@@ -49,6 +49,9 @@ object CoachChat {
 
     const val TELL_ME_MORE = "Tell me more"
 
+    /** The Roast me style's own chip in the chat. */
+    const val ROAST_MY_DAY = "Roast"
+
     fun encode(entries: List<ChatEntry>): String = JSONArray().apply {
         entries.filterNot { it.isError }.takeLast(KEEP).forEach { e ->
             put(
