@@ -402,6 +402,10 @@ tested on the dev app first.
          usage and crash reports" switch on both phones (shared UsageReportsCard). Release builds
          upload their symbol file to Crashlytics. Not on iPhone: "widget added" (iOS doesn't say
          when a widget is added) and the speech-service key (Apple has one).
+         Store readiness: the iPhone's share cards, share text and report footer name the App
+         Store instead of Google Play (shared ThisAppStore; the link is added once App Store
+         Connect gives the app its id, until then the label shows without a link); Apple's
+         privacy manifests (PrivacyInfo.xcprivacy for the app and the widget); version 1.0.0.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -774,3 +778,7 @@ uses the Firebase config already in the app, no new key. No new permissions on e
 Store privacy labels (before the first App Store submission, Neetish): Usage data (product
 interaction) and Diagnostics (crash data), plus Device ID (Firebase's install ID), not linked to
 identity, not used for tracking; this matches Android's Data safety entry.
+The privacy manifest declares the same data as the App Store labels (name, email, user ID, health,
+fitness and the person's own logs for the app to work, linked to the account; usage, crash data
+and the Firebase install ID for analytics, not linked; nothing for tracking) and why the app uses
+settings storage (its own and the widget's shared group), file dates and the phone's uptime.

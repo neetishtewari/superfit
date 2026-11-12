@@ -7,7 +7,8 @@ options:
     iOS: "17.0"
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
+    # The App Store version people see, and the build number (raised for every upload).
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     # Neetish's Apple Developer team goes here (Xcode > Signing & Capabilities), not in the repo.
     DEVELOPMENT_TEAM: ""
@@ -26,6 +27,8 @@ targets:
     type: application
     platform: iOS
     sources:
+      # Includes PrivacyInfo.xcprivacy, Apple's privacy manifest: what the app collects and why it
+      # uses settings storage, file dates and the phone's uptime. The App Store needs it.
       - Superfit
       # Names shared with the widget (app group, link key).
       - SuperfitWidget/WidgetKeys.swift

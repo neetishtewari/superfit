@@ -75,6 +75,7 @@ import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.RoastCard
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.report.ThisAppStore
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -83,8 +84,8 @@ const val CARD_WIDTH_PX = 1080
 const val CARD_HEIGHT_PX = 1920
 private val CardDensity = Density(density = 3f, fontScale = 1f)
 
-/** The words sent with a shared picture. */
-const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
+/** The words sent with a shared picture: this phone's store link. */
+val SHARE_TEXT: String get() = ThisAppStore.shareText
 private val accentNames = listOf("Orange", "Mint", "Cyan", "Violet")
 
 /** Longest side of a loaded photo: room to zoom in on a 1080 x 1920 card, about 20 MB at most. */

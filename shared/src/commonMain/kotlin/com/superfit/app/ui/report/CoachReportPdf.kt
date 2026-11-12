@@ -28,9 +28,6 @@ interface PdfSurface {
     fun link(url: String, left: Float, top: Float, right: Float, bottom: Float)
 }
 
-/** The store the footer's link points to, e.g. "Get it on Google Play". */
-data class StoreLink(val label: String, val url: String)
-
 /**
  * The "Share my report" PDF, laid out once for both apps: a branded summary page with headline
  * numbers, a day-by-day table, then each day's meals. Every page carries the Superfit header and
@@ -44,7 +41,10 @@ object CoachReportPdf {
     private const val BAND_H = 64f // green header band on later pages
     const val FOOTER_TOP = PAGE_H - 50f
 
-    val GOOGLE_PLAY = StoreLink("Get it on Google Play", "https://play.google.com/store/apps/details?id=com.superfit.aifitness")
+    val GOOGLE_PLAY = StoreLink.GOOGLE_PLAY
+
+    /** This phone's store, for the footer (Swift can't use Kotlin's default arguments). */
+    val store: StoreLink get() = ThisAppStore
 
     // Superfit "Fresh Green" colours, matching the app.
     private const val WHITE = 0xFFFFFFFF.toInt()
@@ -63,7 +63,7 @@ object CoachReportPdf {
     fun fileName(report: CoachExport): String = "superfit-report-${report.from}-to-${report.to}.pdf"
 
     /** Draws the whole report on [surface]. */
-    fun draw(report: CoachExport, surface: PdfSurface, store: StoreLink = GOOGLE_PLAY) {
+    fun draw(report: CoachExport, surface: PdfSurface, store: StoreLink = ThisAppStore) {
         val pen = Pen(surface, range(report), store)
         summary(pen, report)
         dayTable(pen, report)
@@ -300,11 +300,15 @@ object CoachReportPdf {
             draw(num, PAGE_W - MARGIN - measure(num), FOOTER_TOP + 16f)
             // A short green link label, made tappable.
             style(9f, PdfFont.BOLD, GREEN)
-            val label = "${store.label} ›"
-            draw(label, MARGIN, FOOTER_TOP + 30f)
-            val w = measure(label)
-            surface.fillRect(MARGIN, FOOTER_TOP + 32f, MARGIN + w, FOOTER_TOP + 32.8f, GREEN, 0f)
-            surface.link(store.url, MARGIN - 2f, FOOTER_TOP + 19f, MARGIN + w + 2f, FOOTER_TOP + 36f)
+            if (store.url.isBlank()) {
+                draw(store.label, MARGIN, FOOTER_TOP + 30f)
+            } else {
+                val label = "${store.label} ›"
+                draw(label, MARGIN, FOOTER_TOP + 30f)
+                val w = measure(label)
+                surface.fillRect(MARGIN, FOOTER_TOP + 32f, MARGIN + w, FOOTER_TOP + 32.8f, GREEN, 0f)
+                surface.link(store.url, MARGIN - 2f, FOOTER_TOP + 19f, MARGIN + w + 2f, FOOTER_TOP + 36f)
+            }
             surface.finishPage()
         }
 

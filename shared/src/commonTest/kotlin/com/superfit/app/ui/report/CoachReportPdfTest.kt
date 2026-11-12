@@ -96,7 +96,7 @@ class CoachReportPdfTest {
     @Test
     fun wordsAndNumbersMatchAndroid() {
         val surface = FakeSurface()
-        CoachReportPdf.draw(report(14), surface)
+        CoachReportPdf.draw(report(14), surface, CoachReportPdf.GOOGLE_PLAY)
         val all = surface.texts
         assertTrue("15 Oct 2026 to 11 Nov 2026" in all)
         assertTrue("Thu 15 Oct" in all)

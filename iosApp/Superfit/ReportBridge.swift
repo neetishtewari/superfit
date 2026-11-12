@@ -11,7 +11,7 @@ final class ReportBridge: NSObject, IosReport {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [kCGPDFContextTitle as String: "My Superfit report", kCGPDFContextCreator as String: "Superfit"]
         let data = UIGraphicsPDFRenderer(bounds: page, format: format).pdfData { context in
-            layout.draw(report: report, surface: PdfDrawing(context: context), store: layout.GOOGLE_PLAY)
+            layout.draw(report: report, surface: PdfDrawing(context: context), store: layout.store)
         }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("shares", isDirectory: true)
         try? FileManager.default.removeItem(at: dir)

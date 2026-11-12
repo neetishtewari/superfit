@@ -70,6 +70,7 @@ import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
+import com.superfit.app.ui.report.ThisAppStore
 import com.superfit.shared.resources.Res
 import com.superfit.shared.resources.superfit_logo
 import kotlin.math.roundToInt
@@ -273,12 +274,12 @@ private fun CardFooter(showDivider: Boolean, roasted: Boolean = false) {
     }
 }
 
-/** "Get it on Google Play", with "Roasted by Superfit" above it on a roast. */
+/** "Get it on Google Play" (or the App Store on iPhone), with "Roasted by Superfit" above it on a roast. */
 @Composable
 private fun FooterNote(roasted: Boolean, main: Color, soft: Color) {
     Column(horizontalAlignment = Alignment.End) {
         if (roasted) Text("🔥 Roasted by Superfit", color = main, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text("Get it on Google Play", color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(ThisAppStore.label, color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
