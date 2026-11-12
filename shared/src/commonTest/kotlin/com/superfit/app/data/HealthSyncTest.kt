@@ -21,6 +21,8 @@ class HealthSyncTest {
         }
         override suspend fun readDistanceMeters(date: LocalDate): Double? = null
         override suspend fun readSleep(date: LocalDate) = sleep[date.toString()]
+        override suspend fun readWorkouts(fromMs: Long, toMs: Long, bmr: Double): List<HealthWorkout>? = null
+        override suspend fun readBody(sinceMs: Long): BodySamples? = null
     }
 
     private class FakeStore : HealthStore {

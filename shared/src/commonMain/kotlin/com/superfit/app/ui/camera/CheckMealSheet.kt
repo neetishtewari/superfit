@@ -20,7 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.MealItems
 import com.superfit.app.domain.PackAmount
 import com.superfit.app.domain.PackagedFood
@@ -37,7 +39,6 @@ import com.superfit.app.theme.ThemeTextSecondary
 import com.superfit.app.ui.dashboard.MealItemsEditor
 import com.superfit.app.ui.dashboard.NeonGreen
 import com.superfit.app.ui.dashboard.StepButton
-import java.util.Locale
 
 /** What the AI saw in a meal photo, for the user to adjust before anything is saved. */
 @Composable
@@ -53,14 +54,14 @@ fun CheckMealSheet(
             proteinG = result.proteinG,
             carbsG = result.carbsG,
             fatG = result.fatG,
-            timestamp = System.currentTimeMillis(),
+            timestamp = Now.millis(),
             qualityTags = result.tags?.encode(),
             items = result.items?.encode()
         )
     }
     var meal by remember(result) { mutableStateOf(result.items ?: MealItems.legacy(base)) }
 
-    CheckSheetFrame(onRetake = onRetake, onLog = { onLog(base.withItems(meal).copy(timestamp = System.currentTimeMillis())) }) {
+    CheckSheetFrame(onRetake = onRetake, onLog = { onLog(base.withItems(meal).copy(timestamp = Now.millis())) }) {
         MealItemsEditor(meal = meal, onChange = { meal = it })
     }
 }
@@ -86,7 +87,7 @@ fun CheckPackSheet(
                     proteinG = totals.protein,
                     carbsG = totals.carbs,
                     fatG = totals.fat,
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = Now.millis(),
                     items = meal.encode()
                 )
             )
@@ -225,7 +226,7 @@ private fun RowScope.AmountTab(label: String, selected: Boolean, onClick: () -> 
     }
 }
 
-private fun roundTo25(grams: Double): Double = maxOf(25.0, Math.round(grams / 25.0) * 25.0)
+private fun roundTo25(grams: Double): Double = maxOf(25.0, kotlin.math.round(grams / 25.0) * 25.0)
 
 private fun formatAmount(qty: Double): String =
-    if (qty == Math.floor(qty)) qty.toLong().toString() else String.format(Locale.US, "%.1f", qty)
+    if (qty == kotlin.math.floor(qty)) qty.toLong().toString() else Decimals.one(qty)

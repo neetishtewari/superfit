@@ -285,6 +285,43 @@ tested on the dev app first.
          an Apple Health section. Read again at every app open and return to the front (no
          background reads yet). On-screen "Health Connect" becomes the phone's own health app
          name. Workouts from other apps (6b) and smart-scale body data (6c) follow.
+       - 6b: Apple Health, workouts. Workouts the watch, Strava or any app saved to Apple
+         Health come into imported_workouts through shared WorkoutSync (90 days the first time,
+         then the last week; deleted there, gone here), with distance, active calories and
+         average heart rate, named after the app or watch that recorded them. Apple's workout
+         kinds map onto the same numbers Android uses (AppleWorkoutTypes), so titles, paces,
+         doubles across apps, "vs your usual", History, Insights and the calorie add-back work as
+         on Android. Connecting Apple Health turns the import on; people who connected before see
+         the card once more for the new part, and their steps and sleep keep coming in meanwhile.
+         Hiding a workout works as on Android; the import's settings page (main app, add-back)
+         joins with the rest of Settings.
+       - 6c: Apple Health, weight and body. Weigh-ins with body fat and lean mass from a smart
+         scale (or typed into the Health app) come in through shared ScaleImport, the same rules
+         as Android's BodyImporter: a reading close to the person's own weight goes into the
+         weight log ("from Withings"), one far from it (or the first with body fat) waits for
+         "Is this you?" on Today, and "Not me" sets a partner's readings aside from then on. Body
+         fat sets the calorie target as on Android and feeds the Journey Body card. Apple Health
+         has no bone mass or scale BMR, so those stay Android-only.
+       - 7: Voice. Today's "Say what you ate" (Food) and "Say your workout" (Activity) mics,
+         the same buttons as Android, through shared VoiceLog on top of a small VoiceRecognizer
+         that Swift provides with Apple's Speech framework (SpeechBridge). The same behaviour as
+         Android's: listens through pauses with live words, finishes 2 s after the last word or
+         after a minute, "Checking what you said…" waits up to 1.5 s for the corrected words, and
+         up to 5 of Apple's guesses go to the AI (SpokenInput) so it can pick the one that makes
+         sense as food. The phone's language and region are used (Indian English on an Indian
+         English phone). A refused mic shows the same "Microphone is off" note with Open
+         Settings. The mics in meal editing ("Say what it was") and "My nutritionist's advice"
+         show on iPhone too, with a small Listening window, since iPhone has no voice-typing box.
+         Results slide in at the top as on Android. Camera, barcode and label reading follow.
+       - 8: Camera and barcode. "Snap your plate" on Today's Food side offers Meal, Barcode or
+         Label, the three modes of Android's food camera. Apple's own camera takes the meal or
+         label photo (CameraBridge; the simulator picks a library photo instead), shrunk to
+         1280 px and sent to the AI once through shared FoodPhotoParser; Apple's live barcode
+         scanner (VisionKit) reads packets, looked up in Open Food Facts through shared
+         OpenFoodFacts (Android now uses its barcode forms too). Shared PhotoLog has Android's
+         words for working, not found ("Snap its nutrition label instead") and failures, and the
+         check sheets (CheckMealSheet, CheckPackSheet) move to shared, so nothing is saved until
+         Log meal, as on Android. Saved meals get quality tags the same way.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -558,3 +595,31 @@ ads (App Store rule 5.1.3). An empty or refused read never overwrites a saved da
 phone on the same account can't wipe steps. The entitlement is HealthKit only (no clinical
 records). No new Android permissions; Android unchanged apart from the shared text naming its
 health app.
+
+Step 6b (reviewed 11 Nov): still read only. Superfit now also asks to read workouts, cycling and
+swimming distance and heart rate; heart rate is read only as each workout's average. Workouts stay
+in the account's own database on the phone and are not backed up, exactly as Android keeps Health
+Connect workouts; the app and watch names are kept in the account's own settings on the phone.
+Nothing new goes to the AI or anywhere else. No new Android permissions; Android unchanged.
+
+Step 6c (reviewed 12 Nov): still read only; adds weight, body fat and lean mass. Accepted weigh-ins
+go into the weight log and are backed up to users/{signed-in uid} only, as Android does with Health
+Connect weigh-ins; the scale lists (mine, not me, waiting) and the last body fat stay in the
+account's own settings on the phone. Readings that may be someone else's are never added without
+the person's answer. Nothing new goes to the AI or anywhere else. Android unchanged.
+
+Step 7 (reviewed 12 Nov): asks for the microphone and speech recognition only when a mic button is
+first tapped, with the reasons in Apple's sheets (NSMicrophoneUsageDescription,
+NSSpeechRecognitionUsageDescription). The microphone is on only while the button shows Listening,
+and stops after a minute at most. Sound goes to Apple's speech recognition (as it goes to Google's
+on Android) and is never recorded, kept or sent to Superfit or Firebase; only the words go on, to
+Gemini through Firebase AI Logic with App Check, exactly as typed words do. Nothing new is stored
+or backed up. No new Android permissions; Android unchanged.
+
+Step 8 (reviewed 12 Nov): asks for the camera only when it first opens, with the reason in
+Apple's sheet (NSCameraUsageDescription). Photos are shrunk, sent once to Gemini through Firebase
+AI Logic with App Check, and never saved to the phone's photos, the database or the backup. Only
+the barcode number goes to Open Food Facts (over HTTPS, a plain app name as User-Agent, no
+account or device details). The simulator's photo picker needs no library permission. What is
+logged is saved and backed up like any meal. No new Android permissions; Android's camera is
+unchanged apart from the check sheets now coming from shared code.

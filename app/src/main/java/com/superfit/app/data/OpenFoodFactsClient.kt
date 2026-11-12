@@ -1,5 +1,6 @@
 package com.superfit.app.data
 
+import com.superfit.app.domain.OpenFoodFacts
 import com.superfit.app.domain.PackagedFood
 import com.superfit.app.domain.PackagedFoodParser
 import java.io.IOException
@@ -17,19 +18,11 @@ object OpenFoodFactsClient {
     /** Null when the product isn't known or has no calories; throws when offline. */
     suspend fun lookup(barcode: String): PackagedFood? = withContext(Dispatchers.IO) {
         if (!BARCODE.matches(barcode)) return@withContext null
-        // A 12-digit UPC-A code is the same product as its 13-digit EAN form with a leading 0,
-        // and the database may only have one of the two.
-        alternateForms(barcode).firstNotNullOfOrNull { fetch(it) }
-    }
-
-    internal fun alternateForms(barcode: String): List<String> = when {
-        barcode.length == 12 -> listOf(barcode, "0$barcode")
-        barcode.length == 13 && barcode.startsWith("0") -> listOf(barcode, barcode.drop(1))
-        else -> listOf(barcode)
+        OpenFoodFacts.alternateForms(barcode).firstNotNullOfOrNull { fetch(it) }
     }
 
     private fun fetch(barcode: String): PackagedFood? {
-        val url = URL("https://world.openfoodfacts.org/api/v2/product/$barcode.json?fields=product_name,nutriments,serving_quantity")
+        val url = URL(OpenFoodFacts.url(barcode))
         val conn = url.openConnection() as HttpURLConnection
         return try {
             conn.connectTimeout = 8_000

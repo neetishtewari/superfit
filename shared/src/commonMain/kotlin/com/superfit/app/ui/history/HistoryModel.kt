@@ -2,19 +2,25 @@ package com.superfit.app.ui.history
 
 import com.superfit.app.data.DayTotalsBuilder
 import com.superfit.app.data.GoalDatePref
+import com.superfit.app.data.HealthSourceNames
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
 import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WorkoutEntryEntity
+import com.superfit.app.data.WorkoutImportPrefs
+import com.superfit.app.data.WorkoutSync
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.BodyPeriod
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.ScaleReading
+import com.superfit.app.domain.WorkoutView
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,7 +64,8 @@ class HistoryModel(
     private val scope: CoroutineScope,
     private val parser: NutritionParser = NutritionParser(),
     private val tagger: MealTagger = MealTagger(),
-    private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() }
+    private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val scaleReadings: () -> List<ScaleReading> = { emptyList() }
 ) {
     private val today = Now.today()
     private val thisMonth = LocalDate(today.year, today.month, 1)
@@ -76,25 +83,35 @@ class HistoryModel(
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
 
+    private val workoutPrefs = WorkoutImportPrefs(prefs)
+
+    /** Workouts from other apps (the phone's health app) by day, as Today shows them. */
+    private suspend fun importedByDay(profile: UserProfileEntity, tz: TimeZone): Map<LocalDate, List<WorkoutView>> =
+        DayTotalsBuilder.byDate(
+            WorkoutSync.views(log.importedWorkouts.getAll(), workoutPrefs, HealthSourceNames(prefs), PhysiologyEngine.calculateBmr(profile)),
+            tz
+        )
+
     val page: StateFlow<HistoryPage?> = combine(log.profileFlow, log.allNutritionEntriesFlow, month, selected, reload) { profile, meals, monthStart, day, _ ->
         if (profile == null) return@combine null
         val tz = zone()
         val nutrition = HistoryLog.byDay(meals, tz) { it.timestamp }
         val workouts = HistoryLog.byDay(log.getAllWorkoutEntries(), tz) { it.timestamp }
         val activity = HistoryLog.activityByDay(log.getAllActivityTelemetry())
-        val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, emptyList(), workouts[date].orEmpty()) }
+        val imported = importedByDay(profile, tz)
+        val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, imported[date].orEmpty(), workouts[date].orEmpty()) }
         HistoryPage(
             monthStart = monthStart,
             days = HistoryLog.monthDays(monthStart, nutrition, target),
             selected = day,
-            summary = HistoryLog.daySummary(day, nutrition, workouts, activity, emptyMap(), target),
+            summary = HistoryLog.daySummary(day, nutrition, workouts, activity, imported, target),
             canGoNext = monthStart < thisMonth
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
     private val period = MutableStateFlow(BodyPeriod.fromLabel(prefs.getString(ProgressLog.KEY_BODY_PERIOD, null)))
 
-    /** Insights and Journey. Scale readings (body fat and more) come with Apple Health. */
+    /** Insights and Journey, with the person's own smart-scale readings (body fat and more) from the health app. */
     val progress: StateFlow<ProgressPage?> = combine(log.profileFlow, log.allNutritionEntriesFlow, log.weightEntriesFlow, period, reload) { profile, meals, weights, bodyPeriod, _ ->
         if (profile == null) return@combine null
         val tz = zone()
@@ -103,16 +120,17 @@ class HistoryModel(
         val activityList = log.getAllActivityTelemetry()
         val nutrition = HistoryLog.byDay(meals, tz) { it.timestamp }
         val workouts = HistoryLog.byDay(workoutList, tz) { it.timestamp }
-        val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, emptyList(), workouts[date].orEmpty()) }
-        val totals = DayTotalsBuilder.days(meals, workoutList, activityList, emptyMap(), target, PhysiologyEngine.proteinTargetG(profile), tz)
+        val imported = importedByDay(profile, tz)
+        val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, imported[date].orEmpty(), workouts[date].orEmpty()) }
+        val totals = DayTotalsBuilder.days(meals, workoutList, activityList, imported, target, PhysiologyEngine.proteinTargetG(profile), tz)
         ProgressPage(
-            progress = ProgressLog.build(profile, prefs, meals, weights, totals, emptyList(), bodyPeriod, day, tz),
-            consistency = HistoryLog.consistency(day, nutrition, workouts, emptyMap(), target),
+            progress = ProgressLog.build(profile, prefs, meals, weights, totals, scaleReadings(), bodyPeriod, day, tz),
+            consistency = HistoryLog.consistency(day, nutrition, workouts, imported, target),
             trends = HistoryLog.weeklyTrends(
                 day,
                 nutrition,
                 workouts,
-                emptyMap(),
+                imported,
                 HistoryLog.activityByDay(activityList),
                 HistoryLog.sleepByDay(log.getAllSleepTelemetry()),
                 target

@@ -20,6 +20,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +32,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
+import com.superfit.app.domain.LogKind
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.camera.PhotoCamera
+import com.superfit.app.ui.camera.PhotoKind
+import com.superfit.app.ui.camera.PhotoKindSheet
+import com.superfit.app.ui.camera.PhotoLog
+import com.superfit.app.ui.camera.PhotoLogOverlay
+import com.superfit.app.ui.camera.PhotoLogState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Today on the iPhone, with the same Food / Activity switch and shared cards Android shows.
@@ -39,7 +50,16 @@ import com.superfit.app.theme.SuperfitTheme
  * adds for now.
  */
 @Composable
-fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Composable () -> Unit = {}) {
+fun TodayScreen(
+    model: TodayModel,
+    onOpenSettings: () -> Unit = {},
+    /** Opens Superfit's page in the phone's own Settings, for turning the microphone back on. */
+    onOpenPhoneSettings: () -> Unit = {},
+    /** The camera for "Snap your plate", with what happens to its pictures; null hides the button. */
+    camera: PhotoCamera? = null,
+    photoLog: PhotoLog? = null,
+    footer: @Composable () -> Unit = {}
+) {
     val state by model.state.collectAsState()
     val usualDay by model.usualDay.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
@@ -47,12 +67,67 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
     val coaching by model.coaching.collectAsState()
     val healthAsked by model.healthAsked.collectAsState()
     val distanceKm by model.distanceKm.collectAsState()
+    val workoutImportEnabled by model.workoutImportEnabled.collectAsState()
+    val workoutImportRunning by model.workoutImportRunning.collectAsState()
+    val pendingScaleReading by model.pendingScaleReading.collectAsState()
     var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
     var foodInput by remember { mutableStateOf("") }
     var showAllFoods by remember { mutableStateOf(false) }
+    val voice = model.voiceLog?.takeIf { it.available }
+    val noVoice = remember { VoiceIdle() }
+    val voiceUi by (voice?.ui ?: noVoice.ui).collectAsState()
+    val voiceNotice by (voice?.notice ?: noVoice.notice).collectAsState()
+    val micOff by (voice?.micOff ?: noVoice.micOff).collectAsState()
+    var banner by remember { mutableStateOf<LogBanner?>(null) }
+    val photoCamera = camera?.takeIf { photoLog != null && it.isAvailable() }
+    var showPhotoKinds by remember { mutableStateOf(false) }
+    // The camera opens once the sheet has gone, so Apple's camera isn't shown on the closing sheet.
+    var pendingCamera by remember { mutableStateOf<PhotoKind?>(null) }
+    val idlePhoto = remember { MutableStateFlow<PhotoLogState>(PhotoLogState.Idle) }
+    val photoState by (photoLog?.state ?: idlePhoto).collectAsState()
+    val openCamera: (PhotoKind) -> Unit = { kind ->
+        photoLog?.close()
+        photoCamera?.take(
+            kind,
+            onPhoto = { photoLog?.onPhoto(kind, it) },
+            onBarcode = { photoLog?.onBarcode(it) },
+            onError = { banner = LogBanner(it, isError = true) }
+        )
+    }
+
+    // What was logged, or why it couldn't be, slides in at the top for a few seconds, as on Android.
+    LaunchedEffect(parsing) {
+        when (val p = parsing) {
+            is ParsingState.Success -> banner = LogBanner(p.message ?: "Logged: ${p.foodText}", isError = false)
+            is ParsingState.Error -> banner = LogBanner(p.message, isError = true)
+            else -> return@LaunchedEffect
+        }
+        model.resetParsing()
+    }
+    LaunchedEffect(voiceNotice) {
+        voiceNotice?.let {
+            banner = LogBanner(it, isError = true)
+            voice?.dismissNotice()
+        }
+    }
+    LaunchedEffect(pendingCamera) {
+        pendingCamera?.let { kind ->
+            delay(400)
+            openCamera(kind)
+            pendingCamera = null
+        }
+    }
+    LaunchedEffect(banner) {
+        if (banner != null) {
+            delay(4000)
+            banner = null
+        }
+    }
+    // Leaving Today stops the mic without logging half a sentence.
+    DisposableEffect(voice) { onDispose { voice?.cancel() } }
 
     Box(
         modifier = Modifier
@@ -80,7 +155,25 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 DashboardHeader(grantedPermissions = emptySet(), hasHealthConnectPermissions = true, onNavigateToSettings = onOpenSettings)
-                FoodActivitySwitch(side = side, onSelect = { side = it })
+                FoodActivitySwitch(side = side, onSelect = {
+                    voice?.cancel()
+                    side = it
+                })
+                if (voice != null) {
+                    val kind = if (side == "MEAL") LogKind.MEAL else LogKind.WORKOUT
+                    // Only the mic that's listening shows it; the other side's waits.
+                    val mine = voiceUi.listening && voiceUi.kind == kind
+                    VoiceQuickLogCard(
+                        logType = if (side == "MEAL") "MEAL" else "WORKOUT",
+                        isListening = mine,
+                        isChecking = mine && voiceUi.checking,
+                        liveText = if (mine) voiceUi.liveText else "",
+                        isProcessing = parsing is ParsingState.Loading,
+                        onMicClick = { voice.start(kind) },
+                        onStopClick = voice::stop,
+                        onCameraClick = photoCamera?.let { { showPhotoKinds = true } }
+                    )
+                }
                 if (side == "MEAL") {
                     CalorieRingsCard(state = s, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
                     val day = Now.today()
@@ -110,12 +203,15 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                         onViewAllFoods = { showAllFoods = true }
                     )
                 } else {
-                    // Sharing a workout card joins with share cards; workouts from other apps with their own step.
+                    // Sharing a workout card joins with share cards.
                     if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
                     ActivityPerformanceCard(
                         state = s,
                         vsUsual = model.vsUsual(s, usualDay, distanceKm),
-                        onDeleteWorkout = model::deleteWorkout
+                        onDeleteWorkout = model::deleteWorkout,
+                        onHideImportedWorkout = model::hideImportedWorkout,
+                        workoutImportEnabled = workoutImportEnabled,
+                        workoutImportRunning = workoutImportRunning
                     )
                     SleepRecoveryCard(state = s)
                 }
@@ -123,12 +219,58 @@ fun TodayScreen(model: TodayModel, onOpenSettings: () -> Unit = {}, footer: @Com
                 Spacer(modifier = Modifier.height(48.dp))
             }
         }
+        photoLog?.let { log ->
+            PhotoLogOverlay(
+                state = photoState,
+                kind = log.kind,
+                onLog = { entry, isPackaged ->
+                    log.close()
+                    model.addPhotoMeal(entry, isPackaged)
+                },
+                onRetake = { kind ->
+                    // Closes the check sheet first; the camera opens once it has gone.
+                    log.close()
+                    pendingCamera = kind
+                },
+                onClose = log::close
+            )
+        }
+        LogResultBanner(banner, modifier = Modifier.align(Alignment.TopCenter))
+    }
+
+    if (showPhotoKinds) {
+        PhotoKindSheet(
+            onPick = { kind ->
+                showPhotoKinds = false
+                pendingCamera = kind
+            },
+            onDismiss = { showPhotoKinds = false }
+        )
+    }
+
+    if (micOff) {
+        MicOffDialog(
+            onOpenSettings = {
+                voice?.dismissMicOff()
+                onOpenPhoneSettings()
+            },
+            onDismiss = { voice?.dismissMicOff() }
+        )
     }
 
     if (showStepGoalSheet) {
         stepGoal?.let { goal ->
             StepGoalSheet(goal = goal, onSetOwn = model::setOwnStepGoal, onDismiss = { showStepGoalSheet = false })
         }
+    }
+
+    pendingScaleReading?.let { reading ->
+        ScaleReadingDialog(
+            reading = reading,
+            onMe = { model.answerScaleReading(isMe = true) },
+            onNotMe = { model.answerScaleReading(isMe = false) },
+            onLater = model::postponeScaleReading
+        )
     }
 
     if (showAllFoods) {

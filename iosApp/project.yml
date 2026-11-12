@@ -48,7 +48,8 @@ targets:
         com.apple.developer.devicecheck.appattest-environment: production
         # Sign in with Apple (Continue with Apple on the sign-in screen).
         com.apple.developer.applesignin: [Default]
-        # Apple Health, read only (steps, active energy, walking distance, sleep).
+        # Apple Health, read only (steps, energy, distances, sleep, workouts, workout heart rate,
+        # weight, body fat, lean mass).
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
     info:
@@ -60,7 +61,14 @@ targets:
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true
         # Shown in Apple's Health access sheet. Superfit only reads; it never writes to Apple Health.
-        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, walking distance and sleep to show your day, set your step goal and guide your coach. It never changes anything in Apple Health."
+        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, distances, sleep, workouts and heart rate during workouts and weigh-ins with body measurements from your scale, to show your day, set your step goal and targets, and guide your coach. It never changes anything in Apple Health."
+        # Shown when a mic button is first tapped. The sound goes to Apple's speech recognition and
+        # only the words come back; nothing is recorded or kept.
+        NSMicrophoneUsageDescription: "Superfit listens when you tap a mic button, so you can say what you ate or the workout you did. Nothing is recorded or kept."
+        NSSpeechRecognitionUsageDescription: "Apple's speech recognition turns what you say into words, which Superfit uses to log your meal or workout. Nothing is recorded or kept."
+        # Shown the first time the camera opens (meal photo, barcode or label). Photos go to the AI
+        # once and are never saved.
+        NSCameraUsageDescription: "Superfit uses the camera when you snap your meal, scan a barcode or snap a nutrition label, to work out what you ate. Photos aren't saved."
         # Google's sign-in sheet returns to the app through this link (REVERSED_CLIENT_ID in
         # GoogleService-Info.plist). It identifies the app, it is not a secret.
         CFBundleURLTypes:

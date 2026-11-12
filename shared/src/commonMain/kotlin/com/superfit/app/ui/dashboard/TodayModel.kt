@@ -3,21 +3,26 @@ package com.superfit.app.ui.dashboard
 import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.CoachInsightStore
 import com.superfit.app.data.CoachStyleStore
+import com.superfit.app.data.DayTotalsBuilder
 import com.superfit.app.data.HabitEntryEntity
 import com.superfit.app.data.HealthSource
+import com.superfit.app.data.HealthSourceNames
 import com.superfit.app.data.HealthSync
+import com.superfit.app.data.ImportedWorkoutEntity
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.Now
 import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.StepGoalStore
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
+import com.superfit.app.data.WorkoutSync
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
@@ -30,10 +35,13 @@ import com.superfit.app.domain.MealTagBackfill
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.NutritionistNote
+import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
 import com.superfit.app.domain.UsualDay
+import com.superfit.app.domain.WorkoutView
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -50,7 +58,7 @@ import kotlinx.datetime.TimeZone
  * Today for the iPhone, built from the same shared pieces as Android: today's meals, targets,
  * streak, weigh-ins and voice-logged workouts from [log], worked out by [TodayState.build]. Steps,
  * active calories, distance and sleep come from the phone's health app ([health], Apple Health)
- * once the person connects it; workouts from other apps join in a later step.
+ * once the person connects it, and workouts other apps and the watch saved there.
  */
 class TodayModel(
     private val log: LogRepository,
@@ -60,7 +68,9 @@ class TodayModel(
     private val coachNotes: () -> List<CoachNote> = { emptyList() },
     private val coach: CoachingEngine = CoachingEngine(),
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
-    private val health: HealthSource? = null
+    private val health: HealthSource? = null,
+    private val scale: ScaleImport? = null,
+    voice: VoiceRecognizer? = null
 ) {
     private val today = Now.today()
 
@@ -68,6 +78,8 @@ class TodayModel(
     init {
         CoachStyleStore.load(prefs)
         NutritionAdviceStore.load(prefs)
+        // The last body fat from a smart scale, for the calorie target.
+        scale?.load()
     }
 
     private val _coachStyle = MutableStateFlow(CoachStyle.current)
@@ -80,10 +92,22 @@ class TodayModel(
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
 
     private var lastMeal: String? = null
+
+    /** Today's mic buttons, or null where the app doesn't provide speech recognition yet. */
+    val voiceLog: VoiceLog? = voice?.let { recognizer ->
+        VoiceLog(recognizer) { heard, kind -> smartLog(heard.text, heard.otherVersions, kind) }
+    }
     val canRetryLastMeal: Boolean get() = !lastMeal.isNullOrBlank()
 
     // Settings saved outside the database (own calorie targets) ask Today to work things out again.
     private val settingsChanged = MutableStateFlow(0)
+
+    private val workoutPrefs = WorkoutImportPrefs(prefs)
+    private val sourceNames = HealthSourceNames(prefs)
+
+    /** Workouts from other apps as Today and the usual day show them; empty while the import is off. */
+    private fun workoutViews(rows: List<ImportedWorkoutEntity>, profile: UserProfileEntity): List<WorkoutView> =
+        WorkoutSync.views(rows, workoutPrefs, sourceNames, PhysiologyEngine.calculateBmr(profile))
 
     @Suppress("UNCHECKED_CAST")
     val state: StateFlow<DashboardUiState> = combine(
@@ -96,10 +120,13 @@ class TodayModel(
             log.weightEntriesFlow,
             log.getHabitEntryFlow(today.toString()),
             log.allNutritionEntriesFlow,
-            settingsChanged
+            settingsChanged,
+            log.allImportedWorkoutsFlow
         )
     ) { values ->
         val profile = values[0] as? UserProfileEntity ?: return@combine DashboardUiState.NotInitialized
+        val importedRows = values[9] as? List<ImportedWorkoutEntity> ?: emptyList()
+        val todayViews = DayTotalsBuilder.byDate(workoutViews(importedRows, profile), zone())[today].orEmpty()
         TodayState.build(
             today = today.toString(),
             zone = zone(),
@@ -111,9 +138,9 @@ class TodayModel(
             weightEntries = values[5] as? List<WeightEntryEntity> ?: emptyList(),
             habit = values[6] as? HabitEntryEntity,
             allNutritionHistory = values[7] as? List<NutritionEntryEntity> ?: emptyList(),
-            importedWorkouts = emptyList(),
-            importedCount = 0,
-            workoutPrefs = WorkoutImportPrefs(prefs),
+            importedWorkouts = todayViews,
+            importedCount = importedRows.size,
+            workoutPrefs = workoutPrefs,
             prefs = prefs
         )
     }.stateIn(scope, SharingStarted.Eagerly, DashboardUiState.Loading)
@@ -125,13 +152,14 @@ class TodayModel(
     val usualDay: StateFlow<UsualDay?> = combine(
         log.profileFlow,
         log.getActivityFlow(today.toString()),
-        log.getWorkoutEntriesForDay(today)
-    ) { profile, _, _ ->
+        log.getWorkoutEntriesForDay(today),
+        log.allImportedWorkoutsFlow
+    ) { profile, _, _, imported ->
         if (profile == null) return@combine null
         TodayState.usualDay(
             voiceWorkouts = log.getAllWorkoutEntries(),
             activity = log.getAllActivityTelemetry(),
-            imported = emptyList(),
+            imported = workoutViews(imported, profile),
             today = today,
             zone = zone()
         )
@@ -168,6 +196,9 @@ class TodayModel(
             }
             if (!answered) return@launch
             prefs.edit { putBoolean(HealthSync.KEY_ASKED, true) }
+            // Connecting brings workouts in too, as turning on the import does on Android.
+            if (!workoutPrefs.enabled) workoutPrefs.enabled = true
+            _workoutImportEnabled.value = true
             _healthAsked.value = true
             readHealth(source)
         }
@@ -175,12 +206,61 @@ class TodayModel(
 
     /** Reads today's and yesterday's steps and sleep again; the app calls this whenever it comes to the front. */
     fun syncHealth() {
-        val source = health?.takeIf { _healthAsked.value } ?: return
+        val askedBefore = HealthSync.EARLIER_KEYS.any { prefs.getBoolean(it, false) }
+        val source = health?.takeIf { healthAvailable && (_healthAsked.value || askedBefore) } ?: return
         scope.launch { readHealth(source) }
+    }
+
+    private val _workoutImportEnabled = MutableStateFlow(workoutPrefs.enabled)
+
+    /** Whether workouts from other apps are brought in (on once Apple Health is connected). */
+    val workoutImportEnabled: StateFlow<Boolean> = _workoutImportEnabled.asStateFlow()
+
+    private val _workoutImportRunning = MutableStateFlow(false)
+    val workoutImportRunning: StateFlow<Boolean> = _workoutImportRunning.asStateFlow()
+
+    private val _pendingScaleReading = MutableStateFlow(scale?.nextPending())
+
+    /** A smart-scale reading far from the person's own, waiting for "Is this you?". */
+    val pendingScaleReading: StateFlow<ScaleReading?> = _pendingScaleReading.asStateFlow()
+
+    fun answerScaleReading(isMe: Boolean) {
+        val reading = _pendingScaleReading.value ?: return
+        val importer = scale ?: return
+        scope.launch {
+            importer.answer(reading.id, isMe)
+            _pendingScaleReading.value = importer.nextPending()
+            settingsChanged.value++
+        }
+    }
+
+    /** "Not now": asked again next time the app opens. */
+    fun postponeScaleReading() {
+        _pendingScaleReading.value = null
+    }
+
+    /** Hides a workout from another app (every app's copy of it), as on Android. */
+    fun hideImportedWorkout(view: WorkoutView) {
+        workoutPrefs.hide(view.merged.memberIds)
+        settingsChanged.value++
     }
 
     private suspend fun readHealth(source: HealthSource) {
         HealthSync.sync(source, log.healthStore, Now.today())
+        log.getProfile()?.let { profile ->
+            _workoutImportRunning.value = workoutPrefs.enabled && workoutPrefs.lastImportMillis == 0L
+            try {
+                WorkoutSync.import(source, log.importedWorkouts, workoutPrefs, sourceNames, PhysiologyEngine.calculateBmr(profile), Now.millis())
+            } finally {
+                _workoutImportRunning.value = false
+            }
+        }
+        scale?.let { importer ->
+            importer.importNew(source, Now.millis())
+            _pendingScaleReading.value = importer.nextPending()
+            // Body fat may have changed the calorie target.
+            settingsChanged.value++
+        }
         _distanceKm.value = try {
             source.readDistanceMeters(Now.today())?.takeIf { it > 0 }?.div(1000)
         } catch (e: CancellationException) {
@@ -392,6 +472,34 @@ class TodayModel(
             _parsing.value = ParsingState.Loading
             _parsing.value = smartLogger.log(input, otherVersions, kind)
         }
+    }
+
+    /**
+     * Saves a meal from the camera once the person checked it, as Android does: packets (and
+     * meals whose food was changed) get their quality tags afterwards.
+     */
+    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean) {
+        scope.launch {
+            try {
+                val id = log.addNutritionEntry(entry)
+                loadPredictedFoods()
+                _parsing.value = ParsingState.Success(entry.foodText)
+                if (isPackaged || entry.qualityTags == null) {
+                    val saved = entry.copy(id = id)
+                    MealTagger().tagOne(saved)?.let { log.saveMealTags(saved, it.encode()) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Saving photo meal failed", e)
+                _parsing.value = ParsingState.Error("Couldn't save this meal. Please try again.")
+            }
+        }
+    }
+
+    /** The result has been shown (in the banner), so the box goes back to its usual look. */
+    fun resetParsing() {
+        _parsing.value = ParsingState.Idle
     }
 
     fun retryLastMeal() {
