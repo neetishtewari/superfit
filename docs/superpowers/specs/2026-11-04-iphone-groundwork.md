@@ -322,6 +322,10 @@ tested on the dev app first.
          words for working, not found ("Snap its nutrition label instead") and failures, and the
          check sheets (CheckMealSheet, CheckPackSheet) move to shared, so nothing is saved until
          Log meal, as on Android. Saved meals get quality tags the same way.
+       - 9: App icon. The Play Store's 1024 px Superfit icon (store/app_icon.png) becomes the
+         iPhone's home-screen icon through an asset catalog (Assets.xcassets/AppIcon), so the
+         app no longer shows a blank grid. Home-screen widget, reminders and the PDF report
+         follow.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -623,3 +627,6 @@ the barcode number goes to Open Food Facts (over HTTPS, a plain app name as User
 account or device details). The simulator's photo picker needs no library permission. What is
 logged is saved and backed up like any meal. No new Android permissions; Android's camera is
 unchanged apart from the check sheets now coming from shared code.
+
+Step 9 (reviewed 12 Nov): the app icon only adds an image to the app bundle. There is no new
+permission, data, network call or code.

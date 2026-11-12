@@ -77,6 +77,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superfit.aifitness
+        # The home-screen icon: the same 1024 px icon as the Play Store (Assets.xcassets/AppIcon).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
         # The shared Kotlin code, built by Gradle in the step below.
