@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
 import com.superfit.app.data.CloudBackup
+import com.superfit.app.data.HealthSync
 import com.superfit.app.data.IosAuth
 import com.superfit.app.data.IosAuthClient
 import com.superfit.app.data.IosBackupLocal
@@ -31,11 +32,13 @@ import com.superfit.app.data.IosCloudStore
 import com.superfit.app.data.IosCloudStoreAdapter
 import com.superfit.app.data.IosHealth
 import com.superfit.app.data.IosHealthSource
+import com.superfit.app.data.IosOnboardingHealth
 import com.superfit.app.data.IosPrefs
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.WorkoutCardData
+import com.superfit.app.data.WorkoutImportPrefs
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachChat
@@ -63,11 +66,14 @@ import com.superfit.app.ui.dashboard.VoiceRecognizer
 import com.superfit.app.ui.dashboard.dailyShareCard
 import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
+import com.superfit.app.ui.onboarding.OnboardingModel
+import com.superfit.app.ui.onboarding.OnboardingScreen
 import com.superfit.app.ui.settings.CoachMemoryCard
 import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
 import com.superfit.app.ui.share.LocalShareCardHost
 import com.superfit.app.ui.share.ShareCardSheet
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
@@ -191,6 +197,40 @@ private fun IosRoot(
         // Lives while this account is signed in; signing out stops Today's updates.
         val accountScope = rememberCoroutineScope()
         val log = remember(uid) { LogRepository(database = { database }, backup = backup, isImportedWeight = ScaleImport::isImported) }
+        // A new account sets up its profile first, as on Android; the backup has already come down.
+        val hasProfile by remember(uid) { log.profileFlow.map { it != null } }.collectAsState(initial = null)
+        if (hasProfile == null) return
+        if (hasProfile == false) {
+            val prefs = remember(uid) { IosPrefs.forUser(uid) }
+            val onboarding = remember(uid) { OnboardingModel(log, IosOnboardingHealth(health, prefs).takeIf { health.isAvailable() }, accountScope) }
+            OnboardingScreen(
+                model = onboarding,
+                prefs = prefs,
+                onConnectHealth = if (health.isAvailable()) {
+                    { done ->
+                        accountScope.launch {
+                            val answered = runCatching { health.requestAccess() }.getOrDefault(false)
+                            if (answered) {
+                                // Same as connecting on Today: steps, sleep and workouts come in from now on.
+                                prefs.edit { putBoolean(HealthSync.KEY_ASKED, true) }
+                                WorkoutImportPrefs(prefs).enabled = true
+                            }
+                            done(answered)
+                        }
+                    }
+                } else {
+                    null
+                },
+                // Today appears by itself once the profile is saved.
+                onOnboardingComplete = {},
+                onBack = {
+                    auth.signOut()
+                    signedIn = false
+                    email = null
+                }
+            )
+            return
+        }
         val scale = remember(uid) { ScaleImport(IosPrefs.forUser(uid), log) }
         val today = remember(uid) {
             TodayModel(

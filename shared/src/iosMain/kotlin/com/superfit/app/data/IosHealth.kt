@@ -38,7 +38,7 @@ interface IosHealth {
     /** Workouts that started between two times, from every app and watch, newest first. */
     fun workouts(startMs: Long, endMs: Long, done: (List<IosWorkout>?, String?) -> Unit)
 
-    /** [kind] is "weightKg", "bodyFatPct" (0 to 100) or "leanKg": every sample since [sinceMs]. */
+    /** [kind] is "weightKg", "bodyFatPct" (0 to 100), "leanKg" or "heightCm": every sample since [sinceMs]. */
     fun bodySamples(kind: String, sinceMs: Long, done: (List<IosBodySample>?, String?) -> Unit)
 
     /**
@@ -135,6 +135,9 @@ class IosHealthSource(private val ios: IosHealth, private val zone: () -> TimeZo
                 if (error != null) c.resumeWithException(IosHealthException(error)) else c.resume(list)
             }
         }?.chunked(2)?.filter { it.size == 2 }?.map { HeartSample(it[0], it[1].toInt()) }
+
+    /** The newest [kind] sample's value ("heightCm" or "weightKg"), for sign-up; null when there's none. */
+    suspend fun latest(kind: String): Double? = samples(kind, 0L)?.maxByOrNull { it.timeMs }?.value
 
     private suspend fun samples(kind: String, sinceMs: Long): List<IosBodySample>? = suspendCancellableCoroutine { c ->
         ios.bodySamples(kind, sinceMs) { list, error ->

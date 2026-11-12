@@ -172,7 +172,7 @@ fun TodayScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    "No profile on this account yet. Set it up in the Android app for now; setup on iPhone comes with onboarding.",
+                    "Setting up your profile…",
                     style = MaterialTheme.typography.bodyLarge,
                     color = SuperfitTheme.colors.textPrimary
                 )

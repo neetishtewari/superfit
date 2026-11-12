@@ -22,6 +22,8 @@ final class HealthKitBridge: NSObject, IosHealth {
         HKQuantityType(.bodyMass),
         HKQuantityType(.bodyFatPercentage),
         HKQuantityType(.leanBodyMass),
+        // Height, to fill in "About you" at sign-up.
+        HKQuantityType(.height),
     ]
 
     // A workout's distance is kept under the kind that fits it; the first one it has is used.
@@ -117,6 +119,7 @@ final class HealthKitBridge: NSObject, IosHealth {
         case "weightKg": (type, unit, scale) = (HKQuantityType(.bodyMass), .gramUnit(with: .kilo), 1)
         case "bodyFatPct": (type, unit, scale) = (HKQuantityType(.bodyFatPercentage), .percent(), 100)
         case "leanKg": (type, unit, scale) = (HKQuantityType(.leanBodyMass), .gramUnit(with: .kilo), 1)
+        case "heightCm": (type, unit, scale) = (HKQuantityType(.height), .meterUnit(with: .centi), 1)
         default:
             done(nil, "Unknown body value \(kind)")
             return

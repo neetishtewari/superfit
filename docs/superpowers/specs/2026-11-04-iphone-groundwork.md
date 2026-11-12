@@ -374,6 +374,13 @@ tested on the dev app first.
          any roast in the coach chat. Workout cards read heart rate from Apple Health during the
          workout (the watch or app that recorded it first), as Android does from Health Connect.
          The "new personal best" card and Settings › Sharing come with the rest of Settings.
+       - 15: Onboarding (moved ahead of the monthly recap, Neetish 12 Nov). A new account on the
+         iPhone sets up its profile on the phone with the same six steps as Android (welcome,
+         health app, about you, goal, pick your coach, your plan), now shared OnboardingScreen and
+         OnboardingModel. Each phone names its own health app (Health Connect, Apple Health) and
+         shows its own access sheet; "About you" fills height and weight from it (the iPhone now
+         also reads height). Android keeps "Read aloud" (its text to speech); the iPhone hides
+         the speaker for now. Back on the first step signs out on iPhone, for a wrong account.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -721,3 +728,8 @@ The coach line and roast go to Gemini through Firebase AI Logic with App Check, 
 card's own facts, as before. The iPhone adds one Info.plist line: "Save Image" on the share sheet
 may ask to add that picture to Photos (NSPhotoLibraryAddUsageDescription); the app never reads the
 photo library. No new Android permissions.
+
+Step 15 (reviewed 12 Nov): sign-up saves the profile on the phone and in the person's own
+users/{uid} backup, as on Android. Height and weight are read once from the health app, only after
+the person allows it, and only fill the boxes. The iPhone asks Apple Health for one more read-only
+type (height), named in the access sheet's description. No new Android permissions.
