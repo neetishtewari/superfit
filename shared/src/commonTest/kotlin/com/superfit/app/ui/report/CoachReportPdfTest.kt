@@ -111,7 +111,7 @@ class CoachReportPdfTest {
         val surface = FakeSurface()
         CoachReportPdf.draw(report(2), surface, StoreLink("Download on the App Store", ""))
         assertTrue("Download on the App Store" in surface.texts)
-        assertEquals(emptyList(), surface.links)
+        assertEquals(emptyList<Int>(), surface.links)
     }
 
     @Test
