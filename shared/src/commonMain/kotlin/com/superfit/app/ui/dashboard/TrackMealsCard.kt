@@ -56,6 +56,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.CoachPatternEngine
+import com.superfit.app.domain.MealSuggester
 import com.superfit.app.domain.MealTags
 import com.superfit.app.theme.*
 import com.superfit.app.ui.components.SuperfitField
@@ -72,7 +73,8 @@ fun TrackMealsCard(
     parsingState: ParsingState,
     foodInputText: String,
     onFoodInputChange: (String) -> Unit,
-    onViewAllFoods: () -> Unit
+    onViewAllFoods: () -> Unit,
+    mealSuggester: MealSuggester = MealSuggester.EMPTY
 ) {
     Column(
         modifier = Modifier
@@ -126,8 +128,17 @@ fun TrackMealsCard(
             }
         )
 
+        // Past meals and foods that finish what's being typed
+        val typingSuggestions = remember(foodInputText, mealSuggester, parsingState) {
+            if (parsingState == ParsingState.Loading) emptyList() else mealSuggester.suggest(foodInputText)
+        }
+        com.superfit.app.ui.components.MealSuggestionList(
+            suggestions = typingSuggestions,
+            onPick = onFoodInputChange
+        )
+
         // Suggestions chips
-        if (predictedFoods.isNotEmpty()) {
+        if (predictedFoods.isNotEmpty() && typingSuggestions.isEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = "Your usual foods",

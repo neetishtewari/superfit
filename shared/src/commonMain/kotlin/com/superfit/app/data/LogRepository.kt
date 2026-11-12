@@ -1,6 +1,7 @@
 package com.superfit.app.data
 
 import com.superfit.app.domain.FoodPredictor
+import com.superfit.app.domain.MealSuggester
 import com.superfit.app.domain.withCurrentAge
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -130,6 +131,13 @@ class LogRepository(
 
     suspend fun getPredictedFoods(currentHour: Int): List<PredictedFood> =
         FoodPredictor.predict(getAllNutritionEntries(), currentHour)
+
+    /** What the meal box suggests while typing, ranked like [getPredictedFoods]. */
+    suspend fun getMealSuggester(currentHour: Int, nowMs: Long = Now.millis()): MealSuggester {
+        val all = getAllNutritionEntries()
+        val scores = FoodPredictor.predict(all, currentHour, nowMs).associate { it.foodText.trim().lowercase() to it.score }
+        return MealSuggester.build(all, scores, nowMs)
+    }
 
     // --- Workouts the user logged ---
 

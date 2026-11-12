@@ -107,6 +107,8 @@ class TodayModel(
 
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
+    private val _mealSuggester = MutableStateFlow(com.superfit.app.domain.MealSuggester.EMPTY)
+    val mealSuggester: StateFlow<com.superfit.app.domain.MealSuggester> = _mealSuggester.asStateFlow()
 
     private var lastMeal: String? = null
 
@@ -582,6 +584,7 @@ class TodayModel(
     private fun loadPredictedFoods() {
         scope.launch {
             _predictedFoods.value = runCatching { log.getPredictedFoods(Now.hour()) }.getOrDefault(emptyList())
+            runCatching { log.getMealSuggester(Now.hour()) }.onSuccess { _mealSuggester.value = it }
         }
     }
 

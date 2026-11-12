@@ -64,6 +64,9 @@ class HistoryViewModel(
     var predictedFoods by mutableStateOf<List<PredictedFood>>(emptyList())
         private set
 
+    var mealSuggester by mutableStateOf(com.superfit.app.domain.MealSuggester.EMPTY)
+        private set
+
     /** The Insights view: last 7 full days, what's working and what to watch. */
 
     /** Earlier months with enough logged for a recap, newest first (up to 12). */
@@ -190,6 +193,7 @@ class HistoryViewModel(
             weeklyTrends = HistoryLog.weeklyTrends(todayK, nutritionByDate, workoutsByDate, importedByDate, activityByDate, sleepByDate, ::targetOn)
 
             predictedFoods = repository.getPredictedFoods()
+            runCatching { repository.getMealSuggester() }.onSuccess { mealSuggester = it }
 
             val proteinTarget = PhysiologyEngine.proteinTargetG(profile)
             val dayTotals = DayTotalsBuilder.days(allNutrition, allWorkouts, allActivity, importedByDate, ::targetOn, proteinTarget, zone)

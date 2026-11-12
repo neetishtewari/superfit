@@ -194,6 +194,10 @@ class DataRepository(
         currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     ): List<PredictedFood> = log.getPredictedFoods(currentHour)
 
+    suspend fun getMealSuggester(
+        currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    ): com.superfit.app.domain.MealSuggester = log.getMealSuggester(currentHour)
+
     fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> =
         log.getWorkoutEntriesForDay(date.toKotlinLocalDate())
 

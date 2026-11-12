@@ -219,6 +219,7 @@ private fun HistoryPageContent(model: HistoryModel) {
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
     var shareCard by remember { mutableStateOf<ShareCard?>(null) }
+    val mealSuggester by model.mealSuggester.collectAsState()
     val p = page
     if (p == null) {
         CircularProgressIndicator(color = NeonMint)
@@ -245,7 +246,8 @@ private fun HistoryPageContent(model: HistoryModel) {
         onDeleteWorkout = model::deleteWorkout,
         // Hiding a workout from another app comes with the rest of Settings.
         onHideImported = {},
-        onShare = { shareCard = it }
+        onShare = { shareCard = it },
+        mealSuggester = mealSuggester
     )
     shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
 }
