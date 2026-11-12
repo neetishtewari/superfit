@@ -79,6 +79,7 @@ import com.superfit.app.widget.WidgetPin
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinYearMonth
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -535,7 +536,7 @@ fun DashboardScreen(
                         )
 
                         recapOffer?.let { month ->
-                            com.superfit.app.ui.recap.RecapReadyCard(month, onOpen = { onOpenRecap(month) })
+                            com.superfit.app.ui.recap.RecapReadyCard(month.toKotlinYearMonth(), onOpen = { onOpenRecap(month) })
                         }
 
                         // The ready-to-share card waits while the recap or a new best is offered.

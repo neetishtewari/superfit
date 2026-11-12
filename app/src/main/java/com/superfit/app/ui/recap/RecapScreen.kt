@@ -97,6 +97,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.toKotlinYearMonth
 
 sealed interface RecapState {
     data object Loading : RecapState
@@ -146,7 +147,7 @@ fun RecapScreen(viewModel: RecapViewModel, onBack: () -> Unit, onOpenSettings: (
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = SuperfitTheme.colors.textPrimary)
             }
             Text(
-                "Your ${monthName(viewModel.month)}",
+                "Your ${monthName(viewModel.month.toKotlinYearMonth())}",
                 color = SuperfitTheme.colors.textPrimary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -166,11 +167,11 @@ fun RecapScreen(viewModel: RecapViewModel, onBack: () -> Unit, onOpenSettings: (
             RecapState.Loading -> Centered {
                 CircularProgressIndicator(color = SuperfitTheme.colors.primaryAccent)
                 Spacer(Modifier.height(12.dp))
-                Text("Putting your ${monthName(viewModel.month)} together…", color = SuperfitTheme.colors.textSecondary)
+                Text("Putting your ${monthName(viewModel.month.toKotlinYearMonth())} together…", color = SuperfitTheme.colors.textSecondary)
             }
             RecapState.TooLittle -> Centered {
                 Text(
-                    "Not enough logged in ${monthName(viewModel.month)} for a recap yet. Log meals on a few days and it'll be here next month.",
+                    "Not enough logged in ${monthName(viewModel.month.toKotlinYearMonth())} for a recap yet. Log meals on a few days and it'll be here next month.",
                     color = SuperfitTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(32.dp)
@@ -396,7 +397,7 @@ private fun SharePage(card: RecapCard, words: RecapWords, month: YearMonth, onSh
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         val cardWidth = if (constraints.hasBoundedHeight) minOf(maxWidth, ((maxHeight - 66.dp) * 9f / 16f).coerceAtLeast(120.dp)) else maxWidth
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            CapturableStory(layer, Modifier.width(cardWidth).then(tapModifier)) { RecapStory(card, words, month) }
+            CapturableStory(layer, Modifier.width(cardWidth).then(tapModifier)) { RecapStory(card, words, month.toKotlinYearMonth()) }
             Button(
                 onClick = {
                     busy = true

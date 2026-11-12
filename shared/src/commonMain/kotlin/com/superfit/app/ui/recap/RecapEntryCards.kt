@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.theme.SuperfitTheme
-import java.time.YearMonth
+import kotlinx.datetime.YearMonth
 
 // Warm amber with dark text, like the recap's own amber cards, so it stands apart from the green app.
 private val RecapAmber = Color(0xFFF2A33A)
