@@ -101,30 +101,20 @@ fun PhotoLogOverlay(
 ) {
     when (state) {
         PhotoLogState.Idle -> {}
-        is PhotoLogState.Working -> Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                CircularProgressIndicator(color = NeonGreen, strokeWidth = 3.dp)
-                Text(text = state.message, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                TextButton(onClick = onClose) { Text("Cancel", color = Color.White) }
-            }
+        is PhotoLogState.Working -> OverlayCard {
+            CircularProgressIndicator(color = NeonGreen, strokeWidth = 3.dp)
+            Text(text = state.message, color = SuperfitTheme.colors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = onClose) { Text("Cancel", color = SuperfitTheme.colors.textSecondary) }
         }
-        is PhotoLogState.Failed -> Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)).padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(text = state.message, color = Color.White, fontSize = 16.sp, textAlign = TextAlign.Center)
-                Button(
-                    onClick = { onRetake(state.retake) },
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
-                ) {
-                    Text(if (state.retake == PhotoKind.LABEL && kind == PhotoKind.BARCODE) "Snap the label" else "Retake", fontWeight = FontWeight.Bold)
-                }
-                TextButton(onClick = onClose) { Text("Close", color = Color.White) }
+        is PhotoLogState.Failed -> OverlayCard {
+            Text(text = state.message, color = SuperfitTheme.colors.textPrimary, fontSize = 16.sp, textAlign = TextAlign.Center)
+            Button(
+                onClick = { onRetake(state.retake) },
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
+            ) {
+                Text(if (state.retake == PhotoKind.LABEL && kind == PhotoKind.BARCODE) "Snap the label" else "Retake", fontWeight = FontWeight.Bold)
             }
+            TextButton(onClick = onClose) { Text("Close", color = SuperfitTheme.colors.textSecondary) }
         }
         is PhotoLogState.MealResult -> CheckMealSheet(
             result = state.result,
@@ -136,5 +126,24 @@ fun PhotoLogOverlay(
             onLog = { onLog(it, true) },
             onRetake = { onRetake(kind) }
         )
+    }
+}
+
+/** A card in the middle of a dimmed Today, so the words stay readable over the cards behind. */
+@Composable
+private fun OverlayCard(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(SuperfitTheme.colors.cardBg)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) { content() }
     }
 }
