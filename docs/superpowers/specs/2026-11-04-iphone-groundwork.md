@@ -403,8 +403,8 @@ tested on the dev app first.
          upload their symbol file to Crashlytics. Not on iPhone: "widget added" (iOS doesn't say
          when a widget is added) and the speech-service key (Apple has one).
          Store readiness: the iPhone's share cards, share text and report footer name the App
-         Store instead of Google Play (shared ThisAppStore; the link is added once App Store
-         Connect gives the app its id, until then the label shows without a link); Apple's
+         Store instead of Google Play (shared ThisAppStore, linking to apps.apple.com/app/id6834018727,
+         the app's App Store Connect id); Apple's
          privacy manifests (PrivacyInfo.xcprivacy for the app and the widget); version 1.0.0.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
