@@ -363,6 +363,17 @@ tested on the dev app first.
          coach (chat and daily tip) as on Android (WorkoutSync.coachEntry). Settings › AI coach
          adds "What my AI coach knows" (shared CoachMemoryCard: notes, add, remove, Clear chat
          history). Sharing a roast as a card comes with share cards.
+       - 14: Share cards. The share screen (card design, colours, Light/Dark, your own photo
+         with pinch and drag, chips, the coach line or roast, "Roast again") moved to shared
+         ShareCardSheet/ShareCardViews, with the saved choices (ShareCardPrefs), the AI lines
+         (RoastCardData, WorkoutCardData) and the strength tags (StrengthTags) beside it. Each
+         phone gives a ShareCardHost: Android's gallery picker, share sheet and toasts as before;
+         the iPhone's ShareBridge.swift uses Apple's photo picker (no photo-library access needed)
+         and Apple's share sheet. Share buttons on iPhone: the streak card (today's card), every
+         workout on Activity and in History, the "ready to share" run or walk card on Today, and
+         any roast in the coach chat. Workout cards read heart rate from Apple Health during the
+         workout (the watch or app that recorded it first), as Android does from Health Connect.
+         The "new personal best" card and Settings › Sharing come with the rest of Settings.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -698,3 +709,15 @@ to 4,000 characters (notes to 3,000). Clear chat history deletes the file and th
 notes stay until removed. The mic is the same as Today's (Apple's indicator shows, nothing
 recorded). No new permissions on either phone; Android's chat works as before, its screen now
 drawn by the shared view.
+
+Step 14 (reviewed 12 Nov): a share card is drawn on the phone and only leaves where the person
+sends it. The picture is written to the app's own temporary folder (Android: its cache, shared
+through its own FileProvider; iPhone: a "share-cards" temporary folder with complete file
+protection), replaced each time. A background photo is picked with the phone's own picker, which
+hands over only that one photo; it is held in memory while the share screen is open and never
+saved or uploaded. Heart rate is read from the health app only when a workout card opens, for that
+workout's time, and never stored (on iPhone it uses the heart-rate read access already asked for).
+The coach line and roast go to Gemini through Firebase AI Logic with App Check, with only the
+card's own facts, as before. The iPhone adds one Info.plist line: "Save Image" on the share sheet
+may ask to add that picture to Photos (NSPhotoLibraryAddUsageDescription); the app never reads the
+photo library. No new Android permissions.

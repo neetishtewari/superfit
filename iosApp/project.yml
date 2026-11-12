@@ -80,6 +80,9 @@ targets:
         # Shown the first time the camera opens (meal photo, barcode or label). Photos go to the AI
         # once and are never saved.
         NSCameraUsageDescription: "Superfit uses the camera when you snap your meal, scan a barcode or snap a nutrition label, to work out what you ate. Photos aren't saved."
+        # Shown only if the person picks "Save Image" on a share card's share sheet. Superfit only
+        # adds that one picture; it never reads the photo library (the card's photo picker needs no access).
+        NSPhotoLibraryAddUsageDescription: "Superfit saves the share card you made to your photos when you choose Save Image. It never reads your photo library."
         # Google's sign-in sheet returns to the app through this link (REVERSED_CLIENT_ID in
         # GoogleService-Info.plist). It identifies the app, it is not a secret.
         CFBundleURLTypes:

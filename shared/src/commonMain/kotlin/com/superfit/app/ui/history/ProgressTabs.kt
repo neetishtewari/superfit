@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.domain.LocalFormat
+import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
@@ -44,6 +45,7 @@ import com.superfit.app.ui.dashboard.FoodQualityCard
 import com.superfit.app.ui.dashboard.FoodSwapCard
 import com.superfit.app.ui.dashboard.SegmentedPills
 import com.superfit.app.ui.dashboard.WeighInDialog
+import com.superfit.app.ui.share.ShareCardSheet
 
 /**
  * Progress on the iPhone: Insights, Journey and History, with the same cards as Android.
@@ -203,6 +205,7 @@ private fun HistoryPageContent(model: HistoryModel) {
     val page by model.page.collectAsState()
     val parsing by model.parsing.collectAsState()
     val predictedFoods by model.predictedFoods.collectAsState()
+    var shareCard by remember { mutableStateOf<ShareCard?>(null) }
     val p = page
     if (p == null) {
         CircularProgressIndicator(color = NeonMint)
@@ -227,7 +230,9 @@ private fun HistoryPageContent(model: HistoryModel) {
         onUpdateMeal = model::updateMeal,
         onDeleteMeal = model::deleteMeal,
         onDeleteWorkout = model::deleteWorkout,
-        // Hiding comes with Apple Health workouts; sharing with share cards.
-        onHideImported = {}
+        // Hiding a workout from another app comes with the rest of Settings.
+        onHideImported = {},
+        onShare = { shareCard = it }
     )
+    shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
 }

@@ -17,6 +17,7 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
 import com.superfit.app.data.ScaleImport
+import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.StepGoalStore
 import com.superfit.app.data.UserProfileEntity
@@ -41,6 +42,7 @@ import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.NutritionistNote
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.ScaleReading
+import com.superfit.app.domain.ShareOffer
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
@@ -364,6 +366,25 @@ class TodayModel(
                 CoachingInsightState.Error(AiFailover.sanitizeError(e))
             }
         }
+    }
+
+    /** Every workout from other apps as Today shows them, for the share cards; empty while the import is off. */
+    suspend fun importedViews(bmr: Double): List<WorkoutView> = WorkoutSync.views(log.importedWorkouts.getAll(), workoutPrefs, sourceNames, bmr)
+
+    /**
+     * Today's "ready to share" card, as on Android: the newest run, or long enough walk, from today
+     * or yesterday, unless it was already shared or dismissed.
+     */
+    suspend fun shareOffer(share: ShareCardPrefs): WorkoutView? {
+        val profile = log.getProfile() ?: return null
+        if (!workoutPrefs.enabled) return null
+        return ShareOffer.pick(
+            workouts = importedViews(PhysiologyEngine.calculateBmr(profile)),
+            today = Now.today(),
+            runsOn = share.offerRuns,
+            walkMinMinutes = share.offerWalkMinutes,
+            handledIds = share.handledOffers
+        )
     }
 
     /** Voice-logged workouts plus the ones from other apps and the watch, for the coach (as on Android). */

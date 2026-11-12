@@ -148,6 +148,29 @@ final class HealthKitBridge: NSObject, IosHealth {
         store.execute(query)
     }
 
+    func heartRate(startMs: Int64, endMs: Int64, sourceId: String, done: @escaping ([KotlinLong]?, String?) -> Void) {
+        let query = HKSampleQuery(
+            sampleType: HKQuantityType(.heartRate),
+            predicate: Self.range(startMs, endMs),
+            limit: 20000,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        ) { _, samples, error in
+            DispatchQueue.main.async {
+                if let error, (error as? HKError)?.code != .errorNoData {
+                    done(nil, error.localizedDescription)
+                    return
+                }
+                let all = (samples as? [HKQuantitySample]) ?? []
+                // The workout's own watch or app first; other readings only when it saved none.
+                let own = all.filter { $0.sourceRevision.source.bundleIdentifier == sourceId }
+                let perMinute = HKUnit.count().unitDivided(by: .minute())
+                let chosen = own.isEmpty ? all : own
+                done(chosen.flatMap { [Self.ms($0.startDate), KotlinLong(value: Int64($0.quantity.doubleValue(for: perMinute).rounded()))] }, nil)
+            }
+        }
+        store.execute(query)
+    }
+
     private static func describe(_ workout: HKWorkout, distanceTypes: [HKQuantityType]) -> IosWorkout {
         let source = workout.sourceRevision.source
         let distance = distanceTypes.lazy

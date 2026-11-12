@@ -34,6 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.LogKind
+import com.superfit.app.domain.ShareCard
+import com.superfit.app.domain.ShareCards
+import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.camera.PhotoCamera
 import com.superfit.app.ui.camera.PhotoKind
@@ -41,6 +44,8 @@ import com.superfit.app.ui.camera.PhotoKindSheet
 import com.superfit.app.ui.camera.PhotoLog
 import com.superfit.app.ui.camera.PhotoLogOverlay
 import com.superfit.app.ui.camera.PhotoLogState
+import com.superfit.app.ui.share.LocalShareCardHost
+import com.superfit.app.ui.share.ShareCardSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -77,6 +82,14 @@ fun TodayScreen(
     val workoutImportEnabled by model.workoutImportEnabled.collectAsState()
     val workoutImportRunning by model.workoutImportRunning.collectAsState()
     val pendingScaleReading by model.pendingScaleReading.collectAsState()
+    // The share screen, and the "ready to share" run or walk (as on Android).
+    val shareHost = LocalShareCardHost.current
+    var shareCard by remember { mutableStateOf<ShareCard?>(null) }
+    var shareOfferWorkout by remember { mutableStateOf<WorkoutView?>(null) }
+    var shareOffer by remember { mutableStateOf<WorkoutView?>(null) }
+    var shareOfferCheck by remember { mutableStateOf(0) }
+    val importedToday = (state as? DashboardUiState.Success)?.importedWorkouts
+    LaunchedEffect(importedToday, shareOfferCheck) { shareOffer = model.shareOffer(shareHost.prefs) }
     var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
@@ -192,13 +205,26 @@ fun TodayScreen(
                         onCameraClick = photoCamera?.let { { showPhotoKinds = true } }
                     )
                 }
+                shareOffer?.let { workout ->
+                    ShareOfferCard(
+                        workout = workout,
+                        onShare = {
+                            shareOfferWorkout = workout
+                            shareCard = ShareCards.activity(workout)
+                        },
+                        onDismiss = {
+                            shareHost.prefs.markOfferHandled(workout.merged.primary.id)
+                            shareOfferCheck++
+                        }
+                    )
+                }
                 if (side == "MEAL") {
                     CalorieRingsCard(state = s, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
                     val day = Now.today()
                     stepGoal?.takeIf { it.raisedOn(day) && stepGoalNoteDismissedOn != day.toString() }?.let { goal ->
                         StepGoalRaisedNote(goal = goal, onDismiss = model::dismissStepGoalNote)
                     }
-                    StreakHeaderCard(streakState = s.streakState)
+                    StreakHeaderCard(streakState = s.streakState, onShare = { shareCard = dailyShareCard(s, coaching) })
                     NutrientLedgerCard(state = s)
                     WeightQuickRow(
                         currentWeightKg = s.weightMetrics.currentWeightKg,
@@ -226,7 +252,6 @@ fun TodayScreen(
                         onViewAllFoods = { showAllFoods = true }
                     )
                 } else {
-                    // Sharing a workout card joins with share cards.
                     if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
                     ActivityPerformanceCard(
                         state = s,
@@ -234,7 +259,8 @@ fun TodayScreen(
                         onDeleteWorkout = model::deleteWorkout,
                         onHideImportedWorkout = model::hideImportedWorkout,
                         workoutImportEnabled = workoutImportEnabled,
-                        workoutImportRunning = workoutImportRunning
+                        workoutImportRunning = workoutImportRunning,
+                        onShareWorkout = { shareCard = it }
                     )
                     SleepRecoveryCard(state = s)
                 }
@@ -259,6 +285,22 @@ fun TodayScreen(
             )
         }
         LogResultBanner(banner, modifier = Modifier.align(Alignment.TopCenter))
+    }
+
+    shareCard?.let { card ->
+        ShareCardSheet(
+            card = card,
+            onDismiss = {
+                shareCard = null
+                shareOfferWorkout = null
+            },
+            onShared = {
+                shareOfferWorkout?.let {
+                    shareHost.prefs.markOfferHandled(it.merged.primary.id)
+                    shareOfferCheck++
+                }
+            }
+        )
     }
 
     if (showPhotoKinds) {

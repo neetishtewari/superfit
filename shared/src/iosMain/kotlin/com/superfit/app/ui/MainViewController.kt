@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -23,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.ComposeUIViewController
 import com.superfit.app.data.CloudBackup
-import com.superfit.app.data.HealthSource
 import com.superfit.app.data.IosAuth
 import com.superfit.app.data.IosAuthClient
 import com.superfit.app.data.IosBackupLocal
@@ -34,6 +34,8 @@ import com.superfit.app.data.IosHealthSource
 import com.superfit.app.data.IosPrefs
 import com.superfit.app.data.LogRepository
 import com.superfit.app.data.ScaleImport
+import com.superfit.app.data.ShareCardPrefs
+import com.superfit.app.data.WorkoutCardData
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachChat
@@ -41,6 +43,8 @@ import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.IosAi
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.ReminderPlan
+import com.superfit.app.domain.ShareCard
+import com.superfit.app.domain.ShareCards
 import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
@@ -56,11 +60,14 @@ import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
 import com.superfit.app.ui.dashboard.VoiceLog
 import com.superfit.app.ui.dashboard.VoiceRecognizer
+import com.superfit.app.ui.dashboard.dailyShareCard
 import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
 import com.superfit.app.ui.settings.CoachMemoryCard
 import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
+import com.superfit.app.ui.share.LocalShareCardHost
+import com.superfit.app.ui.share.ShareCardSheet
 import kotlinx.coroutines.launch
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
@@ -72,7 +79,7 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport, shareCards: IosShareCards): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
@@ -88,7 +95,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, report, shareCards, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -113,12 +120,13 @@ private const val KEY_THEME_MODE = "theme_mode"
 private fun IosRoot(
     auth: IosAuth,
     cloudStore: IosCloudStore,
-    health: HealthSource,
+    health: IosHealthSource,
     speech: VoiceRecognizer,
     camera: IosPhotoCamera,
     widget: IosWidget,
     reminders: IosReminders,
     report: IosReport,
+    shareCards: IosShareCards,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -193,6 +201,21 @@ private fun IosRoot(
                 health = health,
                 scale = scale,
                 voice = speech
+            )
+        }
+        // Share cards: Apple's photo picker and share sheet; workout cards read heart rate from Apple Health.
+        val shareHost = remember(uid) {
+            val sharePrefs = ShareCardPrefs(IosPrefs(ShareCardPrefs.FILE))
+            IosShareCardHost(
+                ios = shareCards,
+                prefs = sharePrefs,
+                workoutCards = WorkoutCardData(
+                    log = log,
+                    userPrefs = IosPrefs.forUser(uid),
+                    share = sharePrefs,
+                    importedViews = today::importedViews,
+                    heartRate = { source, start, end -> health.heartRate(source, start, end) }
+                )
             )
         }
         // The coach chat, kept on the phone and backed up like Android's.
@@ -282,37 +305,39 @@ private fun IosRoot(
             )
             return
         }
-        Scaffold(
-            containerColor = SuperfitTheme.colors.bgStart,
-            // Each screen handles the top of the phone itself; the menu handles the bottom.
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = { MainMenuBar(tab, onSelect = { tab = it }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH)) }
-        ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-                when (tab) {
-                    MainTab.COACH -> CoachTab(coachChat)
-                    MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value) { weeks ->
-                        accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
-                    }
-                    else -> TodayScreen(
-                        today,
-                        onOpenSettings = { showSettings = true },
-                        onOpenPhoneSettings = ::openPhoneSettings,
-                        camera = camera,
-                        photoLog = photoLog,
-                        launch = launch,
-                        onLaunchHandled = IosLaunch::handled,
-                        onOpenCoach = { roast ->
-                            if (roast) coachChat.send(CoachChat.ROAST_MY_DAY, how = "chip")
-                            tab = MainTab.COACH
+        CompositionLocalProvider(LocalShareCardHost provides shareHost) {
+            Scaffold(
+                containerColor = SuperfitTheme.colors.bgStart,
+                // Each screen handles the top of the phone itself; the menu handles the bottom.
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = { MainMenuBar(tab, onSelect = { tab = it }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH)) }
+            ) { padding ->
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                    when (tab) {
+                        MainTab.COACH -> CoachTab(coachChat, today)
+                        MainTab.PROGRESS -> ProgressTabs(history, today.state.collectAsState().value) { weeks ->
+                            accountScope.launch { history.buildReport(weeks, name = auth.currentName())?.let(report::share) }
                         }
-                    ) {
-                        if (restored?.failed == true) {
-                            Text(
-                                text = "Couldn't reach your backup. Check your internet and open the app again.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = SuperfitTheme.colors.textSecondary
-                            )
+                        else -> TodayScreen(
+                            today,
+                            onOpenSettings = { showSettings = true },
+                            onOpenPhoneSettings = ::openPhoneSettings,
+                            camera = camera,
+                            photoLog = photoLog,
+                            launch = launch,
+                            onLaunchHandled = IosLaunch::handled,
+                            onOpenCoach = { roast ->
+                                if (roast) coachChat.send(CoachChat.ROAST_MY_DAY, how = "chip")
+                                tab = MainTab.COACH
+                            }
+                        ) {
+                            if (restored?.failed == true) {
+                                Text(
+                                    text = "Couldn't reach your backup. Check your internet and open the app again.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = SuperfitTheme.colors.textSecondary
+                                )
+                            }
                         }
                     }
                 }
@@ -323,7 +348,10 @@ private fun IosRoot(
 
 /** The Coach tab: the shared chat, with the iPhone's speech recognition on its mic. */
 @Composable
-private fun CoachTab(chat: CoachChatModel) {
+private fun CoachTab(chat: CoachChatModel, today: TodayModel) {
+    var shareCard by remember { mutableStateOf<ShareCard?>(null) }
+    val day by today.state.collectAsState()
+    val coaching by today.coaching.collectAsState()
     val messages by chat.messages.collectAsState()
     val loading by chat.loading.collectAsState()
     val notes by chat.notes.collectAsState()
@@ -360,6 +388,11 @@ private fun CoachTab(chat: CoachChatModel) {
         ),
         onSend = chat::send,
         onUndo = chat::undoNotes,
-        onLogMeal = chat::logSuggestedMeal
+        onLogMeal = chat::logSuggestedMeal,
+        // Any roast can go on a card, as on Android.
+        onShareRoast = { line ->
+            (day as? DashboardUiState.Success)?.let { shareCard = ShareCards.roast(dailyShareCard(it, coaching), line) }
+        }
     )
+    shareCard?.let { card -> ShareCardSheet(card = card, onDismiss = { shareCard = null }) }
 }

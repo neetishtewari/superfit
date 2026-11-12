@@ -2,6 +2,7 @@ package com.superfit.app.data
 
 import com.superfit.app.domain.AppleWorkoutTypes
 import com.superfit.app.domain.BodyValue
+import com.superfit.app.domain.HeartSample
 import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.SleepNight
 import com.superfit.app.domain.SleepSpan
@@ -39,6 +40,13 @@ interface IosHealth {
 
     /** [kind] is "weightKg", "bodyFatPct" (0 to 100) or "leanKg": every sample since [sinceMs]. */
     fun bodySamples(kind: String, sinceMs: Long, done: (List<IosBodySample>?, String?) -> Unit)
+
+    /**
+     * Heart-rate readings between two times as time, bpm, time, bpm…, for a workout's share card.
+     * Only [sourceId]'s readings when it saved any (the watch or app that recorded the workout),
+     * else every reading in that time. Read when the card opens and never stored.
+     */
+    fun heartRate(startMs: Long, endMs: Long, sourceId: String, done: (List<Long>?, String?) -> Unit)
 }
 
 /** One weigh-in or body measurement as Apple Health holds it, with the name of the app or scale that saved it. */
@@ -119,6 +127,14 @@ class IosHealthSource(private val ios: IosHealth, private val zone: () -> TimeZo
             lean = lean.map { BodyValue(it.timeMs, it.sourceName, it.value) }
         )
     }
+
+    /** A workout's heart-rate readings for its share card; throws when Apple Health can't be read. */
+    suspend fun heartRate(sourceId: String, startMs: Long, endMs: Long): List<HeartSample>? =
+        suspendCancellableCoroutine<List<Long>?> { c ->
+            ios.heartRate(startMs, endMs, sourceId) { list, error ->
+                if (error != null) c.resumeWithException(IosHealthException(error)) else c.resume(list)
+            }
+        }?.chunked(2)?.filter { it.size == 2 }?.map { HeartSample(it[0], it[1].toInt()) }
 
     private suspend fun samples(kind: String, sinceMs: Long): List<IosBodySample>? = suspendCancellableCoroutine { c ->
         ios.bodySamples(kind, sinceMs) { list, error ->

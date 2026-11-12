@@ -15,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.HealthConnectManager
@@ -61,7 +62,12 @@ class MainActivity : ComponentActivity() {
             }
             SuperfitTheme(darkTheme = isDark) {
                 // Shared screens use Android's voice typing for short answers.
-                CompositionLocalProvider(LocalVoiceTyping provides { prompt, onText -> androidVoiceTyping(prompt, onText) }) {
+                // Shared share cards use Android's photo picker and share sheet.
+                val shareHost = remember { com.superfit.app.ui.share.AndroidShareCardHost(this@MainActivity) }
+                CompositionLocalProvider(
+                    LocalVoiceTyping provides { prompt, onText -> androidVoiceTyping(prompt, onText) },
+                    com.superfit.app.ui.share.LocalShareCardHost provides shareHost
+                ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background

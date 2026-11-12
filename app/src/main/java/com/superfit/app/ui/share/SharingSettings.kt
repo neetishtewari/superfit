@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.data.ShareCardPrefs
+import com.superfit.app.data.of
 import com.superfit.app.domain.CardChip
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.theme.NeonMint
