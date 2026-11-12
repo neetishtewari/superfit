@@ -15,11 +15,13 @@ import com.superfit.app.domain.WorkoutMerge
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 
+@OptIn(ExperimentalTime::class)
 class CoachChatPromptTest {
 
     private val today = LocalDate(2026, 11, 12)
