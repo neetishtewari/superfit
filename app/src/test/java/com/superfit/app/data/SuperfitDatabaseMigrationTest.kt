@@ -86,7 +86,7 @@ class SuperfitDatabaseMigrationTest {
         try {
             // Opening the database runs the migrations and Room's schema validation.
             val db = database.openHelper.writableDatabase
-            assertEquals(9, db.version)
+            assertEquals(10, db.version)
 
             db.query("SELECT weightKg, startingWeightKg, fitnessLevel FROM user_profile WHERE id = 0").use { cursor ->
                 assertEquals(1, cursor.count)
@@ -94,6 +94,12 @@ class SuperfitDatabaseMigrationTest {
                 assertEquals(82.5, cursor.getDouble(0), 0.0)
                 assertEquals(82.5, cursor.getDouble(1), 0.0)
                 assertEquals("INTERMEDIATE", cursor.getString(2))
+            }
+            // People who signed up before birth months existed keep their typed age until they add one.
+            db.query("SELECT age, birthYearMonth FROM user_profile WHERE id = 0").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(34, cursor.getInt(0))
+                assertEquals(0, cursor.getInt(1))
             }
             db.query("SELECT COUNT(*) FROM nutrition_entries").use { cursor ->
                 cursor.moveToFirst()

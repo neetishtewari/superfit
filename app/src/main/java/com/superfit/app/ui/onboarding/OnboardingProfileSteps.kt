@@ -34,11 +34,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.superfit.app.domain.HeightUnits
+import com.superfit.app.domain.ActivityLevels
 import com.superfit.app.domain.OnboardingTargets
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.BirthMonthInput
+import com.superfit.app.ui.components.ChoiceGrid
 import com.superfit.app.ui.components.GoalPicker
+import com.superfit.app.ui.components.HeightInput
 import com.superfit.app.ui.components.PrimaryButton
+import com.superfit.app.ui.components.ProfileFieldLabel
 import com.superfit.app.ui.components.SuperfitCard
 import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.ui.components.SuperfitLogo
@@ -60,7 +64,7 @@ internal fun WelcomeStep(onNext: () -> Unit) {
     PrimaryButton(text = "Get started", onClick = onNext)
 }
 
-// Step 3 of 6: age, sex, height and weight for the resting-calorie formula.
+// Step 3 of 6: sex, birth month, height and weight for the resting-calorie formula.
 @Composable
 internal fun AboutYouStep(
     uiState: OnboardingUiState,
@@ -77,7 +81,7 @@ internal fun AboutYouStep(
     SuperfitCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FieldLabel("Sex (used only for the calorie formula)")
+                ProfileFieldLabel("Sex (used only for the calorie formula)")
                 ChoiceGrid(
                     options = listOf(true to "Male", false to "Female"),
                     selected = uiState.isMale,
@@ -85,18 +89,15 @@ internal fun AboutYouStep(
                 )
             }
 
-            SuperfitField(
-                value = uiState.age,
-                onValueChange = { viewModel.onAgeChanged(it) },
-                label = { Text("Age") },
-                trailingIcon = { UnitSuffix("years") },
-                isError = errors.age,
-                supportingText = fieldError(errors.age, "Enter your age"),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth()
+            BirthMonthInput(
+                month = uiState.birthMonth,
+                year = uiState.birthYear,
+                onMonth = { viewModel.onBirthMonthChanged(it) },
+                onYear = { viewModel.onBirthYearChanged(it) },
+                error = errors.birth
             )
 
-            HeightInput(uiState = uiState, onHeightCm = { viewModel.onHeightChanged(it) }, isError = errors.height)
+            HeightInput(heightCm = uiState.height, onHeightCm = { viewModel.onHeightChanged(it) }, isError = errors.height, refreshKey = uiState.filledFromHealthConnect)
 
             SuperfitField(
                 value = uiState.weight,
@@ -121,9 +122,9 @@ internal fun AboutYouStep(
     PrimaryButton(text = "Continue", onClick = onNext)
 }
 
-/** Which "About you" boxes still need a number. */
-internal data class AboutYouErrors(val age: Boolean = false, val height: Boolean = false, val weight: Boolean = false) {
-    val any: Boolean get() = age || height || weight
+/** Which "About you" boxes still need fixing; [birth] is the plain line to show, or null. */
+internal data class AboutYouErrors(val birth: String? = null, val height: Boolean = false, val weight: Boolean = false) {
+    val any: Boolean get() = birth != null || height || weight
 }
 
 /** The line under a box that still needs a number, or nothing. */
@@ -135,78 +136,6 @@ private fun fieldError(show: Boolean, message: String): (@Composable () -> Unit)
 @Composable
 private fun UnitSuffix(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = SuperfitTheme.colors.textSecondary, modifier = Modifier.padding(end = 12.dp))
-}
-
-/** Height typed in cm, or in feet and inches; it is always saved in cm. */
-@Composable
-private fun HeightInput(uiState: OnboardingUiState, onHeightCm: (String) -> Unit, isError: Boolean) {
-    var useFeet by rememberSaveable { mutableStateOf(false) }
-    val cm = uiState.height.toDoubleOrNull()?.takeIf { it > 0 }
-    var feet by remember { mutableStateOf("") }
-    var inches by remember { mutableStateOf("") }
-    // When switching to feet, or when Health Connect fills the height in, show it in feet and inches.
-    LaunchedEffect(useFeet, uiState.filledFromHealthConnect) {
-        if (useFeet && cm != null) {
-            val (f, i) = HeightUnits.feetInches(cm)
-            feet = f.toString()
-            inches = i.toString()
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            FieldLabel("Height", modifier = Modifier.weight(1f))
-            Row(modifier = Modifier.width(150.dp)) {
-                ChoiceGrid(options = listOf(false to "cm", true to "ft in"), selected = useFeet, onSelect = { useFeet = it })
-            }
-        }
-        if (!useFeet) {
-            val other = cm?.let { HeightUnits.feetInches(it) }?.let { (f, i) -> "cm · $f ft $i in" } ?: "cm"
-            SuperfitField(
-                value = uiState.height,
-                onValueChange = onHeightCm,
-                placeholder = { Text("e.g. 170") },
-                trailingIcon = { UnitSuffix(other) },
-                isError = isError,
-                supportingText = fieldError(isError, "Enter your height"),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth()
-            )
-        } else {
-            val update = { f: String, i: String ->
-                val ft = f.toIntOrNull() ?: 0
-                val inch = i.toIntOrNull() ?: 0
-                onHeightCm(if (ft == 0 && inch == 0) "" else HeightUnits.cm(ft, inch).toString())
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SuperfitField(
-                    value = feet,
-                    onValueChange = {
-                        feet = it.take(1)
-                        update(feet, inches)
-                    },
-                    placeholder = { Text("5") },
-                    trailingIcon = { UnitSuffix("ft") },
-                    isError = isError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f)
-                )
-                SuperfitField(
-                    value = inches,
-                    onValueChange = {
-                        inches = it.take(2)
-                        update(feet, inches)
-                    },
-                    placeholder = { Text("7") },
-                    trailingIcon = { UnitSuffix("in") },
-                    isError = isError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            if (isError) Text("Enter your height", style = MaterialTheme.typography.bodySmall, color = SuperfitTheme.colors.errorColor)
-        }
-    }
 }
 
 // Step 4 of 6: the goal first, then how active a normal week is.
@@ -228,7 +157,7 @@ internal fun GoalStep(
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel("How active is a normal week?")
+        ProfileFieldLabel("How active is a normal week?")
         ChoiceGrid(
             options = ActivityLevels.map { it.multiplier to it.label },
             selected = ActivityLevels.closest(uiState.activityMultiplier),
@@ -261,22 +190,9 @@ internal fun GoalStep(
     PrimaryButton(text = "Continue", onClick = onNext)
 }
 
-/** The four everyday activity levels, in plain words. Same multipliers as before. */
-internal data class ActivityLevel(val multiplier: Double, val label: String, val description: String)
-
-internal object ActivityLevels : List<ActivityLevel> by listOf(
-    ActivityLevel(1.2, "Mostly sitting", "Desk job, little exercise."),
-    ActivityLevel(1.375, "1-3 workouts", "Light exercise 1 to 3 days a week."),
-    ActivityLevel(1.55, "3-5 workouts", "Exercise 3 to 5 days a week."),
-    ActivityLevel(1.725, "6-7 workouts", "Hard exercise most days.")
-) {
-    fun closest(multiplier: Double): Double = minBy { kotlin.math.abs(it.multiplier - multiplier) }.multiplier
-    fun describe(multiplier: Double): String = first { it.multiplier == closest(multiplier) }.description
-}
-
 /** The targets for what's been entered so far; sensible stand-ins while boxes are still empty. */
 internal fun OnboardingUiState.plan(): OnboardingTargets = OnboardingTargets.of(
-    age = age.toIntOrNull()?.takeIf { it > 0 } ?: 30,
+    age = ageOrNull() ?: 30,
     heightCm = height.toDoubleOrNull()?.takeIf { it > 0 } ?: 170.0,
     weightKg = weight.toDoubleOrNull()?.takeIf { it > 0 } ?: 70.0,
     isMale = isMale,

@@ -94,6 +94,7 @@ object AppAnalytics {
         log("screen_opened", *listOfNotNull("screen" to screen, how?.let { "how" to it }).toTypedArray())
     fun goalSet(withDate: Boolean) = log("goal_set", "target_date" to if (withDate) "yes" else "no")
     fun weighIn() = log("weigh_in")
+    fun profileEdited() = log("profile_edited")
     fun widgetAdded() = log("widget_added")
     fun coachMessageSent(how: String) = log("coach_message_sent", "how" to how)
     fun coachNoteSaved(byUser: Boolean) = log("coach_note_saved", "by" to if (byUser) "user" else "coach")

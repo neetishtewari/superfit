@@ -65,13 +65,13 @@
 <body>
     <div class="container">
         <h1>Privacy Policy</h1>
-        <p><strong>Last Updated: October 26, 2026</strong></p>
+        <p><strong>Last Updated: November 12, 2026</strong></p>
         <p>Superfit is built to empower users with personalized physiological feedback. We are committed to protecting your privacy. This policy describes how Superfit handles data, specifically relating to local execution, Google Health Connect integration, and Gemini AI queries.</p>
 
         <h2>1. Data Collection & Usage</h2>
         <p>Superfit reads physical characteristics and fitness metrics to build a local physiological ledger. This data is used solely to compute your daily target macronutrients and track calorie trends.</p>
         <ul>
-            <li><strong>Height & Weight:</strong> Used to compute your Basal Metabolic Rate (BMR) using scientific formulas.</li>
+            <li><strong>About you (sex, birth month and year, height, weight, activity level):</strong> Used to compute your Basal Metabolic Rate (BMR) and daily calorie needs using scientific formulas. Superfit asks for your birth month and year, not your full date of birth, so your age stays up to date. You can change these at any time in Settings under "About you".</li>
             <li><strong>Body Measurements (optional):</strong> Body fat, lean mass, bone mass and basal metabolic rate saved to Health Connect by a smart scale app. Used to show your body composition and to calculate a more accurate calorie target. Kept on your phone.</li>
             <li><strong>Steps & Activity:</strong> Used to estimate daily active metabolic rate increments, shifting recovery macronutrient targets reactively.</li>
             <li><strong>Sleep Telemetry:</strong> Duration and quality of sleep are used to show your daily Readiness Score.</li>
@@ -79,8 +79,8 @@
         </ul>
 
         <h2>2. Local Storage & Processing</h2>
-        <p class="highlight">All data processed by Superfit is stored locally on your device.</p>
-        <p>Superfit runs all calculation logic locally using an on-device SQLite database (Room). Your raw biometric data, steps record, sleep tracking, and calorie ledger are stored on your device and are not uploaded to any remote server or third-party service. The exception is your backup: when you sign in, your logs (meals, workouts, weigh-ins), daily summaries (steps, sleep), your chats with the coach and the coach's notes about you are backed up to your own Superfit account in Google Firebase, so you can restore them on a new phone.</p>
+        <p class="highlight">Your data is stored on your device and backed up to your own Superfit account.</p>
+        <p>Superfit runs its calculations on your device using an on-device database. When you sign in, your profile (the "About you" details and your goal), your logs (meals, workouts, weigh-ins), daily summaries (steps, sleep), your chats with the coach and the coach's notes about you are backed up to your own Superfit account in Google Firebase, so you can restore them on a new phone. This backup is only for you: it is never sold, shared with advertisers, or used for ads. Apart from the backup and the AI and barcode lookups described below, your data is not sent to any other server or third party.</p>
 
         <h2>3. Google Health Connect Policy Compliance</h2>
         <p>Superfit strictly complies with the <span class="highlight">Google Play Health Connect Developer Policies</span>, including the Additional Requirements:</p>
@@ -99,9 +99,12 @@
         <p>To improve Superfit, the app sends anonymous usage statistics (for example, which screens are opened and how meals are logged, such as by voice or photo) and crash reports to Google Firebase (Google Analytics for Firebase and Firebase Crashlytics). These never include what you eat, your weight, your health or fitness data, photos, or your name or email, and they do not use your advertising ID. You can turn this off at any time in Settings under "Share anonymous usage and crash reports".</p>
 
         <h2>6. Your Rights & Data Portability</h2>
-        <p>Because all data resides in the local database of your device, you have complete ownership of it. If you choose to clear the app storage or uninstall the application, all stored logs are permanently deleted from your device.</p>
+        <p>Your data belongs to you. Uninstalling the app or clearing its storage deletes the copy on your device; your backup stays in your account so you can restore it. To delete your account and its backup for good, use Settings > Delete account in the app, or follow the steps on our <a href="delete_account.html">account deletion page</a>.</p>
 
-        <h2>7. Changes to this Policy</h2>
+        <h2>7. Adults Only</h2>
+        <p>Superfit is for adults aged 18 and over. Its calorie targets are designed for adults, and the app does not knowingly collect data from children. Sign-up asks for your birth month and year and does not continue for anyone under 18.</p>
+
+        <h2>8. Changes to this Policy</h2>
         <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
 
         <div class="footer">

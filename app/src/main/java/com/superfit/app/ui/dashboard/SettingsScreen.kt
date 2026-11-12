@@ -266,6 +266,16 @@ fun SettingsScreen(
             }
 
             SettingsGroupLabel("Your plan")
+            (dashboardState as? DashboardUiState.Success)?.let { success ->
+                com.superfit.app.ui.settings.AboutYouCard(
+                    profile = success.profile,
+                    ownTargets = sharedPrefs.getBoolean("custom_macro_enabled", false),
+                    onSave = { updated ->
+                        viewModel.saveAboutYou(updated)
+                        Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
             com.superfit.app.ui.settings.PlanSettingsCard(
                 state = dashboardState,
                 stepGoal = stepGoal,

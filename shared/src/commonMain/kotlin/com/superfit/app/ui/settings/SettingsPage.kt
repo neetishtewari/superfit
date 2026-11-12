@@ -30,6 +30,7 @@ import com.superfit.app.data.Prefs
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.dashboard.CoachStyleSettings
+import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.HealthSettingsSection
 import com.superfit.app.ui.dashboard.NutritionistAdviceSettings
 import com.superfit.app.ui.dashboard.TodayModel
@@ -78,6 +79,13 @@ fun SettingsPage(
         AccountCard(name = null, email = email, signInMethod = "Email and password")
 
         SettingsGroupLabel("Your plan")
+        (state as? DashboardUiState.Success)?.let { success ->
+            AboutYouCard(
+                profile = success.profile,
+                ownTargets = prefs.getBoolean("custom_macro_enabled", false),
+                onSave = model::saveAboutYou
+            )
+        }
         PlanSettingsCard(
             state = state,
             stepGoal = stepGoal,

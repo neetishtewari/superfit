@@ -39,12 +39,6 @@ internal fun StepTitle(title: String, subtitle: String? = null) {
     }
 }
 
-/** A small grey label above a field or a group of choices. */
-@Composable
-internal fun FieldLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = SuperfitTheme.colors.textSecondary, modifier = modifier)
-}
-
 /** One line with a round green icon, a bold title and a short explanation. */
 @Composable
 internal fun FeatureRow(icon: ImageVector, title: String, desc: String) {
@@ -71,48 +65,5 @@ internal fun ValueRow(label: String, value: String, valueColor: Color = Superfit
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = SuperfitTheme.colors.textPrimary, modifier = Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.titleSmall, color = valueColor)
-    }
-}
-
-/**
- * Choices laid out [columns] per row as rounded pills, the chosen one solid green with white text
- * (the same look as the app's SegmentedPills, but it can wrap onto two rows).
- */
-@Composable
-internal fun <T> ChoiceGrid(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, columns: Int = 2) {
-    val colors = SuperfitTheme.colors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(colors.fieldBg)
-            .padding(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        options.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { (key, label) ->
-                    val isOn = key == selected
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (isOn) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isOn) Color.White else colors.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(50))
-                            .background(if (isOn) NeonMint else Color.Transparent)
-                            .semantics {
-                                role = Role.RadioButton
-                                this.selected = isOn
-                            }
-                            .clickable { onSelect(key) }
-                            .heightIn(min = 44.dp)
-                            .padding(horizontal = 8.dp, vertical = 12.dp)
-                    )
-                }
-            }
-        }
     }
 }

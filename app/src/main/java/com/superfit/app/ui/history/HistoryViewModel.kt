@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
 import com.superfit.app.domain.PhysiologyEngine
+import com.superfit.app.domain.currentAge
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -251,7 +252,7 @@ class HistoryViewModel(
                 header = com.superfit.app.domain.CoachExportHeader(
                     name = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName?.takeIf { it.isNotBlank() },
                     goal = profile.goal,
-                    age = profile.age,
+                    age = profile.currentAge(),
                     heightCm = profile.heightCm,
                     isMale = profile.isMale,
                     startKg = profile.startingWeightKg,
