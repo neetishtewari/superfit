@@ -36,8 +36,8 @@ import com.superfit.app.ui.dashboard.TodayModel
 
 /**
  * Settings on the iPhone, from the same cards as Android: the account, your plan (with your
- * nutritionist's advice), Apple Health, the coach's style and the look. What the coach remembers,
- * reminders, sharing and privacy join with their iPhone parts.
+ * nutritionist's advice), Apple Health, the coach's style, the look and the daily reminder. What the
+ * coach remembers, sharing and privacy join with their iPhone parts.
  */
 @Composable
 fun SettingsPage(
@@ -47,7 +47,9 @@ fun SettingsPage(
     themeMode: String,
     onThemeMode: (String) -> Unit,
     onBack: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    /** Settings › Daily reminder, where the app has reminders. */
+    reminders: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
@@ -112,6 +114,7 @@ fun SettingsPage(
         }
 
         AppearanceCard(mode = themeMode, onSelect = onThemeMode)
+        reminders()
 
         // Deleting the account on the iPhone comes with its own step (the App Store requires it).
         AccountActionsCard(onSignOut = onSignOut, onDeleteAccount = null)
