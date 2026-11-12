@@ -4,6 +4,7 @@ import com.superfit.app.data.ActivityTelemetryEntity
 import com.superfit.app.data.CoachInsightStore
 import com.superfit.app.data.CoachStyleStore
 import com.superfit.app.data.DayTotalsBuilder
+import com.superfit.app.data.GoalDatePref
 import com.superfit.app.data.HabitEntryEntity
 import com.superfit.app.data.HealthSource
 import com.superfit.app.data.HealthSourceNames
@@ -26,7 +27,10 @@ import com.superfit.app.data.WorkoutSync
 import com.superfit.app.domain.AdviceTargets
 import com.superfit.app.domain.AiFailover
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.ChatEntry
+import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.CoachNote
+import com.superfit.app.domain.CoachQuestions
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.FitnessGoal
@@ -42,6 +46,8 @@ import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
 import com.superfit.app.domain.UsualDay
 import com.superfit.app.domain.WorkoutView
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -53,6 +59,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Today for the iPhone, built from the same shared pieces as Android: today's meals, targets,
@@ -340,7 +347,7 @@ class TodayModel(
                         state = current,
                         prefs = prefs,
                         nutrition = log.getAllNutritionEntries(),
-                        workouts = log.getAllWorkoutEntries(),
+                        workouts = coachWorkouts(current),
                         activity = log.getAllActivityTelemetry(),
                         sleep = log.getAllSleepTelemetry(),
                         weights = log.getAllWeightEntries(),
@@ -357,6 +364,52 @@ class TodayModel(
                 CoachingInsightState.Error(AiFailover.sanitizeError(e))
             }
         }
+    }
+
+    /** Voice-logged workouts plus the ones from other apps and the watch, for the coach (as on Android). */
+    private suspend fun coachWorkouts(state: DashboardUiState.Success): List<WorkoutEntryEntity> =
+        log.getAllWorkoutEntries() + workoutViews(log.importedWorkouts.getAll(), state.profile).map(WorkoutSync::coachEntry)
+
+    /** What the coach chat's instructions are written from, read fresh for each question; null until today has loaded. */
+    @OptIn(ExperimentalTime::class)
+    suspend fun coachChatFacts(notes: List<CoachNote>, conversation: List<ChatEntry>): CoachChatFacts? {
+        val current = state.value as? DashboardUiState.Success ?: return null
+        val now = Now.millis()
+        return CoachChatFacts(
+            state = current,
+            today = today,
+            now = Instant.fromEpochMilliseconds(now).toLocalDateTime(zone()).time,
+            nowMs = now,
+            scaleReadings = scale?.mine().orEmpty(),
+            vsUsualLine = vsUsual(current, usualDay.value, distanceKm.value).chatLine(),
+            allNutrition = log.getAllNutritionEntries(),
+            workouts = coachWorkouts(current),
+            activity = log.getAllActivityTelemetry(),
+            sleep = log.getAllSleepTelemetry(),
+            weights = log.getAllWeightEntries(),
+            stepGoal = stepGoal.value?.goal,
+            customMacros = prefs.getBoolean("custom_macro_enabled", false),
+            targetWeightKg = current.profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(prefs) },
+            goalDate = GoalDatePref.get(prefs),
+            notes = notes,
+            todayTip = (_coaching.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(prefs, today),
+            conversation = conversation
+        )
+    }
+
+    /** Ready-made questions for the coach chat, picked for the time of day and what's logged, as on Android. */
+    @OptIn(ExperimentalTime::class)
+    fun coachQuestions(): List<String> {
+        val current = state.value as? DashboardUiState.Success
+        val now = Instant.fromEpochMilliseconds(Now.millis()).toLocalDateTime(zone())
+        return CoachQuestions.forNow(
+            hour = now.hour,
+            day = now.dayOfWeek,
+            mealsToday = current?.nutritionList?.size ?: 0,
+            proteinStillNeeded = current?.let { (it.macroTargets.proteinG - it.proteinEaten).toInt() } ?: 0,
+            workedOutToday = current != null && (current.workoutList.isNotEmpty() || current.importedWorkouts.isNotEmpty()),
+            hasTodayTip = _coaching.value is CoachingInsightState.Success
+        ).let { if (_coachStyle.value == CoachStyle.ROAST) listOf(CoachChat.ROAST_MY_DAY) + it else it }
     }
 
     init {

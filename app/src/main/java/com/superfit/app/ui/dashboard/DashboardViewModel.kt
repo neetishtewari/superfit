@@ -9,15 +9,12 @@ import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.ReviewPrompt
 import com.superfit.app.data.userPrefs
 import com.superfit.app.domain.CoachInsight
-import com.superfit.app.domain.CoachPatternEngine
-import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.LogRouter
 import com.superfit.app.domain.MacroTargets
-import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.PersonalBests
@@ -380,100 +377,34 @@ class DashboardViewModel(
         updateChatEntry(entryId) { it.copy(mealLogged = true) }
     }
 
-    /** The coach chat's instructions: the user's live numbers, their own logs and notes, and the rules. */
+    /** The coach chat's instructions: the user's live numbers, their own logs and notes, and the rules (shared with the iPhone). */
     private suspend fun coachChatInstruction(
         currentState: DashboardUiState.Success,
         conversation: List<com.superfit.app.domain.ChatEntry>
     ): String {
-        val profile = currentState.profile
-        val activity = currentState.activity
-        val sleep = currentState.sleep
-        val nutrition = currentState.nutritionList
-        val macroTargets = currentState.macroTargets
-        val today = LocalDate.now()
-        val now = java.time.LocalTime.now()
-
-        val sleepText = if (sleep != null) {
-            "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h, Readiness Score: ${sleep.readinessScore}%"
-        } else {
-            "No sleep data today."
-        }
-
-        val nutritionText = "Calories Eaten: ${currentState.caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
-            "Protein: ${currentState.proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
-            "Carbs: ${currentState.carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
-            "Fat: ${currentState.fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
-            "Fibre (estimated): ${nutrition.sumOf { MealTags.of(it).fiberG }.toInt()} / ${CoachPatternEngine.fibreTargetG(macroTargets.calories).toInt()}g."
-
-        val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
-        val vsUsualText = todayVsUsual(currentState, usualDay.value).chatLine()
-
-        val body = com.superfit.app.domain.BodyReadings.summary(
-            com.superfit.app.data.BodyImporter.mine(appContext),
-            profile.weightKg,
-            profile.heightCm,
-            today.toKotlinLocalDate()
+        val today = LocalDate.now().toKotlinLocalDate()
+        return com.superfit.app.ui.dashboard.CoachChatPrompt.instruction(
+            com.superfit.app.ui.dashboard.CoachChatFacts(
+                state = currentState,
+                today = today,
+                now = java.time.LocalTime.now().toKotlinLocalTime(),
+                nowMs = System.currentTimeMillis(),
+                scaleReadings = com.superfit.app.data.BodyImporter.mine(appContext),
+                vsUsualLine = todayVsUsual(currentState, usualDay.value).chatLine(),
+                allNutrition = repository.getAllNutritionEntries(),
+                workouts = repository.getAllWorkoutsForCoach(currentState.bmr),
+                activity = repository.getAllActivityTelemetry(),
+                sleep = repository.getAllSleepTelemetry(),
+                weights = repository.getAllWeightEntries(),
+                stepGoal = stepGoal.value?.goal,
+                customMacros = sharedPrefs.getBoolean("custom_macro_enabled", false),
+                targetWeightKg = currentState.profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(AndroidPrefs(sharedPrefs)) },
+                goalDate = GoalDatePref.get(AndroidPrefs(sharedPrefs)),
+                notes = _coachNotes.value,
+                todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(userPrefs(appContext), today),
+                conversation = conversation
+            )
         )
-        val bodyText = if (body.hasScaleData) {
-            listOfNotNull(
-                body.bodyFatPct?.let { "body fat ${com.superfit.app.domain.BodyReadings.fmt(it)}%" + (body.bodyFatChange?.let { c -> " (${if (c > 0) "+" else ""}${com.superfit.app.domain.BodyReadings.fmt(c)} pts over 4 weeks)" } ?: "") },
-                body.leanKg?.let { "lean mass ${com.superfit.app.domain.BodyReadings.fmt(it)} kg" },
-                body.insight
-            ).joinToString(", ")
-        } else {
-            "no smart scale data"
-        }
-
-        val allNutrition = repository.getAllNutritionEntries()
-        val coachWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr)
-        val report = CoachPatternEngine.analyze(
-            today = today.toKotlinLocalDate(),
-            now = now.toKotlinLocalTime(),
-            weightKg = profile.weightKg,
-            goal = profile.goal,
-            targets = macroTargets,
-            maintenanceCalories = if (sharedPrefs.getBoolean("custom_macro_enabled", false)) null else currentState.tdee,
-            nutrition = allNutrition,
-            workouts = coachWorkouts,
-            activity = repository.getAllActivityTelemetry(),
-            sleep = repository.getAllSleepTelemetry(),
-            weights = repository.getAllWeightEntries(),
-            targetWeightKg = profile.targetWeightKg,
-            age = profile.currentAge(),
-            stepGoal = stepGoal.value?.goal
-        )
-
-        val live = """
-            You are Superfit AI Coach, a friendly, knowledgeable personal trainer and nutrition coach who knows this user well.
-            Answer the user's questions about their fitness, food, sleep and progress.
-            Their numbers today:
-            - Profile: Age ${profile.currentAge()}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
-            - Body (smart scale): $bodyText
-            - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
-            - Their own nutritionist's advice (follow it, never contradict it): ${com.superfit.app.domain.PersonalNutrition.advice ?: "none given"}
-            - Targets: Protein ${macroTargets.proteinG.toInt()}g, Carbs ${macroTargets.carbsG.toInt()}g, Fat ${macroTargets.fatG.toInt()}g, Calories ${macroTargets.calories.toInt()} kcal
-            - Today's nutrition: $nutritionText
-            - Today's activity: $activityText
-            - $vsUsualText
-            - Today's sleep: $sleepText
-        """.trimIndent()
-
-        val personal = com.superfit.app.domain.CoachChatContext.personal(
-            today = today.toKotlinLocalDate(),
-            now = now.toKotlinLocalTime(),
-            todayMeals = nutrition,
-            report = report,
-            workouts = coachWorkouts,
-            targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(AndroidPrefs(sharedPrefs)) },
-            goalDate = GoalDatePref.get(AndroidPrefs(sharedPrefs)),
-            commonFoods = CoachingEngine.commonFoods(allNutrition, today.toKotlinLocalDate()),
-            notes = _coachNotes.value,
-            todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(userPrefs(appContext), today.toKotlinLocalDate()),
-            earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
-        )
-
-        return listOf(live, personal, CoachingEngine.chatContext(report).trim(), com.superfit.app.domain.CoachChatContext.RULES + com.superfit.app.domain.CoachStyle.current.instruction())
-            .joinToString("\n\n")
     }
 
     /** Today's steps and workouts next to the usual for this weekday. */
@@ -1207,7 +1138,7 @@ class DashboardViewModel(
         private const val PAST_STEPS_CORRECTED = "past_steps_watch_first_v2"
 
         /** First chat chip in Roast me style. */
-        const val ROAST_MY_DAY = "Roast"
+        const val ROAST_MY_DAY = com.superfit.app.domain.CoachChat.ROAST_MY_DAY
 
         /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
         private const val BACKFILL_KEY = "meal_tag_backfill_date_v3"

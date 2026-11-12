@@ -352,6 +352,17 @@ tested on the dev app first.
          app icon, then Apple's share sheet. The report's numbers come from shared
          CoachExportBuilder via HistoryModel.buildReport, as on Android. The footer links to
          Google Play until Superfit is on the App Store (then StoreLink gets the App Store link).
+       - 13: Coach chat. The Coach tab on the iPhone, the same chat as Android: one running
+         conversation kept between visits (a file per account, backed up to
+         users/{uid}/coach/chat), ready-made questions (Roast chip for Roast me), the mic sends the
+         question when the person stops talking, "Tell me more", "Log this" on suggested meals,
+         and "Remembered: … Undo" when the coach picks out a note. The chat screen moved to shared
+         CoachChatView (Android's screen now only runs Android's mic) and the instructions to
+         shared CoachChatPrompt, so both apps ask the coach the same way. The iPhone's
+         CoachChatModel mirrors Android's chat logic. Workouts from Apple Health now reach the
+         coach (chat and daily tip) as on Android (WorkoutSync.coachEntry). Settings › AI coach
+         adds "What my AI coach knows" (shared CoachMemoryCard: notes, add, remove, Clear chat
+         history). Sharing a roast as a card comes with share cards.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -677,3 +688,13 @@ app's temporary folder with file protection (replaced each time), and leaves the
 through the share sheet, where the person picks where it goes. Nothing is uploaded and there are no
 new permissions. The name at the top comes from the signed-in account, as on Android. Android's
 PDF is drawn by the same shared layout, with the same fonts, colours, positions and Play Store link.
+
+Step 13 (reviewed 12 Nov): the chat and the coach's notes are the person's own and stay under
+their account: a file in the app's own folder named after their account, the notes in their
+account's settings, and the backup in their own users/{uid}/coach documents (the same Firestore
+rules as everything else). Questions go to Gemini through Firebase AI Logic with App Check, with
+the person's own logs, exactly as on Android; nothing else leaves the phone. A long paste is cut
+to 4,000 characters (notes to 3,000). Clear chat history deletes the file and the backup copy;
+notes stay until removed. The mic is the same as Today's (Apple's indicator shows, nothing
+recorded). No new permissions on either phone; Android's chat works as before, its screen now
+drawn by the shared view.
