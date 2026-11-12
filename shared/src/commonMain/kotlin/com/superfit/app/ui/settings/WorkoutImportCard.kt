@@ -85,7 +85,7 @@ fun WorkoutImportCard(
         if (enabled) {
             MainAppPicker(
                 mainApp = mainApp,
-                apps = sourceApps,
+                apps = apps,
                 onPick = onMainApp
             )
 
