@@ -24,6 +24,9 @@ object UsageEvents {
     /** A meal item's amount typed in, or switched between household units and g/ml ([how]: typed, switch). */
     fun mealAmountChanged(how: String) = log("meal_amount_changed", "how" to how)
 
+    /** A suggestion under the meal box picked while typing ([kind]: meal, food). */
+    fun mealSuggestionUsed(kind: String) = log("meal_suggestion_used", "kind" to kind)
+
     /** [method]: voice, typed, photo, barcode or label. */
     fun mealLogged(method: String) = log("meal_logged", "method" to method)
     fun mealEdited() = log("meal_edited")
