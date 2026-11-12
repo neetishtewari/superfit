@@ -2,6 +2,7 @@ package com.superfit.app.ui.camera
 
 import com.superfit.app.domain.AiPhoto
 import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.BarcodeResult
 import com.superfit.app.domain.FoodPhotoParser
 import com.superfit.app.domain.PackagedFood
 import com.superfit.app.domain.ParsedNutritionResult
@@ -34,7 +35,7 @@ sealed interface PhotoLogState {
  */
 class PhotoLog(
     private val scope: CoroutineScope,
-    private val lookup: suspend (barcode: String) -> PackagedFood?,
+    private val lookup: suspend (barcode: String) -> BarcodeResult,
     private val parser: FoodPhotoParser = FoodPhotoParser()
 ) {
     private val _state = MutableStateFlow<PhotoLogState>(PhotoLogState.Idle)
@@ -46,6 +47,9 @@ class PhotoLog(
 
     private var job: Job? = null
 
+    // The name the database gave a packet it has no nutrition for, used if its label has none.
+    private var knownName: String? = null
+
     fun onPhoto(kind: PhotoKind, photo: AiPhoto) {
         if (_state.value is PhotoLogState.Working) return
         this.kind = kind
@@ -53,7 +57,7 @@ class PhotoLog(
         job = scope.launch {
             _state.value = try {
                 if (kind == PhotoKind.LABEL) {
-                    parser.parseLabel(photo)?.let { PhotoLogState.PackResult(it) }
+                    parser.parseLabel(photo)?.let { PhotoLogState.PackResult(if (it.name == null) it.copy(name = knownName) else it) }
                         ?: PhotoLogState.Failed("We couldn't read this label. Try a straight, close-up photo.", PhotoKind.LABEL)
                 } else {
                     val result = parser.parseMeal(photo)
@@ -75,11 +79,19 @@ class PhotoLog(
     fun onBarcode(code: String) {
         if (_state.value is PhotoLogState.Working) return
         kind = PhotoKind.BARCODE
+        knownName = null
         _state.value = PhotoLogState.Working("Looking up product…")
         job = scope.launch {
             _state.value = try {
-                lookup(code)?.let { PhotoLogState.PackResult(it) }
-                    ?: PhotoLogState.Failed("We couldn't find this product. Snap its nutrition label instead.", PhotoKind.LABEL)
+                when (val result = lookup(code)) {
+                    is BarcodeResult.Found -> PhotoLogState.PackResult(result.food)
+                    is BarcodeResult.NoNutrition -> {
+                        knownName = result.name
+                        PhotoLogState.Failed(result.message!!, PhotoKind.LABEL)
+                    }
+                    BarcodeResult.NotAProductCode -> PhotoLogState.Failed(result.message!!, PhotoKind.BARCODE)
+                    BarcodeResult.NotFound -> PhotoLogState.Failed(result.message!!, PhotoKind.LABEL)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

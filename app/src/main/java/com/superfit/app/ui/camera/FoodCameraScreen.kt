@@ -375,7 +375,14 @@ private fun CameraPreview(
 private fun createScanner(camera: Camera): BarcodeScanner {
     val maxZoom = camera.cameraInfo.zoomState.value?.maxZoomRatio ?: 1f
     val builder = BarcodeScannerOptions.Builder()
-        .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
+        // Shop stickers (like a protein tub's) often print the product number as a Code 128 barcode.
+        .setBarcodeFormats(
+            Barcode.FORMAT_EAN_13,
+            Barcode.FORMAT_EAN_8,
+            Barcode.FORMAT_UPC_A,
+            Barcode.FORMAT_UPC_E,
+            Barcode.FORMAT_CODE_128
+        )
     if (maxZoom > 1f) {
         builder.setZoomSuggestionOptions(
             ZoomSuggestionOptions.Builder { ratio ->

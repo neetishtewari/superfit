@@ -1,9 +1,8 @@
 package com.superfit.app.data
 
+import com.superfit.app.domain.BarcodeResult
+import com.superfit.app.domain.HttpReply
 import com.superfit.app.domain.OpenFoodFacts
-import com.superfit.app.domain.PackagedFood
-import com.superfit.app.domain.PackagedFoodParser
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -13,26 +12,22 @@ import kotlinx.coroutines.withContext
 object OpenFoodFactsClient {
 
     private const val USER_AGENT = "Superfit Android - https://github.com/neetishtewari/superfit"
-    private val BARCODE = Regex("^\\d{8,14}$")
 
-    /** Null when the product isn't known or has no calories; throws when offline. */
-    suspend fun lookup(barcode: String): PackagedFood? = withContext(Dispatchers.IO) {
-        if (!BARCODE.matches(barcode)) return@withContext null
-        OpenFoodFacts.alternateForms(barcode).firstNotNullOfOrNull { fetch(it) }
+    /** What the database says about [barcode]; throws when offline. */
+    suspend fun find(barcode: String): BarcodeResult = withContext(Dispatchers.IO) {
+        OpenFoodFacts.find(barcode) { url -> fetch(url) }.also {
+            if (it !is BarcodeResult.Found) android.util.Log.i("FoodCamera", "Barcode $barcode: $it")
+        }
     }
 
-    private fun fetch(barcode: String): PackagedFood? {
-        val url = URL(OpenFoodFacts.url(barcode))
-        val conn = url.openConnection() as HttpURLConnection
+    private fun fetch(url: String): HttpReply {
+        val conn = URL(url).openConnection() as HttpURLConnection
         return try {
             conn.connectTimeout = 8_000
             conn.readTimeout = 8_000
             conn.setRequestProperty("User-Agent", USER_AGENT)
-            when (val code = conn.responseCode) {
-                HttpURLConnection.HTTP_OK -> PackagedFoodParser.fromOpenFoodFacts(conn.inputStream.bufferedReader().use { it.readText() })
-                HttpURLConnection.HTTP_NOT_FOUND -> null.also { android.util.Log.i("FoodCamera", "Barcode $barcode not in Open Food Facts") }
-                else -> throw IOException("Open Food Facts returned HTTP $code")
-            }
+            val status = conn.responseCode
+            HttpReply(status, if (status == HttpURLConnection.HTTP_OK) conn.inputStream.bufferedReader().use { it.readText() } else "")
         } finally {
             conn.disconnect()
         }

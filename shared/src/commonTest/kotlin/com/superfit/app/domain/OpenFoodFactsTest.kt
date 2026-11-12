@@ -34,6 +34,18 @@ class OpenFoodFactsTest {
     }
 
     @Test
+    fun knownProductWithoutNutrition_givesItsName() = runTest {
+        // Cadbury Bournville Intense Orange (India) is listed with no nutriments at all.
+        val body = """{"status":1,"product":{"product_name":"Cadbury Bournville Intense Orange 70%"}}"""
+        assertEquals(
+            BarcodeResult.NoNutrition("Cadbury Bournville Intense Orange 70%"),
+            OpenFoodFacts.find("7622202823862") { HttpReply(200, body) }
+        )
+        assertEquals(BarcodeResult.NotFound, OpenFoodFacts.find("7622202823862") { HttpReply(404, "") })
+        assertEquals(BarcodeResult.NotAProductCode, OpenFoodFacts.find("IMPACTWHEY-1000g") { HttpReply(200, oats) })
+    }
+
+    @Test
     fun unknownProduct_isNull_butAServerErrorThrows() = runTest {
         assertNull(OpenFoodFacts.lookup("40000000") { HttpReply(404, "") })
         assertFailsWith<OpenFoodFactsException> { OpenFoodFacts.lookup("40000000") { HttpReply(503, "") } }

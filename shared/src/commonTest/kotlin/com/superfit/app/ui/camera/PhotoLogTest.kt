@@ -1,5 +1,6 @@
 package com.superfit.app.ui.camera
 
+import com.superfit.app.domain.BarcodeResult
 import com.superfit.app.domain.Nutrients
 import com.superfit.app.domain.PackagedFood
 import kotlin.test.Test
@@ -12,7 +13,7 @@ class PhotoLogTest {
 
     @Test
     fun knownBarcode_showsThePacketToCheck() = runTest {
-        val photoLog = PhotoLog(this, lookup = { biscuits })
+        val photoLog = PhotoLog(this, lookup = { BarcodeResult.Found(biscuits) })
         photoLog.onBarcode("8901063010000")
         testScheduler.advanceUntilIdle()
         assertEquals(PhotoLogState.PackResult(biscuits), photoLog.state.value)
@@ -21,11 +22,29 @@ class PhotoLogTest {
 
     @Test
     fun unknownBarcode_offersTheLabelInstead() = runTest {
-        val photoLog = PhotoLog(this, lookup = { null })
+        val photoLog = PhotoLog(this, lookup = { BarcodeResult.NotFound })
         photoLog.onBarcode("8901063010000")
         testScheduler.advanceUntilIdle()
         val failed = assertIs<PhotoLogState.Failed>(photoLog.state.value)
         assertEquals(PhotoKind.LABEL, failed.retake)
+    }
+
+    @Test
+    fun knownProductWithoutNutrition_namesIt_andOffersTheLabel() = runTest {
+        val photoLog = PhotoLog(this, lookup = { BarcodeResult.NoNutrition("Bournville Intense Orange") })
+        photoLog.onBarcode("7622202823862")
+        testScheduler.advanceUntilIdle()
+        val failed = assertIs<PhotoLogState.Failed>(photoLog.state.value)
+        assertEquals(PhotoKind.LABEL, failed.retake)
+        assertEquals(true, failed.message.contains("Bournville Intense Orange"))
+    }
+
+    @Test
+    fun stickerCode_asksForTheProductBarcode() = runTest {
+        val photoLog = PhotoLog(this, lookup = { BarcodeResult.NotAProductCode })
+        photoLog.onBarcode("IMPACTWHEY-1000g")
+        testScheduler.advanceUntilIdle()
+        assertEquals(PhotoKind.BARCODE, assertIs<PhotoLogState.Failed>(photoLog.state.value).retake)
     }
 
     @Test
