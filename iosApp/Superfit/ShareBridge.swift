@@ -8,9 +8,9 @@ import UIKit
 /// (replaced each time, protected while the phone is locked) and only leaves where the person sends it.
 final class ShareBridge: NSObject, IosShareCards {
     private var picked: ((Data?) -> Void)?
+    private var closePicker: (() -> Void)?
 
     func pickPhoto(maxEdge: Int32, done: @escaping (Data?) -> Void) {
-        guard let top = Self.topViewController() else { return }
         var config = PHPickerConfiguration()
         config.filter = .images
         config.selectionLimit = 1
@@ -18,7 +18,7 @@ final class ShareBridge: NSObject, IosShareCards {
         picker.delegate = self
         picked = { data in done(data) }
         self.maxEdge = CGFloat(maxEdge)
-        top.present(picker, animated: true)
+        closePicker = OverlayPresenter.present(picker)
     }
 
     private var maxEdge: CGFloat = 2560
@@ -35,19 +35,16 @@ final class ShareBridge: NSObject, IosShareCards {
             return
         }
         let sheet = UIActivityViewController(activityItems: [file, text], applicationActivities: nil)
-        guard let top = Self.topViewController() else { return }
-        // iPad shows the sheet as a popover; it needs somewhere to point.
-        sheet.popoverPresentationController?.sourceView = top.view
-        sheet.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
-        top.present(sheet, animated: true)
+        let close = OverlayPresenter.present(sheet)
+        sheet.completionWithItemsHandler = { _, _, _, _ in close() }
     }
 
     func notice(message: String) {
-        guard let top = Self.topViewController() else { return }
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        top.present(alert, animated: true)
+        let close = OverlayPresenter.present(alert)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak alert] in
-            alert?.dismiss(animated: true)
+            guard let alert else { return close() }
+            alert.dismiss(animated: true, completion: close)
         }
     }
 
@@ -70,21 +67,13 @@ final class ShareBridge: NSObject, IosShareCards {
         format.scale = 1
         return UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
     }
-
-    /// The app's own window, not a Compose dialog's (see CameraBridge).
-    private static func topViewController() -> UIViewController? {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
-        let window = scene?.windows.first { $0.windowLevel == .normal && !$0.isHidden } ?? scene?.windows.first
-        var top = window?.rootViewController
-        while let presented = top?.presentedViewController, !presented.isBeingDismissed { top = presented }
-        return top
-    }
 }
 
 extension ShareBridge: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-        picker.dismiss(animated: true)
+        let close = closePicker
+        closePicker = nil
+        picker.dismiss(animated: true) { close?() }
         // Cancelled: no answer, the card stays as it was.
         guard let provider = results.first?.itemProvider else {
             picked = nil
