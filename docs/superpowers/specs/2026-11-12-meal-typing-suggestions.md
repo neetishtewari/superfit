@@ -1,6 +1,6 @@
 # Suggest past foods while typing a meal
 
-Date: 2026-11-12. Status: draft, waiting for Neetish's OK. Target: 1.0.59 (code 63).
+Date: 2026-11-12. Status: approved by Neetish 2026-11-12 with the recommended picks (not in Edit meal for now; 4 suggestions). Built for 1.0.59 (code 63).
 Plan page: https://claude.ai/artifact/NUWsREzM19ABCeFLnj59G4
 
 ## Why
@@ -85,3 +85,9 @@ people use it. Follows the existing analytics switch in Settings.
 1. Also in the Edit meal "change this item" box? Recommended: not in this first version, add if
    wanted.
 2. 4 suggestions, or 3 to keep more of the screen visible? Recommended: 4.
+
+## Also fixed while building
+
+Text boxes (`SuperfitField`) now put the cursor at the end when their text is set from outside
+(a suggestion or a "Your usual foods" chip). Before, it stayed where it was in the old text, so a
+tapped chip left the cursor at the start.

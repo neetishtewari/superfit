@@ -66,7 +66,8 @@ fun DayBalanceCard(
     onDeleteWorkout: (WorkoutEntryEntity) -> Unit,
     onHideImported: (WorkoutView) -> Unit,
     modifier: Modifier = Modifier,
-    onShare: ((ShareCard) -> Unit)? = null
+    onShare: ((ShareCard) -> Unit)? = null,
+    mealSuggester: com.superfit.app.domain.MealSuggester = com.superfit.app.domain.MealSuggester.EMPTY
 ) {
     val netColor = if (summary.netBalance < 0) NeonMint else SolarAmber
     val balanceLabel = if (summary.netBalance < 0) "Under what you burned" else "Over what you burned"
@@ -445,8 +446,17 @@ fun DayBalanceCard(
                     }
                 }
 
+                // Past meals and foods that finish what's being typed
+                val typingSuggestions = remember(foodText, mealSuggester, parsingState) {
+                    if (parsingState == HistoryParsingState.Loading) emptyList() else mealSuggester.suggest(foodText)
+                }
+                com.superfit.app.ui.components.MealSuggestionList(
+                    suggestions = typingSuggestions,
+                    onPick = { foodText = it }
+                )
+
                 // Suggestions chips
-                if (predictedFoods.isNotEmpty()) {
+                if (predictedFoods.isNotEmpty() && typingSuggestions.isEmpty()) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.padding(top = 4.dp)

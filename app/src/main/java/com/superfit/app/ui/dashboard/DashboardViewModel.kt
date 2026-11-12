@@ -88,6 +88,8 @@ class DashboardViewModel(
 
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
+    private val _mealSuggester = MutableStateFlow(com.superfit.app.domain.MealSuggester.EMPTY)
+    val mealSuggester: StateFlow<com.superfit.app.domain.MealSuggester> = _mealSuggester.asStateFlow()
 
     private val customMacroTrigger = MutableStateFlow(System.currentTimeMillis())
 
@@ -178,6 +180,9 @@ class DashboardViewModel(
     fun loadFrequentMeals() {
         viewModelScope.launch {
             _predictedFoods.value = repository.getPredictedFoods()
+            runCatching { repository.getMealSuggester() }
+                .onSuccess { _mealSuggester.value = it }
+                .onFailure { android.util.Log.w("DashboardViewModel", "Meal suggestions failed", it) }
         }
     }
 
