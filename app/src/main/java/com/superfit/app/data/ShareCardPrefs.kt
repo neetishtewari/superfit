@@ -35,6 +35,11 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_OFFER_RUNS, true)
         set(value) = prefs.edit().putBoolean(KEY_OFFER_RUNS, value).apply()
 
+    /** Offer other workouts from a watch or app too (gym, cycling, yoga...); on unless turned off. */
+    var offerOthers: Boolean
+        get() = prefs.getBoolean(KEY_OFFER_OTHERS, true)
+        set(value) = prefs.edit().putBoolean(KEY_OFFER_OTHERS, value).apply()
+
     /** Offer walks at least this long; null means walks are off. */
     var offerWalkMinutes: Int?
         get() = prefs.getInt(KEY_OFFER_WALK_MIN, com.superfit.app.domain.ShareOffer.DEFAULT_WALK_MINUTES).takeIf { it > 0 }
@@ -82,6 +87,7 @@ class ShareCardPrefs(private val prefs: SharedPreferences) {
         private const val OLD_LINE_PLAIN = "line_on_plain"
         private const val MAX_LINES = 40
         private const val KEY_OFFER_RUNS = "offer_runs"
+        private const val KEY_OFFER_OTHERS = "offer_others"
         private const val KEY_OFFER_WALK_MIN = "offer_walk_minutes"
         private const val KEY_OFFER_HANDLED = "offer_handled_ids"
         private const val MAX_HANDLED = 30

@@ -541,7 +541,7 @@ fun DashboardScreen(
                         // The ready-to-share card waits while the recap or a new best is offered.
                         shareOffer?.takeIf { recapOffer == null && personalBests.toOffer == null }?.let { workout ->
                             LaunchedEffect(workout.merged.primary.id) {
-                                com.superfit.app.data.AppAnalytics.shareOffer("shown", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+                                com.superfit.app.data.AppAnalytics.shareOffer("shown", com.superfit.app.domain.ShareOffer.kind(workout))
                             }
                             ShareOfferCard(
                                 workout = workout,
