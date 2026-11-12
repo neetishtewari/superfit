@@ -322,6 +322,29 @@ tested on the dev app first.
          words for working, not found ("Snap its nutrition label instead") and failures, and the
          check sheets (CheckMealSheet, CheckPackSheet) move to shared, so nothing is saved until
          Log meal, as on Android. Saved meals get quality tags the same way.
+       - 9: App icon. The Play Store's 1024 px Superfit icon (store/app_icon.png) becomes the
+         iPhone's home-screen icon through an asset catalog (Assets.xcassets/AppIcon), so the
+         app no longer shows a blank grid. It is cropped to the inner square, so iOS's own
+         rounded mask doesn't show a box inside a box.
+       - 10: Home-screen widget. Like Android's widget: today's calories left ("1,240 kcal
+         left", "of 2,100", or "230 kcal over"), rounded like the Home ring, back to the full
+         target at midnight, and "Open Superfit to start" before the first open or after sign
+         out. Medium size adds the mic and camera buttons, which open Today on the Food side and
+         start listening for a meal or open the camera for one. The small size and the rest of
+         the widget just open Superfit, since Apple allows only one tap area on small widgets.
+         Lock-screen versions show the same line. A WidgetKit extension (SuperfitWidget) reads
+         the numbers that Today saves in an app group (WidgetBridge), and the app asks for a
+         redraw only when they change.
+       - 11: Daily reminder. Settings › Daily reminder as on Android (on by default, 9 PM,
+         "Remind me" and the time). The iPhone doesn't let apps run at a set time, so shared
+         ReminderPlan writes the next 7 evenings ahead as Apple notifications (ReminderBridge)
+         and writes them again whenever today's log, today's coach tip or the settings change.
+         Same rules and words as Android: under 75% of the target logged gets "Complete your
+         food log?", a full day gets today's coach tip from Home (or "Daily log complete").
+         Tapping it, or "Say what you ate", opens Today listening. Apple asks to allow
+         notifications once, after sign-in; if they're off, Settings says so and opens the
+         phone's settings. Signing out removes them. The monthly recap's notification comes with
+         the recap.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -623,3 +646,21 @@ the barcode number goes to Open Food Facts (over HTTPS, a plain app name as User
 account or device details). The simulator's photo picker needs no library permission. What is
 logged is saved and backed up like any meal. No new Android permissions; Android's camera is
 unchanged apart from the check sheets now coming from shared code.
+
+Step 9 (reviewed 12 Nov): the app icon only adds an image to the app bundle. There is no new
+permission, data, network call or code.
+
+Step 10 (reviewed 12 Nov): the widget sees only today's date, calorie target and eaten total. They
+sit in an app group that only Superfit's app and widget can read, and they are cleared on sign
+out, so the next person never sees someone else's numbers (a known gap on Android). The widget
+has no network access and no other data. The mic and camera links (superfit://voice,
+superfit://camera) carry a random key made on the phone and kept in that app group. Another app
+or a web page can open Superfit with a superfit:// link, but without the key the app only opens:
+it never starts listening or opens the camera. Listening still shows Apple's mic indicator, as
+always. No new permissions; Android unchanged.
+
+Step 11 (reviewed 12 Nov): reminders are local notifications made on the phone. Nothing is sent
+anywhere, no server push and no new data. They contain only today's calories and the coach tip
+already on Home, and they are removed on sign out. Apple's notification prompt is the only new
+permission, and it can be refused: the reminder just doesn't show. A reminder tap can only start
+listening on Today (Apple's mic indicator shows), as the widget's mic does. Android unchanged.

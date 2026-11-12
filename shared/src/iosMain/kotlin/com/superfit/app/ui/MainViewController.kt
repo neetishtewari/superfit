@@ -38,17 +38,20 @@ import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.IosAi
+import com.superfit.app.domain.ReminderPlan
 import com.superfit.app.domain.installIosAi
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.camera.PhotoLog
+import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.ProvideVoiceTyping
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
 import com.superfit.app.ui.dashboard.VoiceRecognizer
 import com.superfit.app.ui.history.HistoryModel
 import com.superfit.app.ui.history.ProgressTabs
+import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
@@ -60,7 +63,7 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
@@ -76,7 +79,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, reminders, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -104,6 +107,8 @@ private fun IosRoot(
     health: HealthSource,
     speech: VoiceRecognizer,
     camera: IosPhotoCamera,
+    widget: IosWidget,
+    reminders: IosReminders,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -117,6 +122,11 @@ private fun IosRoot(
     }
 
     if (!signedIn) {
+        // Nobody's numbers on the home screen while signed out.
+        LaunchedEffect(Unit) {
+            widget.clear()
+            reminders.cancelAll()
+        }
         val model = remember { LoginModel(client, scope) }
         LoginScreen(
             model = model,
@@ -175,20 +185,43 @@ private fun IosRoot(
                 voice = speech
             )
         }
+        // The evening reminder, written ahead from Today's numbers (the iPhone can't run code at 9 PM).
+        val reminderSync = remember(uid) { ReminderSync(reminders, IosPrefs.forUser(uid), today) }
+        LaunchedEffect(reminderSync) { reminderSync.run() }
         // Steps and sleep are read again each time the app comes back to the front.
         DisposableEffect(today) {
             val observer = NSNotificationCenter.defaultCenter.addObserverForName(
                 name = UIApplicationDidBecomeActiveNotification,
                 `object` = null,
                 queue = NSOperationQueue.mainQueue
-            ) { _ -> today.syncHealth() }
+            ) { _ ->
+                today.syncHealth()
+                // Back from the phone's Settings: notifications may have been turned on or off.
+                if (ReminderPlan.enabled(IosPrefs.forUser(uid))) reminderSync.checkAllowed()
+            }
             onDispose { NSNotificationCenter.defaultCenter.removeObserver(observer) }
         }
+        // The home-screen widget follows Today's calories left, as on Android.
+        LaunchedEffect(today) {
+            today.state.collect { state ->
+                if (state is DashboardUiState.Success) widget.publish(today.day, state)
+            }
+        }
+        val launch by IosLaunch.pending.collectAsState()
         val photoLog = remember(uid) { PhotoLog(accountScope, camera::lookup) }
         val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope, scaleReadings = scale::mine) }
         var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
         var showSettings by remember(uid) { mutableStateOf(false) }
+        // The widget's mic or camera brings Today forward first.
+        LaunchedEffect(launch) {
+            if (launch != null) {
+                tab = MainTab.TODAY
+                showSettings = false
+            }
+        }
         val signOut = {
+            widget.clear()
+            reminders.cancelAll()
             auth.signOut()
             signedIn = false
             email = null
@@ -201,7 +234,28 @@ private fun IosRoot(
                 themeMode = themeMode,
                 onThemeMode = onThemeMode,
                 onBack = { showSettings = false },
-                onSignOut = signOut
+                onSignOut = signOut,
+                reminders = {
+                    val prefs = IosPrefs.forUser(uid)
+                    var enabled by remember { mutableStateOf(ReminderPlan.enabled(prefs)) }
+                    var time by remember { mutableStateOf(ReminderPlan.hour(prefs) to ReminderPlan.minute(prefs)) }
+                    val allowed by reminderSync.allowed.collectAsState()
+                    ReminderSettingsCard(
+                        enabled = enabled,
+                        hour = time.first,
+                        minute = time.second,
+                        allowed = allowed,
+                        onEnabled = {
+                            enabled = it
+                            reminderSync.setEnabled(it)
+                        },
+                        onTime = { h, m ->
+                            time = h to m
+                            reminderSync.setTime(h, m)
+                        },
+                        onOpenPhoneSettings = ::openPhoneSettings
+                    )
+                }
             )
             return
         }
@@ -219,7 +273,9 @@ private fun IosRoot(
                         onOpenSettings = { showSettings = true },
                         onOpenPhoneSettings = ::openPhoneSettings,
                         camera = camera,
-                        photoLog = photoLog
+                        photoLog = photoLog,
+                        launch = launch,
+                        onLaunchHandled = IosLaunch::handled
                     ) {
                         if (restored?.failed == true) {
                             Text(

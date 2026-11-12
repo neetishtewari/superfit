@@ -10,13 +10,19 @@ struct SuperfitApp: App {
         // it comes from the real app. Same project and rules as the Android app.
         AppCheck.setAppCheckProviderFactory(SuperfitAppCheckFactory())
         FirebaseApp.configure()
+        // Reminder taps are handled from the first moment, even when the tap opened the app.
+        _ = ReminderBridge.shared
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Google's sign-in sheet comes back to the app through this link.
-                .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
+                // The widget's links (superfit://) first; Google's sign-in sheet comes back to the
+                // app through its own link.
+                .onOpenURL { url in
+                    if WidgetBridge.shared.handle(url) { return }
+                    GIDSignIn.sharedInstance.handle(url)
+                }
         }
     }
 }

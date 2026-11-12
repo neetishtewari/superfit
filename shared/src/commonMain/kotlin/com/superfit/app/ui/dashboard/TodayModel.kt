@@ -74,6 +74,9 @@ class TodayModel(
 ) {
     private val today = Now.today()
 
+    /** The day this Today shows (fixed when it opens, like Android's dashboard date). */
+    val day: String get() = today.toString()
+
     // The person's coach style and own nutritionist's advice, before anything is worked out with them.
     init {
         CoachStyleStore.load(prefs)
