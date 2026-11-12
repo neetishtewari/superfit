@@ -415,8 +415,11 @@ tested on the dev app first.
          swipe, looped music faded in and out) made with Apple's encoder (RecapBridge.swift).
          Entry points as Android: Today's card from the 1st until just after opening (latest the
          10th), Progress › Insights top for the first week, "Past months" below. "Get more from
-         Superfit" checks Apple Health, mic + speech recognition and the widget. Not yet: the
-         reminder on the 1st (iPhone needs it scheduled ahead) and the dev-app preview button.
+         Superfit" checks Apple Health, mic + speech recognition and the widget. The "Your
+         October review is ready" reminder is set ahead (RecapData.reminder): 10 am on the 1st
+         once the month has enough logged, or 10 am on days 1-3 for last month while unopened;
+         only when notifications are already allowed (never asks), kept apart from the evening
+         reminder; tapping it opens the recap. Not yet: the dev-app preview button.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal

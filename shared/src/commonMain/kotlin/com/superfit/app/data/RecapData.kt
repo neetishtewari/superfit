@@ -11,6 +11,7 @@ import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.RecapSetup
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
+import com.superfit.app.domain.ReminderNote
 import com.superfit.app.domain.ScaleReading
 import com.superfit.app.domain.StrengthSession
 import com.superfit.app.json.JSONObject
@@ -19,10 +20,13 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.YearMonth
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.yearMonth
 
@@ -52,11 +56,38 @@ object RecapData {
     /** The past 12 months with enough logged (or active) days for a recap, newest first. */
     fun months(days: Map<LocalDate, DayTotals>, today: LocalDate): List<YearMonth> {
         val byMonth = days.values.groupBy { it.date.yearMonth }
-        return (1..12).map { today.minus(DatePeriod(months = it)).yearMonth }.filter { m ->
-            val inMonth = byMonth[m].orEmpty()
-            inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
-        }
+        return (1..12).map { today.minus(DatePeriod(months = it)).yearMonth }.filter { hasEnough(byMonth[it].orEmpty()) }
     }
+
+    /** Whether [month] has enough logged (or active) days for a recap so far. */
+    fun hasEnough(days: Map<LocalDate, DayTotals>, month: YearMonth): Boolean = hasEnough(days.values.filter { it.date.yearMonth == month })
+
+    private fun hasEnough(inMonth: List<DayTotals>): Boolean = inMonth.count { it.logged } >= 3 || inMonth.count { it.active } >= 3
+
+    /**
+     * The "Your October review is ready" reminder for a phone that has to set it ahead (iPhone):
+     * 10 am on the 1st for this month once it has enough logged, or 10 am today for last month in
+     * the first three days while it hasn't been opened. Null when there's nothing to remind about.
+     * Same words as Android's RecapNotificationWorker.
+     */
+    fun reminder(prefs: Prefs, now: LocalDateTime, thisMonthReady: Boolean, lastMonthReady: Boolean, monthName: (YearMonth) -> String): ReminderNote? {
+        val today = now.date
+        val tenToday = LocalDateTime(today, LocalTime(REMINDER_HOUR, 0))
+        val last = offeredMonth(today)
+        val (month, at) = when {
+            today.day <= 3 && now < tenToday && lastMonthReady && openedOn(prefs, last) == null -> last to tenToday
+            thisMonthReady -> today.yearMonth to LocalDateTime(today.yearMonth.lastDay.plus(DatePeriod(days = 1)), LocalTime(REMINDER_HOUR, 0))
+            else -> return null
+        }
+        return ReminderNote(
+            id = "recap-$month",
+            atEpochSeconds = at.toInstant(TimeZone.currentSystemDefault()).epochSeconds,
+            title = "Your ${monthName(month)} review is ready",
+            body = "Your month in a few cards worth sharing. Tap to see it."
+        )
+    }
+
+    private const val REMINDER_HOUR = 10
 
     /** Progress keeps the new recap at the top for the first week of the month. */
     fun showAtTopOfProgress(today: LocalDate): Boolean = today.day <= 7

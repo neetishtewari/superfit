@@ -26,6 +26,13 @@ interface IosReminders {
 
     /** Removes every scheduled Superfit reminder (reminder off, or signed out). */
     fun cancelAll()
+
+    /**
+     * Replaces the monthly recap reminder with [note] (none when null). Set only when notifications
+     * are already allowed: it never asks. Tapping it opens the recap. Kept apart from the evening
+     * reminder, so turning that off leaves it.
+     */
+    fun scheduleRecap(note: ReminderNote?)
 }
 
 /**

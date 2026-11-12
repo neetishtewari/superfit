@@ -39,7 +39,9 @@ import com.superfit.app.data.IosOnboardingHealth
 import com.superfit.app.data.IosPrefs
 import com.superfit.app.data.IosUsageReports
 import com.superfit.app.data.LogRepository
+import com.superfit.app.data.Now
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.RecapData
 import com.superfit.app.data.ScaleImport
 import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.UsageEvents
@@ -79,6 +81,7 @@ import com.superfit.app.ui.onboarding.OnboardingScreen
 import com.superfit.app.ui.recap.RecapModel
 import com.superfit.app.ui.recap.RecapReadyCard
 import com.superfit.app.ui.recap.RecapStoryScreen
+import com.superfit.app.ui.recap.monthName
 import com.superfit.app.ui.settings.CoachMemoryCard
 import com.superfit.app.ui.settings.ReminderSettingsCard
 import com.superfit.app.ui.settings.SettingsPage
@@ -177,6 +180,7 @@ private fun IosRoot(
         LaunchedEffect(Unit) {
             widget.clear()
             reminders.cancelAll()
+            reminders.scheduleRecap(null)
         }
         val model = remember { LoginModel(client, scope) }
         LoginScreen(
@@ -333,6 +337,34 @@ private fun IosRoot(
         LaunchedEffect(uid, recapMonth) {
             if (recapMonth == null) recapOffer = runCatching { RecapModel.homeOffer(log, IosPrefs.forUser(uid), recapSetup(), scale.mine()) }.getOrNull()
         }
+        // "Your October review is ready" at 10 am on the 1st, set ahead (the iPhone can't run code then).
+        LaunchedEffect(history, recapMonth) {
+            history.progress.collect { page ->
+                if (page != null) {
+                    val now = Now.local()
+                    reminders.scheduleRecap(
+                        RecapData.reminder(
+                            prefs = IosPrefs.forUser(uid),
+                            now = now,
+                            thisMonthReady = page.recapThisMonth,
+                            lastMonthReady = RecapData.offeredMonth(now.date) in page.recapMonths,
+                            monthName = ::monthName
+                        )
+                    )
+                }
+            }
+        }
+        // Tapping that reminder opens the recap.
+        val recapLaunch by IosLaunch.recap.collectAsState()
+        LaunchedEffect(recapLaunch) {
+            recapLaunch?.let { m ->
+                runCatching { YearMonth.parse(m) }.getOrNull()?.let {
+                    showSettings = false
+                    recapMonth = it
+                }
+                IosLaunch.recapHandled()
+            }
+        }
         // The widget's mic or camera brings Today forward first.
         LaunchedEffect(launch) {
             if (launch != null) {
@@ -344,6 +376,7 @@ private fun IosRoot(
         val signOut = {
             widget.clear()
             reminders.cancelAll()
+            reminders.scheduleRecap(null)
             auth.signOut()
             signedIn = false
             email = null

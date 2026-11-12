@@ -41,6 +41,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import kotlinx.datetime.yearMonth
 
 /** What the History page shows: the month's days, the chart week and the picked day. */
 data class HistoryPage(
@@ -58,7 +59,9 @@ data class ProgressPage(
     val trends: WeeklyTrendsState,
     val period: BodyPeriod,
     /** Past months with enough logged for a recap, newest first. */
-    val recapMonths: List<kotlinx.datetime.YearMonth> = emptyList()
+    val recapMonths: List<kotlinx.datetime.YearMonth> = emptyList(),
+    /** Whether this month already has enough logged for a recap on the 1st. */
+    val recapThisMonth: Boolean = false
 )
 
 /**
@@ -146,7 +149,8 @@ class HistoryModel(
                 target
             ),
             period = bodyPeriod,
-            recapMonths = com.superfit.app.data.RecapData.months(totals, day)
+            recapMonths = com.superfit.app.data.RecapData.months(totals, day),
+            recapThisMonth = com.superfit.app.data.RecapData.hasEnough(totals, day.yearMonth)
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
 

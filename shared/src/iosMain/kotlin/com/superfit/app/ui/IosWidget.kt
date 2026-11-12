@@ -43,4 +43,17 @@ object IosLaunch {
     internal fun handled() {
         _pending.value = null
     }
+
+    private val _recap = MutableStateFlow<String?>(null)
+
+    /** A month's recap to open (yyyy-MM), from the reminder on the 1st. */
+    internal val recap: StateFlow<String?> = _recap.asStateFlow()
+
+    fun recap(month: String) {
+        _recap.value = month
+    }
+
+    internal fun recapHandled() {
+        _recap.value = null
+    }
 }
