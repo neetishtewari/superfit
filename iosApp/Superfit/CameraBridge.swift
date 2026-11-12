@@ -75,6 +75,7 @@ final class CameraBridge: NSObject, IosCamera {
             picker.sourceType = .camera
             picker.cameraCaptureMode = .photo
             picker.delegate = self
+            picker.presentationController?.delegate = self
             top.present(picker, animated: true)
         } else {
             var config = PHPickerConfiguration()
@@ -82,6 +83,7 @@ final class CameraBridge: NSObject, IosCamera {
             config.selectionLimit = 1
             let picker = PHPickerViewController(configuration: config)
             picker.delegate = self
+            picker.presentationController?.delegate = self
             top.present(picker, animated: true)
         }
     }
@@ -165,13 +167,14 @@ final class CameraBridge: NSObject, IosCamera {
         #endif
     }
 
+    /// The app's own window, never a sheet's or dialog's window: Compose shows each sheet in a
+    /// window of its own, and anything presented on it disappears when the sheet closes.
     private static func topViewController() -> UIViewController? {
-        let window = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first { $0.isKeyWindow }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        let window = scene?.windows.first { $0.windowLevel == .normal && !$0.isHidden } ?? scene?.windows.first
         var top = window?.rootViewController
-        while let presented = top?.presentedViewController { top = presented }
+        while let presented = top?.presentedViewController, !presented.isBeingDismissed { top = presented }
         return top
     }
 }
@@ -184,6 +187,13 @@ extension CameraBridge: UIImagePickerControllerDelegate, UINavigationControllerD
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true) { [weak self] in self?.deliver(nil) }
+    }
+}
+
+extension CameraBridge: UIAdaptivePresentationControllerDelegate {
+    // Swiped down or closed by the system without an answer: count it as cancelled.
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        answer(nil, nil, nil)
     }
 }
 

@@ -84,6 +84,8 @@ fun TodayScreen(
     var banner by remember { mutableStateOf<LogBanner?>(null) }
     val photoCamera = camera?.takeIf { photoLog != null && it.isAvailable() }
     var showPhotoKinds by remember { mutableStateOf(false) }
+    // The camera opens once the sheet has gone, so Apple's camera isn't shown on the closing sheet.
+    var pendingCamera by remember { mutableStateOf<PhotoKind?>(null) }
     val idlePhoto = remember { MutableStateFlow<PhotoLogState>(PhotoLogState.Idle) }
     val photoState by (photoLog?.state ?: idlePhoto).collectAsState()
     val openCamera: (PhotoKind) -> Unit = { kind ->
@@ -109,6 +111,13 @@ fun TodayScreen(
         voiceNotice?.let {
             banner = LogBanner(it, isError = true)
             voice?.dismissNotice()
+        }
+    }
+    LaunchedEffect(pendingCamera) {
+        pendingCamera?.let { kind ->
+            delay(400)
+            openCamera(kind)
+            pendingCamera = null
         }
     }
     LaunchedEffect(banner) {
@@ -218,7 +227,11 @@ fun TodayScreen(
                     log.close()
                     model.addPhotoMeal(entry, isPackaged)
                 },
-                onRetake = openCamera,
+                onRetake = { kind ->
+                    // Closes the check sheet first; the camera opens once it has gone.
+                    log.close()
+                    pendingCamera = kind
+                },
                 onClose = log::close
             )
         }
@@ -229,7 +242,7 @@ fun TodayScreen(
         PhotoKindSheet(
             onPick = { kind ->
                 showPhotoKinds = false
-                openCamera(kind)
+                pendingCamera = kind
             },
             onDismiss = { showPhotoKinds = false }
         )
