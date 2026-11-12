@@ -58,6 +58,9 @@ fun TodayScreen(
     /** The camera for "Snap your plate", with what happens to its pictures; null hides the button. */
     camera: PhotoCamera? = null,
     photoLog: PhotoLog? = null,
+    /** The widget's mic or camera, done once Today is showing; [onLaunchHandled] clears it. */
+    launch: TodayLaunch? = null,
+    onLaunchHandled: () -> Unit = {},
     footer: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
@@ -119,6 +122,17 @@ fun TodayScreen(
             openCamera(kind)
             pendingCamera = null
         }
+    }
+    // The widget's mic or camera: on the Food side, once today's numbers are showing.
+    val ready = state is DashboardUiState.Success
+    LaunchedEffect(launch, ready) {
+        if (launch == null || !ready) return@LaunchedEffect
+        side = "MEAL"
+        when (launch) {
+            TodayLaunch.VOICE -> voice?.start(LogKind.MEAL)
+            TodayLaunch.CAMERA -> if (photoCamera != null) pendingCamera = PhotoKind.MEAL
+        }
+        onLaunchHandled()
     }
     LaunchedEffect(banner) {
         if (banner != null) {

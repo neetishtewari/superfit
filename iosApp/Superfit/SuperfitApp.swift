@@ -15,8 +15,12 @@ struct SuperfitApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Google's sign-in sheet comes back to the app through this link.
-                .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
+                // The widget's links (superfit://) first; Google's sign-in sheet comes back to the
+                // app through its own link.
+                .onOpenURL { url in
+                    if WidgetBridge.shared.handle(url) { return }
+                    GIDSignIn.sharedInstance.handle(url)
+                }
         }
     }
 }

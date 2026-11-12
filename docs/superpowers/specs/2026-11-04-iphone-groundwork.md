@@ -324,8 +324,17 @@ tested on the dev app first.
          Log meal, as on Android. Saved meals get quality tags the same way.
        - 9: App icon. The Play Store's 1024 px Superfit icon (store/app_icon.png) becomes the
          iPhone's home-screen icon through an asset catalog (Assets.xcassets/AppIcon), so the
-         app no longer shows a blank grid. Home-screen widget, reminders and the PDF report
-         follow.
+         app no longer shows a blank grid. It is cropped to the inner square, so iOS's own
+         rounded mask doesn't show a box inside a box.
+       - 10: Home-screen widget. Like Android's widget: today's calories left ("1,240 kcal
+         left", "of 2,100", or "230 kcal over"), rounded like the Home ring, back to the full
+         target at midnight, and "Open Superfit to start" before the first open or after sign
+         out. Medium size adds the mic and camera buttons, which open Today on the Food side and
+         start listening for a meal or open the camera for one. The small size and the rest of
+         the widget just open Superfit, since Apple allows only one tap area on small widgets.
+         Lock-screen versions show the same line. A WidgetKit extension (SuperfitWidget) reads
+         the numbers that Today saves in an app group (WidgetBridge), and the app asks for a
+         redraw only when they change.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -630,3 +639,12 @@ unchanged apart from the check sheets now coming from shared code.
 
 Step 9 (reviewed 12 Nov): the app icon only adds an image to the app bundle. There is no new
 permission, data, network call or code.
+
+Step 10 (reviewed 12 Nov): the widget sees only today's date, calorie target and eaten total. They
+sit in an app group that only Superfit's app and widget can read, and they are cleared on sign
+out, so the next person never sees someone else's numbers (a known gap on Android). The widget
+has no network access and no other data. The mic and camera links (superfit://voice,
+superfit://camera) carry a random key made on the phone and kept in that app group. Another app
+or a web page can open Superfit with a superfit:// link, but without the key the app only opens:
+it never starts listening or opens the camera. Listening still shows Apple's mic indicator, as
+always. No new permissions; Android unchanged.

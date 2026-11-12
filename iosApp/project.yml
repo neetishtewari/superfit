@@ -27,7 +27,11 @@ targets:
     platform: iOS
     sources:
       - Superfit
+      # Names shared with the widget (app group, link key).
+      - SuperfitWidget/WidgetKeys.swift
     dependencies:
+      # The home-screen widget, built and embedded with the app.
+      - target: SuperfitWidget
       - package: Firebase
         product: FirebaseCore
       - package: Firebase
@@ -52,6 +56,8 @@ targets:
         # weight, body fat, lean mass).
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        # Shared with the widget only: today's calorie numbers and the widget's link key.
+        com.apple.security.application-groups: [group.com.superfit.aifitness]
     info:
       path: Superfit/Info.plist
       properties:
@@ -74,10 +80,14 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - com.googleusercontent.apps.797661593902-pustbaj3606h9qdt5jeo0tq0epeqp03n
+          # The widget's mic, camera and open links (superfit://). The mic and camera only act
+          # with the widget's own key (WidgetBridge.swift).
+          - CFBundleURLSchemes:
+              - superfit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superfit.aifitness
-        # The home-screen icon: the same 1024 px icon as the Play Store (Assets.xcassets/AppIcon).
+        # The home-screen icon: the Play Store icon cropped to fill the tile (Assets.xcassets/AppIcon).
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
@@ -92,3 +102,24 @@ targets:
         script: |
           cd "$SRCROOT/.."
           ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+  # Home-screen and lock-screen widget: today's calories left, with mic and camera buttons.
+  SuperfitWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - SuperfitWidget
+    entitlements:
+      path: SuperfitWidget/SuperfitWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.superfit.aifitness]
+    info:
+      path: SuperfitWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Superfit
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.superfit.aifitness.widget
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"

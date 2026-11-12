@@ -43,6 +43,7 @@ import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.auth.LoginModel
 import com.superfit.app.ui.auth.LoginScreen
 import com.superfit.app.ui.camera.PhotoLog
+import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.ProvideVoiceTyping
 import com.superfit.app.ui.dashboard.TodayModel
 import com.superfit.app.ui.dashboard.TodayScreen
@@ -60,7 +61,7 @@ import platform.UIKit.UIViewController
 
 /** The iPhone app's root screen, shown by the Swift app (ContentView.swift). */
 @Suppress("FunctionName", "unused")
-fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera): UIViewController {
+fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget): UIViewController {
     installIosAi(ai)
     HealthApp.useAppleHealth()
     val healthSource = IosHealthSource(health)
@@ -76,7 +77,7 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
         }
         SuperfitTheme(darkTheme = dark) {
             ProvideVoiceTyping(speech, onOpenPhoneSettings = ::openPhoneSettings) {
-                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, themeMode) { mode ->
+                IosRoot(auth, cloudStore, healthSource, speech, photoCamera, widget, themeMode) { mode ->
                     appPrefs.edit { putString(KEY_THEME_MODE, mode) }
                     themeMode = mode
                 }
@@ -104,6 +105,7 @@ private fun IosRoot(
     health: HealthSource,
     speech: VoiceRecognizer,
     camera: IosPhotoCamera,
+    widget: IosWidget,
     themeMode: String,
     onThemeMode: (String) -> Unit
 ) {
@@ -117,6 +119,8 @@ private fun IosRoot(
     }
 
     if (!signedIn) {
+        // Nobody's numbers on the home screen while signed out.
+        LaunchedEffect(Unit) { widget.clear() }
         val model = remember { LoginModel(client, scope) }
         LoginScreen(
             model = model,
@@ -184,11 +188,26 @@ private fun IosRoot(
             ) { _ -> today.syncHealth() }
             onDispose { NSNotificationCenter.defaultCenter.removeObserver(observer) }
         }
+        // The home-screen widget follows Today's calories left, as on Android.
+        LaunchedEffect(today) {
+            today.state.collect { state ->
+                if (state is DashboardUiState.Success) widget.publish(today.day, state)
+            }
+        }
+        val launch by IosLaunch.pending.collectAsState()
         val photoLog = remember(uid) { PhotoLog(accountScope, camera::lookup) }
         val history = remember(uid) { HistoryModel(log = log, prefs = IosPrefs.forUser(uid), scope = accountScope, scaleReadings = scale::mine) }
         var tab by remember(uid) { mutableStateOf(MainTab.TODAY) }
         var showSettings by remember(uid) { mutableStateOf(false) }
+        // The widget's mic or camera brings Today forward first.
+        LaunchedEffect(launch) {
+            if (launch != null) {
+                tab = MainTab.TODAY
+                showSettings = false
+            }
+        }
         val signOut = {
+            widget.clear()
             auth.signOut()
             signedIn = false
             email = null
@@ -219,7 +238,9 @@ private fun IosRoot(
                         onOpenSettings = { showSettings = true },
                         onOpenPhoneSettings = ::openPhoneSettings,
                         camera = camera,
-                        photoLog = photoLog
+                        photoLog = photoLog,
+                        launch = launch,
+                        onLaunchHandled = IosLaunch::handled
                     ) {
                         if (restored?.failed == true) {
                             Text(

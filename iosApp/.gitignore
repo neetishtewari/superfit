@@ -5,3 +5,5 @@ build/
 DerivedData/
 xcuserdata/
 Superfit/Superfit.entitlements
+SuperfitWidget/Info.plist
+SuperfitWidget/SuperfitWidget.entitlements
