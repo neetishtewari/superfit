@@ -803,4 +803,4 @@ protection (the frames-only file is deleted once the music is added, and the fol
 each time) and leaves only through the share sheet. The music is bundled, original, nothing
 downloaded. The setup card only reads whether mic and speech are allowed and whether a widget is
 placed; asking for the mic uses Apple's own prompts (or opens Settings once refused).
-
+TestFlight upload fix: Apple requires a NSHealthUpdateUsageDescription purpose string whenever the app has the HealthKit entitlement, even if it only reads. Added: "Superfit only reads from Apple Health. It never adds or changes anything there." (Superfit still never writes to Apple Health; no new permission.)

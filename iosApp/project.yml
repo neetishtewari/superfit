@@ -88,6 +88,7 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         # Shown in Apple's Health access sheet. Superfit only reads; it never writes to Apple Health.
         NSHealthShareUsageDescription: "Superfit reads your steps, active calories, distances, sleep, workouts and heart rate during workouts, your height, and weigh-ins with body measurements from your scale, to show your day, set your step goal and targets, and guide your coach. It never changes anything in Apple Health."
+        NSHealthUpdateUsageDescription: "Superfit only reads from Apple Health. It never adds or changes anything there."
         # Shown when a mic button is first tapped. The sound goes to Apple's speech recognition and
         # only the words come back; nothing is recorded or kept.
         NSMicrophoneUsageDescription: "Superfit listens when you tap a mic button, so you can say what you ate or the workout you did. Nothing is recorded or kept."
