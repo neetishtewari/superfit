@@ -131,4 +131,26 @@ class AiFailoverTest {
         assertEquals(768 to 1024, AiFailover.scaledSize(3000, 4000))
         assertEquals(800 to 600, AiFailover.scaledSize(800, 600))
     }
+
+    @Test
+    fun remoteConfigModelsGoFirstWithTheBuiltInListBehind() {
+        try {
+            AiFailover.setRemoteModels(" gemini-4-flash-lite, Gemini-4-Flash\ngemini-3.5-flash ")
+            assertEquals(
+                listOf("gemini-4-flash-lite", "gemini-4-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"),
+                AiFailover.MODEL_CASCADE
+            )
+        } finally {
+            AiFailover.setRemoteModels(null)
+        }
+        assertEquals(AiFailover.BUILT_IN_MODELS, AiFailover.MODEL_CASCADE)
+    }
+
+    @Test
+    fun remoteConfigIgnoresNamesThatAreNotGeminiModels() {
+        assertEquals(emptyList<String>(), AiFailover.parseModelList(""))
+        assertEquals(emptyList<String>(), AiFailover.parseModelList("gpt-5, ../models/x, gemini-pro!"))
+        assertEquals(listOf("gemini-a", "gemini-b"), AiFailover.parseModelList("gemini-a;x, gemini-a, gemini-b"))
+        assertEquals(6, AiFailover.parseModelList((1..9).joinToString(",") { "gemini-$it" }).size)
+    }
 }
