@@ -38,7 +38,7 @@ data class AiTurn(val fromUser: Boolean, val text: String)
 object CoachChat {
 
     /** The chat keeps this many messages; older ones live on only as the coach's notes. */
-    const val KEEP = 500
+    const val KEEP = 200
 
     /**
      * Most the saved chat may take, in bytes. The backup holds the whole chat in one Firestore
