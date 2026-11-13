@@ -3,11 +3,10 @@ package com.superfit.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.ComposeUIViewController
 import com.superfit.app.data.CloudBackup
 import com.superfit.app.data.HealthSync
@@ -489,8 +489,7 @@ private fun IosRoot(
             }
             return
         }
-        @OptIn(ExperimentalLayoutApi::class)
-        val imeUp = WindowInsets.isImeVisible
+        val imeUp = WindowInsets.ime.getBottom(LocalDensity.current) > 0
         CompositionLocalProvider(LocalShareCardHost provides shareHost) {
             Scaffold(
                 containerColor = SuperfitTheme.colors.bgStart,
