@@ -9,7 +9,7 @@ settings:
   base:
     # The App Store version people see, and the build number (raised for every upload).
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "4"
     # Neetish's Apple Developer team goes here (Xcode > Signing & Capabilities), not in the repo.
     DEVELOPMENT_TEAM: ""
 # Google's own Firebase iPhone SDK (Swift Package Manager). Products are added as each part

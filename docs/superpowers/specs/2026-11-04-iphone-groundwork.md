@@ -830,3 +830,4 @@ Step 23 (keyboard closes): layout behaviour only; no data, permissions or networ
 - Step 25: back/close audit. Settings, recap, onboarding already have visible back; Share card sheet gets a visible Close (X); other sheets have Cancel/Retake or swipe-down; Settings and recap also go back with the left-edge swipe (BackHandler). Layout/navigation only; nothing new stored or sent. Security: no change.
 
 - Step 26: recap story cards named "Get it on Google Play" on iPhone too; now use this phone's store (App Store on iPhone). Apple rejects apps that mention other platforms. Text only. Security: no change.
+- Step 26b: workout-import card names this phone's apps (Apple Watch/Strava on iPhone, not Samsung Health). Build number 4.
