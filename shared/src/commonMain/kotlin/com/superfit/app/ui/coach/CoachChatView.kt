@@ -144,6 +144,7 @@ fun CoachChatView(
     modifier: Modifier = Modifier,
     onShareRoast: ((String) -> Unit)? = null
 ) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var input by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(mic.problem) {
@@ -306,6 +307,7 @@ fun CoachChatView(
                                     onClick = {
                                         onSend(input, "typed")
                                         input = ""
+                                        focusManager.clearFocus()
                                     }
                                 )
                             }

@@ -66,6 +66,7 @@ import com.superfit.app.ui.camera.PhotoLog
 import com.superfit.app.ui.coach.ChatMic
 import com.superfit.app.ui.coach.CoachChatModel
 import com.superfit.app.ui.coach.CoachChatView
+import com.superfit.app.ui.components.dismissKeyboardOnTapOrScroll
 import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.MicOffDialog
 import com.superfit.app.ui.dashboard.ProvideVoiceTyping
@@ -498,7 +499,7 @@ private fun IosRoot(
                     }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH))
                 }
             ) { padding ->
-                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).dismissKeyboardOnTapOrScroll()) {
                     when (tab) {
                         MainTab.COACH -> CoachTab(coachChat, today)
                         MainTab.PROGRESS -> ProgressTabs(
