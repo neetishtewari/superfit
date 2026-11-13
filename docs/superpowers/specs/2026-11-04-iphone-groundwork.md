@@ -427,7 +427,7 @@ tested on the dev app first.
      - 21 (TestFlight feedback): recap autoplay can no longer turn a page early or while someone is swiping
        (a card must really stay up for its time). Fixes the recap sticking on the last story cards.
      - 22 (TestFlight): the app and widget now take their version and build number from project.yml
-       (MARKETING_VERSION 1.0, CURRENT_PROJECT_VERSION raised for every upload; now 2).
+       (MARKETING_VERSION 1.0, CURRENT_PROJECT_VERSION raised for every upload; now 3).
      - 23 (TestFlight feedback): the keyboard closes when you tap a blank part of the screen or scroll, and
        after sending a chat message or logging a meal (iPhone has no back button for it). The bottom menu
        is left out while the keyboard is up so it no longer leaves a gap above the keyboard.
