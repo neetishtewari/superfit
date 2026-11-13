@@ -72,6 +72,7 @@ import com.superfit.app.domain.SetupItem
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.share.CapturableStory
 import com.superfit.app.ui.share.LocalShareCardHost
+import kotlin.time.TimeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -203,10 +204,15 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, host: RecapHos
         val words = state.words[card.id]
         val total = RecapAutoplay.durationMs(words?.line.orEmpty(), words?.title.orEmpty())
         val left = ((1f - progress.value) * total).toInt()
+        val began = TimeSource.Monotonic.markNow()
         progress.animateTo(1f, tween(left, easing = LinearEasing))
+        // Never turn the page before the card has really been up for its time, whatever the animation clock did.
+        val owed = left - began.elapsedNow().inWholeMilliseconds
+        if (owed > 0) delay(owed)
         if (page + 1 < stories) {
             // Its own coroutine: the page turn itself pauses the timer, which would cancel it here.
-            scope.launch { pager.animateScrollToPage(page + 1) }
+            // Only while this card is still the one on screen and nobody is swiping.
+            if (pager.currentPage == page && !pager.isScrollInProgress) scope.launch { pager.animateScrollToPage(page + 1) }
         } else if (!finished) {
             finished = true
             UsageEvents.recapWatched(stories)

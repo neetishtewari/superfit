@@ -424,6 +424,8 @@ tested on the dev app first.
        the "Next: your Journey" / "Next: History" links, as on Android (shared ProgressTabs pager).
      - 20 (TestFlight feedback): meal/label snap uses Superfit's own camera screen (SnapCamera.swift), so no
        "Use Photo" step, as on Android. Photo stays in memory, never saved to Photos.
+     - 21 (TestFlight feedback): recap autoplay can no longer turn a page early or while someone is swiping
+       (a card must really stay up for its time). Fixes the recap sticking on the last story cards.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
