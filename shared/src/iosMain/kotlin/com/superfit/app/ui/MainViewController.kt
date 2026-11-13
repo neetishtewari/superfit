@@ -3,9 +3,11 @@ package com.superfit.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -487,16 +489,22 @@ private fun IosRoot(
             }
             return
         }
+        @OptIn(ExperimentalLayoutApi::class)
+        val imeUp = WindowInsets.isImeVisible
         CompositionLocalProvider(LocalShareCardHost provides shareHost) {
             Scaffold(
                 containerColor = SuperfitTheme.colors.bgStart,
                 // Each screen handles the top of the phone itself; the menu handles the bottom.
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                // The keyboard covers the menu anyway; leaving it out stops its height showing as a gap
+                // between a text box and the keyboard.
                 bottomBar = {
-                    MainMenuBar(tab, onSelect = {
-                        tabHow = "menu"
-                        tab = it
-                    }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH))
+                    if (!imeUp) {
+                        MainMenuBar(tab, onSelect = {
+                            tabHow = "menu"
+                            tab = it
+                        }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH))
+                    }
                 }
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).dismissKeyboardOnTapOrScroll()) {

@@ -429,7 +429,8 @@ tested on the dev app first.
      - 22 (TestFlight): the app and widget now take their version and build number from project.yml
        (MARKETING_VERSION 1.0, CURRENT_PROJECT_VERSION raised for every upload; now 2).
      - 23 (TestFlight feedback): the keyboard closes when you tap a blank part of the screen or scroll, and
-       after sending a chat message or logging a meal (iPhone has no back button for it).
+       after sending a chat message or logging a meal (iPhone has no back button for it). The bottom menu
+       is left out while the keyboard is up so it no longer leaves a gap above the keyboard.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
