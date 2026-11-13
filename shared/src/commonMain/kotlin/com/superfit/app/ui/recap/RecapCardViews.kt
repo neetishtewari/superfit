@@ -184,7 +184,7 @@ fun RecapStory(card: RecapCard, words: RecapWords, month: YearMonth, modifier: M
                 Spacer(Modifier.width(8.dp))
                 Text("SUPERFIT", color = p.text, fontFamily = Manrope, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
             }
-            Text("Get it on Google Play ›", color = p.soft, fontFamily = Manrope, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("${com.superfit.app.ui.report.ThisAppStore.label} ›", color = p.soft, fontFamily = Manrope, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
