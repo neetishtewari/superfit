@@ -824,3 +824,5 @@ App Store Connect asks about the advertising identifier at submission, decide th
 Step 19 (Progress swipe + Next links): layout only, no data, permissions or network. Security: nothing new.
 Step 20 (own camera screen): uses the camera permission already asked for; the picture is shrunk and handed to the AI as before, never written to Photos or disk. Security: nothing new.
 Step 23 (keyboard closes): layout behaviour only; no data, permissions or network. Security: nothing new.
+
+- Step 24: coach chat keyboard return key is "Send" (sends, then closes the keyboard). UI input option only; nothing new stored or sent. Security: no change.

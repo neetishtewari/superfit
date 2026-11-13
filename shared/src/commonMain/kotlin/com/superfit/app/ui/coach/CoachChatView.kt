@@ -287,6 +287,16 @@ fun CoachChatView(
                     readOnly = mic.listening,
                     modifier = Modifier.weight(1f),
                     maxLines = 4,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSend = {
+                            if (input.isNotBlank() && !loading && !mic.listening) {
+                                onSend(input, "typed")
+                                input = ""
+                            }
+                            focusManager.clearFocus()
+                        }
+                    ),
                     trailingIcon = {
                         Row(
                             modifier = Modifier.padding(end = 6.dp),
