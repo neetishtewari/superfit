@@ -27,6 +27,15 @@ interface IosAuth {
     fun signInWithGoogle(done: (IosAuthError?) -> Unit)
     fun signInWithApple(done: (IosAuthError?) -> Unit)
     fun signOut()
+
+    /** "Google sign-in", "Sign in with Apple" or "Email and password", for Settings › Account. */
+    fun signInMethod(): String
+
+    /**
+     * Deletes the signed-in Firebase account (after its data). Answers "DELETED",
+     * "NEEDS_RECENT_SIGN_IN", "CANCELLED" (the person closed Apple's sheet) or "FAILED".
+     */
+    fun deleteAccount(done: (String) -> Unit)
 }
 
 /** Lets shared code use the Swift [IosAuth] as an ordinary [AuthClient], plus Google and Apple. */

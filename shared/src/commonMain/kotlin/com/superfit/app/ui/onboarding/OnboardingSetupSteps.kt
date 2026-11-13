@@ -18,29 +18,28 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.superfit.app.data.HealthConnectManager
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.components.PrimaryButton
 import com.superfit.app.ui.components.SuperfitCard
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
-// Step 2 of 6: connect Health Connect, so "About you" can fill itself in.
+// Step 2 of 6: connect the phone's health app, so "About you" can fill itself in.
 @Composable
 internal fun HealthConnectStep(
     uiState: OnboardingUiState,
-    healthConnectManager: HealthConnectManager,
-    requestPermissionsLauncher: androidx.activity.result.ActivityResultLauncher<Set<String>>,
+    healthName: String,
+    onConnect: () -> Unit,
     onNext: () -> Unit
 ) {
-    val context = LocalContext.current
     val colors = SuperfitTheme.colors
     val connected = uiState.hasHealthConnectPermissions
     StepTitle(
         title = "Connect your health data",
-        subtitle = "Log less by hand. Superfit reads from Health Connect on your phone:"
+        subtitle = "Log less by hand. Superfit reads from $healthName on your phone:"
     )
 
     SuperfitCard {
@@ -66,16 +65,12 @@ internal fun HealthConnectStep(
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         PrimaryButton(
-            text = if (connected) "Continue" else "Connect Health Connect",
+            text = if (connected) "Continue" else "Connect $healthName",
             onClick = {
                 if (connected) {
                     onNext()
                 } else {
-                    com.superfit.app.ui.launchHealthConnectPermissions(
-                        context,
-                        requestPermissionsLauncher,
-                        healthConnectManager.permissions + healthConnectManager.bodyPermissions
-                    )
+                    onConnect()
                 }
             }
         )
@@ -116,6 +111,8 @@ internal fun CoachStyleStep(
 @Composable
 internal fun OnboardingSummaryStep(
     uiState: OnboardingUiState,
+    /** The health app's name and how to connect it; null where the phone has none. */
+    healthName: String?,
     onConnectHealth: () -> Unit,
     onStartClick: () -> Unit
 ) {
@@ -136,7 +133,7 @@ internal fun OnboardingSummaryStep(
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Eat about", style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
             Text(
-                "${"%,d".format(plan.targets.calories.roundToInt())} kcal",
+                "${LocalFormat.integer(plan.targets.calories.roundToLong())} kcal",
                 style = MaterialTheme.typography.displaySmall,
                 color = colors.primaryAccent
             )
@@ -153,15 +150,17 @@ internal fun OnboardingSummaryStep(
         }
     }
 
-    SuperfitCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Health Connect", style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary, modifier = Modifier.weight(1f))
-            if (uiState.hasHealthConnectPermissions) {
-                Text("Connected", style = MaterialTheme.typography.titleSmall, color = colors.primaryAccent)
-            } else {
-                Text("Not connected", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                TextButton(onClick = onConnectHealth, modifier = Modifier.padding(start = 4.dp)) {
-                    Text("Connect", style = MaterialTheme.typography.labelLarge, color = colors.primaryAccent)
+    if (healthName != null) {
+        SuperfitCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(healthName, style = MaterialTheme.typography.bodyMedium, color = colors.textPrimary, modifier = Modifier.weight(1f))
+                if (uiState.hasHealthConnectPermissions) {
+                    Text("Connected", style = MaterialTheme.typography.titleSmall, color = colors.primaryAccent)
+                } else {
+                    Text("Not connected", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    TextButton(onClick = onConnectHealth, modifier = Modifier.padding(start = 4.dp)) {
+                        Text("Connect", style = MaterialTheme.typography.labelLarge, color = colors.primaryAccent)
+                    }
                 }
             }
         }

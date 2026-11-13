@@ -57,7 +57,9 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toJavaYearMonth
 import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinYearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +89,7 @@ fun HistoryScreen(
     }
     var unseen by remember { mutableStateOf(com.superfit.app.data.SeenTabs.unseen(context, listOf("progress_1", "progress_2"))) }
     LaunchedEffect(selectedTab) {
-        com.superfit.app.data.AppAnalytics.screenOpened(listOf("insights", "journey", "log")[selectedTab])
+        com.superfit.app.data.UsageEvents.screenOpened(listOf("insights", "journey", "log")[selectedTab])
         if ("progress_$selectedTab" in unseen) {
             com.superfit.app.data.SeenTabs.markSeen(context, "progress_$selectedTab")
             unseen = unseen - "progress_$selectedTab"
@@ -185,7 +187,7 @@ fun HistoryScreen(
                             com.superfit.app.data.MonthlyRecapData.showAtTopOfProgress(LocalDate.now()) && it in viewModel.recapMonths
                         }
                         if (page == 0 && newRecap != null) {
-                            com.superfit.app.ui.recap.RecapReadyCard(newRecap, onOpen = { onOpenRecap(newRecap) })
+                            com.superfit.app.ui.recap.RecapReadyCard(newRecap.toKotlinYearMonth(), onOpen = { onOpenRecap(newRecap) })
                         }
 
                         when (page) {
@@ -249,7 +251,7 @@ fun HistoryScreen(
                                     }
                                 )
                                 Spacer(Modifier.height(8.dp))
-                                com.superfit.app.ui.recap.PastMonthsList(viewModel.recapMonths - setOfNotNull(newRecap), onOpenRecap)
+                                com.superfit.app.ui.recap.PastMonthsList((viewModel.recapMonths - setOfNotNull(newRecap)).map { it.toKotlinYearMonth() }) { onOpenRecap(it.toJavaYearMonth()) }
                                 if (context.packageName.endsWith(".debug")) {
                                     // Dev app only: see this month's recap so far, to check the cards before the 1st.
                                     androidx.compose.material3.TextButton(onClick = { onOpenRecap(java.time.YearMonth.now()) }) {

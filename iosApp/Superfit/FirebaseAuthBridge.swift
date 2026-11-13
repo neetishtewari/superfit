@@ -18,6 +18,45 @@ final class FirebaseAuthBridge: NSObject, IosAuth {
 
     func currentName() -> String? { Auth.auth().currentUser?.displayName }
 
+    func signInMethod() -> String {
+        let providers = Auth.auth().currentUser?.providerData.map(\.providerID) ?? []
+        if providers.contains("apple.com") { return "Sign in with Apple" }
+        if providers.contains("google.com") { return "Google sign-in" }
+        return "Email and password"
+    }
+
+    /// Deletes the Firebase account (its data is deleted first by shared code). A Sign in with
+    /// Apple account confirms with Apple once more, so Apple's link to Superfit is revoked too, as
+    /// Apple asks of apps that offer account deletion.
+    func deleteAccount(done: @escaping (String) -> Void) {
+        guard let user = Auth.auth().currentUser else { return done("DELETED") }
+        let finish: (Error?) -> Void = { error in
+            guard let error = error as NSError? else { return done("DELETED") }
+            done(AuthErrorCode(rawValue: error.code) == .requiresRecentLogin ? "NEEDS_RECENT_SIGN_IN" : "FAILED")
+        }
+        guard user.providerData.contains(where: { $0.providerID == "apple.com" }) else {
+            return user.delete(completion: finish)
+        }
+        let flow = AppleSignIn(finish: { [weak self] error in
+            self?.appleSignIn = nil
+            if let error { done(error.code == "APPLE_CANCELLED" ? "CANCELLED" : "FAILED") }
+        })
+        flow.confirmed = { [weak self] credential, code in
+            self?.appleSignIn = nil
+            user.reauthenticate(with: credential) { _, error in
+                if let error { return finish(error) }
+                guard let code else { return user.delete(completion: finish) }
+                Auth.auth().revokeToken(withAuthorizationCode: code) { _ in
+                    // The account goes even if Apple's link couldn't be revoked; the person can
+                    // still remove it in the iPhone's Settings › Apple ID › Sign in with Apple.
+                    user.delete(completion: finish)
+                }
+            }
+        }
+        appleSignIn = flow
+        flow.start()
+    }
+
     func signIn(email: String, password: String, done: @escaping (IosAuthError?) -> Void) {
         Auth.auth().signIn(withEmail: email, password: password) { _, error in done(Self.authError(error)) }
     }
@@ -104,6 +143,10 @@ private final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, AS
     private let rawNonce = AppleSignIn.randomNonce()
     private let finish: (IosAuthError?) -> Void
 
+    /// Set when the person is confirming who they are (deleting the account) rather than signing
+    /// in: gets Apple's credential and its one-time authorization code instead.
+    var confirmed: ((OAuthCredential, String?) -> Void)?
+
     init(finish: @escaping (IosAuthError?) -> Void) {
         self.finish = finish
     }
@@ -126,6 +169,9 @@ private final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, AS
             return finish(IosAuthError(code: "APPLE_FAILED", message: nil, isNetwork: false))
         }
         let credential = OAuthProvider.appleCredential(withIDToken: token, rawNonce: rawNonce, fullName: apple.fullName)
+        if let confirmed {
+            return confirmed(credential, apple.authorizationCode.flatMap { String(data: $0, encoding: .utf8) })
+        }
         Auth.auth().signIn(with: credential) { [finish] _, error in finish(FirebaseAuthBridge.authError(error)) }
     }
 

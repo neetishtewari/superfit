@@ -5,8 +5,8 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.ReviewPrompt
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.userPrefs
 import com.superfit.app.domain.CoachInsight
 import com.superfit.app.domain.DaySteps
@@ -249,7 +249,7 @@ class DashboardViewModel(
     fun sendChatMessage(text: String, how: String = "typed") {
         val question = text.trim().take(com.superfit.app.domain.CoachChat.MAX_TEXT)
         if (question.isBlank() || _chatLoading.value) return
-        AppAnalytics.coachMessageSent(how)
+        UsageEvents.coachMessageSent(how)
         val before = _chatMessages.value.filterNot { it.isError }
         _chatMessages.value = _chatMessages.value + com.superfit.app.domain.ChatEntry(
             id = newChatId(),
@@ -315,7 +315,7 @@ class DashboardViewModel(
                 if (update.isEmpty) return@launch
                 val current = _coachNotes.value
                 saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(current, update))
-                update.add.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = false) }
+                update.add.forEach { _ -> UsageEvents.coachNoteSaved(byUser = false) }
                 updateChatEntry(reply.id) {
                     it.copy(
                         rememberedIds = update.add.map { n -> n.id },
@@ -342,7 +342,7 @@ class DashboardViewModel(
         val restored = current.filterNot { it.id in entry.rememberedIds } +
             entry.forgotten.filter { old -> current.none { it.id == old.id } }
         saveCoachNotes(restored)
-        AppAnalytics.coachNoteRemoved("undo")
+        UsageEvents.coachNoteRemoved("undo")
         updateChatEntry(entryId) { it.copy(rememberedIds = emptyList(), forgotten = emptyList()) }
     }
 
@@ -355,13 +355,13 @@ class DashboardViewModel(
         com.superfit.app.data.CoachStyleStore.save(userPrefs(appContext), style)
         if (style == _coachStyle.value) return
         _coachStyle.value = style
-        AppAnalytics.coachStyleChanged(style.name)
+        UsageEvents.coachStyleChanged(style.name)
         if (_coachingState.value is CoachingInsightState.Success) refreshCoachingInsight()
     }
 
     fun deleteCoachNote(id: String) {
         saveCoachNotes(_coachNotes.value.filterNot { it.id == id })
-        AppAnalytics.coachNoteRemoved("settings")
+        UsageEvents.coachNoteRemoved("settings")
     }
 
     /** Adds what the user typed or pasted in Settings; each line becomes its own note. */
@@ -369,7 +369,7 @@ class DashboardViewModel(
         val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now().toKotlinLocalDate(), System.currentTimeMillis())
         if (notes.isEmpty()) return
         saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(notes, emptyList())))
-        notes.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = true) }
+        notes.forEach { _ -> UsageEvents.coachNoteSaved(byUser = true) }
     }
 
     /** "Log this" under a coach reply: the suggested meal goes through the normal meal log. */
@@ -378,7 +378,7 @@ class DashboardViewModel(
         val meal = entry.mealToLog ?: return
         if (entry.mealLogged) return
         parseAndAddMeal(meal)
-        AppAnalytics.coachMealLogged()
+        UsageEvents.coachMealLogged()
         updateChatEntry(entryId) { it.copy(mealLogged = true) }
     }
 
@@ -464,7 +464,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             repository.setWorkoutImportEnabled(enabled)
             _workoutImportEnabled.value = enabled
-            if (enabled) AppAnalytics.workoutsConnected()
+            if (enabled) UsageEvents.workoutsConnected()
         }
     }
 
@@ -680,7 +680,7 @@ class DashboardViewModel(
     ) { profile, activity, _ ->
         if (profile == null) return@combine null
         TodayCoach.stepGoal(profile, activity, userPrefs(appContext), LocalDate.now().toKotlinLocalDate()) { up ->
-            AppAnalytics.stepGoalChanged(if (up) "up" else "down", "auto")
+            UsageEvents.stepGoalChanged(if (up) "up" else "down", "auto")
         }
     }.stateIn(
         scope = viewModelScope,
@@ -702,7 +702,7 @@ class DashboardViewModel(
     fun setOwnStepGoal(steps: Int?) {
         val clamped = steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX)
         StepGoalStore.setOwnGoal(userPrefs(appContext), clamped)
-        AppAnalytics.stepGoalChanged("set", if (clamped == null) "auto" else "own")
+        UsageEvents.stepGoalChanged("set", if (clamped == null) "auto" else "own")
         stepGoalTrigger.value = System.currentTimeMillis()
     }
 
@@ -738,7 +738,7 @@ class DashboardViewModel(
     /** Shared or dismissed: the card goes and this workout isn't offered again. */
     fun handleShareOffer(workout: WorkoutView, shared: Boolean) {
         com.superfit.app.data.ShareCardPrefs.of(appContext).markOfferHandled(workout.merged.primary.id)
-        com.superfit.app.data.AppAnalytics.shareOffer(if (shared) "shared" else "dismissed", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+        com.superfit.app.data.UsageEvents.shareOffer(if (shared) "shared" else "dismissed", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
         shareOfferTrigger.value++
     }
 
@@ -780,7 +780,7 @@ class DashboardViewModel(
     fun logWeight(weightKg: Double, note: String = "") {
         viewModelScope.launch {
             repository.addWeightEntry(weightKg, note)
-            AppAnalytics.weighIn()
+            UsageEvents.weighIn()
         }
     }
 
@@ -796,7 +796,7 @@ class DashboardViewModel(
                 )
             }
             GoalDatePref.markGoalSet(AndroidPrefs(sharedPrefs))
-            AppAnalytics.goalSet(withDate = false)
+            UsageEvents.goalSet(withDate = false)
         }
     }
 
@@ -894,7 +894,7 @@ class DashboardViewModel(
                 items = result.items?.encode()
             )
         )
-        AppAnalytics.mealLogged(if (lastInputWasSpoken) "voice" else "typed")
+        UsageEvents.mealLogged(if (lastInputWasSpoken) "voice" else "typed")
         loadFrequentMeals()
     }
 
@@ -910,7 +910,7 @@ class DashboardViewModel(
                 difficultyRating = difficultyRating
             )
         )
-        AppAnalytics.workoutLogged()
+        UsageEvents.workoutLogged()
         offerDuplicateCheck(id, result.workoutText, result.workoutType)
     }
 
@@ -968,7 +968,7 @@ class DashboardViewModel(
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
-            AppAnalytics.mealEdited()
+            UsageEvents.mealEdited()
             // A changed food drops the old tags (see withItems), so the meal is judged again.
             if (entry.qualityTags == null) {
                 com.superfit.app.domain.MealTagger().tagOne(entry)?.let { repository.saveMealTags(entry, it.encode()) }
@@ -1041,7 +1041,7 @@ class DashboardViewModel(
                     activityMultiplier = updated.activityMultiplier
                 )
             )
-            AppAnalytics.profileEdited()
+            UsageEvents.profileEdited()
         }
     }
 

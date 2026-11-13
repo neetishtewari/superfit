@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.superfit.app.domain.ActivityLevels
+import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.OnboardingTargets
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.components.BirthMonthInput
@@ -47,6 +48,7 @@ import com.superfit.app.ui.components.SuperfitCard
 import com.superfit.app.ui.components.SuperfitField
 import com.superfit.app.ui.components.SuperfitLogo
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 // Step 1 of 6: what Superfit is, in one glance.
 @Composable
@@ -68,7 +70,8 @@ internal fun WelcomeStep(onNext: () -> Unit) {
 @Composable
 internal fun AboutYouStep(
     uiState: OnboardingUiState,
-    viewModel: OnboardingViewModel,
+    healthName: String,
+    model: OnboardingModel,
     errors: AboutYouErrors,
     onNext: () -> Unit
 ) {
@@ -85,23 +88,23 @@ internal fun AboutYouStep(
                 ChoiceGrid(
                     options = listOf(true to "Male", false to "Female"),
                     selected = uiState.isMale,
-                    onSelect = { viewModel.onSexChanged(it) }
+                    onSelect = { model.onSexChanged(it) }
                 )
             }
 
             BirthMonthInput(
                 month = uiState.birthMonth,
                 year = uiState.birthYear,
-                onMonth = { viewModel.onBirthMonthChanged(it) },
-                onYear = { viewModel.onBirthYearChanged(it) },
+                onMonth = { model.onBirthMonthChanged(it) },
+                onYear = { model.onBirthYearChanged(it) },
                 error = errors.birth
             )
 
-            HeightInput(heightCm = uiState.height, onHeightCm = { viewModel.onHeightChanged(it) }, isError = errors.height, refreshKey = uiState.filledFromHealthConnect)
+            HeightInput(heightCm = uiState.height, onHeightCm = { model.onHeightChanged(it) }, isError = errors.height, refreshKey = uiState.filledFromHealthConnect)
 
             SuperfitField(
                 value = uiState.weight,
-                onValueChange = { viewModel.onWeightChanged(it) },
+                onValueChange = { model.onWeightChanged(it) },
                 label = { Text("Weight") },
                 trailingIcon = { UnitSuffix("kg") },
                 isError = errors.weight,
@@ -113,7 +116,7 @@ internal fun AboutYouStep(
             if (uiState.filledFromHealthConnect) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.primaryAccent, modifier = Modifier.size(16.dp))
-                    Text("Height and weight from Health Connect", style = MaterialTheme.typography.bodySmall, color = colors.primaryAccent)
+                    Text("Height and weight from $healthName", style = MaterialTheme.typography.bodySmall, color = colors.primaryAccent)
                 }
             }
         }
@@ -142,7 +145,7 @@ private fun UnitSuffix(text: String) {
 @Composable
 internal fun GoalStep(
     uiState: OnboardingUiState,
-    viewModel: OnboardingViewModel,
+    model: OnboardingModel,
     onOpenBurnInfo: () -> Unit,
     onNext: () -> Unit
 ) {
@@ -152,8 +155,8 @@ internal fun GoalStep(
 
     GoalPicker(
         selected = uiState.goal,
-        onSelect = { goal -> viewModel.onGoalChanged(goal.key, goal.calorieOffset) },
-        selectedDetail = "${"%,d".format(plan.targets.calories.roundToInt())} kcal · ${plan.targets.proteinG.roundToInt()} g protein a day"
+        onSelect = { goal -> model.onGoalChanged(goal.key, goal.calorieOffset) },
+        selectedDetail = "${LocalFormat.integer(plan.targets.calories.roundToLong())} kcal · ${plan.targets.proteinG.roundToInt()} g protein a day"
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -161,7 +164,7 @@ internal fun GoalStep(
         ChoiceGrid(
             options = ActivityLevels.map { it.multiplier to it.label },
             selected = ActivityLevels.closest(uiState.activityMultiplier),
-            onSelect = { viewModel.onActivityMultiplierChanged(it) }
+            onSelect = { model.onActivityMultiplierChanged(it) }
         )
         Text(
             ActivityLevels.describe(uiState.activityMultiplier),
@@ -178,7 +181,7 @@ internal fun GoalStep(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            "You burn about ${"%,d".format(plan.tdee.roundToInt())} kcal a day",
+            "You burn about ${LocalFormat.integer(plan.tdee.roundToLong())} kcal a day",
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textPrimary
         )

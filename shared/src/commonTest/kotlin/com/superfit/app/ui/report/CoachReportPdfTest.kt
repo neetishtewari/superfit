@@ -87,7 +87,7 @@ class CoachReportPdfTest {
     @Test
     fun everyPageHasTheStoreLinkAndPagesNeverOverlap() {
         val surface = FakeSurface()
-        CoachReportPdf.draw(report(28), surface)
+        CoachReportPdf.draw(report(28), surface, CoachReportPdf.GOOGLE_PLAY)
         assertTrue(surface.pages >= 3)
         assertEquals((1..surface.pages).toList(), surface.links)
         assertTrue(!surface.open)
@@ -96,7 +96,7 @@ class CoachReportPdfTest {
     @Test
     fun wordsAndNumbersMatchAndroid() {
         val surface = FakeSurface()
-        CoachReportPdf.draw(report(14), surface)
+        CoachReportPdf.draw(report(14), surface, CoachReportPdf.GOOGLE_PLAY)
         val all = surface.texts
         assertTrue("15 Oct 2026 to 11 Nov 2026" in all)
         assertTrue("Thu 15 Oct" in all)
@@ -104,6 +104,14 @@ class CoachReportPdfTest {
         assertTrue("-1.4 kg" in all)
         assertTrue("Get it on Google Play ›" in all)
         assertTrue(all.any { it == "1.4 kg down since start" || it.startsWith("1.4 kg down") })
+    }
+
+    @Test
+    fun aStoreWithoutALinkShowsJustItsName() {
+        val surface = FakeSurface()
+        CoachReportPdf.draw(report(2), surface, StoreLink("Download on the App Store", ""))
+        assertTrue("Download on the App Store" in surface.texts)
+        assertEquals(emptyList<Int>(), surface.links)
     }
 
     @Test

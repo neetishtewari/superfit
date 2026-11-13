@@ -16,7 +16,6 @@ import com.superfit.app.domain.RecapSetup
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
 import com.superfit.app.domain.StrengthSession
-import com.superfit.app.domain.StrengthSessions
 import com.superfit.app.widget.WidgetPin
 import java.time.Instant
 import java.time.LocalDate
@@ -36,8 +35,6 @@ object MonthlyRecapData {
 
     private const val KEY_OPENED = "recap_opened_" // + yyyy-MM -> the date it was first opened
     private const val KEY_NOTIFIED = "recap_notified_month"
-
-    private const val KEY_STRENGTH_TAGS = "recap_strength_tags"
 
     // v2: the calorie and new activity cards need their own words, so saved months are written again once.
     private const val KEY_WORDS = "recap_words_v3_" // + yyyy-MM_STYLE -> JSON
@@ -132,32 +129,11 @@ object MonthlyRecapData {
         return MonthlyRecap.build(month.toKotlinYearMonth(), days, nutrition, strength, kWeighIns, journey, goalSet, setup, zone.toKotlinTimeZone(), body)
     }
 
-    fun tagKey(w: WorkoutEntryEntity) = "${w.timestamp}_${w.description.hashCode()}"
+    fun tagKey(w: WorkoutEntryEntity) = StrengthTags.key(w)
 
-    /**
-     * What each voice-logged strength session worked and how long it took, as the user said it.
-     * Asked of the AI once per log (in one batch) and kept, so a month is never tagged twice.
-     */
-    suspend fun strengthTags(context: Context, logs: List<WorkoutEntryEntity>): Map<String, Pair<Set<BodyArea>, Int?>> {
-        val prefs = getUserSharedPrefs(context)
-        val saved = runCatching { JSONObject(prefs.getString(KEY_STRENGTH_TAGS, null) ?: "{}") }.getOrElse { JSONObject() }
-        fun read(key: String): Pair<Set<BodyArea>, Int?>? = saved.optJSONObject(key)?.let { o ->
-            o.optString("a").split(',').mapNotNull { BodyArea.of(it) }.toSet() to o.optInt("m", 0).takeIf { it > 0 }
-        }
-        val todo = logs.filter { !saved.has(tagKey(it)) }.take(60)
-        if (todo.isNotEmpty()) {
-            val json = runCatching {
-                GeminiClient.generateContent(prompt = StrengthSessions.prompt(todo.map { it.description }), systemInstructionText = StrengthSessions.TAG_INSTRUCTION, isJson = true)
-            }.getOrNull()
-            if (json != null) {
-                StrengthSessions.parse(json, todo.size).forEachIndexed { i, r ->
-                    if (r != null) saved.put(tagKey(todo[i]), JSONObject().put("a", r.first.joinToString(",") { it.key }).put("m", r.second ?: 0))
-                }
-                prefs.edit().putString(KEY_STRENGTH_TAGS, saved.toString()).apply()
-            }
-        }
-        return logs.mapNotNull { w -> read(tagKey(w))?.let { tagKey(w) to it } }.toMap()
-    }
+    /** What each voice-logged strength session worked and how long it took (shared with the iPhone). */
+    suspend fun strengthTags(context: Context, logs: List<WorkoutEntryEntity>): Map<String, Pair<Set<BodyArea>, Int?>> =
+        StrengthTags.load(AndroidPrefs(getUserSharedPrefs(context)), logs)
 
     /**
      * The card words in the current coach style: saved ones if this month was already written,

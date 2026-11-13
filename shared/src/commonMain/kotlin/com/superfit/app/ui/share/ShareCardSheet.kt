@@ -1,17 +1,5 @@
 package com.superfit.app.ui.share
 
-import android.content.ClipData
-import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
-import android.net.Uri
-import android.os.Build
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -64,27 +52,22 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import com.superfit.app.data.RoastCardData
-import com.superfit.app.data.ShareCardPrefs
-import com.superfit.app.data.WorkoutCardData
 import com.superfit.app.domain.CardChip
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.DayChip
@@ -92,38 +75,33 @@ import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.RoastCard
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.theme.SuperfitTheme
-import java.io.File
+import com.superfit.app.ui.report.ThisAppStore
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Share pictures are 1080 x 1920 px: the 360 x 640 dp card drawn at 3x. */
 const val CARD_WIDTH_PX = 1080
 const val CARD_HEIGHT_PX = 1920
 private val CardDensity = Density(density = 3f, fontScale = 1f)
 
-private const val SHARE_TEXT = "Tracked with Superfit https://play.google.com/store/apps/details?id=com.superfit.aifitness"
+/** The words sent with a shared picture: this phone's store link. */
+val SHARE_TEXT: String get() = ThisAppStore.shareText
 private val accentNames = listOf("Orange", "Mint", "Cyan", "Violet")
 
-// Whether the photo hint was seen; the rest of the saved share choices live in ShareCardPrefs.
-private const val KEY_HINT_SHOWN = "photo_hint_shown"
-
-// Longest side of a loaded photo: room to zoom in on a 1080 x 1920 card, about 20 MB at most.
-private const val MAX_PHOTO_EDGE = 2560
+/** Longest side of a loaded photo: room to zoom in on a 1080 x 1920 card, about 20 MB at most. */
+const val MAX_PHOTO_EDGE = 2560
 
 /**
- * Preview of a share card with colour choices. Share draws the picture on the phone and opens
- * the Android share sheet; nothing is uploaded.
+ * Preview of a share card with colour choices, the same on Android and iPhone. Share draws the
+ * picture on the phone and opens the phone's share sheet ([LocalShareCardHost]); nothing is uploaded.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit = {}) {
-    val context = LocalContext.current
+    val host = LocalShareCardHost.current
     val scope = rememberCoroutineScope()
     val layer = rememberGraphicsLayer()
-    val prefs = remember { context.getSharedPreferences(ShareCardPrefs.FILE, Context.MODE_PRIVATE) }
-    val cardPrefs = remember { ShareCardPrefs(prefs) }
+    val cardPrefs = host.prefs
     var accent by remember(card) { mutableStateOf(defaultAccent(card)) }
     var busy by remember { mutableStateOf(false) }
     // Light background by default (Neetish, 2026-11-03).
@@ -137,7 +115,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     var detailed by remember(card) { mutableStateOf<ShareCard.Activity?>(null) }
     LaunchedEffect(card) {
         if (card is ShareCard.Activity && card.workout != null) {
-            detailed = withContext(Dispatchers.IO) { WorkoutCardData.enrich(context, card) }
+            detailed = host.workoutCards?.enrich(card) ?: card
         }
     }
     // What's added to a workout card, kept apart for photo and plain cards, each starting from its default.
@@ -169,7 +147,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
         if (failed == ask && retries == 0) return@LaunchedEffect
         writing = ask
         val line = try {
-            withContext(Dispatchers.IO) { WorkoutCardData.aiLine(context, target, ask) }
+            host.workoutCards?.aiLine(target, ask)
         } finally {
             writing = null
         }
@@ -201,41 +179,36 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     LaunchedEffect(roastText) {
         val text = roastText ?: return@LaunchedEffect
         if (roastCard == null) return@LaunchedEffect
-        picked = withContext(Dispatchers.IO) { RoastCardData.pick(context, text, roastCard.pool) }
+        picked = RoastCardData.pick(cardPrefs, text, roastCard.pool)
     }
     var againLeft by remember(card) { mutableStateOf(0) }
     var againBusy by remember(card) { mutableStateOf(false) }
     LaunchedEffect(card) {
         if (roastCard != null) {
-            againLeft = RoastCardData.againLeft(context)
-            dayJourney = withContext(Dispatchers.IO) { WorkoutCardData.dayJourney(context) }
+            againLeft = RoastCardData.againLeft(cardPrefs)
+            dayJourney = host.workoutCards?.dayJourney()
         }
     }
     val onPhotoNow = photo != null
     LaunchedEffect(onPhotoNow, roastText) {
         val text = roastText ?: return@LaunchedEffect
         if (roastCard == null || !onPhotoNow || shortRoast != null || text.length <= RoastCard.PHOTO_MAX_CHARS) return@LaunchedEffect
-        shortRoast = withContext(Dispatchers.IO) { RoastCardData.short(context, text, roastCard.pool) }
+        shortRoast = RoastCardData.short(cardPrefs, text, roastCard.pool)
     }
     val shown = activityBase?.copy(chips = chips, coachLine = coachLine, roastLine = roastLine)
         ?: roastCard?.copy(coachLine = roastText, chips = dayChips, journey = dayJourney, shortRoast = shortRoast, picked = picked)
         ?: base
 
-    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val loaded = withContext(Dispatchers.IO) { loadPhoto(context, uri) }
-                if (loaded != null) {
-                    photo = loaded.asImageBitmap()
-                    frame = PhotoFrame()
-                    if (!prefs.getBoolean(KEY_HINT_SHOWN, false)) {
-                        showHint = true
-                        prefs.edit().putBoolean(KEY_HINT_SHOWN, true).apply()
-                    }
-                } else {
-                    Toast.makeText(context, "Couldn't open that photo.", Toast.LENGTH_SHORT).show()
-                }
+    val pickPhoto = host.rememberPhotoPicker { loaded ->
+        if (loaded != null) {
+            photo = loaded
+            frame = PhotoFrame()
+            if (!cardPrefs.photoHintShown) {
+                showHint = true
+                cardPrefs.photoHintShown = true
             }
+        } else {
+            host.notice("Couldn't open that photo.")
         }
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -249,6 +222,12 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     ) {
         // The choices scroll; the Share button stays pinned below them so it's never missed.
         Column(Modifier.fillMaxWidth()) {
+            // A visible way out; swiping the sheet down or tapping outside also closes it.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                androidx.compose.material3.IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = SuperfitTheme.colors.textSecondary)
+                }
+            }
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -342,7 +321,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                 }
                 if (current == null) {
                     OptionPill("Add your photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
-                        pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        pickPhoto()
                     }
                 } else {
                     OptionPill("Remove photo", Icons.Filled.Close, on = false, accent = accent, highlight = false, centered = true) {
@@ -417,15 +396,15 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                     againBusy = true
                                     scope.launch {
                                         val fresh = try {
-                                            withContext(Dispatchers.IO) { RoastCardData.again(context, old, roastCard.pool) }
+                                            RoastCardData.again(cardPrefs, old, roastCard.pool)
                                         } finally {
                                             againBusy = false
                                         }
-                                        againLeft = RoastCardData.againLeft(context)
+                                        againLeft = RoastCardData.againLeft(cardPrefs)
                                         if (fresh != null) {
                                             roastText = fresh
                                         } else {
-                                            Toast.makeText(context, "Couldn't write another roast just now.", Toast.LENGTH_SHORT).show()
+                                            host.notice("Couldn't write another roast just now.")
                                         }
                                     }
                                 }
@@ -454,7 +433,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                             .clickable {
                                 cardPrefs.setDefaults(onPhoto, chips)
                                 if (onPhoto) savedPhoto = chips else savedPlain = chips
-                                Toast.makeText(context, "Saved. Change it any time in Settings > Sharing.", Toast.LENGTH_SHORT).show()
+                                host.notice("Saved. Change it any time in Settings > Sharing.")
                             }
                             .padding(vertical = 4.dp)
                     )
@@ -465,25 +444,28 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                     busy = true
                     scope.launch {
                         try {
-                            val bitmap = layer.toImageBitmap().asAndroidBitmap()
-                            shareImage(context, bitmap)
+                            host.share(layer.toImageBitmap())
                             val activity = shown as? ShareCard.Activity
-                            com.superfit.app.data.AppAnalytics.cardShared(
-                                type = when (card) {
-                                    is ShareCard.Daily -> if (card.roast) "roast" else "day"
-                                    is ShareCard.Activity -> "activity"
-                                    is ShareCard.Best -> "best"
-                                },
-                                photo = photo != null,
-                                adjusted = photo != null && frame.adjusted,
-                                chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } }
-                                    ?: roastCard?.let { dayChips.joinToString(",") { it.key } },
-                                statsPlace = if (frame.statsTop) "top" else "bottom",
-                                heartLine = activity?.shownHeart != null
+                            host.shared(
+                                CardShared(
+                                    type = when (card) {
+                                        is ShareCard.Daily -> if (card.roast) "roast" else "day"
+                                        is ShareCard.Activity -> "activity"
+                                        is ShareCard.Best -> "best"
+                                    },
+                                    photo = photo != null,
+                                    adjusted = photo != null && frame.adjusted,
+                                    chips = activity?.let { a -> CardChip.encode(a.chips.filter { it in available }.toSet()).ifEmpty { "numbers" } }
+                                        ?: roastCard?.let { dayChips.joinToString(",") { it.key } },
+                                    statsPlace = if (frame.statsTop) "top" else "bottom",
+                                    heartLine = activity?.shownHeart != null
+                                )
                             )
                             onShared()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
                         } catch (e: Exception) {
-                            Toast.makeText(context, "Couldn't make the picture. Please try again.", Toast.LENGTH_SHORT).show()
+                            host.notice("Couldn't make the picture. Please try again.")
                         } finally {
                             busy = false
                         }
@@ -581,7 +563,7 @@ private fun MiniChoice(label: String, picked: Boolean, accent: Color, onPick: ()
             .clickable(onClick = onPick)
             .padding(vertical = 6.dp)
             .semantics { contentDescription = "$label${if (picked) ", chosen" else ""}" },
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        textAlign = TextAlign.Center
     )
 }
 
@@ -631,51 +613,4 @@ fun CapturableStory(layer: GraphicsLayer, modifier: Modifier, content: @Composab
             CompositionLocalProvider(LocalDensity provides CardDensity) { content() }
         }
     }
-}
-
-/** Saves the picture in the app's cache (replacing the last one) and opens the share sheet. */
-suspend fun shareImage(context: Context, bitmap: Bitmap) {
-    val file = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "shares").apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }
-        val software = if (bitmap.config == Bitmap.Config.HARDWARE) bitmap.copy(Bitmap.Config.ARGB_8888, false) else bitmap
-        File(dir, "superfit-${System.currentTimeMillis()}.png").also { f ->
-            f.outputStream().use { software.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        }
-    }
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.shares", file)
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "image/png"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_TEXT, SHARE_TEXT)
-        clipData = ClipData.newRawUri(null, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(send, "Share"))
-}
-
-/**
- * Reads a gallery photo turned the right way up, with its longest side at most [MAX_PHOTO_EDGE] so
- * it stays sharp when zoomed in without using too much memory. Returns null if it can't be read.
- */
-private fun loadPhoto(context: Context, uri: Uri): Bitmap? = try {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-            val longest = maxOf(info.size.width, info.size.height)
-            if (longest > MAX_PHOTO_EDGE) {
-                val shrink = longest / MAX_PHOTO_EDGE.toDouble()
-                decoder.setTargetSize((info.size.width / shrink).roundToInt().coerceAtLeast(1), (info.size.height / shrink).roundToInt().coerceAtLeast(1))
-            }
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-        }
-    } else {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_PHOTO_EDGE) sample *= 2
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-    }
-} catch (e: Exception) {
-    null
 }

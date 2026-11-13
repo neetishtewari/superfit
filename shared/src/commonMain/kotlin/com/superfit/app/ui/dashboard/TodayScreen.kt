@@ -32,8 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Now
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.LogKind
+import com.superfit.app.domain.PersonalBest
+import com.superfit.app.domain.ShareCard
+import com.superfit.app.domain.ShareCards
+import com.superfit.app.domain.ShareOffer
+import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.ui.camera.PhotoCamera
 import com.superfit.app.ui.camera.PhotoKind
@@ -41,6 +47,8 @@ import com.superfit.app.ui.camera.PhotoKindSheet
 import com.superfit.app.ui.camera.PhotoLog
 import com.superfit.app.ui.camera.PhotoLogOverlay
 import com.superfit.app.ui.camera.PhotoLogState
+import com.superfit.app.ui.share.LocalShareCardHost
+import com.superfit.app.ui.share.ShareCardSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -64,6 +72,8 @@ fun TodayScreen(
     onLaunchHandled: () -> Unit = {},
     /** Opens the coach chat (with a roast asked for, in Roast me style); null hides "Chat with coach". */
     onOpenCoach: ((roast: Boolean) -> Unit)? = null,
+    /** Last month's recap card while Home offers it (from the 1st); null when there's none. */
+    recapCard: (@Composable () -> Unit)? = null,
     footer: @Composable () -> Unit = {}
 ) {
     val state by model.state.collectAsState()
@@ -77,6 +87,16 @@ fun TodayScreen(
     val workoutImportEnabled by model.workoutImportEnabled.collectAsState()
     val workoutImportRunning by model.workoutImportRunning.collectAsState()
     val pendingScaleReading by model.pendingScaleReading.collectAsState()
+    // The share screen, and the "ready to share" run or walk (as on Android).
+    val shareHost = LocalShareCardHost.current
+    var shareCard by remember { mutableStateOf<ShareCard?>(null) }
+    var shareOfferWorkout by remember { mutableStateOf<WorkoutView?>(null) }
+    var shareBest by remember { mutableStateOf<PersonalBest?>(null) }
+    val bests by model.personalBests.collectAsState()
+    var shareOffer by remember { mutableStateOf<WorkoutView?>(null) }
+    var shareOfferCheck by remember { mutableStateOf(0) }
+    val importedToday = (state as? DashboardUiState.Success)?.importedWorkouts
+    LaunchedEffect(importedToday, shareOfferCheck) { shareOffer = model.shareOffer(shareHost.prefs) }
     var showStepGoalSheet by remember { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("MEAL") }
     val parsing by model.parsing.collectAsState()
@@ -160,7 +180,7 @@ fun TodayScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    "No profile on this account yet. Set it up in the Android app for now; setup on iPhone comes with onboarding.",
+                    "Setting up your profile…",
                     style = MaterialTheme.typography.bodyLarge,
                     color = SuperfitTheme.colors.textPrimary
                 )
@@ -193,13 +213,40 @@ fun TodayScreen(
                         onCameraClick = photoCamera?.let { { showPhotoKinds = true } }
                     )
                 }
+                recapCard?.invoke()
+                // The ready-to-share card waits while the recap or a new best is offered, as on Android.
+                shareOffer?.takeIf { bests.toOffer == null && recapCard == null }?.let { workout ->
+                    LaunchedEffect(workout.merged.primary.id) { UsageEvents.shareOffer("shown", offerType(workout)) }
+                    ShareOfferCard(
+                        workout = workout,
+                        onShare = {
+                            shareOfferWorkout = workout
+                            shareCard = ShareCards.activity(workout)
+                        },
+                        onDismiss = {
+                            UsageEvents.shareOffer("dismissed", offerType(workout))
+                            shareHost.prefs.markOfferHandled(workout.merged.primary.id)
+                            shareOfferCheck++
+                        }
+                    )
+                }
+                bests.toOffer?.let { best ->
+                    NewBestCard(
+                        best = best,
+                        onShare = {
+                            shareBest = best
+                            shareCard = ShareCards.best(best, isNew = true, today = Now.today())
+                        },
+                        onDismiss = { model.acknowledgeBest(best) }
+                    )
+                }
                 if (side == "MEAL") {
                     CalorieRingsCard(state = s, stepGoal = stepGoal, onStepsClick = { showStepGoalSheet = true })
                     val day = Now.today()
                     stepGoal?.takeIf { it.raisedOn(day) && stepGoalNoteDismissedOn != day.toString() }?.let { goal ->
                         StepGoalRaisedNote(goal = goal, onDismiss = model::dismissStepGoalNote)
                     }
-                    StreakHeaderCard(streakState = s.streakState)
+                    StreakHeaderCard(streakState = s.streakState, onShare = { shareCard = dailyShareCard(s, coaching) })
                     NutrientLedgerCard(state = s)
                     WeightQuickRow(
                         currentWeightKg = s.weightMetrics.currentWeightKg,
@@ -228,7 +275,6 @@ fun TodayScreen(
                         mealSuggester = mealSuggester
                     )
                 } else {
-                    // Sharing a workout card joins with share cards.
                     if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
                     ActivityPerformanceCard(
                         state = s,
@@ -236,7 +282,8 @@ fun TodayScreen(
                         onDeleteWorkout = model::deleteWorkout,
                         onHideImportedWorkout = model::hideImportedWorkout,
                         workoutImportEnabled = workoutImportEnabled,
-                        workoutImportRunning = workoutImportRunning
+                        workoutImportRunning = workoutImportRunning,
+                        onShareWorkout = { shareCard = it }
                     )
                     SleepRecoveryCard(state = s)
                 }
@@ -249,8 +296,9 @@ fun TodayScreen(
                 state = photoState,
                 kind = log.kind,
                 onLog = { entry, isPackaged ->
+                    val method = if (log.kind == PhotoKind.MEAL) "photo" else log.kind.name.lowercase()
                     log.close()
-                    model.addPhotoMeal(entry, isPackaged)
+                    model.addPhotoMeal(entry, isPackaged, method)
                 },
                 onRetake = { kind ->
                     // Closes the check sheet first; the camera opens once it has gone.
@@ -261,6 +309,25 @@ fun TodayScreen(
             )
         }
         LogResultBanner(banner, modifier = Modifier.align(Alignment.TopCenter))
+    }
+
+    shareCard?.let { card ->
+        ShareCardSheet(
+            card = card,
+            onDismiss = {
+                shareCard = null
+                shareOfferWorkout = null
+                shareBest = null
+            },
+            onShared = {
+                shareBest?.let(model::acknowledgeBest)
+                shareOfferWorkout?.let {
+                    UsageEvents.shareOffer("shared", offerType(it))
+                    shareHost.prefs.markOfferHandled(it.merged.primary.id)
+                    shareOfferCheck++
+                }
+            }
+        )
     }
 
     if (showPhotoKinds) {
@@ -328,3 +395,5 @@ fun FoodActivitySwitch(side: String, onSelect: (String) -> Unit, unseenActivity:
         unseen = if (unseenActivity) setOf("WORKOUT") else emptySet()
     )
 }
+
+private fun offerType(workout: WorkoutView) = if (ShareOffer.isRun(workout)) "run" else "walk"

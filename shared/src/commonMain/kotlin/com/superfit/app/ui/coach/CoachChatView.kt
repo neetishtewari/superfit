@@ -144,6 +144,7 @@ fun CoachChatView(
     modifier: Modifier = Modifier,
     onShareRoast: ((String) -> Unit)? = null
 ) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var input by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(mic.problem) {
@@ -286,6 +287,16 @@ fun CoachChatView(
                     readOnly = mic.listening,
                     modifier = Modifier.weight(1f),
                     maxLines = 4,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSend = {
+                            if (input.isNotBlank() && !loading && !mic.listening) {
+                                onSend(input, "typed")
+                                input = ""
+                            }
+                            focusManager.clearFocus()
+                        }
+                    ),
                     trailingIcon = {
                         Row(
                             modifier = Modifier.padding(end = 6.dp),
@@ -306,6 +317,7 @@ fun CoachChatView(
                                     onClick = {
                                         onSend(input, "typed")
                                         input = ""
+                                        focusManager.clearFocus()
                                     }
                                 )
                             }

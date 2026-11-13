@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -59,7 +58,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.superfit.app.R
 import com.superfit.app.domain.CardStat
 import com.superfit.app.domain.Effort
 import com.superfit.app.domain.HeartLine
@@ -72,7 +70,11 @@ import com.superfit.app.theme.ElectricCyan
 import com.superfit.app.theme.HyperViolet
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SolarAmber
+import com.superfit.app.ui.report.ThisAppStore
+import com.superfit.shared.resources.Res
+import com.superfit.shared.resources.superfit_logo
 import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.painterResource
 
 /** A share card's own colours, whatever theme the app is in: dark by default, or light if the user picks it. */
 private data class CardPalette(
@@ -192,7 +194,7 @@ private val SAFE_TOP = 100.dp
 private fun CardHeader(dateLine: String, dateColor: Color = TextDate) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Image(
-            painter = painterResource(R.drawable.ic_superfit_launcher),
+            painter = painterResource(Res.drawable.superfit_logo),
             contentDescription = "Superfit logo",
             modifier = Modifier
                 .size(34.dp)
@@ -272,12 +274,12 @@ private fun CardFooter(showDivider: Boolean, roasted: Boolean = false) {
     }
 }
 
-/** "Get it on Google Play", with "Roasted by Superfit" above it on a roast. */
+/** "Get it on Google Play" (or the App Store on iPhone), with "Roasted by Superfit" above it on a roast. */
 @Composable
 private fun FooterNote(roasted: Boolean, main: Color, soft: Color) {
     Column(horizontalAlignment = Alignment.End) {
         if (roasted) Text("🔥 Roasted by Superfit", color = main, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text("Get it on Google Play", color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(ThisAppStore.label, color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -293,7 +295,7 @@ private fun BrandBadge(background: Color, border: Color) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_superfit_launcher),
+            painter = painterResource(Res.drawable.superfit_logo),
             contentDescription = "Superfit logo",
             modifier = Modifier
                 .size(32.dp)

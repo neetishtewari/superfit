@@ -1,7 +1,5 @@
 package com.superfit.app.ui.onboarding
 
-import android.view.View
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -49,12 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import androidx.health.connect.client.PermissionController
-import com.superfit.app.data.HealthConnectManager
-import com.superfit.app.data.userPrefs
+import com.superfit.app.data.CoachStyleStore
+import com.superfit.app.data.Prefs
+import com.superfit.app.domain.CoachStyle
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 
@@ -70,46 +66,38 @@ private const val STEP_COUNT = 6
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
-    healthConnectManager: HealthConnectManager,
-    viewModel: OnboardingViewModel,
+    model: OnboardingModel,
+    /** The account's settings, where the coach style is saved. */
+    prefs: Prefs,
+    /**
+     * Shows the phone's own health access sheet, then answers whether access was given; null where
+     * the phone has no health app.
+     */
+    onConnectHealth: ((onDone: (granted: Boolean) -> Unit) -> Unit)?,
     onOnboardingComplete: () -> Unit,
     onBack: (() -> Unit)? = null,
+    /** Reads the steps aloud; null hides the speaker button. */
+    voiceGuide: OnboardingVoiceGuide? = null,
     modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val uiState by model.uiState.collectAsState()
     val colors = SuperfitTheme.colors
+    val healthName = model.health?.appName?.takeIf { onConnectHealth != null }
 
     var currentStep by rememberSaveable { mutableIntStateOf(STEP_WELCOME) }
     // Supportive starts selected: Roast me is there for people who pick it themselves.
     var coachStyle by remember {
-        mutableStateOf(if (com.superfit.app.data.CoachStyleStore.hasChosen(userPrefs(context))) com.superfit.app.domain.CoachStyle.current else com.superfit.app.domain.CoachStyle.SUPPORTIVE)
+        mutableStateOf(if (CoachStyleStore.hasChosen(prefs)) CoachStyle.current else CoachStyle.SUPPORTIVE)
     }
     var aboutYouErrors by remember { mutableStateOf(AboutYouErrors()) }
     // Spoken guidance is opt-in: it starts off and the speaker button turns it on.
     var voiceGuideEnabled by remember { mutableStateOf(false) }
     var showBurnInfo by remember { mutableStateOf(false) }
 
-    // Text to Speech engine configuration
-    var tts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
-    DisposableEffect(context) {
-        var ttsInstance: android.speech.tts.TextToSpeech? = null
-        ttsInstance = android.speech.tts.TextToSpeech(context) { status ->
-            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-                runCatching { ttsInstance?.language = java.util.Locale.US }
-            }
-        }
-        tts = ttsInstance
-        onDispose {
-            ttsInstance.stop()
-            ttsInstance.shutdown()
-        }
-    }
-
-    val guidanceVoices = remember {
+    val guidanceVoices = remember(healthName) {
         mapOf(
             STEP_WELCOME to "Welcome to Superfit. Tell it what you ate, or snap your plate, and your AI coach does the counting. Tap Get started.",
-            STEP_HEALTH to "Connect Health Connect, and Superfit can add your steps and workouts, and fill in your height and weight. Or tap Not now.",
+            STEP_HEALTH to "Connect ${healthName ?: "your health app"}, and Superfit can add your steps and workouts, and fill in your height and weight. Or tap Not now.",
             STEP_ABOUT_YOU to "Now a few things about you, so we can work out how many calories your body burns at rest.",
             STEP_GOAL to "Pick your goal, and how active a normal week is. We'll set your daily calories and protein from this.",
             STEP_COACH to "Pick how your AI coach talks to you. Supportive, straight talk, or roast me. Same advice, different voice.",
@@ -118,36 +106,28 @@ fun OnboardingScreen(
     }
 
     LaunchedEffect(currentStep, voiceGuideEnabled) {
-        val currentTts = tts ?: return@LaunchedEffect
-        currentTts.stop()
+        val guide = voiceGuide ?: return@LaunchedEffect
+        guide.stop()
         if (!voiceGuideEnabled) return@LaunchedEffect
-        guidanceVoices[currentStep]?.let { speakUtterance(currentTts, it) }
+        guidanceVoices[currentStep]?.let(guide::speak)
     }
+    DisposableEffect(voiceGuide) { onDispose { voiceGuide?.stop() } }
 
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val original = view.importantForAutofill
-        view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-        onDispose {
-            view.importantForAutofill = original
-        }
-    }
-
-    // Health Connect permission prompt: on the Health step it moves on to "About you" with
-    // height and weight filled in; from the last step it just refreshes "Connected".
-    val requestPermissionsLauncher = rememberLauncherForActivityResult(
-        PermissionController.createRequestPermissionResultContract()
-    ) { granted ->
-        viewModel.checkPermissions()
-        if (granted.isNotEmpty()) {
-            viewModel.autofillFromHealthConnect()
-            if (currentStep == STEP_HEALTH) currentStep = STEP_ABOUT_YOU
+    // The health app's access sheet: on the Health step it moves on to "About you" with height and
+    // weight filled in; from the last step it just refreshes "Connected".
+    val connectHealth: () -> Unit = {
+        onConnectHealth?.invoke { granted ->
+            model.checkPermissions()
+            if (granted) {
+                model.autofillFromHealth()
+                if (currentStep == STEP_HEALTH) currentStep = STEP_ABOUT_YOU
+            }
         }
     }
 
     fun goBack() {
         aboutYouErrors = AboutYouErrors()
-        currentStep -= 1
+        currentStep = if (currentStep == STEP_ABOUT_YOU && healthName == null) STEP_WELCOME else currentStep - 1
     }
 
     Box(
@@ -184,17 +164,21 @@ fun OnboardingScreen(
                     modifier = Modifier.weight(1f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
-                IconButton(
-                    onClick = { voiceGuideEnabled = !voiceGuideEnabled },
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = if (voiceGuideEnabled) colors.brandSoft else androidx.compose.ui.graphics.Color.Transparent,
-                        contentColor = if (voiceGuideEnabled) colors.primaryAccent else colors.textSecondary
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (voiceGuideEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                        contentDescription = if (voiceGuideEnabled) "Stop reading aloud" else "Read aloud"
-                    )
+                if (voiceGuide != null) {
+                    IconButton(
+                        onClick = { voiceGuideEnabled = !voiceGuideEnabled },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (voiceGuideEnabled) colors.brandSoft else androidx.compose.ui.graphics.Color.Transparent,
+                            contentColor = if (voiceGuideEnabled) colors.primaryAccent else colors.textSecondary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (voiceGuideEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                            contentDescription = if (voiceGuideEnabled) "Stop reading aloud" else "Read aloud"
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(48.dp))
                 }
             }
 
@@ -240,16 +224,18 @@ fun OnboardingScreen(
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     when (step) {
-                        STEP_WELCOME -> WelcomeStep(onNext = { currentStep = STEP_HEALTH })
+                        // Without a health app the Health step is skipped both ways.
+                        STEP_WELCOME -> WelcomeStep(onNext = { currentStep = if (healthName != null) STEP_HEALTH else STEP_ABOUT_YOU })
                         STEP_HEALTH -> HealthConnectStep(
                             uiState = uiState,
-                            healthConnectManager = healthConnectManager,
-                            requestPermissionsLauncher = requestPermissionsLauncher,
+                            healthName = healthName ?: "your health app",
+                            onConnect = connectHealth,
                             onNext = { currentStep = STEP_ABOUT_YOU }
                         )
                         STEP_ABOUT_YOU -> AboutYouStep(
                             uiState = uiState,
-                            viewModel = viewModel,
+                            healthName = healthName ?: "your health app",
+                            model = model,
                             errors = aboutYouErrors,
                             onNext = {
                                 val errors = AboutYouErrors(
@@ -263,7 +249,7 @@ fun OnboardingScreen(
                         )
                         STEP_GOAL -> GoalStep(
                             uiState = uiState,
-                            viewModel = viewModel,
+                            model = model,
                             onOpenBurnInfo = { showBurnInfo = true },
                             onNext = { currentStep = STEP_COACH }
                         )
@@ -271,20 +257,15 @@ fun OnboardingScreen(
                             selected = coachStyle,
                             onSelect = { coachStyle = it },
                             onNext = {
-                                com.superfit.app.data.CoachStyleStore.save(userPrefs(context), coachStyle)
+                                CoachStyleStore.save(prefs, coachStyle)
                                 currentStep = STEP_ALL_SET
                             }
                         )
                         STEP_ALL_SET -> OnboardingSummaryStep(
                             uiState = uiState,
-                            onConnectHealth = {
-                                com.superfit.app.ui.launchHealthConnectPermissions(
-                                    context,
-                                    requestPermissionsLauncher,
-                                    healthConnectManager.permissions + healthConnectManager.bodyPermissions
-                                )
-                            },
-                            onStartClick = { viewModel.saveProfile(onOnboardingComplete) }
+                            healthName = healthName,
+                            onConnectHealth = connectHealth,
+                            onStartClick = { model.saveProfile(onOnboardingComplete) }
                         )
                     }
                 }

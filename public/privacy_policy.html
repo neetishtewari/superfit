@@ -66,7 +66,7 @@
     <div class="container">
         <h1>Privacy Policy</h1>
         <p><strong>Last Updated: November 12, 2026</strong></p>
-        <p>Superfit is built to empower users with personalized physiological feedback. We are committed to protecting your privacy. This policy describes how Superfit handles data, specifically relating to local execution, Google Health Connect integration, and Gemini AI queries.</p>
+        <p>Superfit is built to empower users with personalized physiological feedback. We are committed to protecting your privacy. This policy describes how Superfit handles data, specifically relating to local execution, Google Health Connect (Android) and Apple Health (iPhone) integration, and Gemini AI queries.</p>
 
         <h2>1. Data Collection & Usage</h2>
         <p>Superfit reads physical characteristics and fitness metrics to build a local physiological ledger. This data is used solely to compute your daily target macronutrients and track calorie trends.</p>
@@ -82,13 +82,23 @@
         <p class="highlight">Your data is stored on your device and backed up to your own Superfit account.</p>
         <p>Superfit runs its calculations on your device using an on-device database. When you sign in, your profile (the "About you" details and your goal), your logs (meals, workouts, weigh-ins), daily summaries (steps, sleep), your chats with the coach and the coach's notes about you are backed up to your own Superfit account in Google Firebase, so you can restore them on a new phone. This backup is only for you: it is never sold, shared with advertisers, or used for ads. Apart from the backup and the AI and barcode lookups described below, your data is not sent to any other server or third party.</p>
 
-        <h2>3. Google Health Connect Policy Compliance</h2>
+        <h2>3. Google Health Connect Policy Compliance (Android)</h2>
         <p>Superfit strictly complies with the <span class="highlight">Google Play Health Connect Developer Policies</span>, including the Additional Requirements:</p>
         <ul>
             <li>We request permission only for statistics necessary to calculate metabolic targets: steps, sleep sessions, weight, height, active calories, and (optionally) body fat, lean mass, bone mass and basal metabolic rate.</li>
             <li>Under no circumstances is Health Connect data sold, rented, or transferred to advertising networks, data brokers, or information resellers.</li>
             <li>Users can revoke permission access at any time directly through the Android system settings.</li>
         </ul>
+
+        <h2>3a. Apple Health (iPhone)</h2>
+        <p>On iPhone, Superfit reads from <span class="highlight">Apple Health</span> only what you allow in Apple's Health access sheet, and never writes to it:</p>
+        <ul>
+            <li>Steps, active calories, walking and running distances, sleep, workouts and heart rate during those workouts, height, weight, and (optionally) body fat and lean mass from your scale.</li>
+            <li>This data is used only to show your day, set your step goal and calorie targets, make share cards you choose to share, and guide your coach. It is backed up only to your own Superfit account, as described above, and is never stored in iCloud by Superfit.</li>
+            <li>Apple Health data is never sold, rented, used for advertising or marketing, or shared with advertising networks, data brokers or information resellers. The only service that sees any of it is Google's Gemini AI, when the app asks the coach about your day (see section 4); it is used only to write that answer.</li>
+            <li>You can change or remove Superfit's access at any time in the Health app or in iPhone Settings › Privacy &amp; Security › Health.</li>
+        </ul>
+        <p>On iPhone you can sign in with Apple, Google or email. With Sign in with Apple you may choose to hide your email; deleting your account also removes Superfit's link to your Apple ID. Spoken logs and questions are turned into text by Apple's speech recognition; no audio is recorded or kept by Superfit.</p>
 
         <h2>4. Generative AI & API Queries</h2>
         <p>To turn spoken or typed meal and workout logs into calories and nutrients, Superfit sends what you said or typed to Google's Gemini AI, through Google Firebase AI Logic.</p>
@@ -106,6 +116,9 @@
 
         <h2>8. Changes to this Policy</h2>
         <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
+
+        <h2>9. Contact</h2>
+        <p>Questions about your privacy or your data? Email <a href="mailto:ntlabssupport@gmail.com">ntlabssupport@gmail.com</a>. More help is on our <a href="support.html">support page</a>.</p>
 
         <div class="footer">
             <p>Superfit Applications - Built for Premium Privacy and Local Processing.</p>

@@ -7,8 +7,9 @@ options:
     iOS: "17.0"
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    # The App Store version people see, and the build number (raised for every upload).
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "4"
     # Neetish's Apple Developer team goes here (Xcode > Signing & Capabilities), not in the repo.
     DEVELOPMENT_TEAM: ""
 # Google's own Firebase iPhone SDK (Swift Package Manager). Products are added as each part
@@ -26,6 +27,8 @@ targets:
     type: application
     platform: iOS
     sources:
+      # Includes PrivacyInfo.xcprivacy, Apple's privacy manifest: what the app collects and why it
+      # uses settings storage, file dates and the phone's uptime. The App Store needs it.
       - Superfit
       # Names shared with the widget (app group, link key).
       - SuperfitWidget/WidgetKeys.swift
@@ -45,6 +48,11 @@ targets:
         product: FirebaseAuth
       - package: Firebase
         product: FirebaseAI
+      # Anonymous usage counts and crash reports (Settings › Privacy switch, off in Debug builds).
+      - package: Firebase
+        product: FirebaseAnalytics
+      - package: Firebase
+        product: FirebaseCrashlytics
       - package: GoogleSignIn
         product: GoogleSignIn
     entitlements:
@@ -65,14 +73,27 @@ targets:
       path: Superfit/Info.plist
       properties:
         CFBundleDisplayName: Superfit
+        # Taken from the settings above (XcodeGen would otherwise write a fixed 1.0 and 1).
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         # Manrope for drawing the report PDF (copied in from the shared fonts above).
         UIAppFonts: [manrope_regular.ttf, manrope_medium.ttf, manrope_bold.ttf, manrope_extrabold.ttf]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Usage counts and crash reports start off; UsageReportsBridge turns them on only when the
+        # person's Settings › Privacy switch is on, and never in Debug builds. No advertising ID,
+        # no ad personalisation.
+        FIREBASE_ANALYTICS_COLLECTION_ENABLED: false
+        FirebaseCrashlyticsCollectionEnabled: false
+        GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED: false
+        GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS: false
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true
         # Shown in Apple's Health access sheet. Superfit only reads; it never writes to Apple Health.
-        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, distances, sleep, workouts and heart rate during workouts and weigh-ins with body measurements from your scale, to show your day, set your step goal and targets, and guide your coach. It never changes anything in Apple Health."
+        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, distances, sleep, workouts and heart rate during workouts, your height, and weigh-ins with body measurements from your scale, to show your day, set your step goal and targets, and guide your coach. It never changes anything in Apple Health."
+        NSHealthUpdateUsageDescription: "Superfit only reads from Apple Health. It never adds or changes anything there."
+        # Only standard encryption (HTTPS and Apple's own), which is exempt: skips the export question on each upload.
+        ITSAppUsesNonExemptEncryption: false
         # Shown when a mic button is first tapped. The sound goes to Apple's speech recognition and
         # only the words come back; nothing is recorded or kept.
         NSMicrophoneUsageDescription: "Superfit listens when you tap a mic button, so you can say what you ate or the workout you did. Nothing is recorded or kept."
@@ -80,6 +101,9 @@ targets:
         # Shown the first time the camera opens (meal photo, barcode or label). Photos go to the AI
         # once and are never saved.
         NSCameraUsageDescription: "Superfit uses the camera when you snap your meal, scan a barcode or snap a nutrition label, to work out what you ate. Photos aren't saved."
+        # Shown only if the person picks "Save Image" on a share card's share sheet. Superfit only
+        # adds that one picture; it never reads the photo library (the card's photo picker needs no access).
+        NSPhotoLibraryAddUsageDescription: "Superfit saves the share card you made to your photos when you choose Save Image. It never reads your photo library."
         # Google's sign-in sheet returns to the app through this link (REVERSED_CLIENT_ID in
         # GoogleService-Info.plist). It identifies the app, it is not a secret.
         CFBundleURLTypes:
@@ -107,6 +131,21 @@ targets:
         script: |
           cd "$SRCROOT/.."
           ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+    postBuildScripts:
+      # Sends the Release build's symbol file to Crashlytics so crash reports show code lines.
+      # Debug builds don't report, so they skip it.
+      - name: Upload symbols for crash reports
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}
+          - ${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
+        script: |
+          if [ "$CONFIGURATION" = "Release" ]; then
+            "${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run"
+          fi
   # Home-screen and lock-screen widget: today's calories left, with mic and camera buttons.
   SuperfitWidget:
     type: app-extension
@@ -121,6 +160,9 @@ targets:
       path: SuperfitWidget/Info.plist
       properties:
         CFBundleDisplayName: Superfit
+        # Must match the app's versions.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

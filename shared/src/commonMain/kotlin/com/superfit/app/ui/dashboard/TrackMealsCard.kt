@@ -100,10 +100,12 @@ fun TrackMealsCard(
             color = ThemeTextPrimary
         )
 
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
         val submitMeal = {
             if (foodInputText.isNotBlank()) {
                 onLogMeal(foodInputText)
                 onFoodInputChange("")
+                focusManager.clearFocus()
             }
         }
         SuperfitField(

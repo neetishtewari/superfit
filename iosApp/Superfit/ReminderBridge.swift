@@ -12,6 +12,8 @@ final class ReminderBridge: NSObject, IosReminders, UNUserNotificationCenterDele
     private static let prefix = "reminder-"
     private static let category = "SUPERFIT_REMINDER"
     private static let sayMeal = "SAY_MEAL"
+    private static let recapPrefix = "recap-"
+    private static let recapCategory = "SUPERFIT_RECAP"
     private let center = UNUserNotificationCenter.current()
 
     override private init() {
@@ -50,6 +52,29 @@ final class ReminderBridge: NSObject, IosReminders, UNUserNotificationCenterDele
         removeScheduled {}
     }
 
+    /// The monthly recap's "review is ready" note: replaces the last one, and is only set when
+    /// notifications are already allowed (it never asks).
+    func scheduleRecap(note: ReminderNote?) {
+        center.getPendingNotificationRequests { [center] pending in
+            let old = pending.map(\.identifier).filter { $0.hasPrefix(Self.recapPrefix) }
+            center.removePendingNotificationRequests(withIdentifiers: old)
+            guard let note else { return }
+            center.getNotificationSettings { settings in
+                guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+                let content = UNMutableNotificationContent()
+                content.title = note.title
+                content.body = note.body
+                content.sound = .default
+                content.categoryIdentifier = Self.recapCategory
+                content.userInfo = ["month": String(note.id.dropFirst(Self.recapPrefix.count))]
+                let date = Date(timeIntervalSince1970: TimeInterval(note.atEpochSeconds))
+                let when = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+                let trigger = UNCalendarNotificationTrigger(dateMatching: when, repeats: false)
+                center.add(UNNotificationRequest(identifier: note.id, content: content, trigger: trigger))
+            }
+        }
+    }
+
     /// Takes away every Superfit reminder still waiting, then carries on.
     private func removeScheduled(then next: @escaping () -> Void) {
         center.getPendingNotificationRequests { [center] pending in
@@ -76,6 +101,9 @@ final class ReminderBridge: NSObject, IosReminders, UNUserNotificationCenterDele
         if response.notification.request.content.categoryIdentifier == Self.category,
            response.actionIdentifier == UNNotificationDefaultActionIdentifier || response.actionIdentifier == Self.sayMeal {
             DispatchQueue.main.async { IosLaunch.shared.voice() }
+        } else if response.notification.request.content.categoryIdentifier == Self.recapCategory,
+                  let month = response.notification.request.content.userInfo["month"] as? String {
+            DispatchQueue.main.async { IosLaunch.shared.recap(month: month) }
         }
         completionHandler()
     }

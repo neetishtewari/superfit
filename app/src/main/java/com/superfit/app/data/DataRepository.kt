@@ -27,7 +27,7 @@ class DataRepository(
     val firebaseSyncManager get() = FirebaseSyncManager(context)
 
     // The log itself (database plus cloud backup) is shared with the iPhone app.
-    private val log: LogRepository
+    val log: LogRepository
         get() = LogRepository(
             database = { database },
             backup = firebaseSyncManager.backup,

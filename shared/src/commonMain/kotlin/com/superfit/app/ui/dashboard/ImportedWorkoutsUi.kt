@@ -60,7 +60,7 @@ fun WorkoutConnectCard(onConnect: () -> Unit, onNotNow: () -> Unit, modifier: Mo
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                text = "Bring in your workouts from Samsung Health, Strava and other apps.",
+                text = "Bring in your workouts from ${com.superfit.app.domain.HealthApp.workoutApps}.",
                 fontWeight = FontWeight.Bold,
                 color = SuperfitTheme.colors.textPrimary,
                 fontSize = 14.sp

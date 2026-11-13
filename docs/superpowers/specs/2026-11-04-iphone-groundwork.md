@@ -363,6 +363,74 @@ tested on the dev app first.
          coach (chat and daily tip) as on Android (WorkoutSync.coachEntry). Settings › AI coach
          adds "What my AI coach knows" (shared CoachMemoryCard: notes, add, remove, Clear chat
          history). Sharing a roast as a card comes with share cards.
+       - 14: Share cards. The share screen (card design, colours, Light/Dark, your own photo
+         with pinch and drag, chips, the coach line or roast, "Roast again") moved to shared
+         ShareCardSheet/ShareCardViews, with the saved choices (ShareCardPrefs), the AI lines
+         (RoastCardData, WorkoutCardData) and the strength tags (StrengthTags) beside it. Each
+         phone gives a ShareCardHost: Android's gallery picker, share sheet and toasts as before;
+         the iPhone's ShareBridge.swift uses Apple's photo picker (no photo-library access needed)
+         and Apple's share sheet. Share buttons on iPhone: the streak card (today's card), every
+         workout on Activity and in History, the "ready to share" run or walk card on Today, and
+         any roast in the coach chat. Workout cards read heart rate from Apple Health during the
+         workout (the watch or app that recorded it first), as Android does from Health Connect.
+         The "new personal best" card and Settings › Sharing come with the rest of Settings.
+       - 15: Onboarding (moved ahead of the monthly recap, Neetish 12 Nov). A new account on the
+         iPhone sets up its profile on the phone with the same six steps as Android (welcome,
+         health app, about you, goal, pick your coach, your plan), now shared OnboardingScreen and
+         OnboardingModel. Each phone names its own health app (Health Connect, Apple Health) and
+         shows its own access sheet; "About you" fills height and weight from it (the iPhone now
+         also reads height). Android keeps "Read aloud" (its text to speech); the iPhone hides
+         the speaker for now. Back on the first step signs out on iPhone, for a wrong account.
+       - 16: Rest of Settings. Settings › Account shows the name and how the account signs in
+         (Google, Apple or email). Apple Health gets the workouts-from-other-apps choices (shared
+         WorkoutImportCard: on/off, main workout app, add workout calories Off/Half/All, show
+         hidden workouts), backed up like Android's. Settings › Sharing (shared
+         SharingSettingsCard). A home-screen widget card says how to add it on iPhone. Delete
+         account (the App Store requires it): the cloud backup first, then the account, then
+         everything this account kept on the phone (its database, chat and settings), as on
+         Android; a Sign in with Apple account confirms with Apple once more so Apple's link to
+         Superfit is revoked too. Today now offers a "New personal best" card and Progress lists
+         every personal best with Share, from shared TodayModel.personalBests. The usage and crash
+         reports switch comes with analytics.
+       - 17: Usage and crash reports. The events move into shared UsageEvents (Android's
+         AppAnalytics now only switches Firebase on/off and sends them), so both phones count the
+         same things: meals logged by voice/typed/photo/barcode/label, edits, weigh-ins, goals,
+         coach messages and notes, share cards and offers, report shared, step goal, coach style
+         and which tab or screen was opened. The iPhone sends them with Firebase Analytics and
+         Crashlytics (UsageReportsBridge.swift); a crash in the shared Kotlin code is noted with
+         its Kotlin stack before the app closes. Settings › Privacy has the same "Share anonymous
+         usage and crash reports" switch on both phones (shared UsageReportsCard). Release builds
+         upload their symbol file to Crashlytics. Not on iPhone: "widget added" (iOS doesn't say
+         when a widget is added) and the speech-service key (Apple has one).
+         Store readiness: the iPhone's share cards, share text and report footer name the App
+         Store instead of Google Play (shared ThisAppStore, linking to apps.apple.com/app/id6834018727,
+         the app's App Store Connect id); Apple's
+         privacy manifests (PrivacyInfo.xcprivacy for the app and the widget); version 1.0.0.
+       - 18: Monthly recap. The month's data (RecapData, same settings keys as Android's
+         MonthlyRecapData), the story cards and the story screen (RecapStoryScreen) are shared;
+         each phone plugs in its music, video maker and setup fixes through RecapHost. iPhone:
+         the same 12 original tracks as m4a (made from Android's ogg files with ffmpeg, 80 kbps
+         AAC), played with the "ambient" audio setting so the silent switch keeps them quiet and
+         someone's own music isn't stopped; the video is the same 720x1280 24 fps story (count-up,
+         swipe, looped music faded in and out) made with Apple's encoder (RecapBridge.swift).
+         Entry points as Android: Today's card from the 1st until just after opening (latest the
+         10th), Progress › Insights top for the first week, "Past months" below. "Get more from
+         Superfit" checks Apple Health, mic + speech recognition and the widget. The "Your
+         October review is ready" reminder is set ahead (RecapData.reminder): 10 am on the 1st
+         once the month has enough logged, or 10 am on days 1-3 for last month while unopened;
+         only when notifications are already allowed (never asks), kept apart from the evening
+         reminder; tapping it opens the recap. Not yet: the dev-app preview button.
+     - 19 (TestFlight feedback): iPhone Progress now swipes between Insights, Journey and History and has
+       the "Next: your Journey" / "Next: History" links, as on Android (shared ProgressTabs pager).
+     - 20 (TestFlight feedback): meal/label snap uses Superfit's own camera screen (SnapCamera.swift), so no
+       "Use Photo" step, as on Android. Photo stays in memory, never saved to Photos.
+     - 21 (TestFlight feedback): recap autoplay can no longer turn a page early or while someone is swiping
+       (a card must really stay up for its time). Fixes the recap sticking on the last story cards.
+     - 22 (TestFlight): the app and widget now take their version and build number from project.yml
+       (MARKETING_VERSION 1.0, CURRENT_PROJECT_VERSION raised for every upload; now 3).
+     - 23 (TestFlight feedback): the keyboard closes when you tap a blank part of the screen or scroll, and
+       after sending a chat message or logging a meal (iPhone has no back button for it). The bottom menu
+       is left out while the keyboard is up so it no longer leaves a gap above the keyboard.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -698,3 +766,68 @@ to 4,000 characters (notes to 3,000). Clear chat history deletes the file and th
 notes stay until removed. The mic is the same as Today's (Apple's indicator shows, nothing
 recorded). No new permissions on either phone; Android's chat works as before, its screen now
 drawn by the shared view.
+
+Step 14 (reviewed 12 Nov): a share card is drawn on the phone and only leaves where the person
+sends it. The picture is written to the app's own temporary folder (Android: its cache, shared
+through its own FileProvider; iPhone: a "share-cards" temporary folder with complete file
+protection), replaced each time. A background photo is picked with the phone's own picker, which
+hands over only that one photo; it is held in memory while the share screen is open and never
+saved or uploaded. Heart rate is read from the health app only when a workout card opens, for that
+workout's time, and never stored (on iPhone it uses the heart-rate read access already asked for).
+The coach line and roast go to Gemini through Firebase AI Logic with App Check, with only the
+card's own facts, as before. The iPhone adds one Info.plist line: "Save Image" on the share sheet
+may ask to add that picture to Photos (NSPhotoLibraryAddUsageDescription); the app never reads the
+photo library. No new Android permissions.
+
+Step 15 (reviewed 12 Nov): sign-up saves the profile on the phone and in the person's own
+users/{uid} backup, as on Android. Height and weight are read once from the health app, only after
+the person allows it, and only fill the boxes. The iPhone asks Apple Health for one more read-only
+type (height), named in the access sheet's description. No new Android permissions.
+
+Step 16 (reviewed 12 Nov): Delete account removes the person's users/{uid} data in the cloud before
+the account (it can't be reached afterwards; offline, nothing is deleted and they stay signed in),
+then the Firebase account, then the phone's copy (database file, chat file, account settings). For
+Sign in with Apple, Apple's sheet confirms the person and the app revokes its Apple token with the
+one-time code (Apple's rule for account deletion); the code is used once and never stored. Workout
+choices go to the same users/{uid} backup document as Android's. No new permissions on either phone.
+
+Step 17 (reviewed 12 Nov): usage counts carry only how something was done or which screen opened,
+never food, numbers, health data, photos, names or email (UsageEvents is the one list for both
+phones). Both phones keep the person's switch (on unless turned off) and never report from the dev
+app (Android: .debug package; iPhone: Debug builds). On iPhone, Analytics and Crashlytics start
+switched off in Info.plist and are only turned on once the switch has been checked, so nothing is
+sent before that; no advertising ID is collected (no AdSupport, no tracking prompt,
+GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED off) and ad personalisation signals are off. Crash
+reports and handled errors include the error message and stack, as on Android. The symbol upload
+uses the Firebase config already in the app, no new key. No new permissions on either phone. App
+Store privacy labels (before the first App Store submission, Neetish): Usage data (product
+interaction) and Diagnostics (crash data), plus Device ID (Firebase's install ID), not linked to
+identity, not used for tracking; this matches Android's Data safety entry.
+The privacy manifest declares the same data as the App Store labels (name, email, user ID, health,
+fitness and the person's own logs for the app to work, linked to the account; usage, crash data
+and the Firebase install ID for analytics, not linked; nothing for tracking) and why the app uses
+settings storage (its own and the widget's shared group), file dates and the phone's uptime.
+Step 18 (recap): no new permissions or data. The recap reads only the person's own logs on the
+phone; its words come from the same one AI call per month as Android (no new data sent). The
+video is made on the phone, written to the app's own temporary folder with complete file
+protection (the frames-only file is deleted once the music is added, and the folder is cleared
+each time) and leaves only through the share sheet. The music is bundled, original, nothing
+downloaded. The setup card only reads whether mic and speech are allowed and whether a widget is
+placed; asking for the mic uses Apple's own prompts (or opens Settings once refused).
+TestFlight upload fix: Apple requires a NSHealthUpdateUsageDescription purpose string whenever the app has the HealthKit entitlement, even if it only reads. Added: "Superfit only reads from Apple Health. It never adds or changes anything there." (Superfit still never writes to Apple Health; no new permission.)
+Also: ITSAppUsesNonExemptEncryption is false (only standard encryption), which skips the export
+question on each upload. Firebase 12 has no "without advertising-ID support" product any more
+(tried; the package product doesn't exist), so FirebaseAnalytics stays. Superfit never reads the
+advertising ID: collection is switched off in Info.plist and the app has no tracking prompt. If
+App Store Connect asks about the advertising identifier at submission, decide the answer then.
+
+Step 19 (Progress swipe + Next links): layout only, no data, permissions or network. Security: nothing new.
+Step 20 (own camera screen): uses the camera permission already asked for; the picture is shrunk and handed to the AI as before, never written to Photos or disk. Security: nothing new.
+Step 23 (keyboard closes): layout behaviour only; no data, permissions or network. Security: nothing new.
+
+- Step 24: coach chat keyboard return key is "Send" (sends, then closes the keyboard). UI input option only; nothing new stored or sent. Security: no change.
+
+- Step 25: back/close audit. Settings, recap, onboarding already have visible back; Share card sheet gets a visible Close (X); other sheets have Cancel/Retake or swipe-down; Settings and recap also go back with the left-edge swipe (BackHandler). Layout/navigation only; nothing new stored or sent. Security: no change.
+
+- Step 26: recap story cards named "Get it on Google Play" on iPhone too; now use this phone's store (App Store on iPhone). Apple rejects apps that mention other platforms. Text only. Security: no change.
+- Step 26b: workout-import card names this phone's apps (Apple Watch/Strava on iPhone, not Samsung Health). Build number 4.

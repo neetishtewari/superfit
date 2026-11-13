@@ -19,7 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.superfit.app.data.AppAnalytics
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.theme.ThemeBgStart
 import com.superfit.app.ui.MainMenuBar
 import com.superfit.app.ui.MainTab
@@ -58,9 +58,9 @@ fun MainTabs(
     }
     LaunchedEffect(tab) {
         when (tab) {
-            MainTab.TODAY -> AppAnalytics.screenOpened("home")
-            MainTab.PROGRESS -> AppAnalytics.screenOpened("progress", how)
-            MainTab.COACH -> AppAnalytics.screenOpened("coach", how)
+            MainTab.TODAY -> UsageEvents.screenOpened("home")
+            MainTab.PROGRESS -> UsageEvents.screenOpened("progress", how)
+            MainTab.COACH -> UsageEvents.screenOpened("coach", how)
         }
     }
     BackHandler(enabled = tab != MainTab.TODAY) { select(MainTab.TODAY, "back") }
