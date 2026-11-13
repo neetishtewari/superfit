@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.OpenFoodFactsClient
+import com.superfit.app.domain.BarcodeResult
 import com.superfit.app.domain.FoodPhotoParser
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.PackagedFood
@@ -56,6 +57,9 @@ class FoodCameraController : ViewModel() {
     private var emptyFrames = 0
     private var job: Job? = null
 
+    // The name the database gave a packet it has no nutrition for, used if its label has none.
+    private var knownName: String? = null
+
     fun reset() {
         retake()
         mode = CameraMode.MEAL
@@ -80,7 +84,8 @@ class FoodCameraController : ViewModel() {
             state = try {
                 val parser = FoodPhotoParser()
                 if (photoMode == CameraMode.LABEL) {
-                    parser.parseLabel(com.superfit.app.domain.AiPhoto(bitmap))?.let { CameraState.PackResult(it) }
+                    parser.parseLabel(com.superfit.app.domain.AiPhoto(bitmap))
+                        ?.let { CameraState.PackResult(if (it.name == null) it.copy(name = knownName) else it) }
                         ?: CameraState.Failed("We couldn't read this label. Try a straight, close-up photo.")
                 } else {
                     val result = parser.parseMeal(com.superfit.app.domain.AiPhoto(bitmap))
@@ -106,25 +111,27 @@ class FoodCameraController : ViewModel() {
     }
 
     /** Returns true when this barcode is the one being looked up, so the screen can vibrate once. */
-    fun onBarcode(code: String, now: Long = System.currentTimeMillis()): Boolean {
+    fun onBarcode(code: String, now: Long = System.currentTimeMillis(), typed: Boolean = false): Boolean {
         if (scanLocked || mode != CameraMode.BARCODE || state != CameraState.Viewfinder) return false
         emptyFrames = 0
-        if (code == ignoredCode && now < ignoreUntil) return false
+        if (!typed && code == ignoredCode && now < ignoreUntil) return false
         scanLocked = true
         lastCode = code
-        android.util.Log.i("FoodCamera", "Scanned barcode $code")
+        knownName = null
+        android.util.Log.i("FoodCamera", (if (typed) "Typed" else "Scanned") + " barcode $code")
         banner = null
         state = CameraState.Working("Looking up product…")
         job = viewModelScope.launch {
             try {
-                val food = OpenFoodFactsClient.lookup(code)
-                if (food != null) {
-                    state = CameraState.PackResult(food)
-                } else {
-                    mode = CameraMode.LABEL
-                    banner = "We couldn't find this product. Snap its nutrition label instead."
-                    scanLocked = false
-                    state = CameraState.Viewfinder
+                when (val result = OpenFoodFactsClient.find(code)) {
+                    is BarcodeResult.Found -> state = CameraState.PackResult(result.food)
+                    else -> {
+                        knownName = (result as? BarcodeResult.NoNutrition)?.name
+                        if (result != BarcodeResult.NotAProductCode) mode = CameraMode.LABEL
+                        banner = result.message
+                        scanLocked = false
+                        state = CameraState.Viewfinder
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
