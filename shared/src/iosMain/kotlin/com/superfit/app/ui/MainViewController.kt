@@ -427,12 +427,15 @@ private fun IosRoot(
                 }
             }
             val state by recapModel.state.collectAsState()
+            // Swipe from the left edge to go back, like other iPhone apps.
+            androidx.compose.ui.backhandler.BackHandler { recapMonth = null }
             CompositionLocalProvider(LocalShareCardHost provides shareHost) {
                 RecapStoryScreen(month, state, host, inBackground, onBack = { recapMonth = null }, onReload = recapModel::reload)
             }
             return
         }
         if (showSettings) {
+            androidx.compose.ui.backhandler.BackHandler { showSettings = false }
             Box(Modifier.fillMaxSize()) {
                 CompositionLocalProvider(LocalShareCardHost provides shareHost) {
                     SettingsPage(

@@ -826,3 +826,5 @@ Step 20 (own camera screen): uses the camera permission already asked for; the p
 Step 23 (keyboard closes): layout behaviour only; no data, permissions or network. Security: nothing new.
 
 - Step 24: coach chat keyboard return key is "Send" (sends, then closes the keyboard). UI input option only; nothing new stored or sent. Security: no change.
+
+- Step 25: back/close audit. Settings, recap, onboarding already have visible back; Share card sheet gets a visible Close (X); other sheets have Cancel/Retake or swipe-down; Settings and recap also go back with the left-edge swipe (BackHandler). Layout/navigation only; nothing new stored or sent. Security: no change.
