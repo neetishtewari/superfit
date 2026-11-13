@@ -111,14 +111,14 @@ class FoodCameraController : ViewModel() {
     }
 
     /** Returns true when this barcode is the one being looked up, so the screen can vibrate once. */
-    fun onBarcode(code: String, now: Long = System.currentTimeMillis()): Boolean {
+    fun onBarcode(code: String, now: Long = System.currentTimeMillis(), typed: Boolean = false): Boolean {
         if (scanLocked || mode != CameraMode.BARCODE || state != CameraState.Viewfinder) return false
         emptyFrames = 0
-        if (code == ignoredCode && now < ignoreUntil) return false
+        if (!typed && code == ignoredCode && now < ignoreUntil) return false
         scanLocked = true
         lastCode = code
         knownName = null
-        android.util.Log.i("FoodCamera", "Scanned barcode $code")
+        android.util.Log.i("FoodCamera", (if (typed) "Typed" else "Scanned") + " barcode $code")
         banner = null
         state = CameraState.Working("Looking up product…")
         job = viewModelScope.launch {

@@ -35,6 +35,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOff
@@ -53,6 +55,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -167,6 +171,17 @@ fun FoodCameraScreen(
         val state = controller.state
         // If nothing has been read after a while, give a tip and a way out to the label.
         var showScanHelp by remember { mutableStateOf(false) }
+        // Some barcodes (crinkled shop stickers, tiny prints) won't scan; the number under them can be typed.
+        var typingCode by remember { mutableStateOf(false) }
+        if (typingCode) {
+            TypeBarcodeDialog(
+                onDismiss = { typingCode = false },
+                onDone = { code ->
+                    typingCode = false
+                    controller.onBarcode(code, typed = true)
+                }
+            )
+        }
         LaunchedEffect(controller.mode, state) {
             showScanHelp = false
             if (controller.mode == CameraMode.BARCODE && state == CameraState.Viewfinder) {
@@ -221,11 +236,23 @@ fun FoodCameraScreen(
                     // Keeps the mode switcher in the same place in every mode.
                     Box(modifier = Modifier.height(76.dp), contentAlignment = Alignment.Center) {
                         if (showScanHelp) {
-                            Button(
-                                onClick = { controller.changeMode(CameraMode.LABEL) },
-                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
-                            ) {
-                                Text("Can't scan? Snap the label", fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = { typingCode = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                                ) {
+                                    Text("Type the number", fontWeight = FontWeight.Bold)
+                                }
+                                Button(
+                                    onClick = { controller.changeMode(CameraMode.LABEL) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
+                                ) {
+                                    Text("Snap the label", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            TextButton(onClick = { typingCode = true }) {
+                                Text("Type the number instead", color = Color.White, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -409,6 +436,36 @@ private fun focusOnCentre(previewView: PreviewView, camera: Camera) {
 
 private const val MAX_AUTO_ZOOM = 3f
 private const val SCAN_HELP_AFTER_MS = 8_000L
+
+/** Asks for the digits printed under a barcode. */
+@Composable
+private fun TypeBarcodeDialog(onDismiss: () -> Unit, onDone: (String) -> Unit) {
+    var code by remember { mutableStateOf("") }
+    val valid = code.length in 8..14
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Type the barcode number") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("The digits printed under the barcode, usually 13.")
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { typed -> code = typed.filter(Char::isDigit).take(14) },
+                    singleLine = true,
+                    placeholder = { Text("8906133025793") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { if (valid) onDone(code) })
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onDone(code) }, enabled = valid) { Text("Look up") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
 
 /** Hands each frame's barcode number, or null for none, to [onCode]. ML Kit calls back on the main thread. */
 private class BarcodeAnalyzer(
