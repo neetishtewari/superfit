@@ -804,8 +804,8 @@ each time) and leaves only through the share sheet. The music is bundled, origin
 downloaded. The setup card only reads whether mic and speech are allowed and whether a widget is
 placed; asking for the mic uses Apple's own prompts (or opens Settings once refused).
 TestFlight upload fix: Apple requires a NSHealthUpdateUsageDescription purpose string whenever the app has the HealthKit entitlement, even if it only reads. Added: "Superfit only reads from Apple Health. It never adds or changes anything there." (Superfit still never writes to Apple Health; no new permission.)
-Also: Firebase Analytics now comes from the product without advertising-ID support
-(FirebaseAnalyticsWithoutAdIdSupport), so the app contains no code that asks for the advertising ID,
-matching the App Privacy answers (no advertising data, no tracking). ITSAppUsesNonExemptEncryption
-is false (only standard encryption), which skips the export question on each upload.
-
+Also: ITSAppUsesNonExemptEncryption is false (only standard encryption), which skips the export
+question on each upload. Firebase 12 has no "without advertising-ID support" product any more
+(tried; the package product doesn't exist), so FirebaseAnalytics stays. Superfit never reads the
+advertising ID: collection is switched off in Info.plist and the app has no tracking prompt. If
+App Store Connect asks about the advertising identifier at submission, decide the answer then.
