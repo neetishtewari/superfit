@@ -38,7 +38,13 @@ data class AiTurn(val fromUser: Boolean, val text: String)
 object CoachChat {
 
     /** The chat keeps this many messages; older ones live on only as the coach's notes. */
-    const val KEEP = 300
+    const val KEEP = 500
+
+    /**
+     * Most the saved chat may take, in bytes. The backup holds the whole chat in one Firestore
+     * document, which can't be over 1 MiB, so the oldest messages drop off first to stay under it.
+     */
+    const val MAX_SAVED_BYTES = 800_000
 
     /** How far back the AI reads the conversation word for word. */
     const val HISTORY_DAYS = 3L
@@ -52,23 +58,31 @@ object CoachChat {
     /** The Roast me style's own chip in the chat. */
     const val ROAST_MY_DAY = "Roast"
 
-    fun encode(entries: List<ChatEntry>): String = JSONArray().apply {
-        entries.filterNot { it.isError }.takeLast(KEEP).forEach { e ->
-            put(
-                JSONObject().apply {
-                    put("id", e.id)
-                    put("u", e.fromUser)
-                    put("t", e.text.take(MAX_TEXT))
-                    put("at", e.time)
-                    if (e.spoken) put("v", true)
-                    if (e.rememberedIds.isNotEmpty()) put("rem", JSONArray(e.rememberedIds))
-                    if (e.forgotten.isNotEmpty()) put("fgt", JSONArray(CoachNotes.encode(e.forgotten)))
-                    e.mealToLog?.let { put("log", it) }
-                    if (e.mealLogged) put("logged", true)
-                }
-            )
+    fun encode(entries: List<ChatEntry>): String {
+        // Newest first, so when the size limit is reached it's the oldest messages that go.
+        val kept = ArrayDeque<String>()
+        var bytes = 2 // the surrounding [ ]
+        for (e in entries.filterNot { it.isError }.takeLast(KEEP).asReversed()) {
+            val json = toJson(e).toString()
+            val size = json.encodeToByteArray().size + 1 // plus a comma
+            if (bytes + size > MAX_SAVED_BYTES) break
+            bytes += size
+            kept.addFirst(json)
         }
-    }.toString()
+        return kept.joinToString(separator = ",", prefix = "[", postfix = "]")
+    }
+
+    private fun toJson(e: ChatEntry) = JSONObject().apply {
+        put("id", e.id)
+        put("u", e.fromUser)
+        put("t", e.text.take(MAX_TEXT))
+        put("at", e.time)
+        if (e.spoken) put("v", true)
+        if (e.rememberedIds.isNotEmpty()) put("rem", JSONArray(e.rememberedIds))
+        if (e.forgotten.isNotEmpty()) put("fgt", JSONArray(CoachNotes.encode(e.forgotten)))
+        e.mealToLog?.let { put("log", it) }
+        if (e.mealLogged) put("logged", true)
+    }
 
     fun decode(raw: String?): List<ChatEntry> {
         if (raw.isNullOrBlank()) return emptyList()

@@ -195,7 +195,8 @@ fun CoachChatView(
                 val rows = remember(messages) { chatRows(messages, Now.today(), TimeZone.currentSystemDefault()) }
                 val listState = rememberLazyListState()
                 LaunchedEffect(rows.size, loading) {
-                    if (rows.isNotEmpty()) listState.animateScrollToItem(rows.size - 1 + if (loading) 1 else 0)
+                    // +1 for the note on how much history is kept, at the top.
+                    if (rows.isNotEmpty()) listState.animateScrollToItem(rows.size + if (loading) 1 else 0)
                 }
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (rows.isEmpty()) {
@@ -203,6 +204,18 @@ fun CoachChatView(
                             CoachBubble(
                                 text = "Hi! I'm Superfit's AI coach. I can see your meals, workouts and goal, and I remember what you tell me, " +
                                     "like an injury or a food you don't eat. Ask me anything, or tap the mic and just talk."
+                            )
+                        }
+                    }
+                    if (rows.isNotEmpty()) {
+                        item(key = "history-note") {
+                            Text(
+                                text = "Your latest ${CoachChat.KEEP} messages are kept here. What your coach learned from " +
+                                    "older chats stays in Settings › What my AI coach knows.",
+                                color = ThemeTextSecondary,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
                             )
                         }
                     }
