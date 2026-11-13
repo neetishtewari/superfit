@@ -144,6 +144,7 @@ private fun openPhoneSettings() {
 private const val APP_PREFS = "superfit_prefs"
 private const val KEY_THEME_MODE = "theme_mode"
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun IosRoot(
     auth: IosAuth,
