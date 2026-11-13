@@ -422,6 +422,8 @@ tested on the dev app first.
          reminder; tapping it opens the recap. Not yet: the dev-app preview button.
      - 19 (TestFlight feedback): iPhone Progress now swipes between Insights, Journey and History and has
        the "Next: your Journey" / "Next: History" links, as on Android (shared ProgressTabs pager).
+     - 20 (TestFlight feedback): meal/label snap uses Superfit's own camera screen (SnapCamera.swift), so no
+       "Use Photo" step, as on Android. Photo stays in memory, never saved to Photos.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -813,3 +815,4 @@ advertising ID: collection is switched off in Info.plist and the app has no trac
 App Store Connect asks about the advertising identifier at submission, decide the answer then.
 
 Step 19 (Progress swipe + Next links): layout only, no data, permissions or network. Security: nothing new.
+Step 20 (own camera screen): uses the camera permission already asked for; the picture is shrunk and handed to the AI as before, never written to Photos or disk. Security: nothing new.
