@@ -1,0 +1,6 @@
+<en-GB>
+• Barcode scanning tells you why: if a product is found but has no nutrition info, Superfit says so and asks you to snap the label instead.
+• Reads more barcodes, including shop sticker codes.
+• Coach chat: the keyboard's Send key now sends your message.
+• Behind-the-scenes improvements shared with the new iPhone app.
+</en-GB>
