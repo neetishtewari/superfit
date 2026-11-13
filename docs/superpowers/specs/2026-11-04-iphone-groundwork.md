@@ -426,6 +426,11 @@ tested on the dev app first.
        "Use Photo" step, as on Android. Photo stays in memory, never saved to Photos.
      - 21 (TestFlight feedback): recap autoplay can no longer turn a page early or while someone is swiping
        (a card must really stay up for its time). Fixes the recap sticking on the last story cards.
+     - 22 (TestFlight): the app and widget now take their version and build number from project.yml
+       (MARKETING_VERSION 1.0, CURRENT_PROJECT_VERSION raised for every upload; now 3).
+     - 23 (TestFlight feedback): the keyboard closes when you tap a blank part of the screen or scroll, and
+       after sending a chat message or logging a meal (iPhone has no back button for it). The bottom menu
+       is left out while the keyboard is up so it no longer leaves a gap above the keyboard.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -818,3 +823,11 @@ App Store Connect asks about the advertising identifier at submission, decide th
 
 Step 19 (Progress swipe + Next links): layout only, no data, permissions or network. Security: nothing new.
 Step 20 (own camera screen): uses the camera permission already asked for; the picture is shrunk and handed to the AI as before, never written to Photos or disk. Security: nothing new.
+Step 23 (keyboard closes): layout behaviour only; no data, permissions or network. Security: nothing new.
+
+- Step 24: coach chat keyboard return key is "Send" (sends, then closes the keyboard). UI input option only; nothing new stored or sent. Security: no change.
+
+- Step 25: back/close audit. Settings, recap, onboarding already have visible back; Share card sheet gets a visible Close (X); other sheets have Cancel/Retake or swipe-down; Settings and recap also go back with the left-edge swipe (BackHandler). Layout/navigation only; nothing new stored or sent. Security: no change.
+
+- Step 26: recap story cards named "Get it on Google Play" on iPhone too; now use this phone's store (App Store on iPhone). Apple rejects apps that mention other platforms. Text only. Security: no change.
+- Step 26b: workout-import card names this phone's apps (Apple Watch/Strava on iPhone, not Samsung Health). Build number 4.

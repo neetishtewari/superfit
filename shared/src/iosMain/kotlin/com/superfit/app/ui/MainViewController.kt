@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.ComposeUIViewController
 import com.superfit.app.data.CloudBackup
 import com.superfit.app.data.HealthSync
@@ -66,6 +68,7 @@ import com.superfit.app.ui.camera.PhotoLog
 import com.superfit.app.ui.coach.ChatMic
 import com.superfit.app.ui.coach.CoachChatModel
 import com.superfit.app.ui.coach.CoachChatView
+import com.superfit.app.ui.components.dismissKeyboardOnTapOrScroll
 import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.MicOffDialog
 import com.superfit.app.ui.dashboard.ProvideVoiceTyping
@@ -141,6 +144,7 @@ private fun openPhoneSettings() {
 private const val APP_PREFS = "superfit_prefs"
 private const val KEY_THEME_MODE = "theme_mode"
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun IosRoot(
     auth: IosAuth,
@@ -424,12 +428,15 @@ private fun IosRoot(
                 }
             }
             val state by recapModel.state.collectAsState()
+            // Swipe from the left edge to go back, like other iPhone apps.
+            androidx.compose.ui.backhandler.BackHandler { recapMonth = null }
             CompositionLocalProvider(LocalShareCardHost provides shareHost) {
                 RecapStoryScreen(month, state, host, inBackground, onBack = { recapMonth = null }, onReload = recapModel::reload)
             }
             return
         }
         if (showSettings) {
+            androidx.compose.ui.backhandler.BackHandler { showSettings = false }
             Box(Modifier.fillMaxSize()) {
                 CompositionLocalProvider(LocalShareCardHost provides shareHost) {
                     SettingsPage(
@@ -486,19 +493,24 @@ private fun IosRoot(
             }
             return
         }
+        val imeUp = WindowInsets.ime.getBottom(LocalDensity.current) > 0
         CompositionLocalProvider(LocalShareCardHost provides shareHost) {
             Scaffold(
                 containerColor = SuperfitTheme.colors.bgStart,
                 // Each screen handles the top of the phone itself; the menu handles the bottom.
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                // The keyboard covers the menu anyway; leaving it out stops its height showing as a gap
+                // between a text box and the keyboard.
                 bottomBar = {
-                    MainMenuBar(tab, onSelect = {
-                        tabHow = "menu"
-                        tab = it
-                    }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH))
+                    if (!imeUp) {
+                        MainMenuBar(tab, onSelect = {
+                            tabHow = "menu"
+                            tab = it
+                        }, tabs = listOf(MainTab.TODAY, MainTab.PROGRESS, MainTab.COACH))
+                    }
                 }
             ) { padding ->
-                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).dismissKeyboardOnTapOrScroll()) {
                     when (tab) {
                         MainTab.COACH -> CoachTab(coachChat, today)
                         MainTab.PROGRESS -> ProgressTabs(

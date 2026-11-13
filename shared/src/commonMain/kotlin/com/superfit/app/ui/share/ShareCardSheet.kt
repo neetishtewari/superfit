@@ -222,6 +222,12 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
     ) {
         // The choices scroll; the Share button stays pinned below them so it's never missed.
         Column(Modifier.fillMaxWidth()) {
+            // A visible way out; swiping the sheet down or tapping outside also closes it.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                androidx.compose.material3.IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = SuperfitTheme.colors.textSecondary)
+                }
+            }
             Column(
                 modifier = Modifier
                     .weight(1f, fill = false)
