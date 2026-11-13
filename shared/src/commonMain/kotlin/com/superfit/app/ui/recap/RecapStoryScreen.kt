@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -205,7 +206,12 @@ private fun RecapPager(state: RecapState.Ready, month: YearMonth, host: RecapHos
         val total = RecapAutoplay.durationMs(words?.line.orEmpty(), words?.title.orEmpty())
         val left = ((1f - progress.value) * total).toInt()
         val began = TimeSource.Monotonic.markNow()
-        progress.animateTo(1f, tween(left, easing = LinearEasing))
+        // Real time even when the phone shrinks animations (Reduce Motion), which would finish it at once.
+        withContext(object : MotionDurationScale {
+            override val scaleFactor = 1f
+        }) {
+            progress.animateTo(1f, tween(left, easing = LinearEasing))
+        }
         // Never turn the page before the card has really been up for its time, whatever the animation clock did.
         val owed = left - began.elapsedNow().inWholeMilliseconds
         if (owed > 0) delay(owed)
