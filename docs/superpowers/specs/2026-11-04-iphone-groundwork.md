@@ -420,6 +420,8 @@ tested on the dev app first.
          once the month has enough logged, or 10 am on days 1-3 for last month while unopened;
          only when notifications are already allowed (never asks), kept apart from the evening
          reminder; tapping it opens the recap. Not yet: the dev-app preview button.
+     - 19 (TestFlight feedback): iPhone Progress now swipes between Insights, Journey and History and has
+       the "Next: your Journey" / "Next: History" links, as on Android (shared ProgressTabs pager).
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -809,3 +811,5 @@ question on each upload. Firebase 12 has no "without advertising-ID support" pro
 (tried; the package product doesn't exist), so FirebaseAnalytics stays. Superfit never reads the
 advertising ID: collection is switched off in Info.plist and the app has no tracking prompt. If
 App Store Connect asks about the advertising identifier at submission, decide the answer then.
+
+Step 19 (Progress swipe + Next links): layout only, no data, permissions or network. Security: nothing new.
