@@ -76,9 +76,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.SpeechLanguages
 import com.superfit.app.domain.SpokenInput
@@ -160,7 +160,7 @@ class SpeechRecognizerHelper(
     private fun createRecognizer(): SpeechRecognizer {
         val app = context.applicationContext
         val google = if (useGoogleService) googleRecognitionService(app) else null
-        AppAnalytics.setSpeechService(google?.packageName ?: "default")
+        UsageEvents.setSpeechService(google?.packageName ?: "default")
         val recognizer = if (google != null) {
             SpeechRecognizer.createSpeechRecognizer(app, google)
         } else {
@@ -191,7 +191,7 @@ class SpeechRecognizerHelper(
                     return
                 }
                 if (error in SERVICE_ERRORS && !startedListening && heardSegments.isEmpty() && partial == null) {
-                    AppAnalytics.recordError(IllegalStateException("Speech service error $error (google=$useGoogleService)"))
+                    UsageEvents.recordError(IllegalStateException("Speech service error $error (google=$useGoogleService)"))
                     releaseRecognizer()
                     if (useGoogleService && googleRecognitionService(context.applicationContext) != null) {
                         // Google's service failed on this phone; try the phone's own.
@@ -211,7 +211,7 @@ class SpeechRecognizerHelper(
                     return
                 }
                 if (error !in SILENCE_ERRORS && error != SpeechRecognizer.ERROR_CLIENT) {
-                    AppAnalytics.recordError(IllegalStateException("Speech recognizer error $error"))
+                    UsageEvents.recordError(IllegalStateException("Speech recognizer error $error"))
                 }
                 if (heardSegments.isNotEmpty()) {
                     finishWithText()
@@ -298,7 +298,7 @@ class SpeechRecognizerHelper(
             }
             recognizer.startListening(intent)
         } catch (e: Exception) {
-            AppAnalytics.recordError(e)
+            UsageEvents.recordError(e)
             releaseRecognizer()
             endSession()
             onNeedsSystemDialog()

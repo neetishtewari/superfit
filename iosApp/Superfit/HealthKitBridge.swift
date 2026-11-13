@@ -22,6 +22,8 @@ final class HealthKitBridge: NSObject, IosHealth {
         HKQuantityType(.bodyMass),
         HKQuantityType(.bodyFatPercentage),
         HKQuantityType(.leanBodyMass),
+        // Height, to fill in "About you" at sign-up.
+        HKQuantityType(.height),
     ]
 
     // A workout's distance is kept under the kind that fits it; the first one it has is used.
@@ -117,6 +119,7 @@ final class HealthKitBridge: NSObject, IosHealth {
         case "weightKg": (type, unit, scale) = (HKQuantityType(.bodyMass), .gramUnit(with: .kilo), 1)
         case "bodyFatPct": (type, unit, scale) = (HKQuantityType(.bodyFatPercentage), .percent(), 100)
         case "leanKg": (type, unit, scale) = (HKQuantityType(.leanBodyMass), .gramUnit(with: .kilo), 1)
+        case "heightCm": (type, unit, scale) = (HKQuantityType(.height), .meterUnit(with: .centi), 1)
         default:
             done(nil, "Unknown body value \(kind)")
             return
@@ -143,6 +146,29 @@ final class HealthKitBridge: NSObject, IosHealth {
                     )
                 }
                 done(list, nil)
+            }
+        }
+        store.execute(query)
+    }
+
+    func heartRate(startMs: Int64, endMs: Int64, sourceId: String, done: @escaping ([KotlinLong]?, String?) -> Void) {
+        let query = HKSampleQuery(
+            sampleType: HKQuantityType(.heartRate),
+            predicate: Self.range(startMs, endMs),
+            limit: 20000,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        ) { _, samples, error in
+            DispatchQueue.main.async {
+                if let error, (error as? HKError)?.code != .errorNoData {
+                    done(nil, error.localizedDescription)
+                    return
+                }
+                let all = (samples as? [HKQuantitySample]) ?? []
+                // The workout's own watch or app first; other readings only when it saved none.
+                let own = all.filter { $0.sourceRevision.source.bundleIdentifier == sourceId }
+                let perMinute = HKUnit.count().unitDivided(by: .minute())
+                let chosen = own.isEmpty ? all : own
+                done(chosen.flatMap { [Self.ms($0.startDate), KotlinLong(value: Int64($0.quantity.doubleValue(for: perMinute).rounded()))] }, nil)
             }
         }
         store.execute(query)

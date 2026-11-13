@@ -37,6 +37,9 @@ class LogRepository(
 
     suspend fun getProfile(): UserProfileEntity? = db.profileDao().getProfile()
 
+    /** Workout import choices (main app, add-back, hidden workouts) to the person's own backup, as Android does. */
+    suspend fun backUpWorkoutImportSettings(prefs: WorkoutImportPrefs) = backup.uploadWorkoutImportSettings(prefs.toBackup())
+
     suspend fun saveProfile(profile: UserProfileEntity) {
         // The saved age follows the birth month, for older app versions that read only "age".
         val current = profile.withCurrentAge()

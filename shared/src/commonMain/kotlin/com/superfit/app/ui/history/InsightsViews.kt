@@ -130,7 +130,7 @@ fun InsightsTab(
     /** Null hides the report row (the iPhone gets it with its own PDF). */
     onShareWithCoach: ((weeks: Int) -> Unit)?,
     foodQuality: @Composable () -> Unit,
-    /** Null hides personal bests (the iPhone gets them with share cards). */
+    /** Null hides personal bests. */
     bests: (@Composable () -> Unit)?,
     trends: @Composable () -> Unit,
     /** "Your body now": the latest weight and scale readings, first thing on Progress. */

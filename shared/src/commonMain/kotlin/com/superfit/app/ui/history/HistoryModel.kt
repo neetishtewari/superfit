@@ -9,6 +9,7 @@ import com.superfit.app.data.NutritionAdviceStore
 import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.data.WorkoutImportPrefs
@@ -40,6 +41,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import kotlinx.datetime.yearMonth
 
 /** What the History page shows: the month's days, the chart week and the picked day. */
 data class HistoryPage(
@@ -55,7 +57,11 @@ data class ProgressPage(
     val progress: ProgressState,
     val consistency: LogConsistency,
     val trends: WeeklyTrendsState,
-    val period: BodyPeriod
+    val period: BodyPeriod,
+    /** Past months with enough logged for a recap, newest first. */
+    val recapMonths: List<kotlinx.datetime.YearMonth> = emptyList(),
+    /** Whether this month already has enough logged for a recap on the 1st. */
+    val recapThisMonth: Boolean = false
 )
 
 /**
@@ -142,7 +148,9 @@ class HistoryModel(
                 HistoryLog.sleepByDay(log.getAllSleepTelemetry()),
                 target
             ),
-            period = bodyPeriod
+            period = bodyPeriod,
+            recapMonths = com.superfit.app.data.RecapData.months(totals, day),
+            recapThisMonth = com.superfit.app.data.RecapData.hasEnough(totals, day.yearMonth)
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
@@ -199,11 +207,13 @@ class HistoryModel(
     }
 
     fun logWeight(kg: Double) {
+        UsageEvents.weighIn()
         scope.launch { log.addWeightEntry(kg) }
     }
 
     /** Start weight, goal weight and the optional date to reach it by, as on Android. */
     fun updateGoal(startKg: Double, targetKg: Double, date: LocalDate?) {
+        UsageEvents.goalSet(withDate = date != null)
         scope.launch {
             log.getProfile()?.let { log.saveProfile(it.copy(startingWeightKg = startKg, targetWeightKg = targetKg)) }
             GoalDatePref.set(prefs, date)
@@ -248,6 +258,7 @@ class HistoryModel(
                 } else {
                     log.addNutritionEntry(HistoryLog.missedMeal(result, day, zone()))
                     loadSuggestions()
+                    UsageEvents.mealLogged("typed")
                     HistoryParsingState.Success(result.foodText)
                 }
             } catch (e: CancellationException) {
@@ -265,6 +276,7 @@ class HistoryModel(
 
     /** Saves an edited meal; a changed food drops its old tags, so it is judged again, as on Android. */
     fun updateMeal(entry: NutritionEntryEntity) {
+        UsageEvents.mealEdited()
         scope.launch {
             log.updateNutritionEntry(entry)
             if (entry.qualityTags == null) tagger.tagOne(entry)?.let { log.saveMealTags(entry, it.encode()) }

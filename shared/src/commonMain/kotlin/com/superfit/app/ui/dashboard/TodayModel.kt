@@ -17,8 +17,10 @@ import com.superfit.app.data.NutritionEntryEntity
 import com.superfit.app.data.PredictedFood
 import com.superfit.app.data.Prefs
 import com.superfit.app.data.ScaleImport
+import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.StepGoalStore
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.UserProfileEntity
 import com.superfit.app.data.WeightEntryEntity
 import com.superfit.app.data.WorkoutEntryEntity
@@ -33,18 +35,23 @@ import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachQuestions
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.CoachingEngine
+import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FitnessGoal
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.MealTagBackfill
 import com.superfit.app.domain.MealTagger
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.NutritionistNote
+import com.superfit.app.domain.PersonalBest
+import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
 import com.superfit.app.domain.ScaleReading
+import com.superfit.app.domain.ShareOffer
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.TodayVsUsual
 import com.superfit.app.domain.UsualDay
+import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutView
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -58,6 +65,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -254,7 +262,95 @@ class TodayModel(
     /** Hides a workout from another app (every app's copy of it), as on Android. */
     fun hideImportedWorkout(view: WorkoutView) {
         workoutPrefs.hide(view.merged.memberIds)
+        workoutSettingsChanged()
+    }
+
+    /**
+     * Personal bests from every workout from other apps and daily steps, plus the one new best to
+     * offer on Today, as on Android. Workout bests wait for the first import to finish, so it sets
+     * the starting points quietly.
+     */
+    val personalBests: StateFlow<BestsUiState> = combine(
+        log.profileFlow,
+        log.allImportedWorkoutsFlow,
+        log.allActivityTelemetryFlow,
+        settingsChanged
+    ) { profile, rows, activity, _ ->
+        if (profile == null) return@combine BestsUiState()
+        val views = if (workoutPrefs.enabled && workoutPrefs.lastImportMillis > 0) workoutViews(rows, profile) else emptyList()
+        val steps = activity.mapNotNull { row -> runCatching { DaySteps(LocalDate.parse(row.date), row.steps) }.getOrNull() }
+        val bests = PersonalBests.compute(views, steps, Now.today())
+        val baseline = workoutPrefs.bestBaseline
+        val seen = workoutPrefs.bestPodiumSeen
+        val check = PersonalBests.check(bests, baseline, seen, Now.millis())
+        if (check.baseline != baseline || check.podiumSeen != seen) {
+            workoutPrefs.bestBaseline = check.baseline
+            workoutPrefs.bestPodiumSeen = check.podiumSeen
+            backUpWorkoutSettings()
+        }
+        BestsUiState(all = bests, toOffer = check.announce.firstOrNull())
+    }.stateIn(scope, SharingStarted.WhileSubscribed(5000), BestsUiState())
+
+    /** A new best was shared or dismissed: it's offered only once. */
+    fun acknowledgeBest(best: PersonalBest) {
+        workoutPrefs.bestBaseline = PersonalBests.acknowledge(best, workoutPrefs.bestBaseline)
+        workoutPrefs.bestPodiumSeen = PersonalBests.acknowledgePodium(best, workoutPrefs.bestPodiumSeen)
+        workoutSettingsChanged()
+    }
+
+    /** Settings › workouts from other apps: what's chosen now. */
+    val workoutImportPrefs: WorkoutImportPrefs get() = workoutPrefs
+
+    /** Turning the import on asks for health access first when it hasn't been asked yet. */
+    fun setWorkoutImportEnabled(on: Boolean) {
+        if (on && !_healthAsked.value) {
+            connectHealth()
+            return
+        }
+        workoutPrefs.enabled = on
+        _workoutImportEnabled.value = on
+        workoutSettingsChanged()
+        if (on) UsageEvents.workoutsConnected()
+        if (on) health?.takeIf { healthAvailable }?.let { source -> scope.launch { readHealth(source) } }
+    }
+
+    fun setMainWorkoutApp(sourceId: String?) {
+        workoutPrefs.mainApp = sourceId
+        workoutSettingsChanged()
+    }
+
+    fun setWorkoutAddBack(addBack: WorkoutAddBack) {
+        workoutPrefs.addBack = addBack
+        workoutSettingsChanged()
+    }
+
+    fun unhideAllWorkouts() {
+        workoutPrefs.unhideAll()
+        workoutSettingsChanged()
+    }
+
+    /** Apps that have shared workouts, as (id, name), for the "Main workout app" choice. */
+    suspend fun workoutSourceApps(): List<Pair<String, String>> =
+        log.importedWorkouts.getAll().map { it.sourcePackage }.distinct()
+            .map { it to sourceNames.label(it) }
+            .sortedBy { it.second }
+
+    /** Today works its numbers out again, and the choices go to the backup. */
+    private fun workoutSettingsChanged() {
         settingsChanged.value++
+        backUpWorkoutSettings()
+    }
+
+    private fun backUpWorkoutSettings() {
+        scope.launch {
+            try {
+                log.backUpWorkoutImportSettings(workoutPrefs)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.w("TodayModel", "Backing up workout settings failed", e)
+            }
+        }
     }
 
     private suspend fun readHealth(source: HealthSource) {
@@ -307,10 +403,12 @@ class TodayModel(
         scope.launch {
             log.getProfile()?.let { log.saveProfile(it.copy(goal = goal.key, calorieOffset = goal.calorieOffset)) }
         }
+        UsageEvents.goalSet(withDate = false)
     }
 
     /** Sex, birth month, height and activity level from Settings > About you. */
     fun saveAboutYou(updated: UserProfileEntity) {
+        UsageEvents.profileEdited()
         scope.launch {
             // Only the About you fields: a weigh-in or goal saved meanwhile is kept.
             log.getProfile()?.let {
@@ -330,6 +428,7 @@ class TodayModel(
     /** The person's own daily step goal, or null to go back to the automatic one. */
     fun setOwnStepGoal(steps: Int?) {
         StepGoalStore.setOwnGoal(prefs, steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX))
+        UsageEvents.stepGoalChanged("set", if (steps == null) "auto" else "own")
         stepGoalTrigger.value++
     }
 
@@ -366,6 +465,25 @@ class TodayModel(
                 CoachingInsightState.Error(AiFailover.sanitizeError(e))
             }
         }
+    }
+
+    /** Every workout from other apps as Today shows them, for the share cards; empty while the import is off. */
+    suspend fun importedViews(bmr: Double): List<WorkoutView> = WorkoutSync.views(log.importedWorkouts.getAll(), workoutPrefs, sourceNames, bmr)
+
+    /**
+     * Today's "ready to share" card, as on Android: the newest run, or long enough walk, from today
+     * or yesterday, unless it was already shared or dismissed.
+     */
+    suspend fun shareOffer(share: ShareCardPrefs): WorkoutView? {
+        val profile = log.getProfile() ?: return null
+        if (!workoutPrefs.enabled) return null
+        return ShareOffer.pick(
+            workouts = importedViews(PhysiologyEngine.calculateBmr(profile)),
+            today = Now.today(),
+            runsOn = share.offerRuns,
+            walkMinMinutes = share.offerWalkMinutes,
+            handledIds = share.handledOffers
+        )
     }
 
     /** Voice-logged workouts plus the ones from other apps and the watch, for the coach (as on Android). */
@@ -426,6 +544,7 @@ class TodayModel(
         CoachStyleStore.save(prefs, style)
         if (style == _coachStyle.value) return
         _coachStyle.value = style
+        UsageEvents.coachStyleChanged(style.name)
         if (_coaching.value is CoachingInsightState.Success) refreshCoachingInsight()
     }
 
@@ -475,8 +594,11 @@ class TodayModel(
         }
     }
 
-    /** Works out a typed meal with the AI and logs it, the same way as Android. */
-    fun logMeal(text: String) {
+    /**
+     * Works out a typed meal with the AI and logs it, the same way as Android. [countAs] is how it
+     * shows in usage reports (null when the caller counts it itself, like the coach's "Log this").
+     */
+    fun logMeal(text: String, countAs: String? = "typed") {
         if (text.isBlank()) return
         lastMeal = text
         scope.launch {
@@ -499,6 +621,7 @@ class TodayModel(
                         )
                     )
                     loadPredictedFoods()
+                    countAs?.let(UsageEvents::mealLogged)
                     ParsingState.Success(result.foodText)
                 }
             } catch (e: CancellationException) {
@@ -527,6 +650,7 @@ class TodayModel(
                 )
             )
             loadPredictedFoods()
+            UsageEvents.mealLogged("voice")
         },
         saveWorkout = { result ->
             log.addWorkoutEntry(
@@ -540,6 +664,7 @@ class TodayModel(
                     difficultyRating = "JUST_RIGHT"
                 )
             )
+            UsageEvents.workoutLogged()
         }
     )
 
@@ -555,7 +680,8 @@ class TodayModel(
      * Saves a meal from the camera once the person checked it, as Android does: packets (and
      * meals whose food was changed) get their quality tags afterwards.
      */
-    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean) {
+    fun addPhotoMeal(entry: NutritionEntryEntity, isPackaged: Boolean, method: String = "photo") {
+        UsageEvents.mealLogged(method)
         scope.launch {
             try {
                 val id = log.addNutritionEntry(entry)
@@ -584,6 +710,7 @@ class TodayModel(
     }
 
     fun updateMeal(entry: NutritionEntryEntity) {
+        UsageEvents.mealEdited()
         scope.launch { log.updateNutritionEntry(entry) }
     }
 
@@ -596,6 +723,7 @@ class TodayModel(
     }
 
     fun logWeight(weightKg: Double, note: String) {
+        UsageEvents.weighIn()
         scope.launch { log.addWeightEntry(weightKg, note) }
     }
 

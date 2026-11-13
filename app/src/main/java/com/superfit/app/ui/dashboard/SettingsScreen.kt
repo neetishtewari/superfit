@@ -607,42 +607,10 @@ fun SettingsScreen(
             com.superfit.app.ui.share.SharingSettingsCard(onOffersChanged = { viewModel.refreshShareOffer() })
 
             SettingsGroupLabel("Privacy")
-            // Anonymous usage and crash reports (see AppAnalytics)
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SuperfitTheme.colors.cardBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, SuperfitTheme.colors.glassBorder, RoundedCornerShape(20.dp))
-            ) {
-                var usageReports by remember { mutableStateOf(com.superfit.app.data.AppAnalytics.isEnabled(context)) }
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Share anonymous usage and crash reports",
-                            fontWeight = FontWeight.Bold,
-                            color = SuperfitTheme.colors.textPrimary,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = "Helps fix crashes and see which features people use. Never includes what you eat, your weight, health data, photos, or your name or email.",
-                            fontSize = 12.sp,
-                            color = SuperfitTheme.colors.textSecondary
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Switch(
-                        checked = usageReports,
-                        onCheckedChange = { enabled ->
-                            usageReports = enabled
-                            com.superfit.app.data.AppAnalytics.setEnabled(context, enabled)
-                        }
-                    )
-                }
-            }
+            com.superfit.app.ui.settings.UsageReportsCard(
+                enabled = com.superfit.app.data.AppAnalytics.isEnabled(context),
+                onChange = { com.superfit.app.data.AppAnalytics.setEnabled(context, it) }
+            )
 
             com.superfit.app.ui.settings.AccountActionsCard(onSignOut = onSignOut, onDeleteAccount = onDeleteAccount)
         }

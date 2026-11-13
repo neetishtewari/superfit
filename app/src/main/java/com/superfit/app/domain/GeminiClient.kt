@@ -107,7 +107,7 @@ object GeminiClient {
         timeoutMs: Long = AiFailover.PER_ATTEMPT_TIMEOUT_MS,
         totalBudgetMs: Long = AiFailover.TOTAL_BUDGET_MS,
         call: suspend (modelName: String) -> String?
-    ): String = AiFailover.run(models, timeoutMs, totalBudgetMs, { com.superfit.app.data.AppAnalytics.recordError(it) }, call)
+    ): String = AiFailover.run(models, timeoutMs, totalBudgetMs, { com.superfit.app.data.UsageEvents.recordError(it) }, call)
 
     fun sanitizeError(e: Throwable?): String = AiFailover.sanitizeError(e)
 }

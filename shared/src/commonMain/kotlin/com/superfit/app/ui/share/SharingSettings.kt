@@ -27,26 +27,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.superfit.app.data.ShareCardPrefs
 import com.superfit.app.domain.CardChip
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.theme.NeonMint
 import com.superfit.app.theme.SuperfitTheme
 
 /**
- * Settings > Sharing: which runs and walks Today offers to share, what workout cards start with,
+ * Settings > Sharing, on both phones: which runs and walks Today offers to share, what workout cards start with,
  * and whether weight progress may appear.
  */
 @Composable
 fun SharingSettingsCard(onOffersChanged: () -> Unit = {}) {
-    val context = LocalContext.current
-    val prefs = remember { ShareCardPrefs.of(context) }
+    val prefs = LocalShareCardHost.current.prefs
     var plain by remember { mutableStateOf(prefs.defaults(photo = false)) }
     var photo by remember { mutableStateOf(prefs.defaults(photo = true)) }
     var showWeight by remember { mutableStateOf(prefs.showWeight) }

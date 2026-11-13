@@ -29,31 +29,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.superfit.app.R
 import com.superfit.app.domain.ActivityPatterns
 import com.superfit.app.domain.BodyArea
 import com.superfit.app.domain.BodyChange
+import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.MonthlyRecap
 import com.superfit.app.domain.RecapAutoplay
 import com.superfit.app.domain.RecapCard
 import com.superfit.app.domain.RecapWords
 import com.superfit.app.domain.RecapWriter
 import com.superfit.app.domain.StrengthSessions
+import com.superfit.app.domain.localMonthName
 import com.superfit.app.domain.localWeekdayName
 import com.superfit.app.theme.Manrope
-import java.time.YearMonth
-import java.time.format.TextStyle as DateTextStyle
-import java.util.Locale
+import com.superfit.shared.resources.Res
+import com.superfit.shared.resources.superfit_logo
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.YearMonth
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * How far the card's numbers and bars have grown, 0-1. The playing recap counts them up as each card
@@ -100,7 +100,7 @@ private fun paletteFor(card: RecapCard): StoryPalette = when (card) {
     else -> Paper
 }
 
-fun monthName(month: YearMonth): String = month.month.getDisplayName(DateTextStyle.FULL, Locale.getDefault())
+fun monthName(month: YearMonth): String = localMonthName(month.month)
 
 private fun kicker(card: RecapCard): String = when (card) {
     is RecapCard.Goal -> "Goal"
@@ -131,7 +131,7 @@ fun RecapStory(card: RecapCard, words: RecapWords, month: YearMonth, modifier: M
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
-                painter = painterResource(R.drawable.ic_superfit_launcher),
+                painter = painterResource(Res.drawable.superfit_logo),
                 contentDescription = "Superfit logo",
                 modifier = Modifier
                     .size(30.dp)
@@ -139,7 +139,7 @@ fun RecapStory(card: RecapCard, words: RecapWords, month: YearMonth, modifier: M
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                "YOUR ${monthName(month).uppercase(Locale.getDefault())} · ${kicker(card).uppercase(Locale.getDefault())}",
+                "YOUR ${monthName(month).uppercase()} · ${kicker(card).uppercase()}",
                 color = p.accent,
                 fontFamily = Manrope,
                 fontSize = 11.sp,
@@ -175,7 +175,7 @@ fun RecapStory(card: RecapCard, words: RecapWords, month: YearMonth, modifier: M
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
-                    painter = painterResource(R.drawable.ic_superfit_launcher),
+                    painter = painterResource(Res.drawable.superfit_logo),
                     contentDescription = null,
                     modifier = Modifier
                         .size(26.dp)
@@ -201,7 +201,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Small("${RecapWriter.fmt(card.kgDone)} of ${RecapWriter.fmt(card.kgTotal)} kg ${if (card.lose) "down" else "up"}", p, bold = true)
-                card.eta?.toJavaLocalDate()?.let { Small("Goal around ${it.dayOfMonth} ${it.month.getDisplayName(DateTextStyle.SHORT, Locale.getDefault())}", p, bold = true) }
+                card.eta?.let { Small("Goal around ${it.day} ${localMonthName(it.month).take(3)}", p, bold = true) }
             }
         }
         is RecapCard.Needle -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -243,7 +243,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             Small(
                 listOfNotNull(
                     "${card.activeDays.size} active days",
-                    if (card.avgSteps > 0) String.format(Locale.US, "%,d steps a day", card.avgSteps) else null
+                    if (card.avgSteps > 0) "${g(card.avgSteps)} steps a day" else null
                 ).joinToString(" · "),
                 p,
                 bold = true
@@ -295,17 +295,17 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
         is RecapCard.Heart -> {
             Big("−${card.change.bpmDrop}", "bpm", p)
             Small(
-                "${card.change.activity.replaceFirstChar { it.titlecase(Locale.getDefault()) }}s at ${MonthlyRecap.pace(card.change.paceNow)} /km · ${card.change.bpmNow} bpm, was ${card.change.bpmPrev}",
+                "${card.change.activity.replaceFirstChar { it.titlecase() }}s at ${MonthlyRecap.pace(card.change.paceNow)} /km · ${card.change.bpmNow} bpm, was ${card.change.bpmPrev}",
                 p,
                 bold = true
             )
         }
         is RecapCard.Reps -> {
-            Big(String.format(Locale.US, "%,d", card.totals.total), "reps", p)
+            Big(g(card.totals.total), "reps", p)
             Small(
                 listOfNotNull(
-                    card.totals.top?.let { String.format(Locale.US, "%,d %s", it.second, it.first) },
-                    card.totals.prev.takeIf { it > 0 }?.let { String.format(Locale.US, "last month %,d", it) }
+                    card.totals.top?.let { "${g(it.second)} ${it.first}" },
+                    card.totals.prev.takeIf { it > 0 }?.let { "last month ${g(it)}" }
                 ).joinToString(" · "),
                 p,
                 bold = true
@@ -320,7 +320,7 @@ private fun Moment(card: RecapCard, p: StoryPalette) {
             r.bestDay?.let { d ->
                 FactRow(
                     "${localWeekdayName(d)}s are your big step day",
-                    String.format(Locale.US, "%,d steps on average, %,d on a usual day", r.bestDaySteps, r.avgSteps),
+                    "${g(r.bestDaySteps)} steps on average, ${g(r.avgSteps)} on a usual day",
                     p.accent,
                     p
                 )
@@ -347,7 +347,7 @@ private fun BodyMoment(c: BodyChange, p: StoryPalette) {
         c.bmr?.let {
             FactRow(
                 "Resting burn",
-                String.format(Locale.US, "%,d → %,d kcal a day", c.bmrFrom!!.roundToInt(), c.bmrTo!!.roundToInt()),
+                "${g(c.bmrFrom!!.roundToInt())} → ${g(c.bmrTo!!.roundToInt())} kcal a day",
                 // A lower resting burn is normal while losing weight: never shown as a warning.
                 if (it >= 0) p.accent else p.soft,
                 p
@@ -393,7 +393,7 @@ private fun CalorieMoment(card: RecapCard.Calories, p: StoryPalette) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Text(String.format(Locale.US, "%,d", f.kcal), color = p.text, fontFamily = Manrope, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                Text(g(f.kcal), color = p.text, fontFamily = Manrope, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
         Small("kcal · ${c.top.sumOf { it.pct }}% of everything you logged", p, bold = true)
@@ -485,3 +485,6 @@ private fun MonthDots(card: RecapCard.Moving, p: StoryPalette) {
         }
     }
 }
+
+/** 12,345: grouped the same way on both phones, like the Android card did. */
+private fun g(n: Number): String = Decimals.grouped(n.toLong())

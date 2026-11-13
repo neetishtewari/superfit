@@ -31,18 +31,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.superfit.app.data.Now
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
 import com.superfit.app.domain.WorkoutView
 import com.superfit.app.theme.SuperfitTheme
-import java.time.LocalDate
-import kotlinx.datetime.toKotlinLocalDate
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /** The daily card from what Home is showing right now. Never calls the AI. */
 fun dailyShareCard(state: DashboardUiState.Success, coaching: CoachingInsightState): ShareCard.Daily =
     ShareCards.daily(
-        date = LocalDate.now().toKotlinLocalDate(),
+        date = Now.today(),
         streakDays = state.streakState.currentStreak,
         mealsToday = state.nutritionList.size,
         proteinEatenG = state.proteinEaten,
@@ -61,7 +64,7 @@ fun dailyShareCard(state: DashboardUiState.Success, coaching: CoachingInsightSta
  */
 @Composable
 fun NewBestCard(best: PersonalBest, onShare: () -> Unit, onDismiss: () -> Unit) {
-    val card = ShareCards.best(best, isNew = true, today = LocalDate.now().toKotlinLocalDate())
+    val card = ShareCards.best(best, isNew = true, today = Now.today())
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,7 +130,7 @@ private val BestPurple = Color(0xFF5B3FC4)
 @Composable
 fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> Unit) {
     val run = com.superfit.app.domain.ShareOffer.isRun(workout)
-    val yesterday = java.time.Instant.ofEpochMilli(workout.startTime).atZone(java.time.ZoneId.systemDefault()).toLocalDate() != LocalDate.now()
+    val yesterday = startDay(workout.startTime) != Now.today()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -168,6 +171,9 @@ fun ShareOfferCard(workout: WorkoutView, onShare: () -> Unit, onDismiss: () -> U
     }
 }
 
+@OptIn(ExperimentalTime::class)
+private fun startDay(ms: Long) = Instant.fromEpochMilliseconds(ms).toLocalDateTime(TimeZone.currentSystemDefault()).date
+
 // Deep teal: the activity colour, dark enough for white text in light and dark mode.
 private val ShareTeal = Color(0xFF0B6E87)
 
@@ -177,7 +183,7 @@ fun PersonalBestsList(bests: List<PersonalBest>, onShare: (PersonalBest) -> Unit
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (bests.isEmpty()) {
             Text(
-                "Your bests appear here once your steps or workouts from other apps come in through Health Connect.",
+                "Your bests appear here once your steps or workouts from other apps come in through your phone's health app.",
                 fontSize = 12.sp,
                 color = SuperfitTheme.colors.textSecondary
             )
@@ -191,7 +197,7 @@ fun PersonalBestsList(bests: List<PersonalBest>, onShare: (PersonalBest) -> Unit
 
 @Composable
 private fun BestRow(best: PersonalBest, onShare: (PersonalBest) -> Unit, modifier: Modifier = Modifier) {
-    val card = ShareCards.best(best, isNew = false, today = LocalDate.now().toKotlinLocalDate())
+    val card = ShareCards.best(best, isNew = false, today = Now.today())
     val main = best.rank == 1
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {

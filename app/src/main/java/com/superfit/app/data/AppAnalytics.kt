@@ -6,9 +6,8 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 /**
- * Anonymous usage counts and crash reports. Events carry only how something was done (voice,
- * photo, ...) or which screen was opened: never food, numbers, health data, names or email.
- * The dev app never reports, and users can turn both off in Settings.
+ * Android's side of anonymous usage counts and crash reports (the events themselves are in the
+ * shared UsageEvents). The dev app never reports, and users can turn both off in Settings.
  */
 object AppAnalytics {
     private const val PREFS = "superfit_usage_reports"
@@ -21,8 +20,10 @@ object AppAnalytics {
     fun init(context: Context) {
         try {
             analytics = FirebaseAnalytics.getInstance(context)
-            // Shared screens (meal editing) report through the same switch.
-            UsageEvents.report = { event, params -> log(event, *params.toList().toTypedArray()) }
+            // Every screen reports through UsageEvents, behind the same switch.
+            UsageEvents.report = ::log
+            UsageEvents.error = ::recordError
+            UsageEvents.key = ::setKey
             apply(context)
         } catch (e: Exception) {
             android.util.Log.w("AppAnalytics", "Usage reports unavailable", e)
@@ -50,74 +51,20 @@ object AppAnalytics {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private fun log(event: String, vararg params: Pair<String, String>) {
+    private fun log(event: String, params: Map<String, String>) {
         if (!active) return
         analytics?.logEvent(event, Bundle().apply { params.forEach { (k, v) -> putString(k, v) } })
     }
 
-    /** [method]: voice, typed, photo, barcode or label. */
-    fun mealLogged(method: String) = log("meal_logged", "method" to method)
-    fun mealEdited() = log("meal_edited")
-
-    fun workoutLogged() = log("workout_logged", "method" to "voice")
-    fun workoutsConnected() = log("workouts_connected")
-
-    /**
-     * [type]: day, activity, best, roast or a recap card. For workout and best cards also: whether a
-     * photo was used and zoomed/moved, numbers only or with the stand-out line, where the stats sat,
-     * and whether the heart-rate line was on it.
-     */
-    fun cardShared(
-        type: String,
-        photo: Boolean? = null,
-        adjusted: Boolean? = null,
-        chips: String? = null,
-        statsPlace: String? = null,
-        heartLine: Boolean? = null
-    ) = log(
-        "share_card_shared",
-        *listOfNotNull(
-            "type" to type,
-            photo?.let { "photo" to if (it) "yes" else "no" },
-            adjusted?.let { "adjusted" to if (it) "yes" else "no" },
-            chips?.let { "chips" to it },
-            statsPlace?.let { "stats_place" to it },
-            heartLine?.let { "heart_line" to if (it) "yes" else "no" }
-        ).toTypedArray()
-    )
-
-    /** The monthly recap played through to its last story card. */
-    fun recapWatched(cards: Int) = log("recap_watched", "cards" to "$cards")
-
-    /** [how] for the bottom menu tabs: menu, card (the coach card on Today), back or start. */
-    fun screenOpened(screen: String, how: String? = null) =
-        log("screen_opened", *listOfNotNull("screen" to screen, how?.let { "how" to it }).toTypedArray())
-    fun goalSet(withDate: Boolean) = log("goal_set", "target_date" to if (withDate) "yes" else "no")
-    fun weighIn() = log("weigh_in")
-    fun profileEdited() = log("profile_edited")
-    fun widgetAdded() = log("widget_added")
-    fun coachMessageSent(how: String) = log("coach_message_sent", "how" to how)
-    fun coachNoteSaved(byUser: Boolean) = log("coach_note_saved", "by" to if (byUser) "user" else "coach")
-    fun coachNoteRemoved(how: String) = log("coach_note_removed", "how" to how)
-    fun coachMealLogged() = log("coach_meal_logged")
-    fun coachStyleChanged(style: String) = log("coach_style_changed", "style" to style)
-    fun stepGoalChanged(direction: String, mode: String) = log("step_goal_changed", "direction" to direction, "mode" to mode)
-
-    /** The "ready to share" card on Today: [action] shown, shared or dismissed; [type] run or walk. */
-    fun shareOffer(action: String, type: String) = log("share_offer", "action" to action, "type" to type)
-    fun reportShared(weeks: Int) = log("coach_report_shared", "weeks" to "$weeks")
-
-    /** Which speech service voice logging used, attached to any later crash report. */
-    fun setSpeechService(name: String) {
+    private fun setKey(name: String, value: String) {
         if (!active) return
         try {
-            FirebaseCrashlytics.getInstance().setCustomKey("speech_service", name)
+            FirebaseCrashlytics.getInstance().setCustomKey(name, value)
         } catch (_: Exception) {
         }
     }
 
-    /** A handled error worth seeing in Crashlytics, such as a background job failing. */
-    fun recordError(e: Throwable) {
+    private fun recordError(e: Throwable) {
         if (!active) return
         try {
             FirebaseCrashlytics.getInstance().recordException(e)
