@@ -150,6 +150,10 @@ final class CameraBridge: NSObject, IosCamera {
 
     // MARK: - Helpers
 
+    fileprivate static func isProductCode(_ code: String) -> Bool {
+        (8...14).contains(code.count) && code.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
     private func answer(_ jpeg: Data?, _ barcode: String?, _ error: String?) {
         let done = self.done
         self.done = nil
@@ -208,8 +212,10 @@ extension CameraBridge: PHPickerViewControllerDelegate {
 
 extension CameraBridge: DataScannerViewControllerDelegate {
     func dataScanner(_ dataScanner: DataScannerViewController, didAdd addedItems: [RecognizedItem], allItems: [RecognizedItem]) {
+        // Skip codes that aren't shop barcodes (8-14 digits), such as a sticker's stock code
+        // with letters in it, and keep looking for the real one.
         for item in addedItems {
-            if case let .barcode(barcode) = item, let code = barcode.payloadStringValue {
+            if case let .barcode(barcode) = item, let code = barcode.payloadStringValue, Self.isProductCode(code) {
                 MainActor.assumeIsolated { scanned(code, from: dataScanner) }
                 return
             }

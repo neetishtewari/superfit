@@ -1,10 +1,10 @@
 package com.superfit.app.ui
 
 import com.superfit.app.domain.AiPhoto
+import com.superfit.app.domain.BarcodeResult
 import com.superfit.app.domain.HttpReply
 import com.superfit.app.domain.OpenFoodFacts
 import com.superfit.app.domain.OpenFoodFactsException
-import com.superfit.app.domain.PackagedFood
 import com.superfit.app.ui.camera.PhotoCamera
 import com.superfit.app.ui.camera.PhotoKind
 import kotlin.coroutines.resume
@@ -53,7 +53,7 @@ class IosPhotoCamera(private val ios: IosCamera) : PhotoCamera {
     }
 
     /** A packet's barcode in Open Food Facts, through Swift's web request. */
-    suspend fun lookup(barcode: String): PackagedFood? = OpenFoodFacts.lookup(barcode) { url ->
+    suspend fun lookup(barcode: String): BarcodeResult = OpenFoodFacts.find(barcode) { url ->
         suspendCancellableCoroutine { c ->
             ios.fetch(url) { body, error ->
                 when {
