@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlinx.coroutines.delay
+import com.superfit.app.data.UsageEvents
 import kotlinx.coroutines.test.runTest
 
 class AiFailoverTest {
@@ -152,5 +153,32 @@ class AiFailoverTest {
         assertEquals(emptyList<String>(), AiFailover.parseModelList("gpt-5, ../models/x, gemini-pro!"))
         assertEquals(listOf("gemini-a", "gemini-b"), AiFailover.parseModelList("gemini-a;x, gemini-a, gemini-b"))
         assertEquals(6, AiFailover.parseModelList((1..9).joinToString(",") { "gemini-$it" }).size)
+    }
+
+    @Test
+    fun aRetiredModelIsReportedOncePerRunAndTheNextModelAnswers() = runTest {
+        val events = mutableListOf<Pair<String, Map<String, String>>>()
+        val errors = mutableListOf<Throwable>()
+        val oldReport = UsageEvents.report
+        val oldError = UsageEvents.error
+        UsageEvents.report = { event, params -> events += event to params }
+        UsageEvents.error = { errors += it }
+        AiFailover.resetUnavailableReports()
+        try {
+            repeat(2) {
+                val result = AiFailover.run(models) { model ->
+                    if (model == "model-a") throw Exception("404 NOT_FOUND: models/model-a is not found")
+                    "ok"
+                }
+                assertEquals("ok", result)
+            }
+            assertEquals(listOf("ai_model_unavailable" to mapOf("model" to "model-a")), events)
+            assertEquals(1, errors.size)
+            assertTrue(errors.single() is AiFailover.ModelUnavailableException)
+        } finally {
+            UsageEvents.report = oldReport
+            UsageEvents.error = oldError
+            AiFailover.resetUnavailableReports()
+        }
     }
 }

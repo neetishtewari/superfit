@@ -77,6 +77,9 @@ object UsageEvents {
 
     /** The "ready to share" card on Today: [action] shown, shared or dismissed; [type] run or walk. */
     fun shareOffer(action: String, type: String) = log("share_offer", "action" to action, "type" to type)
+    /** Google refused a Gemini model as not found (retired or misspelled): only the model's name. */
+    fun aiModelUnavailable(model: String) = log("ai_model_unavailable", "model" to model)
+
     fun reportShared(weeks: Int) = log("coach_report_shared", "weeks" to "$weeks")
 
     /** Which speech service voice logging used, attached to any later crash report. */

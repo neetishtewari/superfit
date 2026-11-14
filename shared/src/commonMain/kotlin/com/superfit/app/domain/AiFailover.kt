@@ -1,5 +1,6 @@
 package com.superfit.app.domain
 
+import com.superfit.app.data.UsageEvents
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
@@ -103,6 +104,31 @@ object AiFailover {
     /** Reported to crash reports when the Gemini credit runs out, named so it stands out. */
     class OutOfCreditException(cause: Throwable) : Exception("Gemini prepaid credit is used up", cause)
 
+    /** Reported to crash reports when Google says a model is gone, named so it stands out. */
+    class ModelUnavailableException(model: String, cause: Throwable) :
+        Exception("Gemini model $model is no longer available (retired or misspelled)", cause)
+
+    @kotlin.concurrent.Volatile
+    private var reportedUnavailable: Set<String> = emptySet()
+
+    /**
+     * Tells Firebase (usage event "ai_model_unavailable" plus a crash-report entry) the first time
+     * in each app run that Google refuses a model as not found, so a retirement is noticed even
+     * though people only see the next model answering. Then the model can be swapped in Remote
+     * Config ([REMOTE_CONFIG_KEY]).
+     */
+    private fun reportUnavailable(model: String, error: Throwable) {
+        if (model in reportedUnavailable) return
+        reportedUnavailable = reportedUnavailable + model
+        UsageEvents.aiModelUnavailable(model)
+        UsageEvents.recordError(ModelUnavailableException(model, error))
+    }
+
+    /** For tests: forget which models were already reported. */
+    internal fun resetUnavailableReports() {
+        reportedUnavailable = emptySet()
+    }
+
     /**
      * Runs [call] against each model in [models] until one returns non-blank text.
      *
@@ -169,7 +195,11 @@ object AiFailover {
                         onOutOfCredit(OutOfCreditException(error))
                         throw Exception(sanitizeError(error), error)
                     }
-                    ErrorKind.RATE_LIMITED, ErrorKind.MODEL_UNAVAILABLE, ErrorKind.OTHER -> break
+                    ErrorKind.MODEL_UNAVAILABLE -> {
+                        reportUnavailable(modelName, error)
+                        break
+                    }
+                    ErrorKind.RATE_LIMITED, ErrorKind.OTHER -> break
                 }
             }
         }
