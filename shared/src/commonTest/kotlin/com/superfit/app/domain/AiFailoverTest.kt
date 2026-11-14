@@ -1,11 +1,11 @@
 package com.superfit.app.domain
 
+import com.superfit.app.data.UsageEvents
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlinx.coroutines.delay
-import com.superfit.app.data.UsageEvents
 import kotlinx.coroutines.test.runTest
 
 class AiFailoverTest {

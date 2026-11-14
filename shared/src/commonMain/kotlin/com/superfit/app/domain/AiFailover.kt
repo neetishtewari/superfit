@@ -105,8 +105,7 @@ object AiFailover {
     class OutOfCreditException(cause: Throwable) : Exception("Gemini prepaid credit is used up", cause)
 
     /** Reported to crash reports when Google says a model is gone, named so it stands out. */
-    class ModelUnavailableException(model: String, cause: Throwable) :
-        Exception("Gemini model $model is no longer available (retired or misspelled)", cause)
+    class ModelUnavailableException(model: String, cause: Throwable) : Exception("Gemini model $model is no longer available (retired or misspelled)", cause)
 
     @kotlin.concurrent.Volatile
     private var reportedUnavailable: Set<String> = emptySet()
