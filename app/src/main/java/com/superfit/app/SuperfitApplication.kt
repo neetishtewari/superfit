@@ -10,6 +10,8 @@ import androidx.work.WorkManager
 import com.google.firebase.Firebase
 import com.google.firebase.appcheck.appCheck
 import com.google.firebase.initialize
+import com.google.firebase.remoteconfig.remoteConfig
+import com.google.firebase.remoteconfig.remoteConfigSettings
 import com.superfit.app.data.DailyReminderWorker
 import com.superfit.app.data.TelemetrySyncWorker
 import com.superfit.app.data.userPrefs
@@ -31,6 +33,7 @@ class SuperfitApplication : Application() {
             com.superfit.app.domain.GeminiClient.chat(system, history, message)
         }
         com.superfit.app.domain.Ai.friendlyError = { com.superfit.app.domain.GeminiClient.sanitizeError(it) }
+        loadAiModels()
         com.superfit.app.data.AppAnalytics.init(this)
         com.superfit.app.data.GeminiKeyStore.forgetOldKeys(this)
         com.superfit.app.data.BodyImporter.load(this)
@@ -51,6 +54,22 @@ class SuperfitApplication : Application() {
             Firebase.appCheck.installAppCheckProviderFactory(AppCheckProviders.factory())
         } catch (e: Exception) {
             android.util.Log.e("SuperfitApplication", "App Check setup failed", e)
+        }
+    }
+
+    // The Gemini models to try first come from Firebase Remote Config, so a retired model can be
+    // swapped in the console without a store update. The last fetched list applies at once; a fresh
+    // one is fetched in the background (at most every few hours) and applies from then on. With no
+    // value, or if Remote Config can't be reached, the built-in list is used.
+    private fun loadAiModels() {
+        try {
+            val config = Firebase.remoteConfig
+            config.setConfigSettingsAsync(remoteConfigSettings { minimumFetchIntervalInSeconds = 6 * 60 * 60 })
+            val apply = { com.superfit.app.domain.AiFailover.setRemoteModels(config.getString(com.superfit.app.domain.AiFailover.REMOTE_CONFIG_KEY)) }
+            apply()
+            config.fetchAndActivate().addOnCompleteListener { apply() }
+        } catch (e: Exception) {
+            android.util.Log.w("SuperfitApplication", "Remote Config unavailable; using built-in AI models", e)
         }
     }
 

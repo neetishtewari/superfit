@@ -48,6 +48,9 @@ targets:
         product: FirebaseAuth
       - package: Firebase
         product: FirebaseAI
+      # Which Gemini models to use, changeable in the Firebase console (parameter ai_models).
+      - package: Firebase
+        product: FirebaseRemoteConfig
       # Anonymous usage counts and crash reports (Settings › Privacy switch, off in Debug builds).
       - package: Firebase
         product: FirebaseAnalytics

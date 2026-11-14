@@ -10,6 +10,8 @@ struct SuperfitApp: App {
         // it comes from the real app. Same project and rules as the Android app.
         AppCheck.setAppCheckProviderFactory(SuperfitAppCheckFactory())
         FirebaseApp.configure()
+        // Which Gemini models to use, changeable in the Firebase console without an app update.
+        RemoteConfigBridge.loadAiModels()
         // Reminder taps are handled from the first moment, even when the tap opened the app.
         _ = ReminderBridge.shared
     }

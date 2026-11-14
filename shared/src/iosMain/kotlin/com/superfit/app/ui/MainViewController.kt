@@ -132,8 +132,8 @@ fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, heal
     }
 }
 
-/** What the placeholder shows after the backup comes down: how many of each the iPhone now has. */
-private data class Restored(val meals: Int, val workouts: Int, val weighIns: Int, val failed: Boolean)
+/** Whether the backup check at sign-in finished, and if it failed. */
+private data class Restored(val failed: Boolean)
 
 /** Superfit's own page in the iPhone's Settings app (microphone, speech recognition, notifications). */
 private fun openPhoneSettings() {
@@ -143,6 +143,9 @@ private fun openPhoneSettings() {
 
 private const val APP_PREFS = "superfit_prefs"
 private const val KEY_THEME_MODE = "theme_mode"
+
+/** When this phone last brought down entries added on the account's other phones. */
+private const val KEY_ENTRIES_REFRESHED = "entries_refreshed_at"
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -201,22 +204,27 @@ private fun IosRoot(
         val backup = remember(uid) {
             CloudBackup(IosCloudStoreAdapter(cloudStore), { auth.currentUid() }, { database }, local)
         }
-        // Same as Android after sign-in: bring the backup down into this account's database
-        // (merge only), then count what arrived.
+        // Same as Android: the full backup only comes down onto a phone that doesn't have this
+        // account's data yet (new install or new sign-in). Later opens show Today straight away and,
+        // at most once a day, bring down meals, workouts and weigh-ins added on another phone in
+        // the background, so opening the app doesn't re-download the whole history.
         LaunchedEffect(uid) {
-            val failed = try {
-                backup.syncAllDown()
-                false
+            val downloaded = try {
+                backup.restoreIfEmpty()
             } catch (e: Exception) {
                 AppLog.w("Restore", "Restoring the backup failed", e)
-                true
+                restored = Restored(failed = true)
+                return@LaunchedEffect
             }
-            restored = Restored(
-                meals = database.nutritionDao().getAllEntries().size,
-                workouts = database.workoutDao().getAllEntries().size,
-                weighIns = database.weightDao().getAllWeightEntries().size,
-                failed = failed
-            )
+            restored = Restored(failed = false)
+            val prefs = IosPrefs.forUser(uid)
+            val now = Now.millis()
+            if (downloaded) {
+                prefs.edit { putLong(KEY_ENTRIES_REFRESHED, now) }
+            } else if (CloudBackup.isEntriesRefreshDue(prefs.getLong(KEY_ENTRIES_REFRESHED, 0L), now)) {
+                backup.syncEntriesDown()
+                prefs.edit { putLong(KEY_ENTRIES_REFRESHED, now) }
+            }
         }
         if (restored == null) {
             // Today waits for the backup, so it never says "no profile" before it arrives.
