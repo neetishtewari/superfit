@@ -27,6 +27,9 @@ interface HealthSource {
 
     suspend fun readSleep(date: LocalDate): SleepTelemetryEntity?
 
+    /** The day's exercise minutes as the phone counts them (Apple's green ring), or null when there are none. */
+    suspend fun readExerciseMinutes(date: LocalDate): Double? = null
+
     /**
      * Workouts any app or watch saved between two times, or null when they couldn't be read.
      * [bmr] fills in the resting part of total calories when only active calories were recorded.
@@ -54,12 +57,12 @@ interface HealthStore {
 object HealthSync {
     /**
      * Set once the person has answered the phone's access sheet. The number goes up when Superfit
-     * reads something new (v2: workouts, v3: weight and body measurements), so the sheet is offered again for just the new part.
+     * reads something new (v2: workouts, v3: weight and body measurements, v4: exercise minutes), so the sheet is offered again for just the new part.
      */
-    const val KEY_ASKED = "health_access_asked_v3"
+    const val KEY_ASKED = "health_access_asked_v4"
 
     /** Asked before something new was read: what was allowed keeps coming in until the new sheet is answered. */
-    val EARLIER_KEYS = listOf("health_access_asked", "health_access_asked_v2")
+    val EARLIER_KEYS = listOf("health_access_asked", "health_access_asked_v2", "health_access_asked_v3")
 
     suspend fun sync(source: HealthSource, store: HealthStore, today: LocalDate) {
         for (date in listOf(today, today.minus(DatePeriod(days = 1)))) {

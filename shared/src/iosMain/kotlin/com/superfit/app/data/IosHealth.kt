@@ -29,7 +29,7 @@ interface IosHealth {
     /** Shows Apple's access sheet for steps, active energy, walking distance and sleep (read only). */
     fun requestAccess(done: (String?) -> Unit)
 
-    /** [kind] is "steps", "activeKcal" or "distanceM". The total, or null when Apple Health has none. */
+    /** [kind] is "steps", "activeKcal", "distanceM" or "exerciseMin". The total, or null when Apple Health has none. */
     fun sum(kind: String, startMs: Long, endMs: Long, done: (Double?, String?) -> Unit)
 
     /** Asleep stretches as start, end, start, end… (in bed when nothing says asleep). */
@@ -92,6 +92,11 @@ class IosHealthSource(private val ios: IosHealth, private val zone: () -> TimeZo
     override suspend fun readDistanceMeters(date: LocalDate): Double? {
         val (start, end) = range(date)
         return sum("distanceM", start, end)
+    }
+
+    override suspend fun readExerciseMinutes(date: LocalDate): Double? {
+        val (start, end) = range(date)
+        return sum("exerciseMin", start, end)
     }
 
     override suspend fun readSleep(date: LocalDate): SleepTelemetryEntity? {

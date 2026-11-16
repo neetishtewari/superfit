@@ -12,6 +12,8 @@ final class HealthKitBridge: NSObject, IosHealth {
         HKQuantityType(.stepCount),
         HKQuantityType(.activeEnergyBurned),
         HKQuantityType(.distanceWalkingRunning),
+        // Apple's exercise minutes (the green ring), so brisk walks count as move time.
+        HKQuantityType(.appleExerciseTime),
         HKCategoryType(.sleepAnalysis),
         // Workouts from the watch and other apps, with their distance and heart rate.
         HKObjectType.workoutType(),
@@ -49,6 +51,7 @@ final class HealthKitBridge: NSObject, IosHealth {
         case "steps": (type, unit) = (HKQuantityType(.stepCount), .count())
         case "activeKcal": (type, unit) = (HKQuantityType(.activeEnergyBurned), .kilocalorie())
         case "distanceM": (type, unit) = (HKQuantityType(.distanceWalkingRunning), .meter())
+        case "exerciseMin": (type, unit) = (HKQuantityType(.appleExerciseTime), .minute())
         default:
             done(nil, "Unknown health value \(kind)")
             return
