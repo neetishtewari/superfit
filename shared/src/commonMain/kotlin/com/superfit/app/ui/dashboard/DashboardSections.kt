@@ -646,6 +646,11 @@ fun ActivityPerformanceCard(
                 fontSize = 12.sp,
                 color = ThemeTextSecondary
             )
+            // Steps arrive but no workouts ever have: workouts were most likely left off in the health app's access.
+            val accessHelp = HealthApp.workoutAccessHelp
+            if (accessHelp != null && !workoutImportRunning && state.importedWorkoutCount == 0 && today.steps > 0) {
+                Text(text = accessHelp, fontSize = 12.sp, color = ThemeTextSecondary, lineHeight = 17.sp)
+            }
         }
 
         if (state.workoutList.isNotEmpty() || state.importedWorkouts.isNotEmpty()) {

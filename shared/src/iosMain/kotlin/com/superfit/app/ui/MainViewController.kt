@@ -53,6 +53,7 @@ import com.superfit.app.data.installUsageReports
 import com.superfit.app.data.openIosDatabase
 import com.superfit.app.domain.AppLog
 import com.superfit.app.domain.CoachChat
+import com.superfit.app.domain.DayChange
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.domain.IosAi
 import com.superfit.app.domain.LogKind
@@ -91,6 +92,11 @@ import com.superfit.app.ui.settings.SettingsPage
 import com.superfit.app.ui.share.LocalShareCardHost
 import com.superfit.app.ui.share.ShareCardSheet
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -275,11 +281,20 @@ private fun IosRoot(
             return
         }
         val scale = remember(uid) { ScaleImport(IosPrefs.forUser(uid), log) }
-        val today = remember(uid) {
+        // Today follows the date. The iPhone keeps a paused app for days, so when it comes back on
+        // a new day (or is open at midnight) Today is set up again for that day; the old one stops.
+        var day by remember(uid) { mutableStateOf(Now.today()) }
+        LaunchedEffect(day) {
+            delay(DayChange.millisToNextDay(Now.local()))
+            day = Now.today()
+        }
+        val dayScope = remember(uid, day) { CoroutineScope(accountScope.coroutineContext + SupervisorJob(accountScope.coroutineContext[Job])) }
+        DisposableEffect(dayScope) { onDispose { dayScope.cancel() } }
+        val today = remember(uid, day) {
             TodayModel(
                 log = log,
                 prefs = IosPrefs.forUser(uid),
-                scope = accountScope,
+                scope = dayScope,
                 coachNotes = local::loadNotes,
                 health = health,
                 scale = scale,
@@ -287,7 +302,7 @@ private fun IosRoot(
             )
         }
         // Share cards: Apple's photo picker and share sheet; workout cards read heart rate from Apple Health.
-        val shareHost = remember(uid) {
+        val shareHost = remember(uid, today) {
             val sharePrefs = ShareCardPrefs(IosPrefs(ShareCardPrefs.FILE))
             IosShareCardHost(
                 ios = shareCards,
@@ -302,11 +317,11 @@ private fun IosRoot(
             )
         }
         // The coach chat, kept on the phone and backed up like Android's.
-        val coachChat = remember(uid) {
+        val coachChat = remember(uid, today) {
             CoachChatModel(local = local, clearLocalChat = local::clearChat, backup = backup, today = today, scope = accountScope, voice = speech)
         }
         // The evening reminder, written ahead from Today's numbers (the iPhone can't run code at 9 PM).
-        val reminderSync = remember(uid) { ReminderSync(reminders, IosPrefs.forUser(uid), today) }
+        val reminderSync = remember(uid, today) { ReminderSync(reminders, IosPrefs.forUser(uid), today) }
         LaunchedEffect(reminderSync) { reminderSync.run() }
         // Steps and sleep are read again each time the app comes back to the front.
         DisposableEffect(today) {
@@ -315,7 +330,8 @@ private fun IosRoot(
                 `object` = null,
                 queue = NSOperationQueue.mainQueue
             ) { _ ->
-                today.syncHealth()
+                // Back on a new day: a fresh Today reads the health app itself.
+                if (Now.today() != day) day = Now.today() else today.syncHealth()
                 // Back from the phone's Settings: notifications may have been turned on or off.
                 if (ReminderPlan.enabled(IosPrefs.forUser(uid))) reminderSync.checkAllowed()
             }
