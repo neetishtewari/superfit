@@ -48,7 +48,9 @@ data class DaySummaryState(
     val meals: List<NutritionEntryEntity>,
     val workouts: List<WorkoutEntryEntity>,
     // Workouts from other apps, without doubles or hidden ones.
-    val importedWorkouts: List<WorkoutView> = emptyList()
+    val importedWorkouts: List<WorkoutView> = emptyList(),
+    // The sleep that ended that morning (plus naps), 0 when no sleep was saved.
+    val sleepSeconds: Long = 0
 )
 
 data class WeeklyTrendsState(
@@ -211,7 +213,8 @@ object HistoryLog {
         workouts: Map<LocalDate, List<WorkoutEntryEntity>>,
         activity: Map<LocalDate, ActivityTelemetryEntity>,
         imported: Map<LocalDate, List<WorkoutView>>,
-        target: (LocalDate) -> Double
+        target: (LocalDate) -> Double,
+        sleep: Map<LocalDate, SleepTelemetryEntity> = emptyMap()
     ): DaySummaryState {
         val meals = nutrition[date].orEmpty()
         val dayWorkouts = workouts[date].orEmpty()
@@ -227,9 +230,13 @@ object HistoryLog {
             netBalance = eaten - tdee,
             meals = meals,
             workouts = dayWorkouts,
-            importedWorkouts = imported[date].orEmpty()
+            importedWorkouts = imported[date].orEmpty(),
+            sleepSeconds = sleep[date]?.sleepDurationSeconds ?: 0
         )
     }
+
+    /** "7h 58m" for a night's sleep. */
+    fun sleepText(seconds: Long): String = "${seconds / 3600}h ${(seconds % 3600) / 60}m"
 
     /** The chart shows the week up to the picked day (or the month's last week). */
     fun chartWeek(days: List<HistoryDayState>, selected: LocalDate): List<HistoryDayState> {

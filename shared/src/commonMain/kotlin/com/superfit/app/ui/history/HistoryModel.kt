@@ -111,13 +111,14 @@ class HistoryModel(
         val nutrition = HistoryLog.byDay(meals, tz) { it.timestamp }
         val workouts = HistoryLog.byDay(log.getAllWorkoutEntries(), tz) { it.timestamp }
         val activity = HistoryLog.activityByDay(log.getAllActivityTelemetry())
+        val sleep = HistoryLog.sleepByDay(log.getAllSleepTelemetry())
         val imported = importedByDay(profile, tz)
         val target = { date: LocalDate -> HistoryLog.calorieTarget(profile, prefs, imported[date].orEmpty(), workouts[date].orEmpty()) }
         HistoryPage(
             monthStart = monthStart,
             days = HistoryLog.monthDays(monthStart, nutrition, target),
             selected = day,
-            summary = HistoryLog.daySummary(day, nutrition, workouts, activity, imported, target),
+            summary = HistoryLog.daySummary(day, nutrition, workouts, activity, imported, target, sleep),
             canGoNext = monthStart < thisMonth
         )
     }.stateIn(scope, SharingStarted.Eagerly, null)

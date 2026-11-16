@@ -19,10 +19,11 @@ import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import com.superfit.app.domain.SleepNight
+import com.superfit.app.domain.SleepSpan
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 class HealthConnectManager(private val context: Context) {
 
@@ -151,12 +152,17 @@ class HealthConnectManager(private val context: Context) {
         return readDistanceTotal(client, localDate.atStartOfDay(zoneId).toInstant(), localDate.plusDays(1).atStartOfDay(zoneId).toInstant())
     }
 
+    /**
+     * The sleep that ended on [localDate] (last night plus any nap that day), worked out the same
+     * way as on iPhone (SleepNight). Samsung Health and another app (or the watch and the phone)
+     * often both save the same night, so overlapping sessions are joined and counted once instead
+     * of added together (one night read 15h56m against Samsung Health's 7h58m).
+     */
     suspend fun readSleepTelemetry(localDate: LocalDate): SleepTelemetryEntity? {
         val client = healthConnectClient ?: return null
 
         try {
             val zoneId = ZoneId.systemDefault()
-            // Query sleep sessions spanning last night
             val startTime = localDate.minusDays(1).atStartOfDay(zoneId).toInstant()
             val endTime = localDate.plusDays(1).atStartOfDay(zoneId).toInstant()
 
@@ -166,45 +172,20 @@ class HealthConnectManager(private val context: Context) {
                     timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
                 )
             )
-
-            // Find the sleep sessions that end on the given date (morning of localDate)
-            val relevantSessions = response.records.filter { record ->
-                val recordEndDate = record.endTime.atZone(zoneId).toLocalDate()
-                recordEndDate == localDate
-            }
-
-            val targetSessions = if (relevantSessions.isNotEmpty()) {
-                relevantSessions
-            } else {
-                val lastRecord = response.records.lastOrNull()
-                if (lastRecord != null) {
-                    val lastRecordEndDate = lastRecord.endTime.atZone(zoneId).toLocalDate()
-                    response.records.filter { record ->
-                        record.endTime.atZone(zoneId).toLocalDate() == lastRecordEndDate
-                    }
-                } else {
-                    emptyList()
+            android.util.Log.i(
+                "HealthConnectManager",
+                "sleep $localDate: " + response.records.joinToString {
+                    "${it.metadata.dataOrigin.packageName} ${it.startTime}-${it.endTime}"
                 }
-            }
-
-            if (targetSessions.isNotEmpty()) {
-                val totalDurationSeconds = targetSessions.sumOf { record ->
-                    ChronoUnit.SECONDS.between(record.startTime, record.endTime)
-                }
-                // Standard ratio estimate for deep sleep (20%)
-                val deepSleepSeconds = (totalDurationSeconds * 0.2).toLong()
-
-                // 8 hours (28800s) = 100% sleep score
-                val sleepRatio = totalDurationSeconds.toDouble() / 28800.0
-                val sleepReadiness = (sleepRatio * 100).toInt().coerceIn(0, 100)
-
-                return SleepTelemetryEntity(
-                    date = localDate.toString(),
-                    sleepDurationSeconds = totalDurationSeconds,
-                    deepSleepDurationSeconds = deepSleepSeconds,
-                    readinessScore = sleepReadiness
-                )
-            }
+            )
+            val spans = response.records.map { SleepSpan(it.startTime.toEpochMilli(), it.endTime.toEpochMilli()) }
+            return SleepNight.summarise(
+                spans,
+                kotlinx.datetime.LocalDate(localDate.year, localDate.monthValue, localDate.dayOfMonth),
+                kotlinx.datetime.TimeZone.of(zoneId.id)
+            )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -266,17 +247,20 @@ class HealthConnectManager(private val context: Context) {
             null
         }
 
+    // From one app, picked like steps: Samsung Health and Google Fit can both save the day's
+    // active calories, and Health Connect's merged total can add them together.
     private suspend fun readActiveCaloriesAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Double {
         return try {
-            val response = client.aggregate(
-                AggregateRequest(
-                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
-                )
-            )
-            val energy = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
-            // Access inKilocalories (the standard calorie scale used for foods and workouts)
-            energy?.inKilocalories ?: 0.0
+            largestSingleSource(
+                client,
+                ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
+                startTime,
+                endTime,
+                "activeKcal",
+                compare = { it.inKilocalories }
+            )?.inKilocalories ?: 0.0
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             0.0
         }

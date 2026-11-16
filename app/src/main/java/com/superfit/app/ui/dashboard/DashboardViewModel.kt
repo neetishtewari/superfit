@@ -30,11 +30,13 @@ import com.superfit.app.widget.SuperfitWidget
 import com.superfit.app.widget.WidgetSnapshot
 import com.superfit.app.widget.WidgetSnapshotStore
 import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -535,19 +537,55 @@ class DashboardViewModel(
         _duplicateWorkoutPrompt.value = null
     }
 
+    // The day Today shows, fixed when it opens.
+    private val openedOn: LocalDate = LocalDate.now()
+
     // Dynamic state combinations
-    val dashboardState: StateFlow<DashboardUiState> = combine(
+    val dashboardState: StateFlow<DashboardUiState> = dayState(openedOn).onEach { state ->
+        if (state is DashboardUiState.Success) {
+            updateWidget(state)
+            writeDietNote(state.dietQualityMetrics)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DashboardUiState.Loading
+    )
+
+    /** Yesterday, for the Activity tab between midnight and waking up ([showYesterday]). */
+    val yesterdayState: StateFlow<DashboardUiState> = dayState(openedOn.minusDays(1)).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DashboardUiState.Loading
+    )
+
+    /** Whether Activity still shows yesterday: re-checked each minute and when last night's sleep arrives. */
+    val showYesterday: StateFlow<Boolean> = combine(
+        repository.getSleepFlow(openedOn.toString()),
+        repository.getRecentSleepFlow(),
+        flow {
+            while (true) {
+                emit(Unit)
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+    ) { night, recent, _ ->
+        LocalDate.now() == openedOn &&
+            com.superfit.app.ui.dashboard.ActivityDay.showYesterday(java.time.LocalTime.now().hour, openedOn.toKotlinLocalDate(), night, recent)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    private fun dayState(day: LocalDate): Flow<DashboardUiState> = combine(
         repository.profileFlow,
-        repository.getActivityFlow(LocalDate.now().toString()),
-        repository.getSleepFlow(LocalDate.now().toString()),
-        repository.getNutritionEntriesForDay(LocalDate.now()),
-        repository.getWorkoutEntriesForDay(LocalDate.now()),
+        repository.getActivityFlow(day.toString()),
+        repository.getSleepFlow(day.toString()),
+        repository.getNutritionEntriesForDay(day),
+        repository.getWorkoutEntriesForDay(day),
         repository.weightEntriesFlow,
         repository.streakStateFlow,
-        repository.getHabitEntryFlow(LocalDate.now().toString()),
+        repository.getHabitEntryFlow(day.toString()),
         customMacroTrigger,
         repository.allNutritionEntriesFlow,
-        repository.getImportedWorkoutsForDay(LocalDate.now()),
+        repository.getImportedWorkoutsForDay(day),
         repository.importedWorkoutCountFlow
     ) { array ->
         val profile = array[0] as? UserProfileEntity
@@ -582,7 +620,7 @@ class DashboardViewModel(
                 emptyList()
             }
             TodayState.build(
-                today = LocalDate.now().toString(),
+                today = day.toString(),
                 zone = kotlinx.datetime.TimeZone.currentSystemDefault(),
                 profile = profile,
                 activity = activity,
@@ -598,16 +636,7 @@ class DashboardViewModel(
                 prefs = userPrefs(appContext)
             )
         }
-    }.onEach { state ->
-        if (state is DashboardUiState.Success) {
-            updateWidget(state)
-            writeDietNote(state.dietQualityMetrics)
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = DashboardUiState.Loading
-    )
+    }
 
     /**
      * The same weekday's usual activity over the last 4 weeks, for Home's "vs your usual" and the
@@ -825,6 +854,12 @@ class DashboardViewModel(
             if (!sharedPrefs.getBoolean(PAST_STEPS_CORRECTED, false)) {
                 repository.correctPastSteps(fromDaysAgo = 2, toDaysAgo = 30)
                 sharedPrefs.edit().putBoolean(PAST_STEPS_CORRECTED, true).apply()
+            }
+            // Once: nights and active calories saved before the fix could hold two apps added together.
+            if (!sharedPrefs.getBoolean(PAST_SLEEP_CORRECTED, false)) {
+                repository.correctPastSleep(fromDaysAgo = 0, toDaysAgo = 30)
+                repository.correctPastActiveCalories(fromDaysAgo = 2, toDaysAgo = 30)
+                sharedPrefs.edit().putBoolean(PAST_SLEEP_CORRECTED, true).apply()
             }
             _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
@@ -1141,6 +1176,7 @@ class DashboardViewModel(
 
     companion object {
         private const val PAST_STEPS_CORRECTED = "past_steps_watch_first_v2"
+        private const val PAST_SLEEP_CORRECTED = "past_sleep_counted_once_v1"
 
         /** First chat chip in Roast me style. */
         const val ROAST_MY_DAY = com.superfit.app.domain.CoachChat.ROAST_MY_DAY

@@ -57,16 +57,20 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 
 /**
@@ -129,16 +133,34 @@ class TodayModel(
     private fun workoutViews(rows: List<ImportedWorkoutEntity>, profile: UserProfileEntity): List<WorkoutView> =
         WorkoutSync.views(rows, workoutPrefs, sourceNames, PhysiologyEngine.calculateBmr(profile))
 
+    val state: StateFlow<DashboardUiState> = dayState(today).stateIn(scope, SharingStarted.Eagerly, DashboardUiState.Loading)
+
+    /** Yesterday, for the Activity tab between midnight and waking up ([showYesterday]). */
+    val yesterdayState: StateFlow<DashboardUiState> =
+        dayState(today.minus(1, DateTimeUnit.DAY)).stateIn(scope, SharingStarted.Eagerly, DashboardUiState.Loading)
+
+    /** Whether Activity still shows yesterday: re-checked each minute and when last night's sleep arrives. */
+    val showYesterday: StateFlow<Boolean> = combine(log.getSleepFlow(today.toString()), log.getRecentSleepFlow(), minuteTicks()) { night, recent, _ ->
+        Now.today() == today && ActivityDay.showYesterday(Now.hour(), today, night, recent)
+    }.stateIn(scope, SharingStarted.Eagerly, false)
+
+    private fun minuteTicks(): Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(60_000)
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
-    val state: StateFlow<DashboardUiState> = combine(
+    private fun dayState(day: LocalDate): Flow<DashboardUiState> = combine(
         listOf<Flow<Any?>>(
             log.profileFlow,
-            log.getActivityFlow(today.toString()),
-            log.getSleepFlow(today.toString()),
-            log.getNutritionEntriesForDay(today),
-            log.getWorkoutEntriesForDay(today),
+            log.getActivityFlow(day.toString()),
+            log.getSleepFlow(day.toString()),
+            log.getNutritionEntriesForDay(day),
+            log.getWorkoutEntriesForDay(day),
             log.weightEntriesFlow,
-            log.getHabitEntryFlow(today.toString()),
+            log.getHabitEntryFlow(day.toString()),
             log.allNutritionEntriesFlow,
             settingsChanged,
             log.allImportedWorkoutsFlow
@@ -146,9 +168,9 @@ class TodayModel(
     ) { values ->
         val profile = values[0] as? UserProfileEntity ?: return@combine DashboardUiState.NotInitialized
         val importedRows = values[9] as? List<ImportedWorkoutEntity> ?: emptyList()
-        val todayViews = DayTotalsBuilder.byDate(workoutViews(importedRows, profile), zone())[today].orEmpty()
+        val todayViews = DayTotalsBuilder.byDate(workoutViews(importedRows, profile), zone())[day].orEmpty()
         TodayState.build(
-            today = today.toString(),
+            today = day.toString(),
             zone = zone(),
             profile = profile,
             activity = values[1] as? ActivityTelemetryEntity,
@@ -163,7 +185,7 @@ class TodayModel(
             workoutPrefs = workoutPrefs,
             prefs = prefs
         )
-    }.stateIn(scope, SharingStarted.Eagerly, DashboardUiState.Loading)
+    }
 
     /**
      * The same weekday's usual activity over the last 4 weeks, for "vs your usual" on Activity.

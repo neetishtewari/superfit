@@ -2,6 +2,7 @@ package com.superfit.app.ui.history
 
 import com.superfit.app.data.MemoryPrefs
 import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.SleepTelemetryEntity
 import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.ParsedNutritionResult
 import kotlin.test.Test
@@ -83,5 +84,19 @@ class HistoryLogTest {
         assertEquals("dal rice", entry.foodText)
         assertEquals(listOf(day), HistoryLog.byDay(listOf(entry), zone) { it.timestamp }.keys.toList())
         assertEquals(listOf(day), HistoryLog.byDay(listOf(entry), TimeZone.UTC) { it.timestamp }.keys.toList())
+    }
+
+    @Test
+    fun thePickedDayShowsTheSleepThatEndedThatMorning() {
+        val day = LocalDate.parse("2026-11-16")
+        val sleep = HistoryLog.sleepByDay(listOf(SleepTelemetryEntity("2026-11-16", 28_680L, 5_736L, 99)))
+
+        val summary = HistoryLog.daySummary(day, emptyMap(), emptyMap(), emptyMap(), emptyMap(), target, sleep)
+        val noSleep = HistoryLog.daySummary(LocalDate.parse("2026-11-14"), emptyMap(), emptyMap(), emptyMap(), emptyMap(), target, sleep)
+
+        assertEquals(28_680L, summary.sleepSeconds)
+        assertEquals("7h 58m", HistoryLog.sleepText(summary.sleepSeconds))
+        // A day without a tracked night has nothing to show, rather than "0h 0m".
+        assertEquals(0L, noSleep.sleepSeconds)
     }
 }

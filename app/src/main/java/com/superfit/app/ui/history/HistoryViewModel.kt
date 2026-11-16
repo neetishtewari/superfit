@@ -124,6 +124,7 @@ class HistoryViewModel(
     private var nutritionByDate: Map<KDate, List<NutritionEntryEntity>> = emptyMap()
     private var workoutsByDate: Map<KDate, List<WorkoutEntryEntity>> = emptyMap()
     private var activityByDate: Map<KDate, ActivityTelemetryEntity> = emptyMap()
+    private var sleepByDate: Map<KDate, com.superfit.app.data.SleepTelemetryEntity> = emptyMap()
     private var importedByDate: Map<KDate, List<com.superfit.app.domain.WorkoutView>> = emptyMap()
     private var profile: UserProfileEntity? = null
     private var dayTotals: Map<kotlinx.datetime.LocalDate, com.superfit.app.domain.DayTotals> = emptyMap()
@@ -159,7 +160,7 @@ class HistoryViewModel(
     }
 
     private fun updateSelectedSummary() {
-        selectedSummary = HistoryLog.daySummary(selectedDate, nutritionByDate, workoutsByDate, activityByDate, importedByDate, ::targetOn)
+        selectedSummary = HistoryLog.daySummary(selectedDate, nutritionByDate, workoutsByDate, activityByDate, importedByDate, ::targetOn, sleepByDate)
     }
 
     fun loadData() {
@@ -178,7 +179,7 @@ class HistoryViewModel(
             nutritionByDate = HistoryLog.byDay(allNutrition, zone) { it.timestamp }
             workoutsByDate = HistoryLog.byDay(allWorkouts, zone) { it.timestamp }
             activityByDate = HistoryLog.activityByDay(allActivity)
-            val sleepByDate = HistoryLog.sleepByDay(allSleep)
+            sleepByDate = HistoryLog.sleepByDay(allSleep)
 
             daysInMonth = HistoryLog.monthDays(currentMonth.atDay(1).toKotlinLocalDate(), nutritionByDate, ::targetOn)
 

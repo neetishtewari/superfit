@@ -184,6 +184,48 @@ class DataRepository(
         }
     }
 
+    /**
+     * One-time clean-up after the sleep fix: re-reads the saved nights from [fromDaysAgo] to
+     * [toDaysAgo], so nights saved with two apps' sessions added together show the real length.
+     * A night Health Connect no longer has keeps what was saved, so nothing is wiped.
+     */
+    suspend fun correctPastSleep(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedNights = log.getAllSleepTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedNights[date.toString()] ?: continue
+            val fresh = healthConnectManager.readSleepTelemetry(date) ?: continue
+            if (fresh.sleepDurationSeconds != saved.sleepDurationSeconds) log.saveSleep(fresh)
+        }
+    }
+
+    /**
+     * One-time clean-up after the single-app active calories fix: re-reads the saved days and
+     * saves one app's active calories, up or down. Steps are left as saved; a failed read or a
+     * day with nothing now keeps what was saved.
+     */
+    suspend fun correctPastActiveCalories(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedDays = log.getAllActivityTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedDays[date.toString()] ?: continue
+            val fresh = try {
+                healthConnectManager.readDailyTelemetry(date)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            if (fresh.activeCalories > 0 && fresh.activeCalories != saved.activeCalories) {
+                log.saveActivity(saved.copy(activeCalories = fresh.activeCalories))
+            }
+        }
+    }
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()
