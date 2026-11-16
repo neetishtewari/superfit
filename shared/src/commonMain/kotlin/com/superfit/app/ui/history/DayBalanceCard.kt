@@ -134,6 +134,13 @@ fun DayBalanceCard(
                     BalanceStat("Steps", LocalFormat.integer(summary.steps.toLong()), ThemeTextPrimary, Modifier.weight(1f))
                     BalanceStat("From exercise", "${count(summary.activeBurn)} kcal", ElectricCyan, Modifier.weight(1f))
                 }
+                // Sleep sits with food and exercise; only on days a tracker saved it, never "0h".
+                if (summary.sleepSeconds > 0) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        BalanceStat("Sleep", HistoryLog.sleepText(summary.sleepSeconds), ThemeTextPrimary, Modifier.weight(1f))
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
             }
 
             // Net balance bar
