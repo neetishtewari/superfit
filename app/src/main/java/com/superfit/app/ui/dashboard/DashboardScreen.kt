@@ -301,6 +301,8 @@ fun DashboardScreen(
     val workoutImportEnabled by viewModel.workoutImportEnabled.collectAsState()
     val workoutCardDismissed by viewModel.workoutCardDismissed.collectAsState()
     val usualDay by viewModel.usualDay.collectAsState()
+    val yesterdayState by viewModel.yesterdayState.collectAsState()
+    val showYesterday by viewModel.showYesterday.collectAsState()
     val todayDistance by viewModel.todayDistance.collectAsState()
     val workoutPermissionMissing by viewModel.workoutPermissionMissing.collectAsState()
     val workoutImportRunning by viewModel.workoutImportRunning.collectAsState()
@@ -647,18 +649,21 @@ fun DashboardScreen(
                             }
 
                             // 1. Activity & Performance Card
+                            // Between midnight and waking up, yesterday's numbers instead of an empty day.
+                            val night = (yesterdayState as? DashboardUiState.Success)?.takeIf { showYesterday }
                             ActivityPerformanceCard(
-                                state = state,
-                                vsUsual = viewModel.todayVsUsual(state, usualDay, todayDistance),
+                                state = night ?: state,
+                                vsUsual = if (night == null) viewModel.todayVsUsual(state, usualDay, todayDistance) else null,
                                 onDeleteWorkout = { viewModel.deleteWorkout(it) },
                                 onHideImportedWorkout = { viewModel.hideWorkout(it) },
                                 workoutImportEnabled = workoutImportEnabled,
                                 workoutImportRunning = workoutImportRunning,
-                                onShareWorkout = { shareCard = it }
+                                onShareWorkout = { shareCard = it },
+                                yesterday = night != null
                             )
 
                             // 2. Sleep & Readiness Recovery Dashboard
-                            SleepRecoveryCard(state = state)
+                            SleepRecoveryCard(state = night ?: state)
                         }
 
                         Spacer(modifier = Modifier.height(48.dp))

@@ -559,7 +559,9 @@ fun ActivityPerformanceCard(
     onHideImportedWorkout: (com.superfit.app.domain.WorkoutView) -> Unit = {},
     workoutImportEnabled: Boolean = false,
     workoutImportRunning: Boolean = false,
-    onShareWorkout: (com.superfit.app.domain.ShareCard) -> Unit = {}
+    onShareWorkout: (com.superfit.app.domain.ShareCard) -> Unit = {},
+    // Between midnight and waking up the tab shows yesterday (ActivityDay).
+    yesterday: Boolean = false
 ) {
     Column(
         modifier = Modifier
@@ -580,10 +582,17 @@ fun ActivityPerformanceCard(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Today's activity",
+            text = if (yesterday) "Yesterday's activity" else "Today's activity",
             style = MaterialTheme.typography.titleLarge,
             color = ThemeTextPrimary
         )
+        if (yesterday) {
+            Text(
+                text = "Today starts when you wake up.",
+                fontSize = 13.sp,
+                color = ThemeTextSecondary
+            )
+        }
 
         val today = vsUsual ?: com.superfit.app.domain.TodayVsUsual.of(Now.today(), state.activity.steps, emptyList(), null)
         val usual = today.usual
@@ -624,10 +633,10 @@ fun ActivityPerformanceCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-            today.coachLine(Now.hour())?.let { line ->
+            today.coachLine(Now.hour())?.takeUnless { yesterday }?.let { line ->
                 Text(text = line, fontSize = 13.sp, color = ThemeTextPrimary, lineHeight = 18.sp)
             }
-            if (usual == null) {
+            if (usual == null && !yesterday) {
                 Text(
                     text = "A couple more weeks of data and Superfit will compare each day with your usual for that weekday.",
                     fontSize = 12.sp,
@@ -660,7 +669,7 @@ fun ActivityPerformanceCard(
             )
 
             Text(
-                text = "Today's workouts",
+                text = if (yesterday) "Yesterday's workouts" else "Today's workouts",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = ThemeTextTertiary,

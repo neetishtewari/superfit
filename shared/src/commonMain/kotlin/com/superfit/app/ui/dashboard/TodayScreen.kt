@@ -78,6 +78,8 @@ fun TodayScreen(
 ) {
     val state by model.state.collectAsState()
     val usualDay by model.usualDay.collectAsState()
+    val yesterdayState by model.yesterdayState.collectAsState()
+    val showYesterday by model.showYesterday.collectAsState()
     val coachStyle by model.coachStyle.collectAsState()
     val stepGoal by model.stepGoal.collectAsState()
     val stepGoalNoteDismissedOn by model.stepGoalNoteDismissedOn.collectAsState()
@@ -277,16 +279,19 @@ fun TodayScreen(
                     )
                 } else {
                     if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
+                    // Between midnight and waking up, yesterday's numbers instead of an empty day.
+                    val night = (yesterdayState as? DashboardUiState.Success)?.takeIf { showYesterday }
                     ActivityPerformanceCard(
-                        state = s,
-                        vsUsual = model.vsUsual(s, usualDay, distanceKm, exerciseMinutes),
+                        state = night ?: s,
+                        vsUsual = if (night == null) model.vsUsual(s, usualDay, distanceKm, exerciseMinutes) else null,
                         onDeleteWorkout = model::deleteWorkout,
                         onHideImportedWorkout = model::hideImportedWorkout,
                         workoutImportEnabled = workoutImportEnabled,
                         workoutImportRunning = workoutImportRunning,
-                        onShareWorkout = { shareCard = it }
+                        onShareWorkout = { shareCard = it },
+                        yesterday = night != null
                     )
-                    SleepRecoveryCard(state = s)
+                    SleepRecoveryCard(state = night ?: s)
                 }
                 footer()
                 Spacer(modifier = Modifier.height(48.dp))
