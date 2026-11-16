@@ -20,7 +20,7 @@ object HealthApp {
     fun useAppleHealth() {
         name = "Apple Health"
         workoutApps = "your Apple Watch, Strava or another fitness app"
-        workoutAccessHelp = "Workouts on your watch but none here? On your iPhone, open Settings › Health › " +
-            "Data Access & Devices › Superfit and turn on Workouts. They come in next time you open Superfit."
+        workoutAccessHelp = "Workouts on your watch but none here? Open the Health app, tap your picture at the top right, " +
+            "then Apps › Superfit, and turn on Workouts. They come in next time you open Superfit."
     }
 }
