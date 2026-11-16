@@ -826,6 +826,11 @@ class DashboardViewModel(
                 repository.correctPastSteps(fromDaysAgo = 2, toDaysAgo = 30)
                 sharedPrefs.edit().putBoolean(PAST_STEPS_CORRECTED, true).apply()
             }
+            // Once: nights saved before the sleep fix could hold two apps' sessions added together.
+            if (!sharedPrefs.getBoolean(PAST_SLEEP_CORRECTED, false)) {
+                repository.correctPastSleep(fromDaysAgo = 0, toDaysAgo = 30)
+                sharedPrefs.edit().putBoolean(PAST_SLEEP_CORRECTED, true).apply()
+            }
             _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()
@@ -1141,6 +1146,7 @@ class DashboardViewModel(
 
     companion object {
         private const val PAST_STEPS_CORRECTED = "past_steps_watch_first_v2"
+        private const val PAST_SLEEP_CORRECTED = "past_sleep_counted_once_v1"
 
         /** First chat chip in Roast me style. */
         const val ROAST_MY_DAY = com.superfit.app.domain.CoachChat.ROAST_MY_DAY

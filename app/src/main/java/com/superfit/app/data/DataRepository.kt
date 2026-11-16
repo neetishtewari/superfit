@@ -184,6 +184,23 @@ class DataRepository(
         }
     }
 
+    /**
+     * One-time clean-up after the sleep fix: re-reads the saved nights from [fromDaysAgo] to
+     * [toDaysAgo], so nights saved with two apps' sessions added together show the real length.
+     * A night Health Connect no longer has keeps what was saved, so nothing is wiped.
+     */
+    suspend fun correctPastSleep(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedNights = log.getAllSleepTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedNights[date.toString()] ?: continue
+            val fresh = healthConnectManager.readSleepTelemetry(date) ?: continue
+            if (fresh.sleepDurationSeconds != saved.sleepDurationSeconds) log.saveSleep(fresh)
+        }
+    }
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()

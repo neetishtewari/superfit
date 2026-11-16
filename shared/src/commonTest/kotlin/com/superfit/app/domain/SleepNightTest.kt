@@ -40,6 +40,14 @@ class SleepNightTest {
     }
 
     @Test
+    fun twoAppsSavingTheExactSameNightCountItOnce() {
+        // Samsung Health 7h58m, also saved by another app: must stay 7h58m, not 15h56m.
+        val night = SleepSpan(at(11, 23, 2), at(12, 7))
+
+        assertEquals(7L * 3600 + 58 * 60, SleepNight.summarise(listOf(night, night.copy()), date, zone)!!.sleepDurationSeconds)
+    }
+
+    @Test
     fun anAfternoonNapIsAddedToThatDay() {
         val night = span(11, 23, 12, 6)
         val nap = span(12, 14, 12, 15)
