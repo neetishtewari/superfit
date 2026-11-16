@@ -13,13 +13,14 @@ data class HealthWorkout(val row: ImportedWorkoutEntity, val sourceName: String)
 
 /**
  * Brings workouts other apps saved to the phone's health app into imported_workouts, the way
- * Android's WorkoutImporter does with Health Connect: 90 days back the first time, then the last
- * week again so edits and late syncs are picked up, and workouts deleted there go here too.
+ * Android's WorkoutImporter does with Health Connect: the last 90 days each time, so edits and late
+ * syncs are picked up, and workouts deleted there go here too. Always 90 days, not just the last
+ * week after the first read: on the iPhone, workouts may only become readable later (switched on in
+ * the Health app, or access widened from Limited), and they must still come in then.
  */
 object WorkoutSync {
     private const val DAY_MS = 24L * 3600 * 1000
-    private const val FIRST_IMPORT_DAYS = 90
-    private const val REFRESH_DAYS = 7
+    private const val IMPORT_DAYS = 90
 
     // Opening the app and coming back to it must not import over each other.
     private val lock = Mutex()
@@ -34,7 +35,7 @@ object WorkoutSync {
         nowMs: Long
     ): Int? = lock.withLock {
         if (!prefs.enabled) return@withLock null
-        val from = nowMs - DAY_MS * if (prefs.lastImportMillis == 0L) FIRST_IMPORT_DAYS else REFRESH_DAYS
+        val from = nowMs - DAY_MS * IMPORT_DAYS
         val workouts = try {
             source.readWorkouts(from, nowMs, bmr)
         } catch (e: CancellationException) {

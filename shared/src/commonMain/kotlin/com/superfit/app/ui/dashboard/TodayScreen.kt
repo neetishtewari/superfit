@@ -84,6 +84,7 @@ fun TodayScreen(
     val coaching by model.coaching.collectAsState()
     val healthAsked by model.healthAsked.collectAsState()
     val distanceKm by model.distanceKm.collectAsState()
+    val exerciseMinutes by model.exerciseMinutes.collectAsState()
     val workoutImportEnabled by model.workoutImportEnabled.collectAsState()
     val workoutImportRunning by model.workoutImportRunning.collectAsState()
     val pendingScaleReading by model.pendingScaleReading.collectAsState()
@@ -278,7 +279,7 @@ fun TodayScreen(
                     if (model.healthAvailable && !healthAsked) ConnectHealthCard(onConnect = model::connectHealth)
                     ActivityPerformanceCard(
                         state = s,
-                        vsUsual = model.vsUsual(s, usualDay, distanceKm),
+                        vsUsual = model.vsUsual(s, usualDay, distanceKm, exerciseMinutes),
                         onDeleteWorkout = model::deleteWorkout,
                         onHideImportedWorkout = model::hideImportedWorkout,
                         workoutImportEnabled = workoutImportEnabled,

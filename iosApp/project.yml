@@ -93,7 +93,7 @@ targets:
         # Compose Multiplatform draws at the screen's full refresh rate (ProMotion).
         CADisableMinimumFrameDurationOnPhone: true
         # Shown in Apple's Health access sheet. Superfit only reads; it never writes to Apple Health.
-        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, distances, sleep, workouts and heart rate during workouts, your height, and weigh-ins with body measurements from your scale, to show your day, set your step goal and targets, and guide your coach. It never changes anything in Apple Health."
+        NSHealthShareUsageDescription: "Superfit reads your steps, active calories, exercise minutes, distances, sleep, workouts and heart rate during workouts, your height, and weigh-ins with body measurements from your scale, to show your day, set your step goal and targets, and guide your coach. It never changes anything in Apple Health."
         NSHealthUpdateUsageDescription: "Superfit only reads from Apple Health. It never adds or changes anything there."
         # Only standard encryption (HTTPS and Apple's own), which is exempt: skips the export question on each upload.
         ITSAppUsesNonExemptEncryption: false

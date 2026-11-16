@@ -428,11 +428,22 @@ data class TodayVsUsual(
     }
 
     companion object {
-        fun of(today: LocalDate, steps: Int, workouts: List<ActivityFact>, usual: UsualDay?, distanceKm: Double? = null) = TodayVsUsual(
+        /**
+         * Move time is the workouts' minutes, or the phone's own exercise minutes when those are more
+         * (brisk walks count there without a recorded workout).
+         */
+        fun of(
+            today: LocalDate,
+            steps: Int,
+            workouts: List<ActivityFact>,
+            usual: UsualDay?,
+            distanceKm: Double? = null,
+            exerciseMinutes: Double? = null
+        ) = TodayVsUsual(
             steps = steps,
             distanceKm = distanceKm ?: (steps * UsualDay.STEP_KM),
             distanceEstimated = distanceKm == null,
-            moveMinutes = workouts.sumOf { it.minutes },
+            moveMinutes = maxOf(workouts.sumOf { it.minutes }, exerciseMinutes?.roundToLong() ?: 0L),
             workoutKcal = workouts.sumOf { it.kcal },
             usual = usual,
             weekday = localWeekdayName(today.dayOfWeek)

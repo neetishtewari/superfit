@@ -46,15 +46,17 @@ class WorkoutSyncTest {
     private fun prefs(enabled: Boolean = true) = WorkoutImportPrefs(MemoryPrefs()).apply { this.enabled = enabled }
 
     @Test
-    fun theFirstImportGoesBackNinetyDaysThenAWeek() = runTest {
+    fun everyImportGoesBackNinetyDays() = runTest {
         val p = prefs()
-        val source = FakeSource(listOf(run("a", 3)))
         val names = HealthSourceNames(MemoryPrefs())
-        WorkoutSync.import(source, FakeDao(), p, names, 1700.0, now)
+        val dao = FakeDao()
+        // The first read finds nothing (workouts not readable yet, e.g. switched off in the Health app).
+        WorkoutSync.import(FakeSource(emptyList()), dao, p, names, 1700.0, now)
+        // Workouts turned on later: a 30-day-old one still comes in.
+        val source = FakeSource(listOf(run("a", 30)))
+        WorkoutSync.import(source, dao, p, names, 1700.0, now)
         assertEquals(now - 90 * day, source.askedFrom)
-
-        WorkoutSync.import(source, FakeDao(), p, names, 1700.0, now)
-        assertEquals(now - 7 * day, source.askedFrom)
+        assertEquals(setOf("a"), dao.rows.keys)
     }
 
     @Test

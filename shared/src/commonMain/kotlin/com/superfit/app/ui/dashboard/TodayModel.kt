@@ -186,8 +186,12 @@ class TodayModel(
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
     /** Today's activity next to [usualDay], with the health app's distance when it has one (else estimated from steps). */
-    fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?, distanceKm: Double? = null): TodayVsUsual =
-        TodayState.vsUsual(state, usual, today, distanceKm)
+    fun vsUsual(
+        state: DashboardUiState.Success,
+        usual: UsualDay?,
+        distanceKm: Double? = null,
+        exerciseMinutes: Double? = _exerciseMinutes.value
+    ): TodayVsUsual = TodayState.vsUsual(state, usual, today, distanceKm, exerciseMinutes)
 
     /** Whether this phone has a health app Superfit can read (false on iPads and without one). */
     val healthAvailable: Boolean = health?.isAvailable() == true
@@ -201,6 +205,11 @@ class TodayModel(
 
     /** Today's walked and run distance from the health app, or null to estimate it from steps. */
     val distanceKm: StateFlow<Double?> = _distanceKm.asStateFlow()
+
+    private val _exerciseMinutes = MutableStateFlow<Double?>(null)
+
+    /** Today's exercise minutes from the health app (Apple's green ring), or null; Move time uses it when it's more than the workouts. */
+    val exerciseMinutes: StateFlow<Double?> = _exerciseMinutes.asStateFlow()
 
     /** Shows the phone's own access sheet, then reads today's steps and sleep straight away. */
     fun connectHealth() {
@@ -371,6 +380,13 @@ class TodayModel(
         }
         _distanceKm.value = try {
             source.readDistanceMeters(Now.today())?.takeIf { it > 0 }?.div(1000)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        _exerciseMinutes.value = try {
+            source.readExerciseMinutes(Now.today())?.takeIf { it > 0 }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

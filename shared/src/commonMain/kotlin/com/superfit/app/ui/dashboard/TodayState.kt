@@ -169,7 +169,13 @@ object TodayState {
      * Today's steps and workouts next to the usual for this weekday. [distanceKm] is the distance
      * the phone's health app recorded today; null falls back to an estimate from steps.
      */
-    fun vsUsual(state: DashboardUiState.Success, usual: UsualDay?, today: LocalDate, distanceKm: Double? = null): TodayVsUsual =
+    fun vsUsual(
+        state: DashboardUiState.Success,
+        usual: UsualDay?,
+        today: LocalDate,
+        distanceKm: Double? = null,
+        exerciseMinutes: Double? = null
+    ): TodayVsUsual =
         TodayVsUsual.of(
             today = today,
             steps = state.activity.steps,
@@ -177,7 +183,8 @@ object TodayState {
                 ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
             },
             usual = usual,
-            distanceKm = distanceKm
+            distanceKm = distanceKm,
+            exerciseMinutes = exerciseMinutes
         )
 
     /** The same weekday's usual activity over the last 4 weeks, or null without enough history. */
