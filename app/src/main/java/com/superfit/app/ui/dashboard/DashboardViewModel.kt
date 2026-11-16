@@ -826,9 +826,10 @@ class DashboardViewModel(
                 repository.correctPastSteps(fromDaysAgo = 2, toDaysAgo = 30)
                 sharedPrefs.edit().putBoolean(PAST_STEPS_CORRECTED, true).apply()
             }
-            // Once: nights saved before the sleep fix could hold two apps' sessions added together.
+            // Once: nights and active calories saved before the fix could hold two apps added together.
             if (!sharedPrefs.getBoolean(PAST_SLEEP_CORRECTED, false)) {
                 repository.correctPastSleep(fromDaysAgo = 0, toDaysAgo = 30)
+                repository.correctPastActiveCalories(fromDaysAgo = 2, toDaysAgo = 30)
                 sharedPrefs.edit().putBoolean(PAST_SLEEP_CORRECTED, true).apply()
             }
             _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }

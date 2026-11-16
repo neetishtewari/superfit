@@ -247,17 +247,20 @@ class HealthConnectManager(private val context: Context) {
             null
         }
 
+    // From one app, picked like steps: Samsung Health and Google Fit can both save the day's
+    // active calories, and Health Connect's merged total can add them together.
     private suspend fun readActiveCaloriesAggregate(client: HealthConnectClient, startTime: Instant, endTime: Instant): Double {
         return try {
-            val response = client.aggregate(
-                AggregateRequest(
-                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
-                )
-            )
-            val energy = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
-            // Access inKilocalories (the standard calorie scale used for foods and workouts)
-            energy?.inKilocalories ?: 0.0
+            largestSingleSource(
+                client,
+                ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
+                startTime,
+                endTime,
+                "activeKcal",
+                compare = { it.inKilocalories }
+            )?.inKilocalories ?: 0.0
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             0.0
         }
