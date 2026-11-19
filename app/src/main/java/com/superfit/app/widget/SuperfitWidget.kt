@@ -88,7 +88,7 @@ class SuperfitWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        com.superfit.app.data.AppAnalytics.widgetAdded()
+        com.superfit.app.data.UsageEvents.widgetAdded()
     }
 }
 

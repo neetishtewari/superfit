@@ -5,43 +5,38 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.superfit.app.data.*
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.ReviewPrompt
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.userPrefs
 import com.superfit.app.domain.CoachInsight
-import com.superfit.app.domain.CoachPatternEngine
-import com.superfit.app.domain.CoachingEngine
 import com.superfit.app.domain.DaySteps
 import com.superfit.app.domain.FoodQualityEngine
 import com.superfit.app.domain.GeminiClient
 import com.superfit.app.domain.LogKind
 import com.superfit.app.domain.LogRouter
 import com.superfit.app.domain.MacroTargets
-import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.NutritionParser
 import com.superfit.app.domain.PersonalBest
 import com.superfit.app.domain.PersonalBests
 import com.superfit.app.domain.PhysiologyEngine
-import com.superfit.app.domain.RepeatMealCache
-import com.superfit.app.domain.SpokenInput
 import com.superfit.app.domain.StepGoal
-import com.superfit.app.domain.StepGoalReason
 import com.superfit.app.domain.StepGoalResult
 import com.superfit.app.domain.WorkoutAddBack
 import com.superfit.app.domain.WorkoutDisplay
 import com.superfit.app.domain.WorkoutParser
 import com.superfit.app.domain.WorkoutView
+import com.superfit.app.domain.currentAge
 import com.superfit.app.widget.SuperfitWidget
 import com.superfit.app.widget.WidgetSnapshot
 import com.superfit.app.widget.WidgetSnapshotStore
 import java.time.LocalDate
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -95,6 +90,8 @@ class DashboardViewModel(
 
     private val _predictedFoods = MutableStateFlow<List<PredictedFood>>(emptyList())
     val predictedFoods: StateFlow<List<PredictedFood>> = _predictedFoods.asStateFlow()
+    private val _mealSuggester = MutableStateFlow(com.superfit.app.domain.MealSuggester.EMPTY)
+    val mealSuggester: StateFlow<com.superfit.app.domain.MealSuggester> = _mealSuggester.asStateFlow()
 
     private val customMacroTrigger = MutableStateFlow(System.currentTimeMillis())
 
@@ -173,23 +170,8 @@ class DashboardViewModel(
         if (sharedPrefs.getString(BACKFILL_KEY, "") == todayStr) return
         viewModelScope.launch {
             try {
-                val cutoff = System.currentTimeMillis() - 28L * 24 * 3600 * 1000
-                val rerateFrom = System.currentTimeMillis() - RERATE_DAYS * 24 * 3600 * 1000
-                val untagged = repository.getAllNutritionEntries()
-                    .filter { it.timestamp >= cutoff && it.id != 0L && needsTags(it, rerate = it.timestamp >= rerateFrom) }
-                    .sortedByDescending { it.timestamp }
-                    .take(60)
-                val tagger = com.superfit.app.domain.MealTagger()
-                untagged.chunked(20).forEach { batch ->
-                    val tags = tagger.tag(batch)
-                    batch.forEach { entry ->
-                        tags[entry.id]?.let { t ->
-                            // Asked once: when the AI gives no food-by-food ratings, don't ask again every day.
-                            val saved = if (t.itemRatings == null && hasSeveralFoods(entry)) t.copy(itemRatings = emptyList()) else t
-                            repository.saveMealTags(entry, saved.encode())
-                        }
-                    }
-                }
+                val due = com.superfit.app.domain.MealTagBackfill.due(repository.getAllNutritionEntries(), System.currentTimeMillis())
+                com.superfit.app.domain.MealTagBackfill.tag(due, com.superfit.app.domain.MealTagger()) { entry, tags -> repository.saveMealTags(entry, tags) }
                 sharedPrefs.edit().putString(BACKFILL_KEY, todayStr).apply()
             } catch (e: Exception) {
                 android.util.Log.w("DashboardViewModel", "Tagging older meals failed; will retry next launch", e)
@@ -197,27 +179,12 @@ class DashboardViewModel(
         }
     }
 
-    /**
-     * Untagged meals always; recent meals also when they have no nutritionist rating yet, or were
-     * rated before the user's nutritionist's advice last changed.
-     */
-    private fun needsTags(entry: NutritionEntryEntity, rerate: Boolean): Boolean {
-        val tags = MealTags.decode(entry.qualityTags) ?: return true
-        if (rerate && (tags.rating == null || tags.verdict == null || tags.adviceVersion != com.superfit.app.domain.PersonalNutrition.adviceVersion())) return true
-        // Meals of several foods rated before each food got its own rating, once.
-        if (tags.itemRatings == null && hasSeveralFoods(entry)) return true
-        return !tags.hasAdvice && FoodQualityEngine.scoreFromTags(tags, isHighProtein = false) <= 5
-    }
-
-    private fun hasSeveralFoods(entry: NutritionEntryEntity): Boolean =
-        com.superfit.app.domain.MealItems.decode(entry.items)?.items.orEmpty()
-            .filter { it.name.isNotBlank() }
-            .map { com.superfit.app.domain.MealTags.itemKey(it.name) }
-            .distinct().size >= 2
-
     fun loadFrequentMeals() {
         viewModelScope.launch {
             _predictedFoods.value = repository.getPredictedFoods()
+            runCatching { repository.getMealSuggester() }
+                .onSuccess { _mealSuggester.value = it }
+                .onFailure { android.util.Log.w("DashboardViewModel", "Meal suggestions failed", it) }
         }
     }
 
@@ -284,7 +251,7 @@ class DashboardViewModel(
     fun sendChatMessage(text: String, how: String = "typed") {
         val question = text.trim().take(com.superfit.app.domain.CoachChat.MAX_TEXT)
         if (question.isBlank() || _chatLoading.value) return
-        AppAnalytics.coachMessageSent(how)
+        UsageEvents.coachMessageSent(how)
         val before = _chatMessages.value.filterNot { it.isError }
         _chatMessages.value = _chatMessages.value + com.superfit.app.domain.ChatEntry(
             id = newChatId(),
@@ -350,7 +317,7 @@ class DashboardViewModel(
                 if (update.isEmpty) return@launch
                 val current = _coachNotes.value
                 saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(current, update))
-                update.add.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = false) }
+                update.add.forEach { _ -> UsageEvents.coachNoteSaved(byUser = false) }
                 updateChatEntry(reply.id) {
                     it.copy(
                         rememberedIds = update.add.map { n -> n.id },
@@ -377,7 +344,7 @@ class DashboardViewModel(
         val restored = current.filterNot { it.id in entry.rememberedIds } +
             entry.forgotten.filter { old -> current.none { it.id == old.id } }
         saveCoachNotes(restored)
-        AppAnalytics.coachNoteRemoved("undo")
+        UsageEvents.coachNoteRemoved("undo")
         updateChatEntry(entryId) { it.copy(rememberedIds = emptyList(), forgotten = emptyList()) }
     }
 
@@ -390,13 +357,13 @@ class DashboardViewModel(
         com.superfit.app.data.CoachStyleStore.save(userPrefs(appContext), style)
         if (style == _coachStyle.value) return
         _coachStyle.value = style
-        AppAnalytics.coachStyleChanged(style.name)
+        UsageEvents.coachStyleChanged(style.name)
         if (_coachingState.value is CoachingInsightState.Success) refreshCoachingInsight()
     }
 
     fun deleteCoachNote(id: String) {
         saveCoachNotes(_coachNotes.value.filterNot { it.id == id })
-        AppAnalytics.coachNoteRemoved("settings")
+        UsageEvents.coachNoteRemoved("settings")
     }
 
     /** Adds what the user typed or pasted in Settings; each line becomes its own note. */
@@ -404,7 +371,7 @@ class DashboardViewModel(
         val notes = com.superfit.app.domain.CoachNotes.fromUserText(text, LocalDate.now().toKotlinLocalDate(), System.currentTimeMillis())
         if (notes.isEmpty()) return
         saveCoachNotes(com.superfit.app.domain.CoachNotes.apply(_coachNotes.value, com.superfit.app.domain.NoteUpdate(notes, emptyList())))
-        notes.forEach { _ -> AppAnalytics.coachNoteSaved(byUser = true) }
+        notes.forEach { _ -> UsageEvents.coachNoteSaved(byUser = true) }
     }
 
     /** "Log this" under a coach reply: the suggested meal goes through the normal meal log. */
@@ -413,119 +380,52 @@ class DashboardViewModel(
         val meal = entry.mealToLog ?: return
         if (entry.mealLogged) return
         parseAndAddMeal(meal)
-        AppAnalytics.coachMealLogged()
+        UsageEvents.coachMealLogged()
         updateChatEntry(entryId) { it.copy(mealLogged = true) }
     }
 
-    /** The coach chat's instructions: the user's live numbers, their own logs and notes, and the rules. */
+    /** The coach chat's instructions: the user's live numbers, their own logs and notes, and the rules (shared with the iPhone). */
     private suspend fun coachChatInstruction(
         currentState: DashboardUiState.Success,
         conversation: List<com.superfit.app.domain.ChatEntry>
     ): String {
-        val profile = currentState.profile
-        val activity = currentState.activity
-        val sleep = currentState.sleep
-        val nutrition = currentState.nutritionList
-        val macroTargets = currentState.macroTargets
-        val today = LocalDate.now()
-        val now = java.time.LocalTime.now()
-
-        val sleepText = if (sleep != null) {
-            "Sleep Duration: ${String.format("%.1f", sleep.sleepDurationSeconds / 3600.0)}h, Readiness Score: ${sleep.readinessScore}%"
-        } else {
-            "No sleep data today."
-        }
-
-        val nutritionText = "Calories Eaten: ${currentState.caloriesEaten.toInt()} / ${macroTargets.calories.toInt()} kcal. " +
-            "Protein: ${currentState.proteinEaten.toInt()} / ${macroTargets.proteinG.toInt()}g. " +
-            "Carbs: ${currentState.carbsEaten.toInt()} / ${macroTargets.carbsG.toInt()}g. " +
-            "Fat: ${currentState.fatEaten.toInt()} / ${macroTargets.fatG.toInt()}g. " +
-            "Fibre (estimated): ${nutrition.sumOf { MealTags.of(it).fiberG }.toInt()} / ${CoachPatternEngine.fibreTargetG(macroTargets.calories).toInt()}g."
-
-        val activityText = "Steps: ${activity.steps}, Active Calories Burned: ${activity.activeCalories.toInt()} kcal."
-        val vsUsualText = todayVsUsual(currentState, usualDay.value).chatLine()
-
-        val body = com.superfit.app.domain.BodyReadings.summary(
-            com.superfit.app.data.BodyImporter.mine(appContext),
-            profile.weightKg,
-            profile.heightCm,
-            today.toKotlinLocalDate()
+        val today = LocalDate.now().toKotlinLocalDate()
+        return com.superfit.app.ui.dashboard.CoachChatPrompt.instruction(
+            com.superfit.app.ui.dashboard.CoachChatFacts(
+                state = currentState,
+                today = today,
+                now = java.time.LocalTime.now().toKotlinLocalTime(),
+                nowMs = System.currentTimeMillis(),
+                scaleReadings = com.superfit.app.data.BodyImporter.mine(appContext),
+                vsUsualLine = todayVsUsual(currentState, usualDay.value).chatLine(),
+                allNutrition = repository.getAllNutritionEntries(),
+                workouts = repository.getAllWorkoutsForCoach(currentState.bmr),
+                activity = repository.getAllActivityTelemetry(),
+                sleep = repository.getAllSleepTelemetry(),
+                weights = repository.getAllWeightEntries(),
+                stepGoal = stepGoal.value?.goal,
+                customMacros = sharedPrefs.getBoolean("custom_macro_enabled", false),
+                targetWeightKg = currentState.profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(AndroidPrefs(sharedPrefs)) },
+                goalDate = GoalDatePref.get(AndroidPrefs(sharedPrefs)),
+                notes = _coachNotes.value,
+                todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(userPrefs(appContext), today),
+                conversation = conversation
+            )
         )
-        val bodyText = if (body.hasScaleData) {
-            listOfNotNull(
-                body.bodyFatPct?.let { "body fat ${com.superfit.app.domain.BodyReadings.fmt(it)}%" + (body.bodyFatChange?.let { c -> " (${if (c > 0) "+" else ""}${com.superfit.app.domain.BodyReadings.fmt(c)} pts over 4 weeks)" } ?: "") },
-                body.leanKg?.let { "lean mass ${com.superfit.app.domain.BodyReadings.fmt(it)} kg" },
-                body.insight
-            ).joinToString(", ")
-        } else {
-            "no smart scale data"
-        }
-
-        val allNutrition = repository.getAllNutritionEntries()
-        val coachWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr)
-        val report = CoachPatternEngine.analyze(
-            today = today.toKotlinLocalDate(),
-            now = now.toKotlinLocalTime(),
-            weightKg = profile.weightKg,
-            goal = profile.goal,
-            targets = macroTargets,
-            maintenanceCalories = if (sharedPrefs.getBoolean("custom_macro_enabled", false)) null else currentState.tdee,
-            nutrition = allNutrition,
-            workouts = coachWorkouts,
-            activity = repository.getAllActivityTelemetry(),
-            sleep = repository.getAllSleepTelemetry(),
-            weights = repository.getAllWeightEntries(),
-            targetWeightKg = profile.targetWeightKg,
-            age = profile.age,
-            stepGoal = stepGoal.value?.goal
-        )
-
-        val live = """
-            You are Superfit AI Coach, a friendly, knowledgeable personal trainer and nutrition coach who knows this user well.
-            Answer the user's questions about their fitness, food, sleep and progress.
-            Their numbers today:
-            - Profile: Age ${profile.age}, Weight ${profile.weightKg} kg, Height ${profile.heightCm} cm
-            - Body (smart scale): $bodyText
-            - Goal: ${profile.goal} (Calorie Offset: ${profile.calorieOffset} kcal)
-            - Their own nutritionist's advice (follow it, never contradict it): ${com.superfit.app.domain.PersonalNutrition.advice ?: "none given"}
-            - Targets: Protein ${macroTargets.proteinG.toInt()}g, Carbs ${macroTargets.carbsG.toInt()}g, Fat ${macroTargets.fatG.toInt()}g, Calories ${macroTargets.calories.toInt()} kcal
-            - Today's nutrition: $nutritionText
-            - Today's activity: $activityText
-            - $vsUsualText
-            - Today's sleep: $sleepText
-        """.trimIndent()
-
-        val personal = com.superfit.app.domain.CoachChatContext.personal(
-            today = today.toKotlinLocalDate(),
-            now = now.toKotlinLocalTime(),
-            todayMeals = nutrition,
-            report = report,
-            workouts = coachWorkouts,
-            targetWeightKg = profile.targetWeightKg.takeIf { GoalDatePref.isGoalSet(sharedPrefs) },
-            goalDate = GoalDatePref.get(sharedPrefs)?.toKotlinLocalDate(),
-            commonFoods = CoachingEngine.commonFoods(allNutrition, today.toKotlinLocalDate()),
-            notes = _coachNotes.value,
-            todayTip = (_coachingState.value as? CoachingInsightState.Success)?.insight ?: CoachInsightStore.loadForDay(sharedPrefs, today),
-            earlierTopics = com.superfit.app.domain.CoachChat.earlierTopics(conversation, System.currentTimeMillis())
-        )
-
-        return listOf(live, personal, CoachingEngine.chatContext(report).trim(), com.superfit.app.domain.CoachChatContext.RULES + com.superfit.app.domain.CoachStyle.current.instruction())
-            .joinToString("\n\n")
     }
 
     /** Today's steps and workouts next to the usual for this weekday. */
-    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?) =
-        com.superfit.app.domain.TodayVsUsual.of(
-            today = LocalDate.now().toKotlinLocalDate(),
-            steps = state.activity.steps,
-            workouts = state.importedWorkouts.map { com.superfit.app.domain.ActivityFact.of(it) } + state.workoutList.map {
-                com.superfit.app.domain.ActivityFact(it.description, 0, null, it.caloriesBurned, null, false)
-            },
-            usual = usual
-        )
+    fun todayVsUsual(state: DashboardUiState.Success, usual: com.superfit.app.domain.UsualDay?, distance: TodayDistance? = todayDistance.value) =
+        TodayState.vsUsual(state, usual, LocalDate.now().toKotlinLocalDate(), distance?.takeIf { it.date == LocalDate.now() }?.km)
+
+    /** Today's recorded distance, read live from Health Connect and kept only in memory (not stored). */
+    data class TodayDistance(val date: LocalDate, val km: Double)
+
+    private val _todayDistance = MutableStateFlow<TodayDistance?>(null)
+    val todayDistance: StateFlow<TodayDistance?> = _todayDistance
 
     private fun loadCachedCoachingInsight() {
-        CoachInsightStore.loadForDay(sharedPrefs, LocalDate.now())?.let {
+        CoachInsightStore.loadForDay(userPrefs(appContext), LocalDate.now().toKotlinLocalDate())?.let {
             _coachingState.value = CoachingInsightState.Success(it)
         }
     }
@@ -566,7 +466,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             repository.setWorkoutImportEnabled(enabled)
             _workoutImportEnabled.value = enabled
-            if (enabled) AppAnalytics.workoutsConnected()
+            if (enabled) UsageEvents.workoutsConnected()
         }
     }
 
@@ -637,19 +537,55 @@ class DashboardViewModel(
         _duplicateWorkoutPrompt.value = null
     }
 
+    // The day Today shows, fixed when it opens.
+    private val openedOn: LocalDate = LocalDate.now()
+
     // Dynamic state combinations
-    val dashboardState: StateFlow<DashboardUiState> = combine(
+    val dashboardState: StateFlow<DashboardUiState> = dayState(openedOn).onEach { state ->
+        if (state is DashboardUiState.Success) {
+            updateWidget(state)
+            writeDietNote(state.dietQualityMetrics)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DashboardUiState.Loading
+    )
+
+    /** Yesterday, for the Activity tab between midnight and waking up ([showYesterday]). */
+    val yesterdayState: StateFlow<DashboardUiState> = dayState(openedOn.minusDays(1)).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DashboardUiState.Loading
+    )
+
+    /** Whether Activity still shows yesterday: re-checked each minute and when last night's sleep arrives. */
+    val showYesterday: StateFlow<Boolean> = combine(
+        repository.getSleepFlow(openedOn.toString()),
+        repository.getRecentSleepFlow(),
+        flow {
+            while (true) {
+                emit(Unit)
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+    ) { night, recent, _ ->
+        LocalDate.now() == openedOn &&
+            com.superfit.app.ui.dashboard.ActivityDay.showYesterday(java.time.LocalTime.now().hour, openedOn.toKotlinLocalDate(), night, recent)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    private fun dayState(day: LocalDate): Flow<DashboardUiState> = combine(
         repository.profileFlow,
-        repository.getActivityFlow(LocalDate.now().toString()),
-        repository.getSleepFlow(LocalDate.now().toString()),
-        repository.getNutritionEntriesForDay(LocalDate.now()),
-        repository.getWorkoutEntriesForDay(LocalDate.now()),
+        repository.getActivityFlow(day.toString()),
+        repository.getSleepFlow(day.toString()),
+        repository.getNutritionEntriesForDay(day),
+        repository.getWorkoutEntriesForDay(day),
         repository.weightEntriesFlow,
         repository.streakStateFlow,
-        repository.getHabitEntryFlow(LocalDate.now().toString()),
+        repository.getHabitEntryFlow(day.toString()),
         customMacroTrigger,
         repository.allNutritionEntriesFlow,
-        repository.getImportedWorkoutsForDay(LocalDate.now()),
+        repository.getImportedWorkoutsForDay(day),
         repository.importedWorkoutCountFlow
     ) { array ->
         val profile = array[0] as? UserProfileEntity
@@ -676,117 +612,31 @@ class DashboardViewModel(
         if (profile == null) {
             DashboardUiState.NotInitialized
         } else {
-            val todayStr = LocalDate.now().toString()
-            // Live physiological calculations
-            val bmr = PhysiologyEngine.calculateBmr(profile)
-            val manualCal = workouts.sumOf { it.caloriesBurned }
-
-            // Workouts from other apps. Their calories are already inside Health Connect's
-            // "burned today", so they only move the target, never the burned number.
+            // Workouts from other apps, named the way this phone names their apps.
             val workoutPrefs = repository.workoutImportPrefs
             val importedWorkouts = if (workoutPrefs.enabled) {
-                ImportedWorkouts.views(appContext, importedRows, workoutPrefs, bmr)
+                ImportedWorkouts.views(appContext, importedRows, workoutPrefs, PhysiologyEngine.calculateBmr(profile))
             } else {
                 emptyList()
             }
-            val dailyTarget = ImportedWorkouts.target(profile, workoutPrefs, importedWorkouts, workouts)
-            // What the body burns today with all of today's workouts, for the coach's deficit sums.
-            val tdee = dailyTarget.maintenance
-            val readiness = sleep?.readinessScore ?: 50 // Default 50% if no sleep session found
-
-            // Macro targets from live TDEE and goal (or the user's own numbers)
-            val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-            val macroTargets = if (customMacroEnabled) {
-                val customProtein = sharedPrefs.getInt("custom_protein_g", 130).toDouble()
-                val customCarbs = sharedPrefs.getInt("custom_carbs_g", 200).toDouble()
-                val customFat = sharedPrefs.getInt("custom_fat_g", 70).toDouble()
-                val customCals = sharedPrefs.getInt("custom_calories", 2000).toDouble()
-                MacroTargets(
-                    calories = customCals,
-                    proteinG = customProtein,
-                    carbsG = customCarbs,
-                    fatG = customFat
-                )
-            } else {
-                dailyTarget.targets
-            }
-            val workoutTargetKcal = if (customMacroEnabled) 0.0 else dailyTarget.workoutKcal
-
-            // Aggregate nutrition eaten today
-            val caloriesEaten = nutrition.sumOf { it.calories }
-            val proteinEaten = nutrition.sumOf { it.proteinG }
-            val carbsEaten = nutrition.sumOf { it.carbsG }
-            val fatEaten = nutrition.sumOf { it.fatG }
-
-            val weightMetrics = com.superfit.app.domain.WeightTrendEngine.calculateMetrics(profile, weightEntries)
-
-            // Streak is derived from the full meal log (one missed day forgiven, two end it)
-            val streakState = com.superfit.app.domain.StreakEngine.fromMealTimestamps(
-                allNutritionHistory.map { it.timestamp }
-            )
-
-            val currentSteps = activity?.steps ?: 0
-            val currentSleepSecs = sleep?.sleepDurationSeconds ?: 0L
-            val workoutMins = (workouts.size * 25)
-
-            val todayStepGoal = StepGoalStore.ownGoal(userPrefs(appContext)) ?: StepGoalStore.load(userPrefs(appContext))?.goal ?: StepGoal.starter(profile.age)
-
-            val habitEntry = (rawHabit ?: HabitEntryEntity(date = todayStr)).copy(
-                stepsCompleted = currentSteps >= todayStepGoal,
-                sleepCompleted = currentSleepSecs >= (7 * 3600),
-                workoutMins = workoutMins
-            )
-
-            // What the AI should weigh when it rates this person's meals
-            com.superfit.app.domain.PersonalNutrition.goal = profile.goal
-            com.superfit.app.domain.PersonalNutrition.calorieTarget = macroTargets.calories
-            com.superfit.app.domain.PersonalNutrition.proteinTargetG = macroTargets.proteinG
-
-            val dietQualityMetrics = com.superfit.app.domain.FoodQualityEngine.analyzeDietQuality(
-                nutritionHistory = allNutritionHistory,
-                userGoal = profile.goal,
-                proteinTargetG = macroTargets.proteinG,
-                calorieTarget = macroTargets.calories
-            )
-
-            DashboardUiState.Success(
+            TodayState.build(
+                today = day.toString(),
+                zone = kotlinx.datetime.TimeZone.currentSystemDefault(),
                 profile = profile,
-                activity = activity ?: ActivityTelemetryEntity(todayStr, 0, 0.0),
+                activity = activity,
                 sleep = sleep,
-                nutritionList = nutrition,
-                workoutList = workouts,
+                nutrition = nutrition,
+                workouts = workouts,
                 weightEntries = weightEntries,
-                weightMetrics = weightMetrics,
-                streakState = streakState,
-                mealDaysLogged = ReviewPrompt.daysWithMeals(allNutritionHistory.map { it.timestamp }),
-                habitEntry = habitEntry,
-                dietQualityMetrics = dietQualityMetrics,
-                bmr = bmr,
-                tdee = tdee,
-                readinessScore = readiness,
-                macroTargets = macroTargets,
-                caloriesEaten = caloriesEaten,
-                proteinEaten = proteinEaten,
-                carbsEaten = carbsEaten,
-                fatEaten = fatEaten,
-                manualWorkoutCalories = manualCal,
-                totalMealsLogged = allNutritionHistory.size,
+                habit = rawHabit,
+                allNutritionHistory = allNutritionHistory,
                 importedWorkouts = importedWorkouts,
-                importedWorkoutCount = if (workoutPrefs.enabled) importedCount else 0,
-                workoutTargetKcal = workoutTargetKcal,
-                workoutTargetSource = WorkoutDisplay.boostSource(importedWorkouts, workouts.size)
+                importedCount = importedCount,
+                workoutPrefs = workoutPrefs,
+                prefs = userPrefs(appContext)
             )
         }
-    }.onEach { state ->
-        if (state is DashboardUiState.Success) {
-            updateWidget(state)
-            writeDietNote(state.dietQualityMetrics)
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = DashboardUiState.Loading
-    )
+    }
 
     /**
      * The same weekday's usual activity over the last 4 weeks, for Home's "vs your usual" and the
@@ -798,16 +648,13 @@ class DashboardViewModel(
         repository.getActivityFlow(LocalDate.now().toString())
     ) { profile, _, _ ->
         if (profile == null) return@combine null
-        val imported = com.superfit.app.data.ImportedWorkouts.byDate(repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)))
-        val days = InsightsData.days(
-            nutrition = emptyList(),
+        TodayState.usualDay(
             voiceWorkouts = repository.getAllWorkoutEntries(),
             activity = repository.getAllActivityTelemetry(),
-            imported = imported,
-            kcalTarget = { 0.0 },
-            proteinTargetG = 0.0
+            imported = repository.getImportedWorkoutViews(PhysiologyEngine.calculateBmr(profile)),
+            today = LocalDate.now().toKotlinLocalDate(),
+            zone = kotlinx.datetime.TimeZone.currentSystemDefault()
         )
-        com.superfit.app.domain.UsualDay.forDay(days, LocalDate.now().toKotlinLocalDate())
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -861,17 +708,9 @@ class DashboardViewModel(
         stepGoalTrigger
     ) { profile, activity, _ ->
         if (profile == null) return@combine null
-        val steps = activity.mapNotNull { row -> runCatching { kotlinx.datetime.LocalDate.parse(row.date) to row.steps }.getOrNull() }.toMap()
-        val saved = StepGoalStore.load(userPrefs(appContext))
-        val result = StepGoal.update(steps, profile.age, saved, StepGoalStore.ownGoal(userPrefs(appContext)), LocalDate.now().toKotlinLocalDate())
-        // An own number is kept apart, so switching back to automatic starts from the steps again.
-        if (result.reason != StepGoalReason.OWN && result.saved != saved) {
-            StepGoalStore.save(userPrefs(appContext), result.saved)
-            if (saved != null && result.goal != saved.goal) {
-                AppAnalytics.stepGoalChanged(if (result.goal > saved.goal) "up" else "down", "auto")
-            }
+        TodayCoach.stepGoal(profile, activity, userPrefs(appContext), LocalDate.now().toKotlinLocalDate()) { up ->
+            UsageEvents.stepGoalChanged(if (up) "up" else "down", "auto")
         }
-        result
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -892,7 +731,7 @@ class DashboardViewModel(
     fun setOwnStepGoal(steps: Int?) {
         val clamped = steps?.coerceIn(StepGoal.OWN_MIN, StepGoal.OWN_MAX)
         StepGoalStore.setOwnGoal(userPrefs(appContext), clamped)
-        AppAnalytics.stepGoalChanged("set", if (clamped == null) "auto" else "own")
+        UsageEvents.stepGoalChanged("set", if (clamped == null) "auto" else "own")
         stepGoalTrigger.value = System.currentTimeMillis()
     }
 
@@ -928,7 +767,7 @@ class DashboardViewModel(
     /** Shared or dismissed: the card goes and this workout isn't offered again. */
     fun handleShareOffer(workout: WorkoutView, shared: Boolean) {
         com.superfit.app.data.ShareCardPrefs.of(appContext).markOfferHandled(workout.merged.primary.id)
-        com.superfit.app.data.AppAnalytics.shareOffer(if (shared) "shared" else "dismissed", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+        com.superfit.app.data.UsageEvents.shareOffer(if (shared) "shared" else "dismissed", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
         shareOfferTrigger.value++
     }
 
@@ -970,7 +809,7 @@ class DashboardViewModel(
     fun logWeight(weightKg: Double, note: String = "") {
         viewModelScope.launch {
             repository.addWeightEntry(weightKg, note)
-            AppAnalytics.weighIn()
+            UsageEvents.weighIn()
         }
     }
 
@@ -985,8 +824,8 @@ class DashboardViewModel(
                     )
                 )
             }
-            GoalDatePref.markGoalSet(sharedPrefs)
-            AppAnalytics.goalSet(withDate = false)
+            GoalDatePref.markGoalSet(AndroidPrefs(sharedPrefs))
+            UsageEvents.goalSet(withDate = false)
         }
     }
 
@@ -1007,7 +846,22 @@ class DashboardViewModel(
 
     fun syncTelemetry() {
         viewModelScope.launch {
-            repository.syncHealthConnectTelemetry(LocalDate.now())
+            val today = LocalDate.now()
+            repository.syncHealthConnectTelemetry(today)
+            // Yesterday too, so a day that was still being counted at midnight gets its final total.
+            repository.refreshActivity(today.minusDays(1))
+            // Once: days saved before the single-app steps fix could hold two apps added together.
+            if (!sharedPrefs.getBoolean(PAST_STEPS_CORRECTED, false)) {
+                repository.correctPastSteps(fromDaysAgo = 2, toDaysAgo = 30)
+                sharedPrefs.edit().putBoolean(PAST_STEPS_CORRECTED, true).apply()
+            }
+            // Once: nights and active calories saved before the fix could hold two apps added together.
+            if (!sharedPrefs.getBoolean(PAST_SLEEP_CORRECTED, false)) {
+                repository.correctPastSleep(fromDaysAgo = 0, toDaysAgo = 30)
+                repository.correctPastActiveCalories(fromDaysAgo = 2, toDaysAgo = 30)
+                sharedPrefs.edit().putBoolean(PAST_SLEEP_CORRECTED, true).apply()
+            }
+            _todayDistance.value = repository.healthConnectManager.readDistanceMeters(today)?.let { TodayDistance(today, it / 1000) }
             _pendingScaleReading.value = com.superfit.app.data.BodyImporter.nextPending(appContext)
             val now = System.currentTimeMillis()
             sharedPrefs.edit().putLong("last_telemetry_sync", now).apply()
@@ -1044,91 +898,23 @@ class DashboardViewModel(
         lastInputWasSpoken = true
         lastSpokenVersions = otherVersions
         lastKind = kind
-        val spoken = SpokenInput(input, otherVersions)
 
         viewModelScope.launch {
             _parsingState.value = ParsingState.Loading
-            try {
-                val history = repository.getAllNutritionEntries()
-                if (kind != LogKind.WORKOUT) {
-                    RepeatMealCache.findRepeatMeal(input, history)?.let { repeat ->
-                        saveMeal(repeat)
-                        _parsingState.value = ParsingState.Success(repeat.foodText)
-                        return@launch
-                    }
-                }
-
-                val routed = kind.presplit(input) ?: LogRouter().route(spoken)
-                if (routed.isEmpty) {
-                    _parsingState.value = ParsingState.Error(kind.nothingRecognised)
-                    return@launch
-                }
-
-                val (meal, workout) = coroutineScope {
-                    val mealJob = async {
-                        if (routed.food.isBlank()) {
-                            null
-                        } else {
-                            runCatching { NutritionParser().parseFoodInput(routed.food, history, spoken) }
-                        }
-                    }
-                    val workoutJob = async {
-                        if (routed.exercise.isBlank()) {
-                            null
-                        } else {
-                            runCatching { WorkoutParser().parseWorkoutInput(routed.exercise) }
-                        }
-                    }
-                    mealJob.await() to workoutJob.await()
-                }
-                listOfNotNull(meal?.exceptionOrNull(), workout?.exceptionOrNull())
-                    .firstOrNull { it is kotlinx.coroutines.CancellationException }
-                    ?.let { throw it }
-
-                val mealResult = meal?.getOrNull()?.takeIf { it.foodText != "invalid" }
-                val workoutResult = workout?.getOrNull()?.takeIf { it.workoutText != "invalid" }
-                mealResult?.let {
-                    saveMeal(it)
-                    // A retry after this point must not log the meal twice.
-                    lastMealInput = routed.exercise.ifBlank { null }
-                    lastSpokenVersions = emptyList()
-                    lastKind = LogKind.WORKOUT
-                }
-                workoutResult?.let { saveWorkout(it, "JUST_RIGHT") }
-                val foodMissed = routed.food.isNotBlank() && mealResult == null
-                val exerciseMissed = routed.exercise.isNotBlank() && workoutResult == null
-
-                _parsingState.value = when {
-                    mealResult != null && workoutResult != null -> ParsingState.Success(
-                        mealResult.foodText,
-                        message = "Logged: ${mealResult.foodText} · Workout: ${workoutResult.workoutText}"
-                    )
-                    mealResult != null -> ParsingState.Success(
-                        mealResult.foodText,
-                        message = if (exerciseMissed) "Logged: ${mealResult.foodText} · Couldn't log the exercise. Try saying it again." else null
-                    )
-                    workoutResult != null -> ParsingState.Success(
-                        workoutResult.workoutText,
-                        message = if (foodMissed) {
-                            "Logged workout: ${workoutResult.workoutText} · Couldn't log the food. Try saying it again."
-                        } else {
-                            "Logged workout: ${workoutResult.workoutText}"
-                        }
-                    )
-                    else -> {
-                        val failure = meal?.exceptionOrNull() ?: workout?.exceptionOrNull()
-                        if (failure != null) android.util.Log.e("DashboardViewModel", "Smart log failed", failure)
-                        ParsingState.Error(failure?.let { GeminiClient.sanitizeError(it) } ?: kind.nothingRecognised)
-                    }
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.e("DashboardViewModel", "Smart log failed", e)
-                _parsingState.value = ParsingState.Error(GeminiClient.sanitizeError(e))
+            _parsingState.value = smartLogger.log(input, otherVersions, kind) { remainingExercise ->
+                // A retry after this point must not log the meal twice.
+                lastMealInput = remainingExercise.ifBlank { null }
+                lastSpokenVersions = emptyList()
+                lastKind = LogKind.WORKOUT
             }
         }
     }
+
+    private val smartLogger = SmartLogger(
+        history = { repository.getAllNutritionEntries() },
+        saveMeal = { saveMeal(it) },
+        saveWorkout = { saveWorkout(it, "JUST_RIGHT") }
+    )
 
     private suspend fun saveMeal(result: com.superfit.app.domain.ParsedNutritionResult) {
         repository.addNutritionEntry(
@@ -1143,7 +929,7 @@ class DashboardViewModel(
                 items = result.items?.encode()
             )
         )
-        AppAnalytics.mealLogged(if (lastInputWasSpoken) "voice" else "typed")
+        UsageEvents.mealLogged(if (lastInputWasSpoken) "voice" else "typed")
         loadFrequentMeals()
     }
 
@@ -1159,7 +945,7 @@ class DashboardViewModel(
                 difficultyRating = difficultyRating
             )
         )
-        AppAnalytics.workoutLogged()
+        UsageEvents.workoutLogged()
         offerDuplicateCheck(id, result.workoutText, result.workoutType)
     }
 
@@ -1217,7 +1003,7 @@ class DashboardViewModel(
     fun updateMeal(entry: NutritionEntryEntity) {
         viewModelScope.launch {
             repository.updateNutritionEntry(entry)
-            AppAnalytics.mealEdited()
+            UsageEvents.mealEdited()
             // A changed food drops the old tags (see withItems), so the meal is judged again.
             if (entry.qualityTags == null) {
                 com.superfit.app.domain.MealTagger().tagOne(entry)?.let { repository.saveMealTags(entry, it.encode()) }
@@ -1276,6 +1062,24 @@ class DashboardViewModel(
         }
     }
 
+    /** Sex, birth month, height and activity level from Settings > About you. */
+    fun saveAboutYou(updated: UserProfileEntity) {
+        viewModelScope.launch {
+            val current = repository.getProfile() ?: return@launch
+            // Only the About you fields: a weigh-in or goal saved meanwhile is kept.
+            repository.saveProfile(
+                current.copy(
+                    isMale = updated.isMale,
+                    age = updated.age,
+                    birthYearMonth = updated.birthYearMonth,
+                    heightCm = updated.heightCm,
+                    activityMultiplier = updated.activityMultiplier
+                )
+            )
+            UsageEvents.profileEdited()
+        }
+    }
+
     fun updateActivityMultiplier(multiplier: Double) {
         viewModelScope.launch {
             val currentProfile = repository.getProfile() ?: return@launch
@@ -1294,22 +1098,18 @@ class DashboardViewModel(
         viewModelScope.launch {
             _coachingState.value = CoachingInsightState.Loading
             try {
-                val customMacroEnabled = sharedPrefs.getBoolean("custom_macro_enabled", false)
-                val insight = CoachingEngine().generateDailyInsight(
-                    profile = currentState.profile,
-                    macroTargets = currentState.macroTargets,
-                    maintenanceCalories = if (customMacroEnabled) null else currentState.tdee,
-                    historyNutrition = repository.getAllNutritionEntries(),
-                    historyWorkouts = repository.getAllWorkoutsForCoach(currentState.bmr),
-                    historyActivity = repository.getAllActivityTelemetry(),
-                    historySleep = repository.getAllSleepTelemetry(),
-                    historyWeights = repository.getAllWeightEntries(),
+                val insight = TodayCoach.dailyTip(
+                    state = currentState,
+                    prefs = userPrefs(appContext),
+                    nutrition = repository.getAllNutritionEntries(),
+                    workouts = repository.getAllWorkoutsForCoach(currentState.bmr),
+                    activity = repository.getAllActivityTelemetry(),
+                    sleep = repository.getAllSleepTelemetry(),
+                    weights = repository.getAllWeightEntries(),
                     stepGoal = stepGoal.value?.goal,
-                    memory = CoachInsightStore.memory(sharedPrefs),
-                    notes = _coachNotes.value
+                    notes = _coachNotes.value,
+                    today = LocalDate.now().toKotlinLocalDate()
                 )
-
-                CoachInsightStore.save(sharedPrefs, LocalDate.now(), insight)
 
                 _coachingState.value = CoachingInsightState.Success(insight)
             } catch (e: Exception) {
@@ -1375,74 +1175,15 @@ class DashboardViewModel(
     }
 
     companion object {
+        private const val PAST_STEPS_CORRECTED = "past_steps_watch_first_v2"
+        private const val PAST_SLEEP_CORRECTED = "past_sleep_counted_once_v1"
+
         /** First chat chip in Roast me style. */
-        const val ROAST_MY_DAY = "Roast"
+        const val ROAST_MY_DAY = com.superfit.app.domain.CoachChat.ROAST_MY_DAY
 
         /** Bumped with the nutritionist ratings, so recent meals are re-rated straight after the update. */
         private const val BACKFILL_KEY = "meal_tag_backfill_date_v3"
-        private const val RERATE_DAYS = 14L
     }
 }
 
-sealed interface ParsingState {
-    object Idle : ParsingState
-    object Loading : ParsingState
-
-    /** [message] replaces the usual "Logged: …" banner, e.g. when a workout was logged too. */
-    data class Success(val foodText: String, val message: String? = null) : ParsingState
-    data class Error(val message: String) : ParsingState
-}
-
-sealed interface DashboardUiState {
-    object Loading : DashboardUiState
-    object NotInitialized : DashboardUiState
-    data class Success(
-        val profile: UserProfileEntity,
-        val activity: ActivityTelemetryEntity,
-        val sleep: SleepTelemetryEntity?,
-        val nutritionList: List<NutritionEntryEntity>,
-        val workoutList: List<WorkoutEntryEntity>,
-        val weightEntries: List<WeightEntryEntity> = emptyList(),
-        val weightMetrics: com.superfit.app.domain.WeightGoalMetrics,
-        val streakState: StreakStateEntity = StreakStateEntity(),
-        /** Different days with at least one meal logged, ever; used to time the rating prompt. */
-        val mealDaysLogged: Int = 0,
-        val habitEntry: HabitEntryEntity = HabitEntryEntity(date = ""),
-        val dietQualityMetrics: com.superfit.app.domain.DietQualityMetrics = com.superfit.app.domain.DietQualityMetrics(85, "BALANCED", emptyList(), emptyList(), emptyList()),
-        val bmr: Double,
-        val tdee: Double,
-        val readinessScore: Int,
-        val macroTargets: MacroTargets,
-        val caloriesEaten: Double,
-        val proteinEaten: Double,
-        val carbsEaten: Double,
-        val fatEaten: Double,
-        val manualWorkoutCalories: Double,
-        val totalMealsLogged: Int = 0,
-        // Today's workouts from other apps, without doubles or hidden ones.
-        val importedWorkouts: List<WorkoutView> = emptyList(),
-        // Every app's copy counted, before doubles are merged; 0 while the import is off.
-        val importedWorkoutCount: Int = 0,
-        // How much of today's calorie target comes from today's workouts, and from which.
-        val workoutTargetKcal: Double = 0.0,
-        val workoutTargetSource: String = ""
-    ) : DashboardUiState
-}
-
-/** Every personal best, and the new one (if any) to offer for sharing on Home. */
-data class BestsUiState(
-    val all: List<PersonalBest> = emptyList(),
-    val toOffer: PersonalBest? = null
-)
-
-/** "Same workout as your Samsung Health run? Keep just one?" after a voice-logged workout. */
-data class DuplicateWorkoutPrompt(val voiceEntryId: Long, val voiceDescription: String, val imported: WorkoutView)
-
 private const val DUPLICATE_WINDOW_MILLIS = 6L * 3600 * 1000
-
-sealed interface CoachingInsightState {
-    object Idle : CoachingInsightState
-    object Loading : CoachingInsightState
-    data class Success(val insight: CoachInsight) : CoachingInsightState
-    data class Error(val message: String) : CoachingInsightState
-}

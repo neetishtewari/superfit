@@ -27,7 +27,7 @@ class DataRepository(
     val firebaseSyncManager get() = FirebaseSyncManager(context)
 
     // The log itself (database plus cloud backup) is shared with the iPhone app.
-    private val log: LogRepository
+    val log: LogRepository
         get() = LogRepository(
             database = { database },
             backup = firebaseSyncManager.backup,
@@ -149,6 +149,83 @@ class DataRepository(
 
     val allActivityTelemetryFlow: Flow<List<ActivityTelemetryEntity>> get() = log.allActivityTelemetryFlow
 
+    /** Re-reads one day's steps from Health Connect and saves them; keeps the saved value if the read fails. */
+    suspend fun refreshActivity(date: LocalDate) {
+        if (!healthConnectManager.isAvailable()) return
+        try {
+            healthConnectManager.readDailyTelemetry(date)?.let { log.saveActivity(it) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("DataRepository", "Refreshing steps for $date failed", e)
+        }
+    }
+
+    /**
+     * One-time clean-up after the single-app steps fix: re-reads the saved days from [fromDaysAgo]
+     * to [toDaysAgo] and saves the watch app's count, up or down. A day Health Connect no longer
+     * has (or reads as zero) keeps its saved count, so nothing is wiped.
+     */
+    suspend fun correctPastSteps(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedDays = log.getAllActivityTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedDays[date.toString()] ?: continue
+            val fresh = try {
+                healthConnectManager.readDailyTelemetry(date)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            if (fresh.steps > 0 && fresh.steps != saved.steps) log.saveActivity(saved.copy(steps = fresh.steps))
+        }
+    }
+
+    /**
+     * One-time clean-up after the sleep fix: re-reads the saved nights from [fromDaysAgo] to
+     * [toDaysAgo], so nights saved with two apps' sessions added together show the real length.
+     * A night Health Connect no longer has keeps what was saved, so nothing is wiped.
+     */
+    suspend fun correctPastSleep(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedNights = log.getAllSleepTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedNights[date.toString()] ?: continue
+            val fresh = healthConnectManager.readSleepTelemetry(date) ?: continue
+            if (fresh.sleepDurationSeconds != saved.sleepDurationSeconds) log.saveSleep(fresh)
+        }
+    }
+
+    /**
+     * One-time clean-up after the single-app active calories fix: re-reads the saved days and
+     * saves one app's active calories, up or down. Steps are left as saved; a failed read or a
+     * day with nothing now keeps what was saved.
+     */
+    suspend fun correctPastActiveCalories(fromDaysAgo: Long, toDaysAgo: Long) {
+        if (!healthConnectManager.isAvailable()) return
+        val today = LocalDate.now()
+        val savedDays = log.getAllActivityTelemetry().associateBy { it.date }
+        for (ago in fromDaysAgo..toDaysAgo) {
+            val date = today.minusDays(ago)
+            val saved = savedDays[date.toString()] ?: continue
+            val fresh = try {
+                healthConnectManager.readDailyTelemetry(date)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            } ?: continue
+            if (fresh.activeCalories > 0 && fresh.activeCalories != saved.activeCalories) {
+                log.saveActivity(saved.copy(activeCalories = fresh.activeCalories))
+            }
+        }
+    }
+
     suspend fun getAllActivityTelemetry(): List<ActivityTelemetryEntity> = log.getAllActivityTelemetry()
 
     suspend fun getAllSleepTelemetry(): List<SleepTelemetryEntity> = log.getAllSleepTelemetry()
@@ -158,6 +235,10 @@ class DataRepository(
     suspend fun getPredictedFoods(
         currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     ): List<PredictedFood> = log.getPredictedFoods(currentHour)
+
+    suspend fun getMealSuggester(
+        currentHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    ): com.superfit.app.domain.MealSuggester = log.getMealSuggester(currentHour)
 
     fun getWorkoutEntriesForDay(date: LocalDate): Flow<List<WorkoutEntryEntity>> =
         log.getWorkoutEntriesForDay(date.toKotlinLocalDate())

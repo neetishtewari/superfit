@@ -24,13 +24,17 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.superfit.app.domain.NumberInput
@@ -74,13 +78,19 @@ fun SuperfitField(
     // Number boxes stay one line (Enter doesn't grow them) and take at most two decimals.
     val type = keyboardOptions.keyboardType
     val numeric = type == KeyboardType.Number || type == KeyboardType.Decimal
-    val onChange: (String) -> Unit = if (numeric) {
-        { typed -> NumberInput.clean(typed, allowDecimals = type == KeyboardType.Decimal)?.let(onValueChange) }
-    } else {
-        onValueChange
+    // Kept here so the cursor can move to the end when the text is set from outside (a
+    // suggestion or chip tapped), instead of staying where it was in the old text.
+    var edit by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    val shown = if (edit.text == value) edit else TextFieldValue(value, TextRange(value.length))
+    val onChange: (TextFieldValue) -> Unit = { typed ->
+        val text = if (numeric) NumberInput.clean(typed.text, allowDecimals = type == KeyboardType.Decimal) else typed.text
+        if (text != null) {
+            edit = if (text == typed.text) typed else TextFieldValue(text, TextRange(text.length))
+            if (text != value) onValueChange(text)
+        }
     }
     TextField(
-        value = value,
+        value = shown,
         onValueChange = onChange,
         modifier = modifier.border(2.dp, frame, FieldShape),
         enabled = enabled,

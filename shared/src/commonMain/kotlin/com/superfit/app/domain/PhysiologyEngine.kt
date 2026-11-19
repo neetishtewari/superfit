@@ -16,7 +16,7 @@ object PhysiologyEngine {
         return calculateBmr(
             weightKg = profile.weightKg,
             heightCm = profile.heightCm,
-            age = profile.age,
+            age = profile.currentAge(),
             isMale = profile.isMale
         )
     }

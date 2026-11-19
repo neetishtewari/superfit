@@ -186,6 +186,85 @@ tested on the dev app first.
          passes these through; it still owns Health Connect, the widget refresh (run after each
          meal change), imported workouts, coach chat files and clearing data. Tested on a real
          in-memory database (bundled SQLite) on the computer.
+     - 5b-5 starts bottom-up with the Today screen's parts, then its ViewModel, then the screen:
+       - 5b-5a: the self-contained Today cards and dialogs move to shared unchanged: streak header,
+         goal progress card with weigh-in and edit-goal dialogs, step-goal note/sheet/chooser,
+         Diet Quality card and detail sheet, coach style chooser, widget tip card, and the
+         dashboard colour tokens. Numbers with decimals use LocalFormat.decimal (the phone's own
+         style, as String.format did on Android); step counts keep "12,000".
+         Also the Home "Log weight" row and the "Is this you?" scale dialog, on kotlinx-datetime;
+         the dialog's time uses LocalFormat.shortClock (the phone's 12/24-hour style, as before).
+       - 5b-5b: what the Today screen shows (DashboardUiState and its parts) moves to shared, so
+         both apps describe Today the same way. The rings, macro bars, sleep pills, meal row and
+         activity bar move too; the calories-left number uses LocalFormat.integer ("1,230").
+       - 5b-5c: the sums behind Today (targets, own macro targets, eaten totals, streak, step and
+         sleep ticks, Diet Quality, workout add-back) move to shared TodayState.build, tested on
+         the computer. Android reads the pieces and calls it; the screen is unchanged.
+       - 5b-5d: the Today sections move to shared: header (date, greeting), calorie rings card,
+         nutrients card, coach card, activity card with "vs your usual", sleep card, and the
+         imported-workout rows, connect card and duplicate dialog. Dates and times come from
+         Now.today/hour/local and LocalFormat.longDay/weekday/shortClock (the phone's language,
+         as before). The meals card stays in the Android app until the meal edit sheet moves.
+       - 5b-5e: the Edit meal sheet and item editor move to shared. Each app plugs in two small
+         things: voice typing for "what was it instead?" (LocalVoiceTyping; Android's voice
+         typing box as before) and usage counts (UsageEvents; Android sends them through
+         AppAnalytics, so the same off switch and dev-app silence apply).
+       - 5b-5f: the meals card (type a meal, usual foods, logged list, edit) moves to shared; it
+         takes its data and actions as parameters instead of the Android ViewModel.
+       - 5b-5g: the iPhone shows Today's Food side after sign-in and restore: header, rings,
+         streak, nutrients, weigh-in and the meals card (type a meal, usual foods, See all,
+         edit, delete). A small shared TodayModel reads the shared LogRepository and builds
+         the state with TodayState.build; logging uses the shared NutritionParser. Steps,
+         sleep and other apps' workouts wait for Apple Health. Android is unchanged (only the
+         food history dialog moved to shared).
+       - 5b-5h: Today's Activity side on iPhone. The Food / Activity switch (FoodActivitySwitch),
+         the per-day totals behind "vs your usual" (DayTotalsBuilder; Android's InsightsData
+         hands its work to it) and the usual-weekday sums (TodayState.usualDay/vsUsual) move to
+         shared. The iPhone shows steps and workouts next to the usual, voice-logged workouts
+         (delete works) and sleep, from data already on the phone or restored from backup.
+         Sharing a workout card waits for share cards; steps, sleep and other apps' workouts
+         keep coming from Android's backup until Apple Health. Android shows the same as before.
+       - 5b-5i: today's coach tip and step goal on iPhone. CoachInsightStore moves to shared (the
+         account's settings, same keys), and TodayCoach.dailyTip/stepGoal share the tip and
+         step-goal work; Android's Today and evening reminder call them. The iPhone shows the
+         coach card ("Get today's tip"; chat comes with coach chat), the step goal on the rings
+         with its sheet, and the "new step goal" note.
+       - 5b-5j: the "log anything" logic and buttons move to shared, ready for iPhone voice and
+         camera. SmartLogger (repeat meals, food/exercise split, both parsers, partial success
+         messages) is what Android's mic logging now calls; TodayModel.smartLog uses it too. The
+         Snap your plate / Say what you ate / Say your workout buttons move to shared
+         (QuickLogCard.kt); the iPhone shows them once its voice and camera arrive (5b-6).
+       - 5c-1: Progress starts on iPhone with its History page, and a bottom menu (Today,
+         Progress; Coach joins with coach chat). HistoryLog (shared) works out the month
+         calendar, the 30-day consistency, the 7-day trends and the picked day, the same sums
+         Android's History used; Android's HistoryViewModel now calls it. The calendar, the
+         "eaten vs what you burn" chart, the trend cards and the bottom menu move to shared. The
+         iPhone shows the chart, the calendar and a read-only view of the picked day; editing
+         past days, Insights and Journey come next. The share offer, new-best and widget-tip
+         cards on Today wait for Apple Health, share cards and the widget (5b-6).
+       - 5c-2: the picked day's card (DayBalanceCard) moves to shared, with the same edit, delete
+         and "log a missed meal" as Android; HistoryModel does them on iPhone and
+         HistoryLog.missedMeal times a late meal at midday for both apps. Share buttons are
+         hidden on iPhone until share cards arrive.
+       - 5c-3: Insights and Journey move to shared (InsightsTab, JourneyTab, the body cards and
+         the goal dialog), with GoalDatePref now on shared Prefs and kotlinx dates. ProgressLog
+         (shared) works out the week report, the journey forecast, the body summary and trend
+         lines, the same sums Android's HistoryViewModel used; Android now calls it. The iPhone
+         Progress page gets the Insights | Journey | History switch, weigh-ins and goal edits.
+         Personal bests and the coach report wait for share cards and the iPhone PDF; scale
+         readings (body fat and more) wait for Apple Health.
+       - 5d-1: Settings, first part. The account card, "Your plan" (goal, step goal, own
+         calorie and macro targets), Appearance and Sign out / Delete account move to shared
+         cards (ui/settings); Android's Settings uses them. The iPhone gets a Settings page from
+         the gear on Today with the account, your plan, Appearance (Auto, Light, Dark, kept for
+         the whole app as on Android) and Sign out. Health data, the AI coach, reminders, the
+         widget, sharing, privacy and deleting the account follow with their iPhone parts.
+       - 5d-2: Settings, second part. "My nutritionist's advice" moves to shared (its mic shows
+         where the phone has voice typing) and the once-a-day re-rating of recent meals becomes
+         shared MealTagBackfill; Android calls both. The iPhone Settings page gets the advice box
+         and the AI coach style, and the iPhone now loads the person's coach style and advice
+         (with confirmed targets and "Fine for me" foods) at sign-in, as Android does at start.
+         "What my coach knows" joins with coach chat.
      - 5b-5: ViewModels (lifecycle-viewmodel multiplatform) and screens move one at a time:
        login, onboarding, Today, History/Progress, Settings, coach chat, recap, share cards. Each
        move ships in an Android release first (phone-checked), then lights up on iPhone.
@@ -194,6 +273,164 @@ tested on the dev app first.
        notifications and daily reminders, background refresh, home-screen widget (WidgetKit,
        SwiftUI), share sheet, PDF report, recap video with music, in-app review, analytics and
        crash reports.
+       Order (Neetish, 11 Nov): Apple Health, voice, camera and barcode, then the widget,
+       reminders and the PDF report, before the remaining screens.
+       - 6a: Apple Health, first part. Steps, active calories, walking distance and sleep are
+         read from Apple Health (HealthKit, read only) by Swift (HealthKitBridge) through a small
+         shared HealthSource; shared HealthSync saves today and yesterday the way Android's sync
+         does, and never saves an empty or failed read over a saved day. Shared SleepNight joins
+         Apple Health's many sleep pieces (watch and sleep app overlapping) into the night that
+         ended that day, deep sleep estimated at a fifth as on Android. Today's Activity side
+         asks to connect first with a short explanation, then Apple's own sheet; Settings has
+         an Apple Health section. Read again at every app open and return to the front (no
+         background reads yet). On-screen "Health Connect" becomes the phone's own health app
+         name. Workouts from other apps (6b) and smart-scale body data (6c) follow.
+       - 6b: Apple Health, workouts. Workouts the watch, Strava or any app saved to Apple
+         Health come into imported_workouts through shared WorkoutSync (90 days the first time,
+         then the last week; deleted there, gone here), with distance, active calories and
+         average heart rate, named after the app or watch that recorded them. Apple's workout
+         kinds map onto the same numbers Android uses (AppleWorkoutTypes), so titles, paces,
+         doubles across apps, "vs your usual", History, Insights and the calorie add-back work as
+         on Android. Connecting Apple Health turns the import on; people who connected before see
+         the card once more for the new part, and their steps and sleep keep coming in meanwhile.
+         Hiding a workout works as on Android; the import's settings page (main app, add-back)
+         joins with the rest of Settings.
+       - 6c: Apple Health, weight and body. Weigh-ins with body fat and lean mass from a smart
+         scale (or typed into the Health app) come in through shared ScaleImport, the same rules
+         as Android's BodyImporter: a reading close to the person's own weight goes into the
+         weight log ("from Withings"), one far from it (or the first with body fat) waits for
+         "Is this you?" on Today, and "Not me" sets a partner's readings aside from then on. Body
+         fat sets the calorie target as on Android and feeds the Journey Body card. Apple Health
+         has no bone mass or scale BMR, so those stay Android-only.
+       - 7: Voice. Today's "Say what you ate" (Food) and "Say your workout" (Activity) mics,
+         the same buttons as Android, through shared VoiceLog on top of a small VoiceRecognizer
+         that Swift provides with Apple's Speech framework (SpeechBridge). The same behaviour as
+         Android's: listens through pauses with live words, finishes 2 s after the last word or
+         after a minute, "Checking what you said…" waits up to 1.5 s for the corrected words, and
+         up to 5 of Apple's guesses go to the AI (SpokenInput) so it can pick the one that makes
+         sense as food. The phone's language and region are used (Indian English on an Indian
+         English phone). A refused mic shows the same "Microphone is off" note with Open
+         Settings. The mics in meal editing ("Say what it was") and "My nutritionist's advice"
+         show on iPhone too, with a small Listening window, since iPhone has no voice-typing box.
+         Results slide in at the top as on Android. Camera, barcode and label reading follow.
+       - 8: Camera and barcode. "Snap your plate" on Today's Food side offers Meal, Barcode or
+         Label, the three modes of Android's food camera. Apple's own camera takes the meal or
+         label photo (CameraBridge; the simulator picks a library photo instead), shrunk to
+         1280 px and sent to the AI once through shared FoodPhotoParser; Apple's live barcode
+         scanner (VisionKit) reads packets, looked up in Open Food Facts through shared
+         OpenFoodFacts (Android now uses its barcode forms too). Shared PhotoLog has Android's
+         words for working, not found ("Snap its nutrition label instead") and failures, and the
+         check sheets (CheckMealSheet, CheckPackSheet) move to shared, so nothing is saved until
+         Log meal, as on Android. Saved meals get quality tags the same way.
+       - 9: App icon. The Play Store's 1024 px Superfit icon (store/app_icon.png) becomes the
+         iPhone's home-screen icon through an asset catalog (Assets.xcassets/AppIcon), so the
+         app no longer shows a blank grid. It is cropped to the inner square, so iOS's own
+         rounded mask doesn't show a box inside a box.
+       - 10: Home-screen widget. Like Android's widget: today's calories left ("1,240 kcal
+         left", "of 2,100", or "230 kcal over"), rounded like the Home ring, back to the full
+         target at midnight, and "Open Superfit to start" before the first open or after sign
+         out. Medium size adds the mic and camera buttons, which open Today on the Food side and
+         start listening for a meal or open the camera for one. The small size and the rest of
+         the widget just open Superfit, since Apple allows only one tap area on small widgets.
+         Lock-screen versions show the same line. A WidgetKit extension (SuperfitWidget) reads
+         the numbers that Today saves in an app group (WidgetBridge), and the app asks for a
+         redraw only when they change.
+       - 11: Daily reminder. Settings › Daily reminder as on Android (on by default, 9 PM,
+         "Remind me" and the time). The iPhone doesn't let apps run at a set time, so shared
+         ReminderPlan writes the next 7 evenings ahead as Apple notifications (ReminderBridge)
+         and writes them again whenever today's log, today's coach tip or the settings change.
+         Same rules and words as Android: under 75% of the target logged gets "Complete your
+         food log?", a full day gets today's coach tip from Home (or "Daily log complete").
+         Tapping it, or "Say what you ate", opens Today listening. Apple asks to allow
+         notifications once, after sign-in; if they're off, Settings says so and opens the
+         phone's settings. Signing out removes them. The monthly recap's notification comes with
+         the recap.
+       - 12: Share my report. Progress › Insights › "Share my report" (2 or 4 weeks), the same
+         PDF as Android. Its layout moved to shared code (CoachReportPdf on a small PdfSurface),
+         so both apps draw the same pages; Android's PdfDocument drawing is now that surface,
+         and the iPhone's is Apple's PDF renderer (ReportBridge) in the bundled Manrope with the
+         app icon, then Apple's share sheet. The report's numbers come from shared
+         CoachExportBuilder via HistoryModel.buildReport, as on Android. The footer links to
+         Google Play until Superfit is on the App Store (then StoreLink gets the App Store link).
+       - 13: Coach chat. The Coach tab on the iPhone, the same chat as Android: one running
+         conversation kept between visits (a file per account, backed up to
+         users/{uid}/coach/chat), ready-made questions (Roast chip for Roast me), the mic sends the
+         question when the person stops talking, "Tell me more", "Log this" on suggested meals,
+         and "Remembered: … Undo" when the coach picks out a note. The chat screen moved to shared
+         CoachChatView (Android's screen now only runs Android's mic) and the instructions to
+         shared CoachChatPrompt, so both apps ask the coach the same way. The iPhone's
+         CoachChatModel mirrors Android's chat logic. Workouts from Apple Health now reach the
+         coach (chat and daily tip) as on Android (WorkoutSync.coachEntry). Settings › AI coach
+         adds "What my AI coach knows" (shared CoachMemoryCard: notes, add, remove, Clear chat
+         history). Sharing a roast as a card comes with share cards.
+       - 14: Share cards. The share screen (card design, colours, Light/Dark, your own photo
+         with pinch and drag, chips, the coach line or roast, "Roast again") moved to shared
+         ShareCardSheet/ShareCardViews, with the saved choices (ShareCardPrefs), the AI lines
+         (RoastCardData, WorkoutCardData) and the strength tags (StrengthTags) beside it. Each
+         phone gives a ShareCardHost: Android's gallery picker, share sheet and toasts as before;
+         the iPhone's ShareBridge.swift uses Apple's photo picker (no photo-library access needed)
+         and Apple's share sheet. Share buttons on iPhone: the streak card (today's card), every
+         workout on Activity and in History, the "ready to share" run or walk card on Today, and
+         any roast in the coach chat. Workout cards read heart rate from Apple Health during the
+         workout (the watch or app that recorded it first), as Android does from Health Connect.
+         The "new personal best" card and Settings › Sharing come with the rest of Settings.
+       - 15: Onboarding (moved ahead of the monthly recap, Neetish 12 Nov). A new account on the
+         iPhone sets up its profile on the phone with the same six steps as Android (welcome,
+         health app, about you, goal, pick your coach, your plan), now shared OnboardingScreen and
+         OnboardingModel. Each phone names its own health app (Health Connect, Apple Health) and
+         shows its own access sheet; "About you" fills height and weight from it (the iPhone now
+         also reads height). Android keeps "Read aloud" (its text to speech); the iPhone hides
+         the speaker for now. Back on the first step signs out on iPhone, for a wrong account.
+       - 16: Rest of Settings. Settings › Account shows the name and how the account signs in
+         (Google, Apple or email). Apple Health gets the workouts-from-other-apps choices (shared
+         WorkoutImportCard: on/off, main workout app, add workout calories Off/Half/All, show
+         hidden workouts), backed up like Android's. Settings › Sharing (shared
+         SharingSettingsCard). A home-screen widget card says how to add it on iPhone. Delete
+         account (the App Store requires it): the cloud backup first, then the account, then
+         everything this account kept on the phone (its database, chat and settings), as on
+         Android; a Sign in with Apple account confirms with Apple once more so Apple's link to
+         Superfit is revoked too. Today now offers a "New personal best" card and Progress lists
+         every personal best with Share, from shared TodayModel.personalBests. The usage and crash
+         reports switch comes with analytics.
+       - 17: Usage and crash reports. The events move into shared UsageEvents (Android's
+         AppAnalytics now only switches Firebase on/off and sends them), so both phones count the
+         same things: meals logged by voice/typed/photo/barcode/label, edits, weigh-ins, goals,
+         coach messages and notes, share cards and offers, report shared, step goal, coach style
+         and which tab or screen was opened. The iPhone sends them with Firebase Analytics and
+         Crashlytics (UsageReportsBridge.swift); a crash in the shared Kotlin code is noted with
+         its Kotlin stack before the app closes. Settings › Privacy has the same "Share anonymous
+         usage and crash reports" switch on both phones (shared UsageReportsCard). Release builds
+         upload their symbol file to Crashlytics. Not on iPhone: "widget added" (iOS doesn't say
+         when a widget is added) and the speech-service key (Apple has one).
+         Store readiness: the iPhone's share cards, share text and report footer name the App
+         Store instead of Google Play (shared ThisAppStore, linking to apps.apple.com/app/id6834018727,
+         the app's App Store Connect id); Apple's
+         privacy manifests (PrivacyInfo.xcprivacy for the app and the widget); version 1.0.0.
+       - 18: Monthly recap. The month's data (RecapData, same settings keys as Android's
+         MonthlyRecapData), the story cards and the story screen (RecapStoryScreen) are shared;
+         each phone plugs in its music, video maker and setup fixes through RecapHost. iPhone:
+         the same 12 original tracks as m4a (made from Android's ogg files with ffmpeg, 80 kbps
+         AAC), played with the "ambient" audio setting so the silent switch keeps them quiet and
+         someone's own music isn't stopped; the video is the same 720x1280 24 fps story (count-up,
+         swipe, looped music faded in and out) made with Apple's encoder (RecapBridge.swift).
+         Entry points as Android: Today's card from the 1st until just after opening (latest the
+         10th), Progress › Insights top for the first week, "Past months" below. "Get more from
+         Superfit" checks Apple Health, mic + speech recognition and the widget. The "Your
+         October review is ready" reminder is set ahead (RecapData.reminder): 10 am on the 1st
+         once the month has enough logged, or 10 am on days 1-3 for last month while unopened;
+         only when notifications are already allowed (never asks), kept apart from the evening
+         reminder; tapping it opens the recap. Not yet: the dev-app preview button.
+     - 19 (TestFlight feedback): iPhone Progress now swipes between Insights, Journey and History and has
+       the "Next: your Journey" / "Next: History" links, as on Android (shared ProgressTabs pager).
+     - 20 (TestFlight feedback): meal/label snap uses Superfit's own camera screen (SnapCamera.swift), so no
+       "Use Photo" step, as on Android. Photo stays in memory, never saved to Photos.
+     - 21 (TestFlight feedback): recap autoplay can no longer turn a page early or while someone is swiping
+       (a card must really stay up for its time). Fixes the recap sticking on the last story cards.
+     - 22 (TestFlight): the app and widget now take their version and build number from project.yml
+       (MARKETING_VERSION 1.0, CURRENT_PROJECT_VERSION raised for every upload; now 3).
+     - 23 (TestFlight feedback): the keyboard closes when you tap a blank part of the screen or scroll, and
+       after sending a chat message or logging a meal (iPhone has no back button for it). The bottom menu
+       is left out while the keyboard is up so it no longer leaves a gap above the keyboard.
      - 5b-7: TestFlight build for Neetish's iPhone 17, then App Store review.
 
 ## Launch goal
@@ -393,3 +630,204 @@ Step 5b-4b (reviewed 10 Nov): no change to what is stored or backed up, or where
 still goes only to users/{signed-in uid}; signed out, nothing is uploaded (CloudBackup checks
 the uid on every call). The new test library (bundled SQLite) is used by the computer tests only
 and is not in either app. No new permissions.
+
+Step 5b-5a (reviewed 10 Nov): display code only; no data, storage, network or permission changes.
+
+Step 5b-5b (reviewed 10 Nov): display code and state types only; no data, storage, network or
+permission changes.
+
+Step 5b-5c (reviewed 10 Nov): the same sums on the same on-phone data, moved; nothing new is read,
+stored or sent. No new permissions.
+
+Step 5b-5d (reviewed 10 Nov): display code only; no data, storage, network or permission changes.
+
+Step 5b-5e (reviewed 10 Nov): the same two anonymous events (meal_item_changed, meal_amount_changed)
+with the same "how" values; still nothing about the food. Voice words stay on the phone until the
+person taps Change, as before. No new permissions.
+
+Step 5b-5f (reviewed 10 Nov): display code only; the same actions are wired to the same ViewModel calls.
+No data, storage, network or permission changes.
+
+Step 5b-5g (reviewed 10 Nov): from this step the iPhone writes too. Meals, edits, deletes and
+weigh-ins made on the iPhone are saved in its own database and backed up to users/{signed-in
+uid} only, exactly as Android does (CloudBackup checks the uid on every call). Meal text goes to
+Gemini through Firebase AI Logic with App Check, as on Android. No new permissions.
+
+Step 5b-5h (reviewed 11 Nov): the same sums on the same on-phone data, moved; the iPhone adds
+deleting a voice-logged workout, which removes it from users/{signed-in uid} only, the same call
+Android makes. Nothing new is read, stored or sent. No new permissions.
+
+Step 5b-5i (reviewed 11 Nov): the same tip request as Android, through Firebase AI Logic with App
+Check; it carries the same history summary Android already sends. The tip and step goal are saved
+in the account's own settings on the phone (same keys as Android), nothing new is backed up. No
+new permissions.
+
+Step 5b-5j (reviewed 11 Nov): the same logging logic, moved; the same text goes to the same AI
+calls (Firebase AI Logic with App Check) and is saved the same way. No new permissions; the mic
+and camera stay Android-only for now.
+
+Step 5c-1 (reviewed 11 Nov): the same sums on the same on-phone data, moved; the iPhone's History
+page only reads the account's own database. Nothing new is stored, backed up or sent. No new
+permissions.
+
+Step 5c-2 (reviewed 11 Nov): on iPhone, editing, deleting and logging a missed meal from History
+use the same calls as Today (5b-5g): saved in the account's own database and backed up to
+users/{signed-in uid} only; the typed meal goes to Gemini through Firebase AI Logic with App
+Check, as on Android. No new permissions.
+
+Step 5c-3 (reviewed 11 Nov): the same sums on the same on-phone data, moved. On iPhone a weigh-in
+and a goal edit use the same calls as Android: saved in the account's own database and settings,
+and the weigh-in and profile backed up to users/{signed-in uid} only. "Fine for me" is kept in
+the account's own settings, as on Android. Nothing new is sent to the AI or anywhere else. No new
+permissions.
+
+
+Step 5d-1 (reviewed 11 Nov): the same settings under the same keys, kept in the account's own
+settings on the phone (theme in the app's settings); a goal change saves the profile, backed up to
+users/{signed-in uid} only, as on Android. Signing out on the iPhone is the same Firebase sign-out
+as before. Nothing new is read, stored or sent. No new permissions.
+
+Step 5d-2 (reviewed 11 Nov): the same settings under the same keys, kept on the phone. The advice
+text goes to Gemini through Firebase AI Logic with App Check only when the person saves it (to
+read targets) and inside the meal-rating prompt, exactly as on Android; re-rated tags are saved to
+the account's own database and backed up to users/{signed-in uid} only. Targets from the advice
+are used only after the person confirms them. No new permissions.
+
+Step 6a (reviewed 11 Nov): Apple Health is read only: Superfit asks to read steps, active energy,
+walking distance and sleep, and asks to write nothing. Access is asked only after the person taps
+Connect, with the reason shown first and in Apple's sheet (NSHealthShareUsageDescription). What is
+read stays in the account's own database on the phone; day totals (steps, active calories) and the
+night's sleep length are backed up to users/{signed-in uid} only, exactly what Android already
+backs up from Health Connect. Distance is shown, not stored. Nothing from Apple Health goes to the
+AI beyond the same day summaries Android's coach already uses, and nothing is shared or used for
+ads (App Store rule 5.1.3). An empty or refused read never overwrites a saved day, so a second
+phone on the same account can't wipe steps. The entitlement is HealthKit only (no clinical
+records). No new Android permissions; Android unchanged apart from the shared text naming its
+health app.
+
+Step 6b (reviewed 11 Nov): still read only. Superfit now also asks to read workouts, cycling and
+swimming distance and heart rate; heart rate is read only as each workout's average. Workouts stay
+in the account's own database on the phone and are not backed up, exactly as Android keeps Health
+Connect workouts; the app and watch names are kept in the account's own settings on the phone.
+Nothing new goes to the AI or anywhere else. No new Android permissions; Android unchanged.
+
+Step 6c (reviewed 12 Nov): still read only; adds weight, body fat and lean mass. Accepted weigh-ins
+go into the weight log and are backed up to users/{signed-in uid} only, as Android does with Health
+Connect weigh-ins; the scale lists (mine, not me, waiting) and the last body fat stay in the
+account's own settings on the phone. Readings that may be someone else's are never added without
+the person's answer. Nothing new goes to the AI or anywhere else. Android unchanged.
+
+Step 7 (reviewed 12 Nov): asks for the microphone and speech recognition only when a mic button is
+first tapped, with the reasons in Apple's sheets (NSMicrophoneUsageDescription,
+NSSpeechRecognitionUsageDescription). The microphone is on only while the button shows Listening,
+and stops after a minute at most. Sound goes to Apple's speech recognition (as it goes to Google's
+on Android) and is never recorded, kept or sent to Superfit or Firebase; only the words go on, to
+Gemini through Firebase AI Logic with App Check, exactly as typed words do. Nothing new is stored
+or backed up. No new Android permissions; Android unchanged.
+
+Step 8 (reviewed 12 Nov): asks for the camera only when it first opens, with the reason in
+Apple's sheet (NSCameraUsageDescription). Photos are shrunk, sent once to Gemini through Firebase
+AI Logic with App Check, and never saved to the phone's photos, the database or the backup. Only
+the barcode number goes to Open Food Facts (over HTTPS, a plain app name as User-Agent, no
+account or device details). The simulator's photo picker needs no library permission. What is
+logged is saved and backed up like any meal. No new Android permissions; Android's camera is
+unchanged apart from the check sheets now coming from shared code.
+
+Step 9 (reviewed 12 Nov): the app icon only adds an image to the app bundle. There is no new
+permission, data, network call or code.
+
+Step 10 (reviewed 12 Nov): the widget sees only today's date, calorie target and eaten total. They
+sit in an app group that only Superfit's app and widget can read, and they are cleared on sign
+out, so the next person never sees someone else's numbers (a known gap on Android). The widget
+has no network access and no other data. The mic and camera links (superfit://voice,
+superfit://camera) carry a random key made on the phone and kept in that app group. Another app
+or a web page can open Superfit with a superfit:// link, but without the key the app only opens:
+it never starts listening or opens the camera. Listening still shows Apple's mic indicator, as
+always. No new permissions; Android unchanged.
+
+Step 11 (reviewed 12 Nov): reminders are local notifications made on the phone. Nothing is sent
+anywhere, no server push and no new data. They contain only today's calories and the coach tip
+already on Home, and they are removed on sign out. Apple's notification prompt is the only new
+permission, and it can be refused: the reminder just doesn't show. A reminder tap can only start
+listening on Today (Apple's mic indicator shows), as the widget's mic does. Android unchanged.
+
+Step 12 (reviewed 12 Nov): the PDF is made on the phone from the person's own data, saved in the
+app's temporary folder with file protection (replaced each time), and leaves the phone only
+through the share sheet, where the person picks where it goes. Nothing is uploaded and there are no
+new permissions. The name at the top comes from the signed-in account, as on Android. Android's
+PDF is drawn by the same shared layout, with the same fonts, colours, positions and Play Store link.
+
+Step 13 (reviewed 12 Nov): the chat and the coach's notes are the person's own and stay under
+their account: a file in the app's own folder named after their account, the notes in their
+account's settings, and the backup in their own users/{uid}/coach documents (the same Firestore
+rules as everything else). Questions go to Gemini through Firebase AI Logic with App Check, with
+the person's own logs, exactly as on Android; nothing else leaves the phone. A long paste is cut
+to 4,000 characters (notes to 3,000). Clear chat history deletes the file and the backup copy;
+notes stay until removed. The mic is the same as Today's (Apple's indicator shows, nothing
+recorded). No new permissions on either phone; Android's chat works as before, its screen now
+drawn by the shared view.
+
+Step 14 (reviewed 12 Nov): a share card is drawn on the phone and only leaves where the person
+sends it. The picture is written to the app's own temporary folder (Android: its cache, shared
+through its own FileProvider; iPhone: a "share-cards" temporary folder with complete file
+protection), replaced each time. A background photo is picked with the phone's own picker, which
+hands over only that one photo; it is held in memory while the share screen is open and never
+saved or uploaded. Heart rate is read from the health app only when a workout card opens, for that
+workout's time, and never stored (on iPhone it uses the heart-rate read access already asked for).
+The coach line and roast go to Gemini through Firebase AI Logic with App Check, with only the
+card's own facts, as before. The iPhone adds one Info.plist line: "Save Image" on the share sheet
+may ask to add that picture to Photos (NSPhotoLibraryAddUsageDescription); the app never reads the
+photo library. No new Android permissions.
+
+Step 15 (reviewed 12 Nov): sign-up saves the profile on the phone and in the person's own
+users/{uid} backup, as on Android. Height and weight are read once from the health app, only after
+the person allows it, and only fill the boxes. The iPhone asks Apple Health for one more read-only
+type (height), named in the access sheet's description. No new Android permissions.
+
+Step 16 (reviewed 12 Nov): Delete account removes the person's users/{uid} data in the cloud before
+the account (it can't be reached afterwards; offline, nothing is deleted and they stay signed in),
+then the Firebase account, then the phone's copy (database file, chat file, account settings). For
+Sign in with Apple, Apple's sheet confirms the person and the app revokes its Apple token with the
+one-time code (Apple's rule for account deletion); the code is used once and never stored. Workout
+choices go to the same users/{uid} backup document as Android's. No new permissions on either phone.
+
+Step 17 (reviewed 12 Nov): usage counts carry only how something was done or which screen opened,
+never food, numbers, health data, photos, names or email (UsageEvents is the one list for both
+phones). Both phones keep the person's switch (on unless turned off) and never report from the dev
+app (Android: .debug package; iPhone: Debug builds). On iPhone, Analytics and Crashlytics start
+switched off in Info.plist and are only turned on once the switch has been checked, so nothing is
+sent before that; no advertising ID is collected (no AdSupport, no tracking prompt,
+GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED off) and ad personalisation signals are off. Crash
+reports and handled errors include the error message and stack, as on Android. The symbol upload
+uses the Firebase config already in the app, no new key. No new permissions on either phone. App
+Store privacy labels (before the first App Store submission, Neetish): Usage data (product
+interaction) and Diagnostics (crash data), plus Device ID (Firebase's install ID), not linked to
+identity, not used for tracking; this matches Android's Data safety entry.
+The privacy manifest declares the same data as the App Store labels (name, email, user ID, health,
+fitness and the person's own logs for the app to work, linked to the account; usage, crash data
+and the Firebase install ID for analytics, not linked; nothing for tracking) and why the app uses
+settings storage (its own and the widget's shared group), file dates and the phone's uptime.
+Step 18 (recap): no new permissions or data. The recap reads only the person's own logs on the
+phone; its words come from the same one AI call per month as Android (no new data sent). The
+video is made on the phone, written to the app's own temporary folder with complete file
+protection (the frames-only file is deleted once the music is added, and the folder is cleared
+each time) and leaves only through the share sheet. The music is bundled, original, nothing
+downloaded. The setup card only reads whether mic and speech are allowed and whether a widget is
+placed; asking for the mic uses Apple's own prompts (or opens Settings once refused).
+TestFlight upload fix: Apple requires a NSHealthUpdateUsageDescription purpose string whenever the app has the HealthKit entitlement, even if it only reads. Added: "Superfit only reads from Apple Health. It never adds or changes anything there." (Superfit still never writes to Apple Health; no new permission.)
+Also: ITSAppUsesNonExemptEncryption is false (only standard encryption), which skips the export
+question on each upload. Firebase 12 has no "without advertising-ID support" product any more
+(tried; the package product doesn't exist), so FirebaseAnalytics stays. Superfit never reads the
+advertising ID: collection is switched off in Info.plist and the app has no tracking prompt. If
+App Store Connect asks about the advertising identifier at submission, decide the answer then.
+
+Step 19 (Progress swipe + Next links): layout only, no data, permissions or network. Security: nothing new.
+Step 20 (own camera screen): uses the camera permission already asked for; the picture is shrunk and handed to the AI as before, never written to Photos or disk. Security: nothing new.
+Step 23 (keyboard closes): layout behaviour only; no data, permissions or network. Security: nothing new.
+
+- Step 24: coach chat keyboard return key is "Send" (sends, then closes the keyboard). UI input option only; nothing new stored or sent. Security: no change.
+
+- Step 25: back/close audit. Settings, recap, onboarding already have visible back; Share card sheet gets a visible Close (X); other sheets have Cancel/Retake or swipe-down; Settings and recap also go back with the left-edge swipe (BackHandler). Layout/navigation only; nothing new stored or sent. Security: no change.
+
+- Step 26: recap story cards named "Get it on Google Play" on iPhone too; now use this phone's store (App Store on iPhone). Apple rejects apps that mention other platforms. Text only. Security: no change.
+- Step 26b: workout-import card names this phone's apps (Apple Watch/Strava on iPhone, not Samsung Health). Build number 4.

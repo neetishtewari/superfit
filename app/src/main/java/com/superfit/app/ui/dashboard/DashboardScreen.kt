@@ -30,8 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
-import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -43,8 +41,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -83,6 +79,7 @@ import com.superfit.app.widget.WidgetPin
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toKotlinYearMonth
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -304,6 +301,9 @@ fun DashboardScreen(
     val workoutImportEnabled by viewModel.workoutImportEnabled.collectAsState()
     val workoutCardDismissed by viewModel.workoutCardDismissed.collectAsState()
     val usualDay by viewModel.usualDay.collectAsState()
+    val yesterdayState by viewModel.yesterdayState.collectAsState()
+    val showYesterday by viewModel.showYesterday.collectAsState()
+    val todayDistance by viewModel.todayDistance.collectAsState()
     val workoutPermissionMissing by viewModel.workoutPermissionMissing.collectAsState()
     val workoutImportRunning by viewModel.workoutImportRunning.collectAsState()
     val duplicateWorkoutPrompt by viewModel.duplicateWorkoutPrompt.collectAsState()
@@ -385,7 +385,7 @@ fun DashboardScreen(
                 FoodCameraScreen(
                     controller = foodCameraController,
                     onLogged = { entry, isPackaged ->
-                        com.superfit.app.data.AppAnalytics.mealLogged(
+                        com.superfit.app.data.UsageEvents.mealLogged(
                             when (foodCameraController.mode) {
                                 com.superfit.app.ui.camera.CameraMode.BARCODE -> "barcode"
                                 com.superfit.app.ui.camera.CameraMode.LABEL -> "label"
@@ -538,13 +538,13 @@ fun DashboardScreen(
                         )
 
                         recapOffer?.let { month ->
-                            com.superfit.app.ui.recap.RecapReadyCard(month, onOpen = { onOpenRecap(month) })
+                            com.superfit.app.ui.recap.RecapReadyCard(month.toKotlinYearMonth(), onOpen = { onOpenRecap(month) })
                         }
 
                         // The ready-to-share card waits while the recap or a new best is offered.
                         shareOffer?.takeIf { recapOffer == null && personalBests.toOffer == null }?.let { workout ->
                             LaunchedEffect(workout.merged.primary.id) {
-                                com.superfit.app.data.AppAnalytics.shareOffer("shown", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
+                                com.superfit.app.data.UsageEvents.shareOffer("shown", if (com.superfit.app.domain.ShareOffer.isRun(workout)) "run" else "walk")
                             }
                             ShareOfferCard(
                                 workout = workout,
@@ -623,11 +623,17 @@ fun DashboardScreen(
                             // 5. Track Your Meals Card (With Text Box, Chips, and Logged List)
                             TrackMealsCard(
                                 state = state,
-                                viewModel = viewModel,
+                                predictedFoods = viewModel.predictedFoods.collectAsState().value,
+                                canRetryLastMeal = viewModel.canRetryLastMeal,
+                                onLogMeal = viewModel::parseAndAddMeal,
+                                onRetryLastMeal = viewModel::retryLastMeal,
+                                onDeleteMeal = viewModel::deleteMeal,
+                                onUpdateMeal = viewModel::updateMeal,
                                 parsingState = parsingState,
                                 foodInputText = foodInputText,
                                 onFoodInputChange = { foodInputText = it },
-                                onViewAllFoods = { showFavoritesDialog = true }
+                                onViewAllFoods = { showFavoritesDialog = true },
+                                mealSuggester = viewModel.mealSuggester.collectAsState().value
                             )
                         } else {
                             // WORKOUT VIEW: Activity & Performance, Sleep & Recovery
@@ -643,18 +649,21 @@ fun DashboardScreen(
                             }
 
                             // 1. Activity & Performance Card
+                            // Between midnight and waking up, yesterday's numbers instead of an empty day.
+                            val night = (yesterdayState as? DashboardUiState.Success)?.takeIf { showYesterday }
                             ActivityPerformanceCard(
-                                state = state,
-                                vsUsual = viewModel.todayVsUsual(state, usualDay),
+                                state = night ?: state,
+                                vsUsual = if (night == null) viewModel.todayVsUsual(state, usualDay, todayDistance) else null,
                                 onDeleteWorkout = { viewModel.deleteWorkout(it) },
                                 onHideImportedWorkout = { viewModel.hideWorkout(it) },
                                 workoutImportEnabled = workoutImportEnabled,
                                 workoutImportRunning = workoutImportRunning,
-                                onShareWorkout = { shareCard = it }
+                                onShareWorkout = { shareCard = it },
+                                yesterday = night != null
                             )
 
                             // 2. Sleep & Readiness Recovery Dashboard
-                            SleepRecoveryCard(state = state)
+                            SleepRecoveryCard(state = night ?: state)
                         }
 
                         Spacer(modifier = Modifier.height(48.dp))
@@ -713,9 +722,8 @@ fun DashboardScreen(
 private fun TodaySwitch(logType: String, onSelect: (String) -> Unit) {
     val context = LocalContext.current
     var unseen by remember { mutableStateOf(com.superfit.app.data.SeenTabs.unseen(context, listOf("today_activity"))) }
-    SegmentedPills(
-        options = listOf("MEAL" to "Food", "WORKOUT" to "Activity"),
-        selected = logType,
+    FoodActivitySwitch(
+        side = logType,
         onSelect = { key ->
             if (key == "WORKOUT" && unseen.isNotEmpty()) {
                 com.superfit.app.data.SeenTabs.markSeen(context, "today_activity")
@@ -723,10 +731,6 @@ private fun TodaySwitch(logType: String, onSelect: (String) -> Unit) {
             }
             onSelect(key)
         },
-        icons = mapOf(
-            "MEAL" to (Icons.Rounded.Restaurant to Icons.Outlined.Restaurant),
-            "WORKOUT" to (Icons.AutoMirrored.Rounded.DirectionsRun to Icons.AutoMirrored.Outlined.DirectionsRun)
-        ),
-        unseen = if (unseen.isEmpty()) emptySet() else setOf("WORKOUT")
+        unseenActivity = unseen.isNotEmpty()
     )
 }

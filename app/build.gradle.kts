@@ -24,8 +24,8 @@ android {
         applicationId = "com.superfit.aifitness"
         minSdk = 26
         targetSdk = 36
-        versionCode = 59
-        versionName = "1.0.55"
+        versionCode = 65
+        versionName = "1.0.61"
     }
 
     // Release signing secrets come from local.properties (gitignored) or environment variables,
@@ -183,6 +183,8 @@ dependencies {
   implementation(libs.firebase.firestore)
   // Gemini through Firebase AI Logic (billed to Superfit's Firebase project), protected by App Check
   implementation(libs.firebase.ai)
+  // Which Gemini models to use, changeable from the Firebase console without an app update
+  implementation(libs.firebase.config)
   implementation(libs.firebase.analytics)
   implementation(libs.firebase.crashlytics)
   implementation(libs.firebase.appcheck.playintegrity)

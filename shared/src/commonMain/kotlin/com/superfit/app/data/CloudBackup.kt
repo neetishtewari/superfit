@@ -73,28 +73,7 @@ class CloudBackup(
             val sleeps = store.list("$base/sleep").map { it.data.toSleepTelemetry() }
             if (sleeps.isNotEmpty()) db.telemetryDao().insertSleeps(sleeps)
 
-            // Merge only: add what the phone is missing and never delete or overwrite what it has.
-            // Restored entries get a new local number and keep their cloud id, which the insert
-            // uses to skip entries the phone already has.
-            // The cloud copy can be incomplete (older versions backed up just the latest entry),
-            // so treating it as the full history would throw away the user's own log.
-            val entries = store.list("$base/nutrition").map { it.data.toNutritionEntry(it.id) }
-            val localNutritionTimes = db.nutritionDao().getAllEntries().map { it.timestamp }.toSet()
-            db.nutritionDao().insertEntriesIfMissing(
-                withoutLegacyDuplicates(entries, localNutritionTimes, { it.cloudId }, { it.timestamp })
-            )
-
-            val workouts = store.list("$base/workouts").map { it.data.toWorkoutEntry(it.id) }
-            val localWorkoutTimes = db.workoutDao().getAllEntries().map { it.timestamp }.toSet()
-            db.workoutDao().insertEntriesIfMissing(
-                withoutLegacyDuplicates(workouts, localWorkoutTimes, { it.cloudId }, { it.timestamp })
-            )
-
-            val weights = store.list("$base/weights").map { it.data.toWeightEntry(it.id) }
-            val localWeightTimes = db.weightDao().getAllWeightEntries().map { it.timestamp }.toSet()
-            db.weightDao().insertWeightsIfMissing(
-                withoutLegacyDuplicates(weights, localWeightTimes, { it.cloudId }, { it.timestamp })
-            )
+            mergeEntries(db, base)
 
             store.get("$base/streak/current")?.let { db.streakDao().insertStreakState(it.toStreakState()) }
 
@@ -113,6 +92,55 @@ class CloudBackup(
         } catch (e: Exception) {
             AppLog.w(tag, "Error syncing data down: ${e.message}", e)
         }
+    }
+
+    /**
+     * Restores the backup only onto a phone that doesn't hold this account's data yet (a fresh
+     * install or a new sign-in), as Android does. Returns true when it downloaded.
+     */
+    suspend fun restoreIfEmpty(): Boolean {
+        if (uid() == null || database().profileDao().getProfile() != null) return false
+        syncAllDown()
+        return true
+    }
+
+    /**
+     * Brings down meals, workouts and weigh-ins added on another phone on the same account (merge
+     * only, never deletes or overwrites). Cheaper than [syncAllDown] and leaves the profile, steps
+     * and sleep alone, so it can run in the background while the app is in use.
+     */
+    suspend fun syncEntriesDown() {
+        val userId = uid() ?: return
+        try {
+            mergeEntries(database(), user(userId))
+        } catch (e: Exception) {
+            AppLog.w(tag, "Error bringing down entries: ${e.message}", e)
+        }
+    }
+
+    private suspend fun mergeEntries(db: SuperfitDatabase, base: String) {
+        // Merge only: add what the phone is missing and never delete or overwrite what it has.
+        // Restored entries get a new local number and keep their cloud id, which the insert
+        // uses to skip entries the phone already has.
+        // The cloud copy can be incomplete (older versions backed up just the latest entry),
+        // so treating it as the full history would throw away the user's own log.
+        val entries = store.list("$base/nutrition").map { it.data.toNutritionEntry(it.id) }
+        val localNutritionTimes = db.nutritionDao().getAllEntries().map { it.timestamp }.toSet()
+        db.nutritionDao().insertEntriesIfMissing(
+            withoutLegacyDuplicates(entries, localNutritionTimes, { it.cloudId }, { it.timestamp })
+        )
+
+        val workouts = store.list("$base/workouts").map { it.data.toWorkoutEntry(it.id) }
+        val localWorkoutTimes = db.workoutDao().getAllEntries().map { it.timestamp }.toSet()
+        db.workoutDao().insertEntriesIfMissing(
+            withoutLegacyDuplicates(workouts, localWorkoutTimes, { it.cloudId }, { it.timestamp })
+        )
+
+        val weights = store.list("$base/weights").map { it.data.toWeightEntry(it.id) }
+        val localWeightTimes = db.weightDao().getAllWeightEntries().map { it.timestamp }.toSet()
+        db.weightDao().insertWeightsIfMissing(
+            withoutLegacyDuplicates(weights, localWeightTimes, { it.cloudId }, { it.timestamp })
+        )
     }
 
     private suspend fun restoreCoach(base: String) {
@@ -258,6 +286,13 @@ class CloudBackup(
         private const val COACH_CHAT_DOC = "chat"
         private const val COACH_NOTES_DOC = "notes"
         private const val COACH_JSON_FIELD = "json"
+
+        /** How often a phone that already has its data brings down entries from the account's other phones. */
+        const val ENTRIES_REFRESH_MS = 24L * 60 * 60 * 1000
+
+        /** True when [lastMs] (0 = never) is a day or more ago, or in the future (clock changed). */
+        fun isEntriesRefreshDue(lastMs: Long, nowMs: Long): Boolean =
+            lastMs <= 0L || nowMs - lastMs >= ENTRIES_REFRESH_MS || nowMs < lastMs
 
         /** Every collection under users/{uid}; account deletion clears them all. */
         val USER_COLLECTIONS = listOf(

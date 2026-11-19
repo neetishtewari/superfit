@@ -1,5 +1,6 @@
 package com.superfit.app.domain
 
+import com.superfit.app.data.UsageEvents
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
@@ -15,19 +16,52 @@ object AiFailover {
 
     private const val TAG = "AiFailover"
 
-    // Multi-model failover cascade prioritized for lowest latency. All four are current stable
+    // Built-in failover cascade, prioritized for lowest latency. All four are current stable
     // models in Firebase AI Logic (gemini-2.0-flash shut down 2026-06-01 and gemini-2.5-flash is
     // deprecated, so both were replaced):
     // 1. gemini-3.1-flash-lite: ultra-low latency, no thinking overhead
     // 2. gemini-3.5-flash-lite: newer lite model, same speed class
     // 3. gemini-3.5-flash: frontier multimodal fallback
     // 4. gemini-3.8-flash: newest flash model, last resort
-    val MODEL_CASCADE = listOf(
+    val BUILT_IN_MODELS = listOf(
         "gemini-3.1-flash-lite",
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
         "gemini-3.8-flash"
     )
+
+    /** Firebase Remote Config parameter with the models to try first, e.g. "gemini-4-flash-lite, gemini-4-flash". */
+    const val REMOTE_CONFIG_KEY = "ai_models"
+
+    /** Most models taken from Remote Config, so a typo can't make every call walk a long list. */
+    private const val MAX_REMOTE_MODELS = 6
+
+    private val MODEL_NAME = Regex("^gemini-[a-z0-9.-]+$")
+
+    @kotlin.concurrent.Volatile
+    private var remoteModels: List<String> = emptyList()
+
+    /**
+     * The models each call tries, in order: the list from Firebase Remote Config (so a retired
+     * model can be replaced without an app update on either store), then the built-in list as a
+     * safety net if the remote one is empty, mistyped or all of it fails.
+     */
+    val MODEL_CASCADE: List<String> get() = (remoteModels + BUILT_IN_MODELS).distinct()
+
+    /** Takes the Remote Config value; blank or unreadable leaves only the built-in list. */
+    fun setRemoteModels(raw: String?) {
+        remoteModels = parseModelList(raw)
+        if (remoteModels.isNotEmpty()) AppLog.d(TAG, "Models from Remote Config: $remoteModels")
+    }
+
+    /** Model names from a comma- or space-separated list, keeping only names that look like Gemini models. */
+    fun parseModelList(raw: String?): List<String> =
+        raw.orEmpty()
+            .split(',', ' ', '\n', '\t')
+            .map { it.trim().lowercase() }
+            .filter { MODEL_NAME.matches(it) }
+            .distinct()
+            .take(MAX_REMOTE_MODELS)
 
     // Per-attempt timeout. Long prompts (coaching with full history) can legitimately take
     // well over 5s, so a short limit turned slow answers into "busy" errors.
@@ -69,6 +103,30 @@ object AiFailover {
 
     /** Reported to crash reports when the Gemini credit runs out, named so it stands out. */
     class OutOfCreditException(cause: Throwable) : Exception("Gemini prepaid credit is used up", cause)
+
+    /** Reported to crash reports when Google says a model is gone, named so it stands out. */
+    class ModelUnavailableException(model: String, cause: Throwable) : Exception("Gemini model $model is no longer available (retired or misspelled)", cause)
+
+    @kotlin.concurrent.Volatile
+    private var reportedUnavailable: Set<String> = emptySet()
+
+    /**
+     * Tells Firebase (usage event "ai_model_unavailable" plus a crash-report entry) the first time
+     * in each app run that Google refuses a model as not found, so a retirement is noticed even
+     * though people only see the next model answering. Then the model can be swapped in Remote
+     * Config ([REMOTE_CONFIG_KEY]).
+     */
+    private fun reportUnavailable(model: String, error: Throwable) {
+        if (model in reportedUnavailable) return
+        reportedUnavailable = reportedUnavailable + model
+        UsageEvents.aiModelUnavailable(model)
+        UsageEvents.recordError(ModelUnavailableException(model, error))
+    }
+
+    /** For tests: forget which models were already reported. */
+    internal fun resetUnavailableReports() {
+        reportedUnavailable = emptySet()
+    }
 
     /**
      * Runs [call] against each model in [models] until one returns non-blank text.
@@ -136,7 +194,11 @@ object AiFailover {
                         onOutOfCredit(OutOfCreditException(error))
                         throw Exception(sanitizeError(error), error)
                     }
-                    ErrorKind.RATE_LIMITED, ErrorKind.MODEL_UNAVAILABLE, ErrorKind.OTHER -> break
+                    ErrorKind.MODEL_UNAVAILABLE -> {
+                        reportUnavailable(modelName, error)
+                        break
+                    }
+                    ErrorKind.RATE_LIMITED, ErrorKind.OTHER -> break
                 }
             }
         }

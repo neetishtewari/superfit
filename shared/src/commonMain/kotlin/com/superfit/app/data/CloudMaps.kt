@@ -18,7 +18,8 @@ fun UserProfileEntity.toMap(): Map<String, Any> = mapOf(
     "startingWeightKg" to startingWeightKg,
     "targetWeightKg" to targetWeightKg,
     "startDateTimestamp" to startDateTimestamp,
-    "fitnessLevel" to fitnessLevel
+    "fitnessLevel" to fitnessLevel,
+    "birthYearMonth" to birthYearMonth
 )
 
 fun Map<String, Any>.toUserProfileEntity(): UserProfileEntity = UserProfileEntity(
@@ -33,7 +34,8 @@ fun Map<String, Any>.toUserProfileEntity(): UserProfileEntity = UserProfileEntit
     startingWeightKg = (this["startingWeightKg"] as? Number)?.toDouble() ?: (this["weightKg"] as? Number)?.toDouble() ?: 75.0,
     targetWeightKg = (this["targetWeightKg"] as? Number)?.toDouble() ?: 70.0,
     startDateTimestamp = (this["startDateTimestamp"] as? Number)?.toLong() ?: 0L,
-    fitnessLevel = this["fitnessLevel"] as? String ?: "INTERMEDIATE"
+    fitnessLevel = this["fitnessLevel"] as? String ?: "INTERMEDIATE",
+    birthYearMonth = (this["birthYearMonth"] as? Number)?.toInt() ?: 0
 )
 
 fun ActivityTelemetryEntity.toMap(): Map<String, Any> = mapOf(

@@ -18,12 +18,24 @@ class IosAuthError(val code: String?, val message: String?, val isNetwork: Boole
 interface IosAuth {
     fun currentUid(): String?
     fun currentEmail(): String?
+
+    /** The account's name (from Google or Apple sign-in), for the top of Share my report. */
+    fun currentName(): String?
     fun signIn(email: String, password: String, done: (IosAuthError?) -> Unit)
     fun createAccount(email: String, password: String, done: (IosAuthError?) -> Unit)
     fun sendPasswordReset(email: String, done: (IosAuthError?) -> Unit)
     fun signInWithGoogle(done: (IosAuthError?) -> Unit)
     fun signInWithApple(done: (IosAuthError?) -> Unit)
     fun signOut()
+
+    /** "Google sign-in", "Sign in with Apple" or "Email and password", for Settings › Account. */
+    fun signInMethod(): String
+
+    /**
+     * Deletes the signed-in Firebase account (after its data). Answers "DELETED",
+     * "NEEDS_RECENT_SIGN_IN", "CANCELLED" (the person closed Apple's sheet) or "FAILED".
+     */
+    fun deleteAccount(done: (String) -> Unit)
 }
 
 /** Lets shared code use the Swift [IosAuth] as an ordinary [AuthClient], plus Google and Apple. */

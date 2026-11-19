@@ -1,6 +1,8 @@
 package com.superfit.app.data
 
 import com.superfit.app.domain.FoodPredictor
+import com.superfit.app.domain.MealSuggester
+import com.superfit.app.domain.withCurrentAge
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
@@ -35,9 +37,14 @@ class LogRepository(
 
     suspend fun getProfile(): UserProfileEntity? = db.profileDao().getProfile()
 
+    /** Workout import choices (main app, add-back, hidden workouts) to the person's own backup, as Android does. */
+    suspend fun backUpWorkoutImportSettings(prefs: WorkoutImportPrefs) = backup.uploadWorkoutImportSettings(prefs.toBackup())
+
     suspend fun saveProfile(profile: UserProfileEntity) {
-        db.profileDao().insertProfile(profile)
-        backup.uploadProfile(profile)
+        // The saved age follows the birth month, for older app versions that read only "age".
+        val current = profile.withCurrentAge()
+        db.profileDao().insertProfile(current)
+        backup.uploadProfile(current)
     }
 
     // --- Steps and sleep already read from the health app ---
@@ -65,6 +72,20 @@ class LogRepository(
         db.telemetryDao().insertSleep(sleep)
         backup.uploadSleep(sleep)
     }
+
+    /** Steps and sleep from the phone's health app, for [HealthSync]. */
+    val healthStore: HealthStore = object : HealthStore {
+        override suspend fun activity(date: String) = db.telemetryDao().getActivity(date)
+        override suspend fun saveActivity(activity: ActivityTelemetryEntity) = this@LogRepository.saveActivity(activity)
+        override suspend fun sleep(date: String) = db.telemetryDao().getSleep(date)
+        override suspend fun saveSleep(sleep: SleepTelemetryEntity) = this@LogRepository.saveSleep(sleep)
+    }
+
+    // --- Workouts from other apps (the phone's health app; kept on the phone, not backed up) ---
+
+    val importedWorkouts: ImportedWorkoutDao get() = db.importedWorkoutDao()
+
+    val allImportedWorkoutsFlow: Flow<List<ImportedWorkoutEntity>> get() = db.importedWorkoutDao().getAllFlow()
 
     // --- Meals ---
 
@@ -110,6 +131,13 @@ class LogRepository(
 
     suspend fun getPredictedFoods(currentHour: Int): List<PredictedFood> =
         FoodPredictor.predict(getAllNutritionEntries(), currentHour)
+
+    /** What the meal box suggests while typing, ranked like [getPredictedFoods]. */
+    suspend fun getMealSuggester(currentHour: Int, nowMs: Long = Now.millis()): MealSuggester {
+        val all = getAllNutritionEntries()
+        val scores = FoodPredictor.predict(all, currentHour, nowMs).associate { it.foodText.trim().lowercase() to it.score }
+        return MealSuggester.build(all, scores, nowMs)
+    }
 
     // --- Workouts the user logged ---
 

@@ -6,7 +6,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
-import com.superfit.app.data.AppAnalytics
+import com.superfit.app.data.UsageEvents
 
 private const val HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata"
 
@@ -24,7 +24,7 @@ fun launchHealthConnectPermissions(
         HealthConnectClient.SDK_AVAILABLE -> try {
             launcher.launch(permissions)
         } catch (e: Exception) {
-            AppAnalytics.recordError(e)
+            UsageEvents.recordError(e)
             Toast.makeText(context, "Couldn't open Health Connect. You can connect later in Settings.", Toast.LENGTH_LONG).show()
         }
         HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
@@ -61,7 +61,7 @@ fun openHealthConnectSettings(context: Context) {
     try {
         context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
-        AppAnalytics.recordError(e)
+        UsageEvents.recordError(e)
         Toast.makeText(context, "Couldn't open Health Connect. Open it from your phone's Settings.", Toast.LENGTH_LONG).show()
     }
 }

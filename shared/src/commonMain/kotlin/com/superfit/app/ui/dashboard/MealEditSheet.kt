@@ -1,0 +1,596 @@
+package com.superfit.app.ui.dashboard
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.*
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.superfit.app.data.NutritionEntryEntity
+import com.superfit.app.data.UsageEvents
+import com.superfit.app.domain.AiFailover
+import com.superfit.app.domain.AppLog
+import com.superfit.app.domain.Decimals
+import com.superfit.app.domain.Level
+import com.superfit.app.domain.MealItem
+import com.superfit.app.domain.MealItemReplacer
+import com.superfit.app.domain.MealItemWeigher
+import com.superfit.app.domain.MealItems
+import com.superfit.app.domain.NumberInput
+import com.superfit.app.domain.withItems
+import com.superfit.app.theme.DeleteRed
+import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.theme.ThemeBrandSoft
+import com.superfit.app.theme.ThemeErrorColor
+import com.superfit.app.theme.ThemeFieldBg
+import com.superfit.app.theme.ThemeGlassBorder
+import com.superfit.app.theme.ThemeTextPrimary
+import com.superfit.app.theme.ThemeTextSecondary
+import com.superfit.app.ui.components.LocalVoiceTyping
+import com.superfit.app.ui.components.SuperfitField
+import kotlinx.coroutines.launch
+
+/**
+ * Lets the user fix a logged meal: the amount of each food, and how much oil and sugar went in.
+ * Numbers update as they tap; nothing is saved until Save.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MealEditSheet(
+    entry: NutritionEntryEntity,
+    onSave: (NutritionEntryEntity) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var meal by remember(entry.id) { mutableStateOf(MealItems.decode(entry.items) ?: MealItems.legacy(entry)) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SuperfitTheme.colors.cardBg,
+        scrimColor = Color.Black.copy(alpha = 0.6f),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = SuperfitTheme.colors.textSecondary) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Edit meal",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = ThemeTextPrimary
+            )
+
+            MealItemsEditor(meal = meal, onChange = { meal = it })
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = { onSave(entry.withItems(meal)) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * The item rows, oil and sugar pickers and live totals, shared by Edit meal and Check your meal.
+ * Any item can be changed to a different food; only that item gets new numbers.
+ */
+@Composable
+fun MealItemsEditor(
+    meal: MealItems,
+    onChange: (MealItems) -> Unit,
+    replaceItem: suspend (item: MealItem, newName: String, rest: List<MealItem>) -> List<MealItem> = MealItemReplacer()::replace,
+    weighItems: suspend (List<MealItem>) -> List<MealItem> = MealItemWeigher()::weigh
+) {
+    val totals = meal.totals()
+    val scope = rememberCoroutineScope()
+    // The item being renamed, and whether the AI is working on it.
+    var changing by remember { mutableStateOf<Int?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    // Why the last change failed, in words the user can act on; null when it didn't.
+    var failed by remember { mutableStateOf<String?>(null) }
+    // The item whose weight the AI is working out for the g or ml switch, and why it last failed.
+    var weighing by remember { mutableStateOf<Int?>(null) }
+    var weighFailed by remember { mutableStateOf<Int?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        meal.items.forEachIndexed { index, item ->
+            if (changing == index) {
+                ChangeItemBox(
+                    item = item,
+                    busy = busy,
+                    failed = failed,
+                    onCancel = {
+                        changing = null
+                        failed = null
+                    },
+                    onChange = { newName ->
+                        busy = true
+                        failed = null
+                        scope.launch {
+                            try {
+                                val replaced = replaceItem(item, newName, meal.items.filterIndexed { i, _ -> i != index })
+                                onChange(meal.replace(index, replaced))
+                                UsageEvents.mealItemChanged(typed = true)
+                                changing = null
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                AppLog.w("MealItemsEditor", "Changing item failed", e)
+                                failed = if (e is MealItemReplacer.UnreadableAnswer) {
+                                    "Couldn't work out that food. Try saying it a bit differently, like \"1 oats chilla\"."
+                                } else {
+                                    AiFailover.sanitizeError(e)
+                                }
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                )
+            } else {
+                MealItemEditRow(
+                    item = item,
+                    askToCheck = !meal.checked,
+                    canRemove = meal.items.size > 1,
+                    canChange = !busy,
+                    weighing = weighing == index,
+                    weighFailed = weighFailed == index,
+                    onQtyChange = { qty ->
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
+                    },
+                    onSwitchUnit = {
+                        if (item.canSwitchUnit) {
+                            onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.switchUnit() }))
+                            UsageEvents.mealAmountChanged(how = "switch")
+                        } else if (item.needsWeight && weighing == null) {
+                            // Never weighed (older or repeated meals): ask the AI once for every item's weight.
+                            weighing = index
+                            weighFailed = null
+                            scope.launch {
+                                try {
+                                    val weighed = weighItems(meal.items).toMutableList()
+                                    val switched = weighed[index].takeIf { it.canSwitchUnit }?.switchUnit()
+                                    if (switched == null) {
+                                        weighFailed = index
+                                    } else {
+                                        weighed[index] = switched
+                                        UsageEvents.mealAmountChanged(how = "weigh")
+                                    }
+                                    onChange(meal.copy(items = weighed))
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    AppLog.w("MealItemsEditor", "Weighing items failed", e)
+                                    weighFailed = index
+                                } finally {
+                                    weighing = null
+                                }
+                            }
+                        }
+                    },
+                    onTypeAmount = { qty ->
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.copy(qty = qty) }))
+                        UsageEvents.mealAmountChanged(how = "typed")
+                    },
+                    onChoose = { choice ->
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it[index] = item.choose(choice) }))
+                        UsageEvents.mealItemChanged(typed = false)
+                    },
+                    onChangeName = {
+                        changing = index
+                        failed = null
+                    },
+                    onRemove = {
+                        onChange(meal.copy(items = meal.items.toMutableList().also { it.removeAt(index) }))
+                    }
+                )
+            }
+        }
+
+        if (meal.hasOil) {
+            LevelPicker(label = "Oil / ghee", selected = meal.oil, onSelect = { onChange(meal.copy(oil = it)) })
+        }
+        if (meal.hasSugar) {
+            LevelPicker(label = "Sugar", selected = meal.sugar, onSelect = { onChange(meal.copy(sugar = it)) })
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(ThemeBrandSoft)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = "Total ${totals.kcal.toInt()} kcal",
+                style = MaterialTheme.typography.titleMedium,
+                color = ThemeTextPrimary
+            )
+            Text(
+                text = "Protein ${totals.protein.toInt()}g  ·  Carbs ${totals.carbs.toInt()}g  ·  Fat ${totals.fat.toInt()}g  ·  Fibre ${totals.fiber.toInt()}g",
+                fontSize = 13.sp,
+                color = ThemeTextSecondary
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun MealItemEditRow(
+    item: MealItem,
+    askToCheck: Boolean,
+    canRemove: Boolean,
+    canChange: Boolean,
+    weighing: Boolean,
+    weighFailed: Boolean,
+    onQtyChange: (Double) -> Unit,
+    onSwitchUnit: () -> Unit,
+    onTypeAmount: (Double) -> Unit,
+    onChoose: (Int) -> Unit,
+    onChangeName: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val highlight = item.isUnsure && askToCheck
+    var typing by remember(item.name, item.unit) { mutableStateOf(false) }
+    if (typing) {
+        AmountDialog(item = item, onDismiss = { typing = false }, onDone = {
+            typing = false
+            onTypeAmount(it)
+        })
+    }
+    // Name on its own line and the controls below it, so large text sizes never squeeze the name.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+            .border(1.dp, if (highlight) ThemeErrorColor else ThemeGlassBorder, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(enabled = canChange, onClickLabel = "Change this item", onClick = onChangeName)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = item.name.replaceFirstChar { it.titlecase() },
+                    color = ThemeTextPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = ThemeTextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Text(
+                text = "${(item.kcal * item.qty).toInt()} kcal",
+                color = ThemeTextSecondary,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StepButton(
+                icon = { Icon(Icons.Default.Remove, contentDescription = "Less ${item.name}") },
+                enabled = item.qty - item.step >= item.step - 1e-9,
+                onClick = { onQtyChange(item.qty - item.step) }
+            )
+            // Tap the amount to type an exact number, for people who weigh their food.
+            Text(
+                text = "${formatAmount(item.qty)} ${unitLabel(item.unit)}",
+                color = ThemeTextPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClickLabel = "Type the amount") { typing = true }
+                    .widthIn(min = 72.dp)
+                    .padding(horizontal = 4.dp, vertical = 6.dp)
+            )
+            StepButton(
+                icon = { Icon(Icons.Default.Add, contentDescription = "More ${item.name}") },
+                enabled = true,
+                onClick = { onQtyChange(item.qty + item.step) }
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            if (canRemove) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Close, contentDescription = "Remove ${item.name}", tint = DeleteRed.copy(alpha = 0.8f))
+                }
+            }
+        }
+        if (item.canSwitchUnit || item.needsWeight) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when {
+                        weighing -> "Weighing…"
+                        weighFailed -> "Couldn't work out the weight. Try again."
+                        else -> item.weightText().orEmpty()
+                    },
+                    color = ThemeTextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                UnitSwitch(item = item, onSwitch = onSwitchUnit)
+            }
+        }
+        if (item.isUnsure) {
+            Text(
+                text = if (highlight) "Is it…?" else "Or was it…?",
+                color = if (highlight) ThemeErrorColor else ThemeTextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item.choices.forEachIndexed { i, choice ->
+                    FilterChip(
+                        selected = choice.name.equals(item.name, ignoreCase = true),
+                        onClick = { onChoose(i) },
+                        label = { Text(choice.name.replaceFirstChar { it.titlecase() }, fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = NeonGreen.copy(alpha = 0.18f),
+                            selectedLabelColor = NeonGreen
+                        )
+                    )
+                }
+                FilterChip(
+                    selected = false,
+                    enabled = canChange,
+                    onClick = onChangeName,
+                    label = { Text("Something else…", fontSize = 13.sp, color = ThemeTextSecondary) }
+                )
+            }
+        }
+    }
+}
+
+/** Two small pills, household unit and g or ml, to show one item either way. */
+@Composable
+private fun UnitSwitch(item: MealItem, onSwitch: () -> Unit) {
+    val household = if (item.isMetric) item.home?.unit else item.unit
+    // Not weighed yet: show g; tapping it asks the AI for the weight first.
+    val metric = if (item.isMetric) item.unit else item.metric ?: "g"
+    if (household == null || metric == null) return
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, ThemeGlassBorder, RoundedCornerShape(50))
+    ) {
+        listOf(unitLabel(household) to !item.isMetric, metric to item.isMetric).forEach { (label, selected) ->
+            Box(
+                modifier = Modifier
+                    .background(if (selected) NeonGreen else Color.Transparent)
+                    .clickable(enabled = !selected, onClickLabel = "Show in $label", onClick = onSwitch)
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) Color.White else ThemeTextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+/** Type an exact amount, such as 40 g for a small home-made paratha. */
+@Composable
+private fun AmountDialog(item: MealItem, onDismiss: () -> Unit, onDone: (Double) -> Unit) {
+    var text by remember { mutableStateOf(formatAmount(item.qty)) }
+    val value = text.toDoubleOrNull()?.takeIf { it > 0.0 }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SuperfitTheme.colors.cardBg,
+        title = { Text("How much ${item.name}?", color = ThemeTextPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SuperfitField(
+                    value = text,
+                    onValueChange = { typed -> NumberInput.clean(typed, allowDecimals = true)?.let { text = it } },
+                    singleLine = true,
+                    trailingIcon = { Text(unitLabel(item.unit), color = ThemeTextSecondary, modifier = Modifier.padding(end = 14.dp)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { value?.let(onDone) }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (!item.isMetric) {
+                    Text("Want grams? Use the ${item.metric ?: "g"} switch under the amount.", color = ThemeTextSecondary, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { value?.let(onDone) }, enabled = value != null) {
+                Text("Done", color = NeonGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = ThemeTextSecondary) } }
+    )
+}
+
+/** Type or say what the item really was. */
+@Composable
+private fun ChangeItemBox(
+    item: MealItem,
+    busy: Boolean,
+    failed: String?,
+    onCancel: () -> Unit,
+    onChange: (String) -> Unit
+) {
+    var text by remember(item) { mutableStateOf("") }
+    val startVoice = LocalVoiceTyping.current("Say what it was") {
+        text = it
+        if (it.isNotBlank()) onChange(it)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ThemeTextPrimary.copy(alpha = 0.03f))
+            .border(1.dp, NeonGreen, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "What was it instead of ${item.name}?",
+            color = ThemeTextPrimary,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp
+        )
+        if (busy) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = NeonGreen)
+                Text("Working out the numbers…", color = ThemeTextSecondary, fontSize = 13.sp)
+            }
+            return@Column
+        }
+        SuperfitField(
+            value = text,
+            onValueChange = { text = it },
+            singleLine = true,
+            placeholder = { Text("e.g. the right name of the food") },
+            trailingIcon = startVoice?.let { start ->
+                {
+                    com.superfit.app.ui.components.MicButton(
+                        onClick = start,
+                        modifier = Modifier.padding(end = 6.dp),
+                        contentDescription = "Say it"
+                    )
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onChange(text) }),
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (failed != null) {
+            Text(failed, color = ThemeErrorColor, fontSize = 12.sp)
+        }
+        Text(
+            "Amount stays ${formatAmount(item.qty)} ${unitLabel(item.unit)} unless you say a different one.",
+            color = ThemeTextSecondary,
+            fontSize = 12.sp
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancel") }
+            Button(
+                onClick = { onChange(text) },
+                enabled = text.isNotBlank(),
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.White)
+            ) {
+                Text("Change", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun StepButton(icon: @Composable () -> Unit, enabled: Boolean, onClick: () -> Unit) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(36.dp),
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = ThemeBrandSoft,
+            contentColor = NeonGreen
+        )
+    ) {
+        icon()
+    }
+}
+
+@Composable
+private fun LevelPicker(label: String, selected: Level, onSelect: (Level) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(text = label, color = ThemeTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Level.entries.forEach { level ->
+                val isSelected = level == selected
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isSelected) NeonGreen else ThemeFieldBg)
+                        .clickable { onSelect(level) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = when (level) {
+                            Level.LOW -> "Low"
+                            Level.NORMAL -> "Normal"
+                            Level.HIGH -> "High"
+                        },
+                        color = if (isSelected) Color.White else ThemeTextPrimary,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatAmount(qty: Double): String =
+    if (qty == kotlin.math.floor(qty)) qty.toLong().toString() else Decimals.one(qty)
+
+private fun unitLabel(unit: String): String = when (unit) {
+    "piece" -> "pc"
+    else -> unit
+}

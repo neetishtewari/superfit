@@ -18,7 +18,9 @@ data class UserProfileEntity(
     val targetWeightKg: Double = 70.0,
     val startDateTimestamp: Long = Now.millis(),
     // "BEGINNER", "INTERMEDIATE", "ADVANCED"
-    val fitnessLevel: String = "INTERMEDIATE"
+    val fitnessLevel: String = "INTERMEDIATE",
+    // Birth month and year as one number (1994 March = 199403), 0 when not given; see BirthMonth.
+    val birthYearMonth: Int = 0
 )
 
 @Entity(tableName = "weight_entries", indices = [Index(value = ["cloudId"], unique = true)])

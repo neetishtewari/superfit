@@ -18,11 +18,11 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.google.firebase.auth.FirebaseAuth
 import com.superfit.app.data.AccountDeletion
-import com.superfit.app.data.AppAnalytics
 import com.superfit.app.data.DataRepository
 import com.superfit.app.data.GeminiKeyStore
 import com.superfit.app.data.HealthConnectManager
 import com.superfit.app.data.ReminderNotifications
+import com.superfit.app.data.UsageEvents
 import com.superfit.app.data.getUserSharedPrefs
 import com.superfit.app.ui.auth.AndroidLoginScreen
 import com.superfit.app.ui.auth.LoginViewModel
@@ -32,7 +32,7 @@ import com.superfit.app.ui.dashboard.DashboardViewModel
 import com.superfit.app.ui.dashboard.SettingsScreen
 import com.superfit.app.ui.history.HistoryScreen
 import com.superfit.app.ui.history.HistoryViewModel
-import com.superfit.app.ui.onboarding.OnboardingScreen
+import com.superfit.app.ui.onboarding.AndroidOnboardingScreen
 import com.superfit.app.ui.onboarding.OnboardingViewModel
 import com.superfit.app.ui.recap.RecapScreen
 import com.superfit.app.ui.recap.RecapViewModel
@@ -128,9 +128,9 @@ fun MainNavigation(
             }
             entry<Onboarding> {
                 val onboardingViewModel: OnboardingViewModel = viewModel {
-                    OnboardingViewModel(repository, context.applicationContext)
+                    OnboardingViewModel(repository)
                 }
-                OnboardingScreen(
+                AndroidOnboardingScreen(
                     healthConnectManager = healthConnectManager,
                     viewModel = onboardingViewModel,
                     onOnboardingComplete = {
@@ -203,7 +203,7 @@ fun MainNavigation(
                 )
             }
             entry<Settings> {
-                LaunchedEffect(Unit) { AppAnalytics.screenOpened("settings") }
+                LaunchedEffect(Unit) { UsageEvents.screenOpened("settings") }
                 val dashboardViewModel: DashboardViewModel = viewModel {
                     DashboardViewModel(repository, context.applicationContext)
                 }

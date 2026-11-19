@@ -1,5 +1,6 @@
 package com.superfit.app.domain
 
+import com.superfit.app.data.UsageEvents
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -130,5 +131,54 @@ class AiFailoverTest {
         assertEquals(1024 to 768, AiFailover.scaledSize(4000, 3000))
         assertEquals(768 to 1024, AiFailover.scaledSize(3000, 4000))
         assertEquals(800 to 600, AiFailover.scaledSize(800, 600))
+    }
+
+    @Test
+    fun remoteConfigModelsGoFirstWithTheBuiltInListBehind() {
+        try {
+            AiFailover.setRemoteModels(" gemini-4-flash-lite, Gemini-4-Flash\ngemini-3.5-flash ")
+            assertEquals(
+                listOf("gemini-4-flash-lite", "gemini-4-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"),
+                AiFailover.MODEL_CASCADE
+            )
+        } finally {
+            AiFailover.setRemoteModels(null)
+        }
+        assertEquals(AiFailover.BUILT_IN_MODELS, AiFailover.MODEL_CASCADE)
+    }
+
+    @Test
+    fun remoteConfigIgnoresNamesThatAreNotGeminiModels() {
+        assertEquals(emptyList<String>(), AiFailover.parseModelList(""))
+        assertEquals(emptyList<String>(), AiFailover.parseModelList("gpt-5, ../models/x, gemini-pro!"))
+        assertEquals(listOf("gemini-a", "gemini-b"), AiFailover.parseModelList("gemini-a;x, gemini-a, gemini-b"))
+        assertEquals(6, AiFailover.parseModelList((1..9).joinToString(",") { "gemini-$it" }).size)
+    }
+
+    @Test
+    fun aRetiredModelIsReportedOncePerRunAndTheNextModelAnswers() = runTest {
+        val events = mutableListOf<Pair<String, Map<String, String>>>()
+        val errors = mutableListOf<Throwable>()
+        val oldReport = UsageEvents.report
+        val oldError = UsageEvents.error
+        UsageEvents.report = { event, params -> events += event to params }
+        UsageEvents.error = { errors += it }
+        AiFailover.resetUnavailableReports()
+        try {
+            repeat(2) {
+                val result = AiFailover.run(models) { model ->
+                    if (model == "model-a") throw Exception("404 NOT_FOUND: models/model-a is not found")
+                    "ok"
+                }
+                assertEquals("ok", result)
+            }
+            assertEquals(listOf("ai_model_unavailable" to mapOf("model" to "model-a")), events)
+            assertEquals(1, errors.size)
+            assertTrue(errors.single() is AiFailover.ModelUnavailableException)
+        } finally {
+            UsageEvents.report = oldReport
+            UsageEvents.error = oldError
+            AiFailover.resetUnavailableReports()
+        }
     }
 }

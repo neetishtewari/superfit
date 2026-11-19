@@ -17,6 +17,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
+import kotlinx.datetime.toKotlinLocalDate
 
 class DailyReminderWorker(
     appContext: Context,
@@ -125,12 +126,12 @@ class DailyReminderWorker(
                     historySleep = database.telemetryDao().getAllSleep(),
                     stepGoal = StepGoalStore.ownGoal(userPrefs(applicationContext)) ?: StepGoalStore.load(userPrefs(applicationContext))?.goal,
                     historyWeights = database.weightDao().getAllWeightEntries(),
-                    memory = CoachInsightStore.memory(sharedPrefs),
+                    memory = CoachInsightStore.memory(userPrefs(applicationContext)),
                     notes = CoachChatStore.loadNotes(applicationContext)
                 )
 
                 // Cache for the home screen, and remember what was said
-                CoachInsightStore.save(sharedPrefs, today, insight)
+                CoachInsightStore.save(userPrefs(applicationContext), today.toKotlinLocalDate(), insight)
 
                 sendNotification(
                     title = CoachStyle.current.tipTitle(),

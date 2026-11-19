@@ -96,7 +96,7 @@ class CoachingEngine {
             sleep = historySleep,
             weights = historyWeights,
             targetWeightKg = profile.targetWeightKg,
-            age = profile.age,
+            age = profile.currentAge(),
             stepGoal = stepGoal
         )
         val plans = CoachNotes.planFindings(notes, historyNutrition, historyWorkouts, today, zone)
@@ -384,7 +384,7 @@ class CoachingEngine {
 
             return buildString {
                 appendLine("Current time: ${EnglishDates.time(now)}")
-                appendLine("User: goal is to $goalText. Age ${profile.age}, ${profile.weightKg.toInt()} kg.")
+                appendLine("User: goal is to $goalText. Age ${profile.currentAge()}, ${profile.weightKg.toInt()} kg.")
                 appendLine()
                 appendLine("THE FOCUS (${focus.kind.name.lowercase()}): ${focus.fact}")
                 if (focus.kind == FindingKind.HABIT) {

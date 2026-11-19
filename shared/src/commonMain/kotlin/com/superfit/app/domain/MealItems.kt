@@ -85,6 +85,19 @@ data class MealItem(
     /** True when this item can be shown in g or ml, or switched back to its household unit. */
     val canSwitchUnit: Boolean get() = if (isMetric) home != null else weightText() != null
 
+    /**
+     * True for a household amount the AI never weighed (older meals, repeats of them, answers
+     * without "grams"): the g or ml switch first asks the AI for its weight.
+     */
+    val needsWeight: Boolean get() = !isMetric && weightText() == null
+
+    /** This item, and its choices, weighing [perUnit] grams (or ml) for each [unit]. */
+    fun withWeight(perUnit: Double, metric: String): MealItem = copy(
+        weight = perUnit,
+        metric = metric,
+        choices = choices.map { it.copy(weight = it.weight ?: perUnit, metric = it.metric ?: metric) }
+    )
+
     /** The same food and amount in g or ml (1 katori at 150 g becomes 150 g), or back again. */
     fun switchUnit(): MealItem {
         if (!canSwitchUnit) return this

@@ -172,6 +172,13 @@ internal object SuperfitMigrations {
         }
     }
 
+    // Birth month and year, so age keeps itself up to date. 0 = not given yet (the typed age is used).
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `user_profile` ADD COLUMN `birthYearMonth` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     val ALL_MIGRATIONS: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -182,6 +189,7 @@ internal object SuperfitMigrations {
         MIGRATION_5_6,
         MIGRATION_6_7,
         MIGRATION_7_8,
-        MIGRATION_8_9
+        MIGRATION_8_9,
+        MIGRATION_9_10
     )
 }

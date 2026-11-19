@@ -63,6 +63,18 @@ object PackagedFoodParser {
             "- \"perServing\": the same five fields per serving, or null if not printed\n" +
             "If the table gives kJ only, convert to kcal. If no nutrition table can be read, set \"name\" to exactly \"invalid\"."
 
+    /** True when Open Food Facts knows the product, even with no nutrition for it. */
+    fun isKnownProduct(json: String): Boolean {
+        val root = runCatching { JSONObject(json) }.getOrNull() ?: return false
+        return root.optInt("status", 0) == 1 && root.optJSONObject("product") != null
+    }
+
+    /** The product's name in Open Food Facts, if it has one. */
+    fun productName(json: String): String? {
+        val root = runCatching { JSONObject(json) }.getOrNull() ?: return null
+        return root.optJSONObject("product")?.optString("product_name", "")?.trim()?.ifEmpty { null }
+    }
+
     /** Null when Open Food Facts doesn't know the product or has no calories on record for it. */
     fun fromOpenFoodFacts(json: String): PackagedFood? {
         val root = runCatching { JSONObject(json) }.getOrNull() ?: return null
