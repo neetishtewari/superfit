@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.Layout
@@ -1022,7 +1023,7 @@ private fun FramedPhoto(photo: ImageBitmap, frame: PhotoFrame, accent: Color) {
                     androidx.compose.ui.geometry.RoundRect(left, top, left + w, top + h, androidx.compose.ui.geometry.CornerRadius(radius))
                 )
             }
-            androidx.compose.ui.graphics.drawscope.clipPath(clip) { drawPhoto(photo, left, top, w, h) }
+            clipPath(clip) { drawPhoto(photo, left, top, w, h) }
         } else {
             drawPhoto(photo, left, top, w, h)
         }
