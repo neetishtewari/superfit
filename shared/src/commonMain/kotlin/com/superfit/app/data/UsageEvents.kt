@@ -45,7 +45,8 @@ object UsageEvents {
         adjusted: Boolean? = null,
         chips: String? = null,
         statsPlace: String? = null,
-        heartLine: Boolean? = null
+        heartLine: Boolean? = null,
+        style: String? = null
     ) = log(
         "share_card_shared",
         *listOfNotNull(
@@ -54,7 +55,8 @@ object UsageEvents {
             adjusted?.let { "adjusted" to yesNo(it) },
             chips?.let { "chips" to it },
             statsPlace?.let { "stats_place" to it },
-            heartLine?.let { "heart_line" to yesNo(it) }
+            heartLine?.let { "heart_line" to yesNo(it) },
+            style?.let { "style" to it }
         ).toTypedArray()
     )
 

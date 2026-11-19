@@ -64,7 +64,8 @@ class AndroidShareCardHost(private val context: Context) : ShareCardHost {
             adjusted = event.adjusted,
             chips = event.chips,
             statsPlace = event.statsPlace,
-            heartLine = event.heartLine
+            heartLine = event.heartLine,
+            style = event.style
         )
     }
 }

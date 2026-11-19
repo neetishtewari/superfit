@@ -85,7 +85,8 @@ class IosShareCardHost(
         adjusted = event.adjusted,
         chips = event.chips,
         statsPlace = event.statsPlace,
-        heartLine = event.heartLine
+        heartLine = event.heartLine,
+        style = event.style
     )
 
     private fun decode(bytes: ByteArray): ImageBitmap? = try {

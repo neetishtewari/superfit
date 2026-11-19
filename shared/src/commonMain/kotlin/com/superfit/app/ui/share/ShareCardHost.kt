@@ -14,7 +14,9 @@ data class CardShared(
     val adjusted: Boolean,
     val chips: String?,
     val statsPlace: String,
-    val heartLine: Boolean
+    val heartLine: Boolean,
+    /** classic, poster, glow or bib, or photo. */
+    val style: String? = null
 )
 
 /**
