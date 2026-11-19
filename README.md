@@ -1,6 +1,6 @@
 # Superfit
 
-Superfit is an Android app for tracking food, training and recovery. You log meals and workouts in plain language, and Gemini turns them into calories and macros using your own Gemini API key. Health Connect supplies steps, calories burned and sleep. On top of that, Superfit adds coaching, streaks, a diet quality score and daily reminders.
+Superfit is an Android app for tracking food, training and recovery. You log meals and workouts in plain language, and Gemini (through Firebase AI Logic) turns them into calories and macros, with nothing for users to set up. Health Connect supplies steps, calories burned and sleep. On top of that, Superfit adds coaching, streaks, a diet quality score and daily reminders.
 
 ## Stack
 
@@ -9,7 +9,7 @@ Superfit is an Android app for tracking food, training and recovery. You log mea
 - Firebase Auth and Firestore for sign-in and cloud sync (`firestore.rules`)
 - Health Connect for activity and sleep
 - WorkManager for background sync and reminders
-- Google AI client SDK for Gemini
+- Firebase AI Logic for Gemini (no user API key)
 
 ## Project layout
 
