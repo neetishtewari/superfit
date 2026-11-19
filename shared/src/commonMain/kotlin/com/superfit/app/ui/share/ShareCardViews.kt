@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.CardStat
 import com.superfit.app.domain.Effort
 import com.superfit.app.domain.HeartLine
+import com.superfit.app.domain.PhotoFill
 import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.ShareCard
 import com.superfit.app.domain.ShareCards
@@ -872,7 +874,7 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, fr
             .clipToBounds()
             .background(Color.Black)
     ) {
-        FramedPhoto(photo, frame)
+        FramedPhoto(photo, frame, accent)
         // A soft fade behind the header, and a deep one behind the stats wherever they sit.
         Box(
             Modifier
@@ -970,25 +972,91 @@ private fun PhotoCardView(card: ShareCard, accent: Color, photo: ImageBitmap, fr
     }
 }
 
-/** The user's photo, zoomed and moved as they set it; at scale 1 it just covers the card. */
+/**
+ * The user's photo, zoomed and moved as they set it; at scale 1 it just covers the card. Pinched
+ * smaller, it gets rounded corners and a soft shadow, with a blurred copy of itself or the card
+ * colour behind it.
+ */
 @Composable
-private fun FramedPhoto(photo: ImageBitmap, frame: PhotoFrame) {
+private fun FramedPhoto(photo: ImageBitmap, frame: PhotoFrame, accent: Color) {
+    // A tiny copy, stretched over the card, reads as a heavy blur on every phone (no blur effect needed).
+    val tiny = remember(photo) { tinyCopy(photo) }
     Canvas(Modifier.fillMaxSize()) {
         val cardW = size.width
         val cardH = size.height
-        val f = frame.clamped(photo.width, photo.height, cardW.roundToInt(), cardH.roundToInt())
-        val (w, h) = PhotoFrame.drawnSize(photo.width, photo.height, cardW.roundToInt(), cardH.roundToInt(), f.scale)
+        val cw = cardW.roundToInt()
+        val ch = cardH.roundToInt()
+        val f = frame.clamped(photo.width, photo.height, cw, ch)
+        val (w, h) = PhotoFrame.drawnSize(photo.width, photo.height, cw, ch, f.scale)
         val left = (cardW - w) / 2f + f.offsetX * cardW
         val top = (cardH - h) / 2f + f.offsetY * cardH
-        drawImage(
-            image = photo,
-            srcOffset = IntOffset.Zero,
-            srcSize = IntSize(photo.width, photo.height),
-            dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
-            dstSize = IntSize(w.roundToInt(), h.roundToInt()),
-            filterQuality = FilterQuality.High
-        )
+        val smaller = frame.showsFill(photo.width, photo.height, cw, ch)
+        if (smaller) {
+            if (frame.fill == PhotoFill.COLOUR) {
+                drawRect(accent)
+            } else {
+                val (bw, bh) = PhotoFrame.drawnSize(tiny.width, tiny.height, cw, ch, 1f)
+                drawImage(
+                    image = tiny,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(tiny.width, tiny.height),
+                    dstOffset = IntOffset(((cardW - bw) / 2f).roundToInt(), ((cardH - bh) / 2f).roundToInt()),
+                    dstSize = IntSize(bw.roundToInt(), bh.roundToInt()),
+                    filterQuality = FilterQuality.Low
+                )
+                drawRect(Color.Black.copy(alpha = 0.35f))
+            }
+            // A soft shadow under the photo, a few faint layers spreading out.
+            val radius = cardW * 0.035f
+            for (i in 1..6) {
+                val spread = cardW * 0.006f * i
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.05f),
+                    topLeft = Offset(left - spread, top - spread + spread * 0.8f),
+                    size = androidx.compose.ui.geometry.Size(w + spread * 2, h + spread * 2),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius + spread)
+                )
+            }
+            val clip = Path().apply {
+                addRoundRect(
+                    androidx.compose.ui.geometry.RoundRect(left, top, left + w, top + h, androidx.compose.ui.geometry.CornerRadius(radius))
+                )
+            }
+            androidx.compose.ui.graphics.drawscope.clipPath(clip) { drawPhoto(photo, left, top, w, h) }
+        } else {
+            drawPhoto(photo, left, top, w, h)
+        }
     }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPhoto(photo: ImageBitmap, left: Float, top: Float, w: Float, h: Float) {
+    drawImage(
+        image = photo,
+        srcOffset = IntOffset.Zero,
+        srcSize = IntSize(photo.width, photo.height),
+        dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
+        dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+        filterQuality = FilterQuality.High
+    )
+}
+
+/** The photo shrunk to about 16 pixels across, in two steps so the colours average out evenly. */
+private fun tinyCopy(photo: ImageBitmap): ImageBitmap {
+    fun shrink(src: ImageBitmap, width: Int): ImageBitmap {
+        val height = (width.toFloat() * src.height / src.width).roundToInt().coerceIn(1, 4096)
+        val out = ImageBitmap(width, height)
+        androidx.compose.ui.graphics.Canvas(out).drawImageRect(
+            image = src,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(src.width, src.height),
+            dstOffset = IntOffset.Zero,
+            dstSize = IntSize(width, height),
+            paint = androidx.compose.ui.graphics.Paint().apply { filterQuality = FilterQuality.High }
+        )
+        return out
+    }
+    val mid = if (photo.width > 128) shrink(photo, 128) else photo
+    return shrink(mid, 16.coerceAtMost(mid.width))
 }
 
 @Composable

@@ -76,6 +76,7 @@ import com.superfit.app.data.RoastCardData
 import com.superfit.app.domain.CardChip
 import com.superfit.app.domain.CoachStyle
 import com.superfit.app.domain.DayChip
+import com.superfit.app.domain.PhotoFill
 import com.superfit.app.domain.PhotoFrame
 import com.superfit.app.domain.RoastCard
 import com.superfit.app.domain.ShareCard
@@ -320,11 +321,17 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                             Text("Stats", color = SuperfitTheme.colors.textSecondary, fontSize = 10.sp)
                             MiniChoice("Top", frame.statsTop, accent) { frame = frame.copy(statsTop = true) }
                             MiniChoice("Bottom", !frame.statsTop, accent) { frame = frame.copy(statsTop = false) }
+                            if (frame.showsFill(current.width, current.height, CARD_WIDTH_PX, CARD_HEIGHT_PX)) {
+                                // Pinched smaller than the card: what fills the space around it.
+                                Text("Fill", color = SuperfitTheme.colors.textSecondary, fontSize = 10.sp)
+                                MiniChoice("Blur", frame.fill == PhotoFill.BLUR, accent) { frame = frame.copy(fill = PhotoFill.BLUR) }
+                                MiniChoice("Colour", frame.fill == PhotoFill.COLOUR, accent) { frame = frame.copy(fill = PhotoFill.COLOUR) }
+                            }
                         }
                     }
                 }
                 if (showHint && current != null) {
-                    Text("Pinch to zoom · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
+                    Text("Pinch to zoom in or out · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
                 }
                 if (current == null) {
                     // The look of the card: every style shows the same numbers and add-ons.
@@ -477,7 +484,7 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                         ?: roastCard?.let { dayChips.joinToString(",") { it.key } },
                                     statsPlace = if (frame.statsTop) "top" else "bottom",
                                     heartLine = activity?.shownHeart != null,
-                                    style = if (photo != null) "photo" else cardStyle.key
+                                    style = photo?.let { p -> if (frame.showsFill(p.width, p.height, CARD_WIDTH_PX, CARD_HEIGHT_PX)) "photo_${frame.fill.key}" else "photo" } ?: cardStyle.key
                                 )
                             )
                             onShared()
