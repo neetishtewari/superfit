@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ fun ConnectHealthCard(onConnect: () -> Unit, modifier: Modifier = Modifier) {
                 color = colors.textSecondary,
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
             )
+            HealthSheetTip()
             HealthConnectButton(onConnect)
         }
     }
@@ -63,11 +65,18 @@ fun HealthSettingsSection(asked: Boolean, onConnect: () -> Unit) {
         Text(healthReadsLine(), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
         if (asked) {
             Text(
-                "To change what Superfit can read, open the Health app, tap your picture, then Apps › Superfit.",
+                "Steps, workouts or sleep missing? " + (HealthApp.accessFixSteps
+                    ?: "To change what Superfit can read, open the Health app, tap your picture, then Apps › Superfit."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textSecondary
             )
+            HealthApp.openHealthApp?.let { open ->
+                OutlinedButton(onClick = open, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open the Health app", fontWeight = FontWeight.SemiBold, color = colors.primaryAccent)
+                }
+            }
         } else {
+            HealthSheetTip()
             HealthConnectButton(onConnect)
         }
     }
@@ -82,4 +91,17 @@ private fun HealthConnectButton(onConnect: () -> Unit) {
     ) {
         Text("Connect ${HealthApp.name}", fontWeight = FontWeight.SemiBold)
     }
+}
+
+/** What to tap on the phone's own access sheet, shown just before it opens (iPhone only). */
+@Composable
+fun HealthSheetTip(modifier: Modifier = Modifier) {
+    val tip = HealthApp.accessSheetTip ?: return
+    Text(
+        tip,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Medium,
+        color = SuperfitTheme.colors.textPrimary,
+        modifier = modifier.fillMaxWidth()
+    )
 }
