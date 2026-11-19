@@ -649,13 +649,16 @@ fun ActivityPerformanceCard(
 
         if (workoutImportEnabled) {
             // Some health data arrives but not the rest: those items were most likely left off in the health app.
-            val gaps = if (HealthApp.accessFixSteps == null || workoutImportRunning || yesterday) emptyList() else
+            val gaps = if (HealthApp.accessFixSteps == null || workoutImportRunning || yesterday) {
+                emptyList()
+            } else {
                 com.superfit.app.domain.HealthGaps.missing(
                     steps = today.steps,
                     exerciseMinutes = exerciseMinutes,
                     importedToday = state.importedWorkouts.size,
                     importedEver = state.importedWorkoutCount
                 )
+            }
             if (gaps.isNotEmpty()) {
                 HealthAccessFix(gaps)
             } else {

@@ -65,8 +65,10 @@ fun HealthSettingsSection(asked: Boolean, onConnect: () -> Unit) {
         Text(healthReadsLine(), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
         if (asked) {
             Text(
-                "Steps, workouts or sleep missing? " + (HealthApp.accessFixSteps
-                    ?: "To change what Superfit can read, open the Health app, tap your picture, then Apps › Superfit."),
+                "Steps, workouts or sleep missing? " + (
+                    HealthApp.accessFixSteps
+                        ?: "To change what Superfit can read, open the Health app, tap your picture, then Apps › Superfit."
+                    ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textSecondary
             )
