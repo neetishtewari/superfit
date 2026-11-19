@@ -334,17 +334,6 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                     Text("Pinch to zoom in or out · drag to move · double-tap to reset", color = SuperfitTheme.colors.textSecondary, fontSize = 12.sp)
                 }
                 if (current == null) {
-                    // The look of the card: every style shows the same numbers and add-ons.
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        CardStyle.entries.forEach { s ->
-                            StyleThumb(s, picked = s == cardStyle, accent = accent, modifier = Modifier.weight(1f)) {
-                                cardStyle = s
-                                cardPrefs.style = s.key
-                            }
-                        }
-                    }
-                }
-                if (current == null) {
                     OptionPill("Add your photo", Icons.Filled.AddPhotoAlternate, on = false, accent = accent, highlight = true) {
                         pickPhoto()
                     }
@@ -435,6 +424,19 @@ fun ShareCardSheet(card: ShareCard, onDismiss: () -> Unit, onShared: () -> Unit 
                                 }
                                 .padding(vertical = 4.dp)
                         )
+                    }
+                }
+                if (current == null) {
+                    // The look of the card, under the photo and add-on choices: every style shows the
+                    // same numbers and add-ons.
+                    Text("Style", color = SuperfitTheme.colors.textSecondary, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CardStyle.entries.forEach { s ->
+                            StyleThumb(s, picked = s == cardStyle, accent = accent, modifier = Modifier.weight(1f)) {
+                                cardStyle = s
+                                cardPrefs.style = s.key
+                            }
+                        }
                     }
                 }
                 failed?.takeIf { it in chips }?.let { chip ->
