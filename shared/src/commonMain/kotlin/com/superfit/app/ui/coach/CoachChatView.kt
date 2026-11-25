@@ -59,6 +59,7 @@ import com.superfit.app.domain.ChatEntry
 import com.superfit.app.domain.CoachChat
 import com.superfit.app.domain.CoachNote
 import com.superfit.app.domain.CoachStyle
+import com.superfit.app.domain.HealthTopic
 import com.superfit.app.theme.SolarAmber
 import com.superfit.app.theme.ThemeAmberSoft
 import com.superfit.app.theme.ThemeBgStart
@@ -69,6 +70,7 @@ import com.superfit.app.theme.ThemeTertiaryAccent
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
 import com.superfit.app.ui.components.FieldActionButton
+import com.superfit.app.ui.components.HealthSourcesLink
 import com.superfit.app.ui.components.IconBadge
 import com.superfit.app.ui.components.MicButton
 import com.superfit.app.ui.components.SuperfitField
@@ -190,6 +192,7 @@ fun CoachChatView(
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }
+            HealthSourcesLink(topics = HealthTopic.entries, label = "Not medical advice · Sources")
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 4.dp)) {
                 val rows = remember(messages) { chatRows(messages, Now.today(), TimeZone.currentSystemDefault()) }

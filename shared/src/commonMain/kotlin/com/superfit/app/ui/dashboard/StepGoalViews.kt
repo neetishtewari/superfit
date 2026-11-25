@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.HealthApp
+import com.superfit.app.domain.HealthTopic
 import com.superfit.app.domain.StepGoal
 import com.superfit.app.domain.StepGoalReason
 import com.superfit.app.domain.StepGoalResult
@@ -46,6 +47,7 @@ import com.superfit.app.theme.SuperfitTheme
 import com.superfit.app.theme.ThemeBrandSoft
 import com.superfit.app.theme.ThemeTextPrimary
 import com.superfit.app.theme.ThemeTextSecondary
+import com.superfit.app.ui.components.HealthSourcesLink
 import com.superfit.app.ui.components.SuperfitField
 
 private fun steps(n: Int) = Decimals.grouped(n.toLong())
@@ -100,6 +102,7 @@ fun StepGoalSheet(goal: StepGoalResult, onSetOwn: (Int?) -> Unit, onDismiss: () 
                 Text(line, color = ThemeTextSecondary, fontSize = 14.sp, lineHeight = 20.sp)
             }
             StepGoalChooser(goal = goal, onSetOwn = onSetOwn)
+            HealthSourcesLink(topics = listOf(HealthTopic.STEPS))
         }
     }
 }

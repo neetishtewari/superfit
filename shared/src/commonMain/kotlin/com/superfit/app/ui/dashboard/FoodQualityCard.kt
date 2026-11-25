@@ -32,7 +32,9 @@ import com.superfit.app.domain.DietScorePart
 import com.superfit.app.domain.FoodItemRating
 import com.superfit.app.domain.FoodSwapSuggestion
 import com.superfit.app.domain.FoodVerdict
+import com.superfit.app.domain.HealthTopic
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.HealthSourcesLink
 
 @Composable
 fun FoodQualityCard(
@@ -224,6 +226,8 @@ fun FoodQualityCard(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            HealthSourcesLink(topics = listOf(HealthTopic.DIET_QUALITY, HealthTopic.PROTEIN, HealthTopic.FIBRE))
         }
     }
 

@@ -59,10 +59,12 @@ import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.HealthApp
+import com.superfit.app.domain.HealthTopic
 import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.currentAge
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.HealthSourcesLink
 import com.superfit.app.ui.components.SuperfitField
 
 @Composable
@@ -167,69 +169,71 @@ fun CalorieRingsCard(
                 shape = RoundedCornerShape(24.dp)
             )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // The person's own step goal (see StepGoal); the age starter until it's worked out.
-            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.currentAge())).toDouble()
-            val caloriesTarget = state.macroTargets.calories
-
-            val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
-            val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
-            val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
-
-            ConcentricActivityRings(
-                caloriesEatenProgress = caloriesProgress,
-                stepsProgress = stepsProgress,
-                caloriesRemaining = caloriesRemaining,
-                modifier = Modifier.size(150.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                fun fmt(n: Int) = LocalFormat.integer(n.toLong())
-                // How workouts raised today's target, shown only when the person taps to ask why.
-                val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
-                var showKcalMath by remember { mutableStateOf(false) }
+                // The person's own step goal (see StepGoal); the age starter until it's worked out.
+                val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.currentAge())).toDouble()
+                val caloriesTarget = state.macroTargets.calories
+
+                val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
+                val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
+                val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
+
+                ConcentricActivityRings(
+                    caloriesEatenProgress = caloriesProgress,
+                    stepsProgress = stepsProgress,
+                    caloriesRemaining = caloriesRemaining,
+                    modifier = Modifier.size(150.dp)
+                )
+
                 Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .then(
-                            if (kcalMath != null) {
-                                Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
-                            } else {
-                                Modifier
-                            }
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    RingLegendItem(
-                        label = "Eaten, kcal",
-                        value = "${fmt(state.caloriesEaten.toInt())} of ${fmt(caloriesTarget.toInt())}",
-                        color = NeonGreen
-                    )
-                    if (showKcalMath && kcalMath != null) {
-                        Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                    fun fmt(n: Int) = LocalFormat.integer(n.toLong())
+                    // How workouts raised today's target, shown only when the person taps to ask why.
+                    val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
+                    var showKcalMath by remember { mutableStateOf(false) }
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .then(
+                                if (kcalMath != null) {
+                                    Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        RingLegendItem(
+                            label = "Eaten, kcal",
+                            value = "${fmt(state.caloriesEaten.toInt())} of ${fmt(caloriesTarget.toInt())}",
+                            color = NeonGreen
+                        )
+                        if (showKcalMath && kcalMath != null) {
+                            Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
+                    ) {
+                        RingLegendItem(
+                            label = "Steps",
+                            value = "${fmt(state.activity.steps)} of ${fmt(stepsTarget.toInt())}",
+                            color = ElectricCyan
+                        )
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
-                ) {
-                    RingLegendItem(
-                        label = "Steps",
-                        value = "${fmt(state.activity.steps)} of ${fmt(stepsTarget.toInt())}",
-                        color = ElectricCyan
-                    )
-                }
             }
+            // Where the calorie and step targets come from (App Store guideline 1.4.1: cite health information).
+            HealthSourcesLink(topics = listOf(HealthTopic.CALORIES, HealthTopic.STEPS))
         }
     }
 }
@@ -305,6 +309,7 @@ fun NutrientLedgerCard(state: DashboardUiState.Success) {
             entries = state.nutritionList,
             macroSelector = { MealTags.of(it).fiberG }
         )
+        HealthSourcesLink(topics = listOf(HealthTopic.PROTEIN, HealthTopic.FIBRE, HealthTopic.CALORIES))
     }
 }
 
@@ -548,6 +553,7 @@ fun CoachInsightsCard(
                 }
             }
         }
+        HealthSourcesLink(topics = HealthTopic.entries, label = "Not medical advice · Sources")
     }
 }
 
@@ -862,6 +868,7 @@ fun SleepRecoveryCard(state: DashboardUiState.Success) {
                 lineHeight = 18.sp
             )
         }
+        HealthSourcesLink(topics = listOf(HealthTopic.SLEEP))
     }
 }
 

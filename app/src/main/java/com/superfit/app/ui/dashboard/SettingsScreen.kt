@@ -612,6 +612,9 @@ fun SettingsScreen(
                 onChange = { com.superfit.app.data.AppAnalytics.setEnabled(context, it) }
             )
 
+            SettingsGroupLabel("Health info")
+            com.superfit.app.ui.settings.SettingsCard(spacing = 6) { com.superfit.app.ui.components.HealthInfoSettingsContent() }
+
             com.superfit.app.ui.settings.AccountActionsCard(onSignOut = onSignOut, onDeleteAccount = onDeleteAccount)
         }
     }
