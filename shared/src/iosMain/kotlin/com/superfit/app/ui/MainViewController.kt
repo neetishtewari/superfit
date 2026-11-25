@@ -115,7 +115,7 @@ import platform.UIKit.UIViewController
 fun MainViewController(auth: IosAuth, cloudStore: IosCloudStore, ai: IosAi, health: IosHealth, speech: VoiceRecognizer, camera: IosCamera, widget: IosWidget, reminders: IosReminders, report: IosReport, shareCards: IosShareCards, usage: IosUsageReports, recap: IosRecapMedia): UIViewController {
     installIosAi(ai)
     installUsageReports(usage)
-    HealthApp.useAppleHealth()
+    HealthApp.useAppleHealth(openHealth = ::openHealthApp)
     val healthSource = IosHealthSource(health)
     val photoCamera = IosPhotoCamera(camera)
     return ComposeUIViewController {
@@ -144,6 +144,12 @@ private data class Restored(val failed: Boolean)
 /** Superfit's own page in the iPhone's Settings app (microphone, speech recognition, notifications). */
 private fun openPhoneSettings() {
     val url = NSURL.URLWithString(UIApplicationOpenSettingsURLString) ?: return
+    UIApplication.sharedApplication.openURL(url, options = emptyMap<Any?, Any>(), completionHandler = null)
+}
+
+/** The Health app's own front page, where Apps › Superfit turns each item on or off. */
+private fun openHealthApp() {
+    val url = NSURL.URLWithString("x-apple-health://") ?: return
     UIApplication.sharedApplication.openURL(url, options = emptyMap<Any?, Any>(), completionHandler = null)
 }
 

@@ -63,6 +63,8 @@ internal fun HealthConnectStep(
         }
     }
 
+    if (!connected) com.superfit.app.ui.dashboard.HealthSheetTip()
+
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         PrimaryButton(
             text = if (connected) "Continue" else "Connect $healthName",

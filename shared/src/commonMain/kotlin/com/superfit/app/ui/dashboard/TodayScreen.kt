@@ -289,7 +289,8 @@ fun TodayScreen(
                         workoutImportEnabled = workoutImportEnabled,
                         workoutImportRunning = workoutImportRunning,
                         onShareWorkout = { shareCard = it },
-                        yesterday = night != null
+                        yesterday = night != null,
+                        exerciseMinutes = exerciseMinutes
                     )
                     SleepRecoveryCard(state = night ?: s)
                 }

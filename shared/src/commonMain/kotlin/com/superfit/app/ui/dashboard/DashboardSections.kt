@@ -567,7 +567,9 @@ fun ActivityPerformanceCard(
     workoutImportRunning: Boolean = false,
     onShareWorkout: (com.superfit.app.domain.ShareCard) -> Unit = {},
     // Between midnight and waking up the tab shows yesterday (ActivityDay).
-    yesterday: Boolean = false
+    yesterday: Boolean = false,
+    // Today's exercise minutes from the health app, to tell turned-off steps from a quiet morning.
+    exerciseMinutes: Double? = null
 ) {
     Column(
         modifier = Modifier
@@ -652,19 +654,29 @@ fun ActivityPerformanceCard(
         }
 
         if (workoutImportEnabled) {
-            Text(
-                text = when {
-                    workoutImportRunning -> "Bringing in your workouts from other apps…"
-                    state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once ${HealthApp.workoutApps} shares them with ${HealthApp.name}."
-                    else -> "Workouts from other apps appear here on their own. Older ones are in History."
-                },
-                fontSize = 12.sp,
-                color = ThemeTextSecondary
-            )
-            // Steps arrive but no workouts ever have: workouts were most likely left off in the health app's access.
-            val accessHelp = HealthApp.workoutAccessHelp
-            if (accessHelp != null && !workoutImportRunning && state.importedWorkoutCount == 0 && today.steps > 0) {
-                Text(text = accessHelp, fontSize = 12.sp, color = ThemeTextSecondary, lineHeight = 17.sp)
+            // Some health data arrives but not the rest: those items were most likely left off in the health app.
+            val gaps = if (HealthApp.accessFixSteps == null || workoutImportRunning || yesterday) {
+                emptyList()
+            } else {
+                com.superfit.app.domain.HealthGaps.missing(
+                    steps = today.steps,
+                    exerciseMinutes = exerciseMinutes,
+                    importedToday = state.importedWorkouts.size,
+                    importedEver = state.importedWorkoutCount
+                )
+            }
+            if (gaps.isNotEmpty()) {
+                HealthAccessFix(gaps)
+            } else {
+                Text(
+                    text = when {
+                        workoutImportRunning -> "Bringing in your workouts from other apps…"
+                        state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once ${HealthApp.workoutApps} shares them with ${HealthApp.name}."
+                        else -> "Workouts from other apps appear here on their own. Older ones are in History."
+                    },
+                    fontSize = 12.sp,
+                    color = ThemeTextSecondary
+                )
             }
         }
 
@@ -930,6 +942,42 @@ private fun TodayTile(label: String, value: String, usual: String?, ahead: Boole
                 fontSize = 12.sp,
                 color = if (ahead) NeonMint else ThemeTextSecondary
             )
+        }
+    }
+}
+
+/** Says which health data isn't arriving and how to turn it on, with a button to the health app. */
+@Composable
+private fun HealthAccessFix(missing: List<String>) {
+    val steps = HealthApp.accessFixSteps ?: return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SolarAmber.copy(alpha = 0.10f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = SolarAmber, modifier = Modifier.size(18.dp))
+            Text(
+                text = "Some ${HealthApp.name} data is turned off",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ThemeTextPrimary
+            )
+        }
+        Text(
+            text = com.superfit.app.domain.HealthGaps.line(missing, HealthApp.name),
+            fontSize = 13.sp,
+            color = ThemeTextPrimary,
+            lineHeight = 18.sp
+        )
+        Text(text = steps, fontSize = 13.sp, color = ThemeTextSecondary, lineHeight = 18.sp)
+        HealthApp.openHealthApp?.let { open ->
+            TextButton(onClick = open, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                Text("Open the Health app", fontWeight = FontWeight.SemiBold, color = SolarAmber)
+            }
         }
     }
 }
