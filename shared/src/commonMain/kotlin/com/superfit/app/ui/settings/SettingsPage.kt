@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.superfit.app.data.Prefs
 import com.superfit.app.domain.HealthApp
 import com.superfit.app.theme.SuperfitTheme
+import com.superfit.app.ui.components.HealthInfoSettingsContent
 import com.superfit.app.ui.dashboard.CoachStyleSettings
 import com.superfit.app.ui.dashboard.DashboardUiState
 import com.superfit.app.ui.dashboard.HealthSettingsSection
@@ -156,6 +157,9 @@ fun SettingsPage(
             SettingsGroupLabel("Privacy")
             UsageReportsCard(enabled = on, onChange = onUsageReports)
         }
+
+        SettingsGroupLabel("Health info")
+        SettingsCard(spacing = 6) { HealthInfoSettingsContent() }
 
         AccountActionsCard(onSignOut = onSignOut, onDeleteAccount = onDeleteAccount)
         Spacer(Modifier.fillMaxWidth().height(24.dp))

@@ -25,8 +25,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.superfit.app.domain.AreaOfConcern
+import com.superfit.app.domain.HealthTopic
 import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.WeightGoalMetrics
+import com.superfit.app.ui.components.HealthSourcesLink
 import com.superfit.app.ui.components.SuperfitField
 
 @Composable
@@ -275,6 +277,8 @@ fun GoalProgressCard(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            HealthSourcesLink(topics = listOf(HealthTopic.CALORIES))
         }
     }
 

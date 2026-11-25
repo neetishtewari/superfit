@@ -59,10 +59,12 @@ import com.superfit.app.data.WorkoutEntryEntity
 import com.superfit.app.domain.CoachPatternEngine
 import com.superfit.app.domain.Decimals
 import com.superfit.app.domain.HealthApp
+import com.superfit.app.domain.HealthTopic
 import com.superfit.app.domain.LocalFormat
 import com.superfit.app.domain.MealTags
 import com.superfit.app.domain.currentAge
 import com.superfit.app.theme.*
+import com.superfit.app.ui.components.HealthSourcesLink
 import com.superfit.app.ui.components.SuperfitField
 
 @Composable
@@ -167,69 +169,71 @@ fun CalorieRingsCard(
                 shape = RoundedCornerShape(24.dp)
             )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // The person's own step goal (see StepGoal); the age starter until it's worked out.
-            val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.currentAge())).toDouble()
-            val caloriesTarget = state.macroTargets.calories
-
-            val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
-            val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
-            val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
-
-            ConcentricActivityRings(
-                caloriesEatenProgress = caloriesProgress,
-                stepsProgress = stepsProgress,
-                caloriesRemaining = caloriesRemaining,
-                modifier = Modifier.size(150.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                fun fmt(n: Int) = LocalFormat.integer(n.toLong())
-                // How workouts raised today's target, shown only when the person taps to ask why.
-                val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
-                var showKcalMath by remember { mutableStateOf(false) }
+                // The person's own step goal (see StepGoal); the age starter until it's worked out.
+                val stepsTarget = (stepGoal?.goal ?: com.superfit.app.domain.StepGoal.starter(state.profile.currentAge())).toDouble()
+                val caloriesTarget = state.macroTargets.calories
+
+                val caloriesProgress = (state.caloriesEaten / caloriesTarget).toFloat().coerceIn(0f, 1f)
+                val stepsProgress = (state.activity.steps.toDouble() / stepsTarget).toFloat().coerceIn(0f, 1f)
+                val caloriesRemaining = (caloriesTarget - state.caloriesEaten).toInt()
+
+                ConcentricActivityRings(
+                    caloriesEatenProgress = caloriesProgress,
+                    stepsProgress = stepsProgress,
+                    caloriesRemaining = caloriesRemaining,
+                    modifier = Modifier.size(150.dp)
+                )
+
                 Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .then(
-                            if (kcalMath != null) {
-                                Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
-                            } else {
-                                Modifier
-                            }
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    RingLegendItem(
-                        label = "Eaten, kcal",
-                        value = "${fmt(state.caloriesEaten.toInt())} of ${fmt(caloriesTarget.toInt())}",
-                        color = NeonGreen
-                    )
-                    if (showKcalMath && kcalMath != null) {
-                        Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                    fun fmt(n: Int) = LocalFormat.integer(n.toLong())
+                    // How workouts raised today's target, shown only when the person taps to ask why.
+                    val kcalMath = workoutTargetLine(caloriesTarget, state.workoutTargetKcal, state.workoutTargetSource)
+                    var showKcalMath by remember { mutableStateOf(false) }
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .then(
+                                if (kcalMath != null) {
+                                    Modifier.clickable(onClickLabel = "Why this target", onClick = { showKcalMath = !showKcalMath })
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        RingLegendItem(
+                            label = "Eaten, kcal",
+                            value = "${fmt(state.caloriesEaten.toInt())} of ${fmt(caloriesTarget.toInt())}",
+                            color = NeonGreen
+                        )
+                        if (showKcalMath && kcalMath != null) {
+                            Text(text = kcalMath, fontSize = 12.sp, color = ThemeTextSecondary)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
+                    ) {
+                        RingLegendItem(
+                            label = "Steps",
+                            value = "${fmt(state.activity.steps)} of ${fmt(stepsTarget.toInt())}",
+                            color = ElectricCyan
+                        )
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClickLabel = "About your step goal", onClick = onStepsClick)
-                ) {
-                    RingLegendItem(
-                        label = "Steps",
-                        value = "${fmt(state.activity.steps)} of ${fmt(stepsTarget.toInt())}",
-                        color = ElectricCyan
-                    )
-                }
             }
+            // Where the calorie and step targets come from (App Store guideline 1.4.1: cite health information).
+            HealthSourcesLink(topics = listOf(HealthTopic.CALORIES, HealthTopic.STEPS))
         }
     }
 }
@@ -305,6 +309,7 @@ fun NutrientLedgerCard(state: DashboardUiState.Success) {
             entries = state.nutritionList,
             macroSelector = { MealTags.of(it).fiberG }
         )
+        HealthSourcesLink(topics = listOf(HealthTopic.PROTEIN, HealthTopic.FIBRE, HealthTopic.CALORIES))
     }
 }
 
@@ -548,6 +553,7 @@ fun CoachInsightsCard(
                 }
             }
         }
+        HealthSourcesLink(topics = HealthTopic.entries, label = "Not medical advice · Sources")
     }
 }
 
@@ -561,7 +567,9 @@ fun ActivityPerformanceCard(
     workoutImportRunning: Boolean = false,
     onShareWorkout: (com.superfit.app.domain.ShareCard) -> Unit = {},
     // Between midnight and waking up the tab shows yesterday (ActivityDay).
-    yesterday: Boolean = false
+    yesterday: Boolean = false,
+    // Today's exercise minutes from the health app, to tell turned-off steps from a quiet morning.
+    exerciseMinutes: Double? = null
 ) {
     Column(
         modifier = Modifier
@@ -646,19 +654,29 @@ fun ActivityPerformanceCard(
         }
 
         if (workoutImportEnabled) {
-            Text(
-                text = when {
-                    workoutImportRunning -> "Bringing in your workouts from other apps…"
-                    state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once ${HealthApp.workoutApps} shares them with ${HealthApp.name}."
-                    else -> "Workouts from other apps appear here on their own. Older ones are in History."
-                },
-                fontSize = 12.sp,
-                color = ThemeTextSecondary
-            )
-            // Steps arrive but no workouts ever have: workouts were most likely left off in the health app's access.
-            val accessHelp = HealthApp.workoutAccessHelp
-            if (accessHelp != null && !workoutImportRunning && state.importedWorkoutCount == 0 && today.steps > 0) {
-                Text(text = accessHelp, fontSize = 12.sp, color = ThemeTextSecondary, lineHeight = 17.sp)
+            // Some health data arrives but not the rest: those items were most likely left off in the health app.
+            val gaps = if (HealthApp.accessFixSteps == null || workoutImportRunning || yesterday) {
+                emptyList()
+            } else {
+                com.superfit.app.domain.HealthGaps.missing(
+                    steps = today.steps,
+                    exerciseMinutes = exerciseMinutes,
+                    importedToday = state.importedWorkouts.size,
+                    importedEver = state.importedWorkoutCount
+                )
+            }
+            if (gaps.isNotEmpty()) {
+                HealthAccessFix(gaps)
+            } else {
+                Text(
+                    text = when {
+                        workoutImportRunning -> "Bringing in your workouts from other apps…"
+                        state.importedWorkoutCount == 0 -> "No workouts from other apps yet. They appear here once ${HealthApp.workoutApps} shares them with ${HealthApp.name}."
+                        else -> "Workouts from other apps appear here on their own. Older ones are in History."
+                    },
+                    fontSize = 12.sp,
+                    color = ThemeTextSecondary
+                )
             }
         }
 
@@ -862,6 +880,7 @@ fun SleepRecoveryCard(state: DashboardUiState.Success) {
                 lineHeight = 18.sp
             )
         }
+        HealthSourcesLink(topics = listOf(HealthTopic.SLEEP))
     }
 }
 
@@ -923,6 +942,42 @@ private fun TodayTile(label: String, value: String, usual: String?, ahead: Boole
                 fontSize = 12.sp,
                 color = if (ahead) NeonMint else ThemeTextSecondary
             )
+        }
+    }
+}
+
+/** Says which health data isn't arriving and how to turn it on, with a button to the health app. */
+@Composable
+private fun HealthAccessFix(missing: List<String>) {
+    val steps = HealthApp.accessFixSteps ?: return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SolarAmber.copy(alpha = 0.10f))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = SolarAmber, modifier = Modifier.size(18.dp))
+            Text(
+                text = "Some ${HealthApp.name} data is turned off",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ThemeTextPrimary
+            )
+        }
+        Text(
+            text = com.superfit.app.domain.HealthGaps.line(missing, HealthApp.name),
+            fontSize = 13.sp,
+            color = ThemeTextPrimary,
+            lineHeight = 18.sp
+        )
+        Text(text = steps, fontSize = 13.sp, color = ThemeTextSecondary, lineHeight = 18.sp)
+        HealthApp.openHealthApp?.let { open ->
+            TextButton(onClick = open, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                Text("Open the Health app", fontWeight = FontWeight.SemiBold, color = SolarAmber)
+            }
         }
     }
 }
